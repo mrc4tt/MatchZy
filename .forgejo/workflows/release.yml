@@ -55,31 +55,56 @@ jobs:
           dotnet publish -c Release -o package/addons/counterstrikesharp/plugins/MatchZy
           cd package && zip -q -r ../MatchZy-$MATCHZY_VERSION-with-cssharp-windows.zip * && cd ..
 
-      - name: Create Forgejo Release
-        env:
-          GITEA_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          # 1. Opret releasen
-          curl -X POST "https://git.miksen.me/api/v1/repos/${{ github.repository }}/releases" \
-            -H "Authorization: token $GITEA_TOKEN" \
-            -H "Content-Type: application/json" \
-            -d "{
-              \"tag_name\": \"${{ env.MATCHZY_VERSION }}\",
-              \"name\": \"MatchZy ${{ env.MATCHZY_VERSION }}\",
-              \"body\": \"Autogenereret build fra VPS runner.\",
-              \"draft\": false,
-              \"prerelease\": false
-            }" > release_response.json
+        - name: Create Forgejo Release
+                env:
+                  GITEA_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+                run: |
+                  # 1. Tjek om releasen allerede findes
+                  EXISTING_RELEASE=$(curl -s -H "Authorization: token $GITEA_TOKEN" \
+                    "https://git.miksen.me/api/v1/repos/${{ github.repository }}/releases/tags/${{ env.MATCHZY_VERSION }}")
+                  
+                  RELEASE_ID=$(echo "$EXISTING_RELEASE" | grep -oP '"id":\s*\K\d+' | head -n 1)
 
-          # 2. Find ID
-          RELEASE_ID=$(grep -oP '"id":\s*\K\d+' release_response.json | head -n 1)
-          echo "Release created with ID: $RELEASE_ID"
+                  if [ -z "$RELEASE_ID" ]; then
+                    echo "Releasen findes ikke. Opretter ny..."
+                    curl -X POST "https://git.miksen.me/api/v1/repos/${{ github.repository }}/releases" \
+                      -H "Authorization: token $GITEA_TOKEN" \
+                      -H "Content-Type: application/json" \
+                      -d "{
+                        \"tag_name\": \"${{ env.MATCHZY_VERSION }}\",
+                        \"name\": \"MatchZy ${{ env.MATCHZY_VERSION }}\",
+                        \"body\": \"Autogenereret build fra VPS runner.\",
+                        \"draft\": false,
+                        \"prerelease\": false
+                      }" > release_response.json
+                    RELEASE_ID=$(grep -oP '"id":\s*\K\d+' release_response.json | head -n 1)
+                  else
+                    echo "Fundet eksisterende release med ID: $RELEASE_ID"
+                  fi
 
-          # 3. Upload med name-parameter
-          for file in MatchZy-${{ env.MATCHZY_VERSION }}*.zip; do
-            echo "Uploading $file..."
-            curl -X POST "https://git.miksen.me/api/v1/repos/${{ github.repository }}/releases/$RELEASE_ID/assets?name=$file" \
-              -H "Authorization: token $GITEA_TOKEN" \
-              -H "Content-Type: application/octet-stream" \
-              -F "attachment=@$file"
-          done
+                  if [ -z "$RELEASE_ID" ]; then
+                    echo "Fejl: Kunne ikke finde eller oprette Release ID!"
+                    exit 1
+                  fi
+
+                  # 2. Upload filer (vi sletter dem først hvis de findes for at undgå dubletter)
+                  for file in MatchZy-${{ env.MATCHZY_VERSION }}*.zip; do
+                    echo "Behandler $file..."
+                    
+                    # Slet gammel asset med samme navn hvis den findes
+                    ASSET_ID=$(curl -s -H "Authorization: token $GITEA_TOKEN" \
+                      "https://git.miksen.me/api/v1/repos/${{ github.repository }}/releases/$RELEASE_ID/assets" | \
+                      jq -r ".[] | select(.name==\"$file\") | .id" 2>/dev/null || echo "")
+                    
+                    if [ ! -z "$ASSET_ID" ] && [ "$ASSET_ID" != "null" ]; then
+                      echo "Sletter gammel version af $file (ID: $ASSET_ID)..."
+                      curl -X DELETE -H "Authorization: token $GITEA_TOKEN" \
+                        "https://git.miksen.me/api/v1/repos/${{ github.repository }}/releases/$RELEASE_ID/assets/$ASSET_ID"
+                    fi
+
+                    echo "Uploader $file..."
+                    curl -X POST "https://git.miksen.me/api/v1/repos/${{ github.repository }}/releases/$RELEASE_ID/assets?name=$file" \
+                      -H "Authorization: token $GITEA_TOKEN" \
+                      -H "Content-Type: application/octet-stream" \
+                      -F "attachment=@$file"
+                  done
