@@ -35,24 +35,19 @@ jobs:
 
       - name: Build and Release Artifacts
         run: |
-          # 1. Hent versioner
           MATCHZY_VERSION=$(grep -oP 'ModuleVersion\s*=>\s*"\K[^"]*' MatchZy.cs)
           CSSHARP_VERSION=$(grep -Po '<PackageReference Include="CounterStrikeSharp.API" Version="\K\d+(\.\d+)*' MatchZy.csproj)
-          echo "Bygger MatchZy v$MATCHZY_VERSION med CSSharp v$CSSHARP_VERSION"
 
-          # 2. Base pakke
           dotnet publish -c Release -o package/addons/counterstrikesharp/plugins/MatchZy
           cp -r cfg package/
           cd package && zip -q -r ../MatchZy-$MATCHZY_VERSION.zip * && cd ..
 
-          # 3. Linux pakke
           echo "Downloader Linux Runtime..."
           wget -q "https://github.com/roflmuffin/CounterStrikeSharp/releases/download/v${CSSHARP_VERSION}/counterstrikesharp-with-runtime-linux-${CSSHARP_VERSION}.zip" -O cssharp-linux.zip
           unzip -o cssharp-linux.zip -d package/
           dotnet publish -c Release -o package/addons/counterstrikesharp/plugins/MatchZy
           cd package && zip -q -r ../MatchZy-$MATCHZY_VERSION-with-cssharp-linux.zip * && cd ..
           
-          # 4. Windows pakke
           rm -rf package/addons/counterstrikesharp
           echo "Downloader Windows Runtime..."
           wget -q "https://github.com/roflmuffin/CounterStrikeSharp/releases/download/v${CSSHARP_VERSION}/counterstrikesharp-with-runtime-windows-${CSSHARP_VERSION}.zip" -O cssharp-windows.zip
@@ -64,26 +59,26 @@ jobs:
         env:
           GITEA_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          # 1. Opret selve releasen og gem svaret i en fil
+          # 1. Opret releasen
           curl -X POST "https://git.miksen.me/api/v1/repos/${{ github.repository }}/releases" \
             -H "Authorization: token $GITEA_TOKEN" \
             -H "Content-Type: application/json" \
             -d "{
               \"tag_name\": \"${{ env.MATCHZY_VERSION }}\",
               \"name\": \"MatchZy ${{ env.MATCHZY_VERSION }}\",
-              \"body\": \"### Installation\n\n- **MatchZy-${{ env.MATCHZY_VERSION }}.zip**: Kun plugin-filer.\n- **MatchZy-${{ env.MATCHZY_VERSION }}-with-cssharp-linux.zip**: Inkluderer CSSharp til Linux.\n- **MatchZy-${{ env.MATCHZY_VERSION }}-with-cssharp-windows.zip**: Inkluderer CSSharp til Windows.\",
+              \"body\": \"Autogenereret build fra VPS runner.\",
               \"draft\": false,
               \"prerelease\": false
             }" > release_response.json
 
-          # 2. Hiv ID'et ud
+          # 2. Find ID
           RELEASE_ID=$(grep -oP '"id":\s*\K\d+' release_response.json | head -n 1)
           echo "Release created with ID: $RELEASE_ID"
 
-          # 3. Upload de 3 zip-filer
+          # 3. Upload med name-parameter
           for file in MatchZy-${{ env.MATCHZY_VERSION }}*.zip; do
             echo "Uploading $file..."
-            curl -X POST "https://git.miksen.me/api/v1/repos/${{ github.repository }}/releases/$RELEASE_ID/assets" \
+            curl -X POST "https://git.miksen.me/api/v1/repos/${{ github.repository }}/releases/$RELEASE_ID/assets?name=$file" \
               -H "Authorization: token $GITEA_TOKEN" \
               -H "Content-Type: application/octet-stream" \
               -F "attachment=@$file"
