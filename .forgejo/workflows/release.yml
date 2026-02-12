@@ -43,7 +43,6 @@ jobs:
           
           # 1. Base pakke (Kun plugin)
           dotnet publish -c Release -o package/addons/counterstrikesharp/plugins/MatchZy
-          cp -r cfg package/ 
           cd package && zip -q -r ../MatchZy-${{ env.MATCHZY_VERSION }}.zip * && cd ..
           
           # 2. Linux pakke (med runtime)
