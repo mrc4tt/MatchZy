@@ -1,0 +1,81 @@
+name: Build and Release
+
+on:
+  push:
+    paths-ignore:
+      - "documentation/**"
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: Build and Release
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0'
+
+      - name: Get MatchZy Version
+        id: matchzy_version_step
+        run: |
+          # Find version i C# filen
+          VERSION=$(grep -oP 'ModuleVersion\s*=>\s*"\K[^"]*' MatchZy.cs)
+          echo "MATCHZY_VERSION=$VERSION" >> $GITHUB_ENV
+          echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
+
+      - name: Build and Release Artifacts
+        run: |
+          # Find CSSharp version fra projektfilen
+          CSSHARP_VERSION=$(grep -Po '<PackageReference Include="CounterStrikeSharp.API" Version="\K\d+(\.\d+)*' MatchZy.csproj)
+          
+          echo "Building MatchZy v${{ env.MATCHZY_VERSION }} with CSSharp v$CSSHARP_VERSION"
+          
+          # 1. Base pakke (Kun plugin)
+          dotnet publish -c Release -o package/addons/counterstrikesharp/plugins/MatchZy
+          cp -r cfg package/ 
+          cd package && zip -q -r ../MatchZy-${{ env.MATCHZY_VERSION }}.zip * && cd ..
+          
+          # 2. Linux pakke (med runtime)
+          echo "Downloading CSSharp Linux Runtime..."
+          curl -s https://api.github.com/repos/roflmuffin/CounterStrikeSharp/releases/tags/v$CSSHARP_VERSION | \
+            grep "counterstrikesharp-with-runtime-linux" | cut -d : -f 2,3 | tr -d \" | head -n 1 | wget -O cssharp-linux.zip -qi -
+          
+          unzip -o cssharp-linux.zip -d package/
+          dotnet publish -c Release -o package/addons/counterstrikesharp/plugins/MatchZy
+          cd package && zip -q -r ../MatchZy-${{ env.MATCHZY_VERSION }}-with-cssharp-linux.zip * && cd ..
+          
+          # Rens pakke-mappe til Windows build
+          rm -rf package/addons/counterstrikesharp
+          
+          # 3. Windows pakke (med runtime)
+          echo "Downloading CSSharp Windows Runtime..."
+          curl -s https://api.github.com/repos/roflmuffin/CounterStrikeSharp/releases/tags/v$CSSHARP_VERSION | \
+            grep "counterstrikesharp-with-runtime-windows" | cut -d : -f 2,3 | tr -d \" | head -n 1 | wget -O cssharp-windows.zip -qi -
+            
+          unzip -o cssharp-windows.zip -d package/
+          dotnet publish -c Release -o package/addons/counterstrikesharp/plugins/MatchZy
+          cd package && zip -q -r ../MatchZy-${{ env.MATCHZY_VERSION }}-with-cssharp-windows.zip * && cd ..
+
+      - name: Create Forgejo Release
+        uses: https://code.forgejo.org/forgejo/release-action@v1
+        with:
+          direction: upload
+          release_name: "MatchZy ${{ env.MATCHZY_VERSION }}"
+          tag_name: "${{ env.MATCHZY_VERSION }}"
+          # Forgejo finder automatisk din interne GITEA_TOKEN/GITHUB_TOKEN
+          files: |
+            MatchZy-${{ env.MATCHZY_VERSION }}.zip
+            MatchZy-${{ env.MATCHZY_VERSION }}-with-cssharp-linux.zip
+            MatchZy-${{ env.MATCHZY_VERSION }}-with-cssharp-windows.zip
+          body: |
+            ### Installation
+            
+            - **MatchZy-${{ env.MATCHZY_VERSION }}.zip**: Kun plugin-filer. Kræver Metamod og CounterStrikeSharp er installeret.
+            - **MatchZy-${{ env.MATCHZY_VERSION }}-with-cssharp-linux.zip**: Inkluderer CSSharp til Linux.
+            - **MatchZy-${{ env.MATCHZY_VERSION }}-with-cssharp-windows.zip**: Inkluderer CSSharp til Windows.
