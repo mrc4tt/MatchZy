@@ -18,8 +18,8 @@ jobs:
 
       - name: Install dependencies
         run: |
-          sudo apt-get update
-          sudo apt-get install -y zip jq curl wget
+          apt-get update
+          apt-get install -y zip jq curl wget
 
       - name: Set up .NET
         uses: actions/setup-dotnet@v4
