@@ -27,43 +27,32 @@ jobs:
           VERSION=$(grep -oP 'ModuleVersion\s*=>\s*"\K[^"]*' MatchZy.cs)
           echo "MATCHZY_VERSION=$VERSION" >> $GITHUB_ENV
           echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
-      - name: Build and Release Artifacts
-        run: >
-          CSSHARP_VERSION=$(grep -Po '<PackageReference
-          Include="CounterStrikeSharp.API" Version="\K\d+(\.\d+)*'
-          MatchZy.csproj)
+    - name: Build and Release Artifacts
+            run: |
+              # 1. Hent versioner
+              MATCHZY_VERSION=$(grep -oP 'ModuleVersion\s*=>\s*"\K[^"]*' MatchZy.cs)
+              CSSHARP_VERSION=$(grep -Po '<PackageReference Include="CounterStrikeSharp.API" Version="\K\d+(\.\d+)*' MatchZy.csproj)
+              echo "Bygger MatchZy v$MATCHZY_VERSION med CSSharp v$CSSHARP_VERSION"
 
-          echo "Building MatchZy v${{ env.MATCHZY_VERSION }} with CSSharp v$CSSHARP_VERSION"
+              # 2. Base pakke
+              dotnet publish -c Release -o package/addons/counterstrikesharp/plugins/MatchZy
+              cp -r cfg package/
+              cd package && zip -q -r ../MatchZy-$MATCHZY_VERSION.zip * && cd ..
+
+              # 3. Linux pakke
+              echo "Downloader Linux Runtime..."
+              wget -q "https://github.com/roflmuffin/CounterStrikeSharp/releases/download/v${CSSHARP_VERSION}/counterstrikesharp-with-runtime-linux-${CSSHARP_VERSION}.zip" -O cssharp-linux.zip
+              unzip -o cssharp-linux.zip -d package/
+              dotnet publish -c Release -o package/addons/counterstrikesharp/plugins/MatchZy
+              cd package && zip -q -r ../MatchZy-$MATCHZY_VERSION-with-cssharp-linux.zip * && cd ..
               
-          dotnet publish -c Release -o package/addons/counterstrikesharp/plugins/MatchZy
-
-          cp -r cfg package/
-
-          cd package && zip -q -r ../MatchZy-${{ env.MATCHZY_VERSION }}.zip * && cd ..
-              
-          echo "Downloading CSSharp Linux Runtime v$CSSHARP_VERSION..."
-
-          wget -q https://github.com/roflmuffin/CounterStrikeSharp/releases/download/v${CSSHARP_VERSION}/counterstrikesharp-with-runtime-linux-${CSSHARP_VERSION}.zip -O cssharp-linux.zip
-              
-          unzip -o cssharp-linux.zip -d package/
-
-          dotnet publish -c Release -o package/addons/counterstrikesharp/plugins/MatchZy
-
-          cd package && zip -q -r ../MatchZy-${{ env.MATCHZY_VERSION }}-with-cssharp-linux.zip * && cd ..
-              
-          rm -rf package/addons/counterstrikesharp
-
-          rm cssharp-linux.zip
-              
-          echo "Downloading CSSharp Windows Runtime v$CSSHARP_VERSION..."
-
-          wget -q https://github.com/roflmuffin/CounterStrikeSharp/releases/download/v${CSSHARP_VERSION}/counterstrikesharp-with-runtime-windows-${CSSHARP_VERSION}.zip -O cssharp-windows.zip
-                
-          unzip -o cssharp-windows.zip -d package/
-
-          dotnet publish -c Release -o package/addons/counterstrikesharp/plugins/MatchZy
-
-          cd package && zip -q -r ../MatchZy-${{ env.MATCHZY_VERSION }}-with-cssharp-windows.zip * && cd ..
+              # 4. Windows pakke
+              rm -rf package/addons/counterstrikesharp
+              echo "Downloader Windows Runtime..."
+              wget -q "https://github.com/roflmuffin/CounterStrikeSharp/releases/download/v${CSSHARP_VERSION}/counterstrikesharp-with-runtime-windows-${CSSHARP_VERSION}.zip" -O cssharp-windows.zip
+              unzip -o cssharp-windows.zip -d package/
+              dotnet publish -c Release -o package/addons/counterstrikesharp/plugins/MatchZy
+              cd package && zip -q -r ../MatchZy-$MATCHZY_VERSION-with-cssharp-windows.zip * && cd ..
 
 
           - name: Create Forgejo Release
