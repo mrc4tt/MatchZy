@@ -63,7 +63,7 @@ jobs:
           EXISTING_RELEASE=$(curl -s -H "Authorization: token $GITEA_TOKEN" \
             "https://git.miksen.me/api/v1/repos/${{ github.repository }}/releases/tags/${{ env.MATCHZY_VERSION }}")
           
-          RELEASE_ID=$(echo "$EXISTING_RELEASE" | grep -oP '"id":\s*\K\d+' | head -n 1)
+          RELEASE_ID=$(echo "$EXISTING_RELEASE" | grep -oP '"id":\s*\K\d+' | head -n 1 || true)
 
           if [ -z "$RELEASE_ID" ]; then
             echo "Releasen findes ikke. Opretter ny..."
