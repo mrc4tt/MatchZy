@@ -546,7 +546,7 @@ namespace MatchZy
             // ── Live scorebot: player_death event ──
             RegisterEventHandler<EventPlayerDeath>((@event, info) =>
             {
-                if (!isMatchLive) return HookResult.Continue;
+                if (!matchStarted) return HookResult.Continue;
                 if (string.IsNullOrEmpty(matchConfig.RemoteLogURL)) return HookResult.Continue;
 
                 var victim = @event.Userid;
@@ -605,11 +605,23 @@ namespace MatchZy
             // ── Live scorebot: bomb_planted event ──
             RegisterEventHandler<EventBombPlanted>((@event, info) =>
             {
-                if (!isMatchLive) return HookResult.Continue;
+                if (!matchStarted) return HookResult.Continue;
                 if (string.IsNullOrEmpty(matchConfig.RemoteLogURL)) return HookResult.Continue;
 
                 var player = @event.Userid;
                 if (player == null || !player.IsValid) return HookResult.Continue;
+
+                // Count alive players
+                int ctAlive = 0, tAlive = 0;
+                foreach (var kvp in playerData)
+                {
+                    var p = kvp.Value;
+                    if (p == null || !p.IsValid || p.IsBot || p.IsHLTV) continue;
+                    if (p.PlayerPawn?.Value == null) continue;
+                    if (p.PlayerPawn.Value.LifeState != (byte)LifeState_t.LIFE_ALIVE) continue;
+                    if (p.TeamNum == (int)CsTeam.CounterTerrorist) ctAlive++;
+                    else if (p.TeamNum == (int)CsTeam.Terrorist) tAlive++;
+                }
 
                 var plantEvent = new BombPlantedLiveEvent
                 {
@@ -619,6 +631,8 @@ namespace MatchZy
                     PlayerName = player.PlayerName,
                     PlayerSteamId = player.SteamID.ToString(),
                     Site = @event.Site == 0 ? "A" : "B",
+                    CtAlive = ctAlive,
+                    TAlive = tAlive,
                 };
 
                 Task.Run(async () => { await SendEventAsync(plantEvent); });
@@ -628,11 +642,23 @@ namespace MatchZy
             // ── Live scorebot: bomb_defused event ──
             RegisterEventHandler<EventBombDefused>((@event, info) =>
             {
-                if (!isMatchLive) return HookResult.Continue;
+                if (!matchStarted) return HookResult.Continue;
                 if (string.IsNullOrEmpty(matchConfig.RemoteLogURL)) return HookResult.Continue;
 
                 var player = @event.Userid;
                 if (player == null || !player.IsValid) return HookResult.Continue;
+
+                // Count alive players
+                int ctAlive = 0, tAlive = 0;
+                foreach (var kvp in playerData)
+                {
+                    var p = kvp.Value;
+                    if (p == null || !p.IsValid || p.IsBot || p.IsHLTV) continue;
+                    if (p.PlayerPawn?.Value == null) continue;
+                    if (p.PlayerPawn.Value.LifeState != (byte)LifeState_t.LIFE_ALIVE) continue;
+                    if (p.TeamNum == (int)CsTeam.CounterTerrorist) ctAlive++;
+                    else if (p.TeamNum == (int)CsTeam.Terrorist) tAlive++;
+                }
 
                 var defuseEvent = new BombDefusedLiveEvent
                 {
@@ -642,6 +668,8 @@ namespace MatchZy
                     PlayerName = player.PlayerName,
                     PlayerSteamId = player.SteamID.ToString(),
                     Site = @event.Site == 0 ? "A" : "B",
+                    CtAlive = ctAlive,
+                    TAlive = tAlive,
                 };
 
                 Task.Run(async () => { await SendEventAsync(defuseEvent); });
@@ -651,7 +679,7 @@ namespace MatchZy
             // ── Live scorebot: freezetime_end event ──
             RegisterEventHandler<EventRoundFreezeEnd>((@event, info) =>
             {
-                if (!isMatchLive) return HookResult.Continue;
+                if (!matchStarted) return HookResult.Continue;
                 if (string.IsNullOrEmpty(matchConfig.RemoteLogURL)) return HookResult.Continue;
 
                 int ctAlive = 0, tAlive = 0;

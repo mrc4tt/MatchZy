@@ -344,6 +344,12 @@ public class BombPlantedLiveEvent : MatchZyMapEvent
     [JsonPropertyName("round_number")]
     public required int RoundNumber { get; init; }
 
+    [JsonPropertyName("ct_alive")]
+    public int CtAlive { get; init; }
+
+    [JsonPropertyName("t_alive")]
+    public int TAlive { get; init; }
+
     public BombPlantedLiveEvent() : base("bomb_planted")
     {
     }
@@ -362,6 +368,12 @@ public class BombDefusedLiveEvent : MatchZyMapEvent
 
     [JsonPropertyName("round_number")]
     public required int RoundNumber { get; init; }
+
+    [JsonPropertyName("ct_alive")]
+    public int CtAlive { get; init; }
+
+    [JsonPropertyName("t_alive")]
+    public int TAlive { get; init; }
 
     public BombDefusedLiveEvent() : base("bomb_defused")
     {
