@@ -42,14 +42,14 @@ jobs:
           cp -r cfg package/
           cd package && zip -q -r ../MatchZy-$MATCHZY_VERSION.zip * && cd ..
 
-          echo "Downloader Linux Runtime..."
+          echo "Downloading Linux Runtime..."
           wget -q "https://github.com/roflmuffin/CounterStrikeSharp/releases/download/v${CSSHARP_VERSION}/counterstrikesharp-with-runtime-linux-${CSSHARP_VERSION}.zip" -O cssharp-linux.zip
           unzip -o cssharp-linux.zip -d package/
           dotnet publish -c Release -o package/addons/counterstrikesharp/plugins/MatchZy
           cd package && zip -q -r ../MatchZy-$MATCHZY_VERSION-with-cssharp-linux.zip * && cd ..
-          
+
           rm -rf package/addons/counterstrikesharp
-          echo "Downloader Windows Runtime..."
+          echo "Downloading Windows Runtime..."
           wget -q "https://github.com/roflmuffin/CounterStrikeSharp/releases/download/v${CSSHARP_VERSION}/counterstrikesharp-with-runtime-windows-${CSSHARP_VERSION}.zip" -O cssharp-windows.zip
           unzip -o cssharp-windows.zip -d package/
           dotnet publish -c Release -o package/addons/counterstrikesharp/plugins/MatchZy
@@ -59,50 +59,50 @@ jobs:
         env:
           GITEA_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          # 1. Tjek om releasen allerede findes
+          # 1. Check if the release already exists
           EXISTING_RELEASE=$(curl -s -H "Authorization: token $GITEA_TOKEN" \
             "https://git.miksen.me/api/v1/repos/${{ github.repository }}/releases/tags/${{ env.MATCHZY_VERSION }}")
-          
+
           RELEASE_ID=$(echo "$EXISTING_RELEASE" | grep -oP '"id":\s*\K\d+' | head -n 1 || true)
 
           if [ -z "$RELEASE_ID" ]; then
-            echo "Releasen findes ikke. Opretter ny..."
+            echo "Release not found. Creating new release..."
             curl -X POST "https://git.miksen.me/api/v1/repos/${{ github.repository }}/releases" \
               -H "Authorization: token $GITEA_TOKEN" \
               -H "Content-Type: application/json" \
               -d "{
                 \"tag_name\": \"${{ env.MATCHZY_VERSION }}\",
                 \"name\": \"MatchZy ${{ env.MATCHZY_VERSION }}\",
-                \"body\": \"Autogenereret build fra VPS runner.\",
+                \"body\": \"Auto-generated build.\",
                 \"draft\": false,
                 \"prerelease\": false
               }" > release_response.json
             RELEASE_ID=$(grep -oP '"id":\s*\K\d+' release_response.json | head -n 1)
           else
-            echo "Fundet eksisterende release med ID: $RELEASE_ID"
+            echo "Found existing release with ID: $RELEASE_ID"
           fi
 
           if [ -z "$RELEASE_ID" ]; then
-            echo "Fejl: Kunne ikke finde eller oprette Release ID!"
+            echo "Error: Could not find or create Release ID!"
             exit 1
           fi
 
-          # 2. Upload filer
+          # 2. Upload files
           for file in MatchZy-${{ env.MATCHZY_VERSION }}*.zip; do
-            echo "Behandler $file..."
-            
-            # Slet gammel asset hvis den findes
+            echo "Processing $file..."
+
+            # Delete old asset if it exists
             ASSET_ID=$(curl -s -H "Authorization: token $GITEA_TOKEN" \
               "https://git.miksen.me/api/v1/repos/${{ github.repository }}/releases/$RELEASE_ID/assets" | \
               jq -r ".[] | select(.name==\"$file\") | .id" 2>/dev/null || echo "")
-            
+
             if [ ! -z "$ASSET_ID" ] && [ "$ASSET_ID" != "null" ]; then
-              echo "Sletter gammel version af $file..."
+              echo "Deleting old version of $file..."
               curl -X DELETE -H "Authorization: token $GITEA_TOKEN" \
                 "https://git.miksen.me/api/v1/repos/${{ github.repository }}/releases/$RELEASE_ID/assets/$ASSET_ID"
             fi
 
-            echo "Uploader $file..."
+            echo "Uploading $file..."
             curl -X POST "https://git.miksen.me/api/v1/repos/${{ github.repository }}/releases/$RELEASE_ID/assets?name=$file" \
               -H "Authorization: token $GITEA_TOKEN" \
               -H "Content-Type: application/octet-stream" \
