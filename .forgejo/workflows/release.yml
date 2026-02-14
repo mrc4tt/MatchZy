@@ -17,94 +17,115 @@ jobs:
 
       - name: Install dependencies
         run: |
-          apt update && apt install -y sudo
-          sudo apt-get update
-          sudo apt-get install -y zip jq curl wget
+          apt-get update
+          apt-get install -y zip jq curl wget
+
+      - name: Get MatchZy Version
+        id: matchzy_version
+        run: |
+          VERSION=$(grep -oP 'ModuleVersion\s*=>\s*"\K[^"]*' MatchZy.cs)
+          if [ -z "$VERSION" ]; then
+            echo "Error: Could not extract version from MatchZy.cs"
+            exit 1
+          fi
+          echo "MATCHZY_VERSION=$VERSION" >> $GITHUB_ENV
+          echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
+
+      - name: Check if release already exists
+        id: check_release
+        run: |
+          STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
+            -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
+            "https://git.miksen.me/api/v1/repos/${{ github.repository }}/releases/tags/${{ env.MATCHZY_VERSION }}")
+          if [ "$STATUS" = "200" ]; then
+            echo "Release ${{ env.MATCHZY_VERSION }} already exists. Skipping."
+            echo "SKIP=true" >> $GITHUB_OUTPUT
+          else
+            echo "New version detected: ${{ env.MATCHZY_VERSION }}"
+            echo "SKIP=false" >> $GITHUB_OUTPUT
+          fi
 
       - name: Set up .NET
+        if: steps.check_release.outputs.SKIP == 'false'
         uses: actions/setup-dotnet@v4
         with:
           dotnet-version: "8.0"
 
-      - name: Get MatchZy Version
-        id: matchzy_version_step
-        run: |
-          VERSION=$(grep -oP 'ModuleVersion\s*=>\s*"\K[^"]*' MatchZy.cs)
-          echo "MATCHZY_VERSION=$VERSION" >> $GITHUB_ENV
-          echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
-
       - name: Build and Release Artifacts
+        if: steps.check_release.outputs.SKIP == 'false'
         run: |
-          MATCHZY_VERSION=$(grep -oP 'ModuleVersion\s*=>\s*"\K[^"]*' MatchZy.cs)
-          CSSHARP_VERSION=$(grep -Po '<PackageReference Include="CounterStrikeSharp.API" Version="\K\d+(\.\d+)*' MatchZy.csproj)
+          set -e
 
+          CSSHARP_VERSION=$(grep -Po '<PackageReference Include="CounterStrikeSharp.API" Version="\K\d+(\.\d+)*' MatchZy.csproj)
+          if [ -z "$CSSHARP_VERSION" ]; then
+            echo "Error: Could not extract CounterStrikeSharp version from MatchZy.csproj"
+            exit 1
+          fi
+          echo "CounterStrikeSharp version: $CSSHARP_VERSION"
+
+          # Build MatchZy-only package
           dotnet publish -c Release -o package/addons/counterstrikesharp/plugins/MatchZy
           cp -r cfg package/
-          cd package && zip -q -r ../MatchZy-$MATCHZY_VERSION.zip * && cd ..
+          cd package && zip -q -r ../MatchZy-${{ env.MATCHZY_VERSION }}.zip * && cd ..
 
+          # Build with CSSharp Linux runtime
           echo "Downloading Linux Runtime..."
           wget -q "https://github.com/roflmuffin/CounterStrikeSharp/releases/download/v${CSSHARP_VERSION}/counterstrikesharp-with-runtime-linux-${CSSHARP_VERSION}.zip" -O cssharp-linux.zip
           unzip -o cssharp-linux.zip -d package/
           dotnet publish -c Release -o package/addons/counterstrikesharp/plugins/MatchZy
-          cd package && zip -q -r ../MatchZy-$MATCHZY_VERSION-with-cssharp-linux.zip * && cd ..
+          cd package && zip -q -r ../MatchZy-${{ env.MATCHZY_VERSION }}-with-cssharp-linux.zip * && cd ..
 
+          # Build with CSSharp Windows runtime
           rm -rf package/addons/counterstrikesharp
           echo "Downloading Windows Runtime..."
           wget -q "https://github.com/roflmuffin/CounterStrikeSharp/releases/download/v${CSSHARP_VERSION}/counterstrikesharp-with-runtime-windows-${CSSHARP_VERSION}.zip" -O cssharp-windows.zip
           unzip -o cssharp-windows.zip -d package/
           dotnet publish -c Release -o package/addons/counterstrikesharp/plugins/MatchZy
-          cd package && zip -q -r ../MatchZy-$MATCHZY_VERSION-with-cssharp-windows.zip * && cd ..
+          cd package && zip -q -r ../MatchZy-${{ env.MATCHZY_VERSION }}-with-cssharp-windows.zip * && cd ..
 
       - name: Create Forgejo Release
+        if: steps.check_release.outputs.SKIP == 'false'
         env:
           GITEA_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          # 1. Check if the release already exists
-          EXISTING_RELEASE=$(curl -s -H "Authorization: token $GITEA_TOKEN" \
-            "https://git.miksen.me/api/v1/repos/${{ github.repository }}/releases/tags/${{ env.MATCHZY_VERSION }}")
+          set -e
 
-          RELEASE_ID=$(echo "$EXISTING_RELEASE" | grep -oP '"id":\s*\K\d+' | head -n 1 || true)
+          # Create release
+          echo "Creating release ${{ env.MATCHZY_VERSION }}..."
+          RELEASE_RESPONSE=$(curl -s -X POST \
+            "https://git.miksen.me/api/v1/repos/${{ github.repository }}/releases" \
+            -H "Authorization: token $GITEA_TOKEN" \
+            -H "Content-Type: application/json" \
+            -d "{
+              \"tag_name\": \"${{ env.MATCHZY_VERSION }}\",
+              \"name\": \"MatchZy ${{ env.MATCHZY_VERSION }}\",
+              \"body\": \"Auto-generated build from VPS runner.\",
+              \"draft\": false,
+              \"prerelease\": false
+            }")
 
+          RELEASE_ID=$(echo "$RELEASE_RESPONSE" | jq -r '.id // empty')
           if [ -z "$RELEASE_ID" ]; then
-            echo "Release not found. Creating new release..."
-            curl -X POST "https://git.miksen.me/api/v1/repos/${{ github.repository }}/releases" \
-              -H "Authorization: token $GITEA_TOKEN" \
-              -H "Content-Type: application/json" \
-              -d "{
-                \"tag_name\": \"${{ env.MATCHZY_VERSION }}\",
-                \"name\": \"MatchZy ${{ env.MATCHZY_VERSION }}\",
-                \"body\": \"Auto-generated build.\",
-                \"draft\": false,
-                \"prerelease\": false
-              }" > release_response.json
-            RELEASE_ID=$(grep -oP '"id":\s*\K\d+' release_response.json | head -n 1)
-          else
-            echo "Found existing release with ID: $RELEASE_ID"
-          fi
-
-          if [ -z "$RELEASE_ID" ]; then
-            echo "Error: Could not find or create Release ID!"
+            echo "Error: Failed to create release!"
+            echo "$RELEASE_RESPONSE"
             exit 1
           fi
+          echo "Created release with ID: $RELEASE_ID"
 
-          # 2. Upload files
+          # Upload assets
           for file in MatchZy-${{ env.MATCHZY_VERSION }}*.zip; do
-            echo "Processing $file..."
-
-            # Delete old asset if it exists
-            ASSET_ID=$(curl -s -H "Authorization: token $GITEA_TOKEN" \
-              "https://git.miksen.me/api/v1/repos/${{ github.repository }}/releases/$RELEASE_ID/assets" | \
-              jq -r ".[] | select(.name==\"$file\") | .id" 2>/dev/null || echo "")
-
-            if [ ! -z "$ASSET_ID" ] && [ "$ASSET_ID" != "null" ]; then
-              echo "Deleting old version of $file..."
-              curl -X DELETE -H "Authorization: token $GITEA_TOKEN" \
-                "https://git.miksen.me/api/v1/repos/${{ github.repository }}/releases/$RELEASE_ID/assets/$ASSET_ID"
-            fi
-
             echo "Uploading $file..."
-            curl -X POST "https://git.miksen.me/api/v1/repos/${{ github.repository }}/releases/$RELEASE_ID/assets?name=$file" \
+            UPLOAD_RESPONSE=$(curl -s -X POST \
+              "https://git.miksen.me/api/v1/repos/${{ github.repository }}/releases/$RELEASE_ID/assets?name=$file" \
               -H "Authorization: token $GITEA_TOKEN" \
               -H "Content-Type: application/octet-stream" \
-              -F "attachment=@$file"
+              -F "attachment=@$file")
+
+            ASSET_ID=$(echo "$UPLOAD_RESPONSE" | jq -r '.id // empty')
+            if [ -z "$ASSET_ID" ]; then
+              echo "Warning: Upload may have failed for $file"
+              echo "$UPLOAD_RESPONSE"
+            else
+              echo "Uploaded $file (asset ID: $ASSET_ID)"
+            fi
           done
