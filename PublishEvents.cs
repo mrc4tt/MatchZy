@@ -20,8 +20,6 @@ namespace MatchZy
 
                 string jsonString = await jsonContent.ReadAsStringAsync();
 
-                Log($"[SendEventAsync] SENDING DATA: {jsonString}");
-
                 if (!string.IsNullOrEmpty(matchConfig.RemoteLogHeaderKey) && !string.IsNullOrEmpty(matchConfig.RemoteLogHeaderValue))
                 {
                     httpClient.DefaultRequestHeaders.Add(matchConfig.RemoteLogHeaderKey,
