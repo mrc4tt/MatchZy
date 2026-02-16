@@ -87,11 +87,6 @@ public partial class MatchZy
             ReplyToUserCommand(player, "Coach command can only be used in match mode!");
             return;
         }
-        if (IsWingmanMode())
-        {
-            ReplyToUserCommand(player, "Coach command cannot be used in wingman!");
-            return;
-        }
 
         side = side.Trim().ToLower();
 
@@ -152,15 +147,20 @@ public partial class MatchZy
         coachKillTimer?.Kill();
         coachKillTimer = null;
         HashSet<CCSPlayerController> coaches = GetAllCoaches();
-        if (IsWingmanMode() || coaches.Count == 0) return;
+	if (coaches.Count == 0) return;
+        if (spawnsData.Values.Any(list => list.Count == 0)) GetSpawns();
+        if (coachSpawns.Count == 0 || 
+            coachSpawns[(byte)CsTeam.CounterTerrorist].Count == 0 || 
+            coachSpawns[(byte)CsTeam.Terrorist].Count == 0)
+        {
+            Log($"[HandleCoaches] No coach spawns found, player positions will not be swapped!");
+            return;
+        }
 
         int freezeTime = ConVar.Find("mp_freezetime")!.GetPrimitiveValue<int>();
         freezeTime = freezeTime > 2 ? freezeTime : 2;
         coachKillTimer ??= AddTimer(freezeTime - 1f, KillCoaches);
 
-        // Stats are now reset in the spawn event handler
-        // Position is now set in the spawn event handler
-        // Just handle team validation
         foreach (CCSPlayerController coach in coaches)
         {
             if (!IsPlayerValid(coach)) continue;
@@ -283,7 +283,7 @@ public partial class MatchZy
     {
         if (isPaused || IsTacticalTimeoutActive()) return;
         HashSet<CCSPlayerController> coaches = GetAllCoaches();
-        if (IsWingmanMode() || coaches.Count == 0) return;
+	if (coaches.Count == 0) return;
         string suicidePenalty = GetConvarStringValue(ConVar.Find("mp_suicide_penalty"));
         string specFreezeTime = GetConvarStringValue(ConVar.Find("spec_freeze_time"));
         string specFreezeTimeLock = GetConvarStringValue(ConVar.Find("spec_freeze_time_lock"));
