@@ -68,7 +68,33 @@ namespace MatchZy
 
             if (connection.State != ConnectionState.Open)
             {
-                connection.Open();
+                try
+                {
+                    connection.Open();
+                }
+                catch (Exception ex)
+                {
+                    Log($"[EnsureConnectionOpen] Failed to open connection: {ex.Message}, attempting reconnect...");
+                    // For MySQL, try closing and reopening to handle stale connections
+                    if (connection is MySqlConnection mysqlConn)
+                    {
+                        try
+                        {
+                            mysqlConn.Close();
+                            mysqlConn.Open();
+                            Log("[EnsureConnectionOpen] MySQL reconnection successful");
+                        }
+                        catch (Exception reconnectEx)
+                        {
+                            Log($"[EnsureConnectionOpen - FATAL] Reconnect failed: {reconnectEx.Message}");
+                            throw;
+                        }
+                    }
+                    else
+                    {
+                        throw;
+                    }
+                }
             }
         }
 

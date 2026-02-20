@@ -1242,6 +1242,31 @@ namespace MatchZy
                 seriesType
             ).GetAwaiter().GetResult();
 
+            // Retry once if database init failed
+            if (liveMatchId == -1)
+            {
+                Log("[HandleMatchStart] WARNING: InitMatchAsync returned -1, retrying database initialization...");
+                liveMatchId = database.InitMatchAsync(
+                    matchzyTeam1.teamName,
+                    matchzyTeam2.teamName,
+                    "-",
+                    isMatchSetup,
+                    liveMatchId,
+                    matchConfig.CurrentMapNumber,
+                    seriesType
+                ).GetAwaiter().GetResult();
+            }
+
+            if (liveMatchId == -1)
+            {
+                Log("[HandleMatchStart] CRITICAL: Database initialization failed! Match stats will NOT be recorded. Check MySQL connection.");
+                PrintToAllChat($" {ChatColors.Red}WARNING: Database connection failed - match stats will not be recorded!");
+            }
+            else
+            {
+                Log($"[HandleMatchStart] Match initialized successfully with matchId: {liveMatchId}");
+            }
+
             SetupRoundBackupFile();
             GetSpawns();
 
