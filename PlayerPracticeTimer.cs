@@ -6,7 +6,7 @@ namespace MatchZy;
 public enum PracticeTimerType
 {
     OnMovement,
-    Immediate
+    Immediate,
 }
 
 public class PlayerPracticeTimer

@@ -72,10 +72,8 @@ namespace MatchZy
                     return;
                 }
 
-                Server.PrintToChatAll(
-                    $"{chatPrefix} Captain for {ChatColors.Green}{matchzyTeam1.teamName}{ChatColors.Default}: {ChatColors.Green}{playerData[team1Captain].PlayerName}{ChatColors.Default}");
-                Server.PrintToChatAll(
-                    $"{chatPrefix} Captain for {ChatColors.Green}{matchzyTeam2.teamName}{ChatColors.Default}: {ChatColors.Green}{playerData[team2Captain].PlayerName}{ChatColors.Default}");
+                PrintLocalizedToAll("matchzy.veto.captainfor", matchzyTeam1.teamName, playerData[team1Captain].PlayerName);
+                PrintLocalizedToAll("matchzy.veto.captainfor", matchzyTeam2.teamName, playerData[team2Captain].PlayerName);
 
                 HandleVetoStep();
                 vetoStateTimer?.Kill();
@@ -85,7 +83,7 @@ namespace MatchZy
 
             warningsPrinted++;
             int secondsRemaining = vetoCountdownTime - warningsPrinted + 1;
-            Server.PrintToChatAll($"{chatPrefix} Map selection commencing in {secondsRemaining}");
+            PrintLocalizedToAll("matchzy.veto.commencing", secondsRemaining);
         }
 
         public void HandleVetoStep()
@@ -170,7 +168,7 @@ namespace MatchZy
             Server.PrintToChatAll($"{chatPrefix} {action}");
 
             string mapListAsString = string.Join(", ", matchConfig.MapsLeftInVetoPool);
-            Server.PrintToChatAll($"{chatPrefix} Remaining Maps: {mapListAsString}");
+            PrintLocalizedToAll("matchzy.veto.remainingmaps", mapListAsString);
 
             playerData[client].PrintToChat($"{chatPrefix} {stepMessage}");
         }
@@ -324,8 +322,8 @@ namespace MatchZy
         public void AbortVeto()
         {
             // Todo: Add AbortVeto() when captain is disconnecting in-between veto
-            Server.PrintToChatAll($"{chatPrefix} A team captain left during map selection. Map selection is paused.");
-            Server.PrintToChatAll($"{chatPrefix} Type .ready when you are ready to resume map selection.");
+            PrintLocalizedToAll("matchzy.veto.captainleft");
+            PrintLocalizedToAll("matchzy.veto.captainleft.ready");
             isPreVeto = true;
             isVeto = false;
             if (isPaused)
@@ -350,7 +348,7 @@ namespace MatchZy
 
         public void FinishVeto()
         {
-            Server.PrintToChatAll($"{chatPrefix} The maps have been decided:");
+            PrintLocalizedToAll("matchzy.veto.mapsdecided");
             matchConfig.MapsLeftInVetoPool.Clear();
 
             if (isPaused)
@@ -363,7 +361,7 @@ namespace MatchZy
 
             for (int i = mapNumber; i < matchConfig.Maplist.Count; i++)
             {
-                Server.PrintToChatAll($"{chatPrefix} Map {i + 1 - mapNumber}: {matchConfig.Maplist[i]}.");
+                PrintLocalizedToAll("matchzy.veto.mapnumber", i + 1 - mapNumber, matchConfig.Maplist[i]);
             }
 
             string currentMapName = Server.MapName;

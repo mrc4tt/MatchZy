@@ -1,9 +1,9 @@
-using CounterStrikeSharp.API.Core;
-using CounterStrikeSharp.API.Modules.Commands;
-using CounterStrikeSharp.API.Core.Attributes.Registration;
-using Newtonsoft.Json.Linq;
 using System.Text.Json.Serialization;
 using CounterStrikeSharp.API;
+using CounterStrikeSharp.API.Core;
+using CounterStrikeSharp.API.Core.Attributes.Registration;
+using CounterStrikeSharp.API.Modules.Commands;
+using Newtonsoft.Json.Linq;
 
 namespace MatchZy
 {
@@ -43,7 +43,8 @@ namespace MatchZy
         [ConsoleCommand("css_uncoach", "Sets coach for the requested team")]
         public void OnUnCoachCommand(CCSPlayerController? player, CommandInfo? command)
         {
-            if (player == null || !player.PlayerPawn.IsValid) return;
+            if (player == null || !player.PlayerPawn.IsValid)
+                return;
             if (isPractice)
             {
                 ReplyToUserCommand(player, "Uncoach command can only be used in match mode!");
@@ -68,7 +69,8 @@ namespace MatchZy
                 return;
             }
 
-            if (player.InGameMoneyServices != null) player.InGameMoneyServices.Account = 0;
+            if (player.InGameMoneyServices != null)
+                player.InGameMoneyServices.Account = 0;
 
             ReplyToUserCommand(player, "You are now not coaching any team!");
         }
@@ -77,7 +79,8 @@ namespace MatchZy
         [ConsoleCommand("get5_addplayer", "Adds player to the provided team")]
         public void OnAddPlayerCommand(CCSPlayerController? player, CommandInfo? command)
         {
-            if (player != null || command == null) return;
+            if (player != null || command == null)
+                return;
             if (!isMatchSetup)
             {
                 command.ReplyToCommand("No match is setup!");
@@ -85,7 +88,9 @@ namespace MatchZy
             }
             if (IsHalfTimePhase())
             {
-                command.ReplyToCommand("Cannot add players during halftime. Please wait until the next round starts.");
+                command.ReplyToCommand(
+                    "Cannot add players during halftime. Please wait until the next round starts."
+                );
                 return;
             }
             if (command.ArgCount < 3)
@@ -117,7 +122,9 @@ namespace MatchZy
             }
             if (!success)
             {
-                command.ReplyToCommand($"Failed to add player {playerName} to {playerTeam}. They may already be on a team or you provided an invalid Steam ID.");
+                command.ReplyToCommand(
+                    $"Failed to add player {playerName} to {playerTeam}. They may already be on a team or you provided an invalid Steam ID."
+                );
                 return;
             }
             command.ReplyToCommand($"Player {playerName} added to {playerTeam} successfully!");
@@ -128,7 +135,8 @@ namespace MatchZy
         [CommandHelper(minArgs: 1, usage: "<steam64>")]
         public void OnRemovePlayerCommand(CCSPlayerController? player, CommandInfo? command)
         {
-            if (player != null || command == null) return;
+            if (player != null || command == null)
+                return;
             if (!isMatchSetup)
             {
                 command.ReplyToCommand("No match is setup!");
@@ -136,7 +144,9 @@ namespace MatchZy
             }
             if (IsHalfTimePhase())
             {
-                command.ReplyToCommand("Cannot remove players during halftime. Please wait until the next round starts.");
+                command.ReplyToCommand(
+                    "Cannot remove players during halftime. Please wait until the next round starts."
+                );
                 return;
             }
 
@@ -160,15 +170,20 @@ namespace MatchZy
             }
             else
             {
-                command.ReplyToCommand($"Player {steamId} not found in any team or the Steam ID was invalid.");
+                command.ReplyToCommand(
+                    $"Player {steamId} not found in any team or the Steam ID was invalid."
+                );
             }
         }
 
         public bool AddPlayerToTeam(string steamId, string name, JToken? team)
         {
-            if (matchzyTeam1.teamPlayers != null && matchzyTeam1.teamPlayers[steamId] != null) return false;
-            if (matchzyTeam2.teamPlayers != null && matchzyTeam2.teamPlayers[steamId] != null) return false;
-            if (matchConfig.Spectators != null && matchConfig.Spectators[steamId] != null) return false;
+            if (matchzyTeam1.teamPlayers != null && matchzyTeam1.teamPlayers[steamId] != null)
+                return false;
+            if (matchzyTeam2.teamPlayers != null && matchzyTeam2.teamPlayers[steamId] != null)
+                return false;
+            if (matchConfig.Spectators != null && matchConfig.Spectators[steamId] != null)
+                return false;
 
             if (team is JObject jObjectTeam)
             {
@@ -187,11 +202,17 @@ namespace MatchZy
 
         public bool RemovePlayerFromTeam(string steamId)
         {
-            List<JToken?> teams = [matchzyTeam1.teamPlayers, matchzyTeam2.teamPlayers, matchConfig.Spectators];
+            List<JToken?> teams =
+            [
+                matchzyTeam1.teamPlayers,
+                matchzyTeam2.teamPlayers,
+                matchConfig.Spectators,
+            ];
 
             foreach (var team in teams)
             {
-                if (team is null) continue;
+                if (team is null)
+                    continue;
                 if (team is JObject jObjectTeam)
                 {
                     jObjectTeam.Remove(steamId);

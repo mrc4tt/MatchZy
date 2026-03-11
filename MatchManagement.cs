@@ -814,7 +814,7 @@ namespace MatchZy
 
             Task.Run(async () =>
             {
-                await database.SetMatchEndDataAsync(liveMatchId, matchConfig.CurrentMapNumber, winnerName ?? "Draw", team1Score, team2Score, winnerName ?? "Draw", team1Score, team2Score);
+                await database.SetMatchEndDataAsync(matchId, matchConfig.CurrentMapNumber, winnerName ?? "Draw", team1Score, team2Score, winnerName ?? "Draw", team1Score, team2Score);
                 // Making sure that map end event is fired first
                 await Task.Delay(2000);
                 await SendEventAsync(seriesResultEvent);

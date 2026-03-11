@@ -1,7 +1,7 @@
 using CounterStrikeSharp.API.Core;
+using CounterStrikeSharp.API.Core.Attributes.Registration;
 using CounterStrikeSharp.API.Modules.Commands;
 using CounterStrikeSharp.API.Modules.Utils;
-using CounterStrikeSharp.API.Core.Attributes.Registration;
 
 namespace MatchZy
 {
@@ -10,7 +10,7 @@ namespace MatchZy
         private Dictionary<CsTeam, HashSet<int>> ggVotes = new()
         {
             { CsTeam.CounterTerrorist, new HashSet<int>() },
-            { CsTeam.Terrorist, new HashSet<int>() }
+            { CsTeam.Terrorist, new HashSet<int>() },
         };
 
         private CounterStrikeSharp.API.Modules.Timers.Timer? ggResetTimer = null;
@@ -18,7 +18,8 @@ namespace MatchZy
         [ConsoleCommand("css_gg", "Vote to surrender the match")]
         public void OnGGCommand(CCSPlayerController? player, CommandInfo? command)
         {
-            if (!IsPlayerValid(player)) return;
+            if (!IsPlayerValid(player))
+                return;
             if (!isMatchLive)
             {
                 ReplyToUserCommand(player, "GG can only be used during a live match!");
@@ -38,7 +39,7 @@ namespace MatchZy
                 return;
             }
 
-            // 
+            //
             (int t1score, int t2score) = GetTeamsScore();
             int playerTeamScore = 0;
             int opponentTeamScore = 0;
@@ -79,17 +80,21 @@ namespace MatchZy
             int scoreDifference = opponentTeamScore - playerTeamScore;
             if (scoreDifference < 6)
             {
-                ReplyToUserCommand(player, $"Your team must be losing by at least 6 rounds to surrender! Current score: {playerTeamScore}-{opponentTeamScore}");
+                ReplyToUserCommand(
+                    player,
+                    $"Your team must be losing by at least 6 rounds to surrender! Current score: {playerTeamScore}-{opponentTeamScore}"
+                );
                 return;
             }
 
             // Подсчитываем общее количество игроков в команде
-            var teamPlayers = playerData.Values
-                .Where(p => IsPlayerValid(p) && p.Team == playerTeam)
+            var teamPlayers = playerData
+                .Values.Where(p => IsPlayerValid(p) && p.Team == playerTeam)
                 .ToList();
 
             // Добавляем голос игрока
-            if (!player.UserId.HasValue) return;
+            if (!player.UserId.HasValue)
+                return;
 
             if (ggVotes[playerTeam].Contains(player.UserId.Value))
             {
@@ -107,7 +112,9 @@ namespace MatchZy
 
             int currentVotes = ggVotes[playerTeam].Count;
 
-            PrintToAllChat($"{ChatColors.Green}{player.PlayerName}{ChatColors.Default} voted to surrender. {ChatColors.Green}({currentVotes}/{votesNeeded}){ChatColors.Default} votes from {ChatColors.Green}{playerTeamName}{ChatColors.Default} [Score: {playerTeamScore}-{opponentTeamScore}]");
+            PrintToAllChat(
+                $"{ChatColors.Green}{player.PlayerName}{ChatColors.Default} voted to surrender. {ChatColors.Green}({currentVotes}/{votesNeeded}){ChatColors.Default} votes from {ChatColors.Green}{playerTeamName}{ChatColors.Default} [Score: {playerTeamScore}-{opponentTeamScore}]"
+            );
 
             // Проверяем, достаточно ли голосов
             if (currentVotes >= votesNeeded)
@@ -148,21 +155,29 @@ namespace MatchZy
                 int finalScoreDifference = finalOpponentTeamScore - finalPlayerTeamScore;
                 if (finalScoreDifference < 6)
                 {
-                    PrintToAllChat($"{ChatColors.Red}GG cancelled!{ChatColors.Default} {ChatColors.Green}{playerTeamName}{ChatColors.Default} is no longer losing by 6+ rounds. Current score: {finalPlayerTeamScore}-{finalOpponentTeamScore}");
+                    PrintToAllChat(
+                        $"{ChatColors.Red}GG cancelled!{ChatColors.Default} {ChatColors.Green}{playerTeamName}{ChatColors.Default} is no longer losing by 6+ rounds. Current score: {finalPlayerTeamScore}-{finalOpponentTeamScore}"
+                    );
                     ResetGGVotes();
                     return;
                 }
 
                 // Команда сдается - определяем победителя
-                CsTeam winnerTeam = playerTeam == CsTeam.CounterTerrorist ? CsTeam.Terrorist : CsTeam.CounterTerrorist;
+                CsTeam winnerTeam =
+                    playerTeam == CsTeam.CounterTerrorist
+                        ? CsTeam.Terrorist
+                        : CsTeam.CounterTerrorist;
                 string winnerTeamName = GetTeamName(winnerTeam);
 
-                PrintToAllChat($"{ChatColors.Green}{playerTeamName}{ChatColors.Default} has surrendered! {ChatColors.Green}{winnerTeamName}{ChatColors.Default} wins!");
+                PrintToAllChat(
+                    $"{ChatColors.Green}{playerTeamName}{ChatColors.Default} has surrendered! {ChatColors.Green}{winnerTeamName}{ChatColors.Default} wins!"
+                );
 
                 // Используем такую же логику как в FFWSystem
                 (int currentT1score, int currentT2score) = GetTeamsScore();
 
-                int t1score_final, t2score_final;
+                int t1score_final,
+                    t2score_final;
 
                 // Определяем команду-победителя (противник сдавшейся команды)
                 Team? winnerMatchTeam = null;
@@ -200,14 +215,19 @@ namespace MatchZy
             {
                 // Устанавливаем таймер для сброса голосов через 60 секунд
                 ggResetTimer?.Kill();
-                ggResetTimer = AddTimer(60.0f, () =>
-                {
-                    if (ggVotes[playerTeam].Count > 0)
+                ggResetTimer = AddTimer(
+                    60.0f,
+                    () =>
                     {
-                        PrintToAllChat($"GG vote for {ChatColors.Green}{playerTeamName}{ChatColors.Default} has expired!");
-                        ggVotes[playerTeam].Clear();
+                        if (ggVotes[playerTeam].Count > 0)
+                        {
+                            PrintToAllChat(
+                                $"GG vote for {ChatColors.Green}{playerTeamName}{ChatColors.Default} has expired!"
+                            );
+                            ggVotes[playerTeam].Clear();
+                        }
                     }
-                });
+                );
             }
         }
 

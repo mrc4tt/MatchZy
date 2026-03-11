@@ -4,12 +4,10 @@
     "matchzy.ready.matchedreadyonteam": "Du er blevet markeret som klar på holdet {green}{0}{default}!",
     "matchzy.ready.markedunready": "Du er blevet markeret som IKKE klar.",
     "matchzy.ready.readytotestorebackupinfomessage": "Ikke-klar spillere: {0}. Skriv .ready, når du er klar til at gendanne match-backuppen. {1}",
-    "matchzy.ready.minimumrequiredmessage": "[Minimum antal spillere klar: {0}]",    
-    
+    "matchzy.ready.minimumrequiredmessage": "[Minimum antal spillere klar: {0}]",
     "matchzy.knife.sidedecisionpending": "{green}{0}{default} vandt knivrunden. Venter på, at de skriver {green}.stay{default} eller {green}.switch{default}.",
     "matchzy.knife.decidedtostay": "{green}{0}{default} har besluttet at blive.",
     "matchzy.knife.decidedtoswitch": "{green}{0}{default} har besluttet at skifte.",
-    
     "matchzy.pause.pausedthematch": "{green}{0}{default} har sat kampen på pause. Skriv .unpause for at genoptage kampen.",
     "matchzy.pause.techpausedthematch": "{green}{0}{defaul} har anmodet om en teknisk pause. Skriv .unpause for at genoptage kampen.",
     "matchzy.pause.teamsunpausedthematch": "Begge hold har afbrudt pausen, kampen genoptages!",
@@ -25,12 +23,10 @@
     "matchzy.pause.matchended": "Du kan ikke bruge denne kommando efter spillet er afsluttet.",
     "matchzy.pause.tacticaltimeout": "Du kan ikke bruge denne kommando, når en taktisk timeout er aktiv.",
     "matchzy.pause.calltechpausedthematch": "{green}{0}{default} har anmodet om en teknisk pause. Skriv .unpause for at genoptage kampen.",
-    
     "matchzy.restore.teamwantstorestore": "{green}{0}{default} ønsker at gendanne spillet til starten af den aktuelle runde. {green}{1}{default}, skriv venligst !stop for at bekræfte.",
     "matchzy.restore.loadedsuccessfully": "Backupfil indlæst med succes: {0}",
     "matchzy.restore.restoredsuccessfully": "Backupfil gendannet med succes: {0}",
     "matchzy.restore.stopcommandrequiresnodamage": "En anmodning om at genstarte runden kan ikke gives, hvis en spiller har skadet en modspiller.",
-    
     "matchzy.backup.stopduringhalftime": "Du kan ikke bruge denne kommando i halvlegen.",
     "matchzy.backup.stopmatchended": "Du kan ikke bruge denne kommando, efter spillet er afsluttet.",
     "matchzy.backup.stoptacticaltimeout": "Du kan ikke bruge denne kommando, når en taktisk timeout er aktiv.",
@@ -39,13 +35,10 @@
     "matchzy.backup.restorematchended": "Du kan ikke bruge denne kommando, efter spillet er afsluttet.",
     "matchzy.backup.restoretacticaltimeout": "Du kan ikke bruge denne kommando, når en taktisk timeout er aktiv.",
     "matchzy.backup.restoredoesntexist": "Backupfilen {0} eksisterer ikke, sørg for at gendanne en gyldig backup.",
-    
     "matchzy.cvars.invalidvalue": "Ugyldig værdi for matchzy_chat_messages_timer_delay. Angiv venligst et gyldigt ikke-negativt tal.",
-    
     "matchzy.liveknife1": "{green}KNIV!",
     "matchzy.liveknife2": "{olive}KNIV!!",
     "matchzy.liveknife3": "{lime}KNIV!!!",
-    
     "matchzy.cc.enabled": "{green}slået til{default}",
     "matchzy.cc.disabled": "{red}slået fra{default}",
     "matchzy.cc.usage": "Brug: {0}",
@@ -77,7 +70,6 @@
     "matchzy.cc.matchpaused": "Kampen er allerede på pause, kan ikke starte en taktisk timeout!",
     "matchzy.cc.nomorepauses": "Du har ikke flere taktiske timeouts tilbage!",
     "matchzy.match.mode.loaded": "{green}Matchtilstand er blevet indlæst.{default}",
-    
     "matchzy.mm.matchisalreadysetup": "[LoadMatch] A match is already setup with id: {green}{0}{default}, cannot load a new match!",
     "matchzy.mm.filedoesntexist": "[LoadMatch] Provided file does not exist! Usage: matchzy_loadmatch <filename>",
     "matchzy.mm.matchloadfailed": "Match load failed! Resetting current match",
@@ -85,7 +77,6 @@
     "matchzy.mm.invalidurl": "[LoadMatchDataCommand] Invalid URL: {green}{0}{default}. Please provide a valid URL to load the match!",
     "matchzy.mm.httprequestfailed": "[LoadMatchFromURL] HTTP request failed with status code: {0}",
     "matchzy.mm.teamcannotbechanged": "Holdnavne kan ikke ændres, når kampen er startet!",
-    
     "matchzy.pm.movedtospawn": "Flyttet til spawn: {0}",
     "matchzy.pm.negativenumber": "Ugyldig værdi for {command}-kommandoen. Angiv venligst et gyldigt ikke-negativt tal. Brug: !{command} <nummer>",
     "matchzy.pm.lineupissaved": "Lineup findes allerede! Brug venligst et andet navn eller brug .delnade <nade>",
@@ -121,12 +112,9 @@
     "matchzy.pm.backtonumber": "Brug: !back <nummer> (Du har kastet {green}{0}{default} granater indtil nu)",
     "matchzy.pm.throwindextonumber": "Brug: !throwindex <nummer> (Du har kastet {green}{0}{default} granater indtil nu)",
     "matchzy.pm.nobots": "Hej! Bots er i øjeblikket deaktiveret på din server. Du kan aktivere den gennem Serverpanelet.",
-    
     "matchzy.rs.minreadyplayers": "Du skal have mindst {green}{0}{default} spillere på serveren for at gøre dig klar.",
     "matchzy.rs.forcereadiedby": "Dit hold blev tvangsklarmeldt af {green}{0}{default}",
-    
     "matchzy.sleep.sleepwhenmatchstared": "Søvntilstand kan ikke startes, når en kamp er startet!",
-    
     "matchzy.utility.unreadyplayers": "Ikke-klare spillere: {0}. Skriv venligst .ready for at gøre dig klar! {1}",
     "matchzy.utility.readyplayers": "Nuværende klare spillere: {green}{0}{default}",
     "matchzy.utility.minimumreadyplayers": "Minimum antal klare spillere påkrævet {green}{0}{default}, nuværende klare spillere: {green}{1}{default}",
@@ -143,7 +131,6 @@
     "matchzy.utility.matchlive": "{green}LIVE!{default}",
     "matchzy.utility.knifestart": "{green}Knivrunden starter om 10 sekunder!{default}",
     "matchzy.utility.matchstart": "{green}Kampen starter om 10 sekunder!{default}",
-    
     "matchzy.pracc.smoke": "Røg kastet af {red}{0}{default} tog {green}{1}{default} sekunder om at detonere.",
     "matchzy.pracc.flash": "Flash kastet af {red}{0}{default} tog {green}{1}{default} sekunder om at detonere.",
     "matchzy.pracc.grenade": "Granat kastet af {red}{0}{default} tog {green}{1}{default} sekunder om at detonere.",
@@ -151,7 +138,6 @@
     "matchzy.pracc.decoy": "Lokkedue kastet af {red}{0}{default} tog {green}{1}{default} sekunder om at detonere.",
     "matchzy.pracc.damage": "{red}{0}{default} skade til {lightblue}{1}{default} ({green}{2}{default} liv tilbage).",
     "matchzy.pracc.blind": "{lightblue}{0}{default} blev blindet i {green}{1}{default} sekunder.",
-    
     "matchzy.eh.start": "Skriv venligst {Green}.ready{Default} eller {Green}.rdy{Default} for at gøre dig klar!",
     "matchzy.eh.prac": "For at starte Øvelsestilstand skal du skrive {Green}.prac{default}",
     "matchzy.eh.quitprac": "For at afslutte Øvelsestilstand og skifte til Kampmode skal du skrive {Green}.exitprac{Default}",
@@ -159,5 +145,19 @@
     "matchzy.hint.waitingforplayers": "Venter på spillere [Klar: {0}/{1}]",
     "matchzy.hint.usereadycommand": "Brug !ready for at gøre dig klar!",
     "matchzy.ah.title": "=== MatchZy Admin Kommandobetjeningsvejledning ===",
-    "matchzy.ah.checkconsole": "Se konsol for den fulde kommandoliste"
+    "matchzy.ah.checkconsole": "Se konsol for den fulde kommandoliste",
+    "matchzy.backup.teamsagreed": "Begge hold er enige! Gendanner runde...",
+    "matchzy.backup.nobackupavailable": "Fejl: Ingen backup tilgængelig at gendanne!",
+    "matchzy.backup.voteexpired": "Forrige .stop afstemning er udløbet. Starter ny afstemning...",
+    "matchzy.backup.votepending": "Afstemningen udløber om {0} sekunder.",
+    "matchzy.backup.restartinground": "Genstarter runde {0}...",
+    "matchzy.veto.commencing": "Kortvalg starter om {0}",
+    "matchzy.veto.captainfor": "Kaptajn for {green}{0}{default}: {green}{1}{default}",
+    "matchzy.veto.captainleft": "En holdkaptajn forlod under kortvalg. Kortvalg er sat på pause.",
+    "matchzy.veto.captainleft.ready": "Skriv .ready når du er klar til at genoptage kortvalg.",
+    "matchzy.veto.mapsdecided": "Kortene er blevet besluttet:",
+    "matchzy.veto.mapnumber": "Kort {0}: {1}.",
+    "matchzy.veto.remainingmaps": "Resterende kort: {0}",
+    "matchzy.ot.starting": "Kampen er uafgjort! Overtid starter.",
+    "matchzy.ot.format": "Format: MR{0} (${1} startpenge)"
 }

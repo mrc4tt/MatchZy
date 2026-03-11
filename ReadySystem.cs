@@ -1,8 +1,8 @@
 using CounterStrikeSharp.API.Core;
 using CounterStrikeSharp.API.Core.Attributes.Registration;
+using CounterStrikeSharp.API.Core.Translations;
 using CounterStrikeSharp.API.Modules.Commands;
 using CounterStrikeSharp.API.Modules.Utils;
-using CounterStrikeSharp.API.Core.Translations;
 
 namespace MatchZy;
 
@@ -12,7 +12,7 @@ public partial class MatchZy
     {
         { CsTeam.Terrorist, false },
         { CsTeam.CounterTerrorist, false },
-        { CsTeam.Spectator, false }
+        { CsTeam.Spectator, false },
     };
 
     public bool allowForceReady = true;
@@ -61,15 +61,19 @@ public partial class MatchZy
 
     public int GetPlayersPerTeam(int team)
     {
-        if (team == (int)CsTeam.CounterTerrorist || team == (int)CsTeam.Terrorist) return matchConfig.PlayersPerTeam;
-        if (team == (int)CsTeam.Spectator) return matchConfig.MinSpectatorsToReady;
+        if (team == (int)CsTeam.CounterTerrorist || team == (int)CsTeam.Terrorist)
+            return matchConfig.PlayersPerTeam;
+        if (team == (int)CsTeam.Spectator)
+            return matchConfig.MinSpectatorsToReady;
         return 0;
     }
 
     public int GetTeamMinReady(int team)
     {
-        if (team == (int)CsTeam.CounterTerrorist || team == (int)CsTeam.Terrorist) return matchConfig.MinPlayersToReady;
-        if (team == (int)CsTeam.Spectator) return matchConfig.MinSpectatorsToReady;
+        if (team == (int)CsTeam.CounterTerrorist || team == (int)CsTeam.Terrorist)
+            return matchConfig.MinPlayersToReady;
+        if (team == (int)CsTeam.Spectator)
+            return matchConfig.MinSpectatorsToReady;
         return 0;
     }
 
@@ -79,11 +83,13 @@ public partial class MatchZy
         int readyCount = 0;
         foreach (var key in playerData.Keys)
         {
-            if (!playerData[key].IsValid) continue;
+            if (!playerData[key].IsValid)
+                continue;
             if (playerData[key].TeamNum == team)
             {
                 playerCount++;
-                if (playerReadyStatus[key] == true) readyCount++;
+                if (playerReadyStatus[key] == true)
+                    readyCount++;
             }
         }
 
@@ -99,24 +105,32 @@ public partial class MatchZy
     public void OnForceReadyCommandCommand(CCSPlayerController? player, CommandInfo? command)
     {
         Log($"{readyAvailable} {isMatchSetup} {allowForceReady} {IsPlayerValid(player)}");
-        if (!readyAvailable || !isMatchSetup || !allowForceReady || !IsPlayerValid(player)) return;
+        if (!readyAvailable || !isMatchSetup || !allowForceReady || !IsPlayerValid(player))
+            return;
 
         int minReady = GetTeamMinReady(player!.TeamNum);
         (int playerCount, int readyCount) = GetTeamPlayerCount(player!.TeamNum, false);
 
         if (playerCount < minReady)
         {
-            ReplyToUserCommand(player, Localizer.ForPlayer(player, "matchzy.rs.minreadyplayers", minReady));
+            ReplyToUserCommand(
+                player,
+                Localizer.ForPlayer(player, "matchzy.rs.minreadyplayers", minReady)
+            );
             return;
         }
 
         foreach (var key in playerData.Keys)
         {
-            if (!playerData[key].IsValid) continue;
+            if (!playerData[key].IsValid)
+                continue;
             if (playerData[key].TeamNum == player.TeamNum)
             {
                 playerReadyStatus[key] = true;
-                ReplyToUserCommand(playerData[key], Localizer.ForPlayer(player, "matchzy.rs.forcereadiedby", player.PlayerName));
+                ReplyToUserCommand(
+                    playerData[key],
+                    Localizer.ForPlayer(player, "matchzy.rs.forcereadiedby", player.PlayerName)
+                );
             }
         }
 

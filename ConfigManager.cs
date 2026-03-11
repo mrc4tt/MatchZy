@@ -1,10 +1,10 @@
+using System;
+using System.Collections.Generic;
+using System.IO;
 using CounterStrikeSharp.API;
 using CounterStrikeSharp.API.Core;
-using System;
-using System.IO;
-using System.Collections.Generic;
-using CounterStrikeSharp.API.Modules.Utils;
 using CounterStrikeSharp.API.Modules.Memory;
+using CounterStrikeSharp.API.Modules.Utils;
 
 namespace MatchZy
 {
@@ -42,7 +42,8 @@ namespace MatchZy
         {
             var configs = new Dictionary<string, string>
             {
-                [ConfigFiles.Paths.Config] = @"
+                [ConfigFiles.Paths.Config] =
+                    @"
 // Whether whitelist is enabled by default or not. Default value: false
 // This is the default value, but whitelist can be toggled by admin using .whitelist command
 matchzy_whitelist_enabled_default false
@@ -171,7 +172,8 @@ matchzy_match_start_message """"
 matchzy_match_end_auto_changelevel 1
 ",
 
-                [ConfigFiles.Paths.Dryrun] = @"
+                [ConfigFiles.Paths.Dryrun] =
+                    @"
 ammo_grenade_limit_default 1
 ammo_grenade_limit_flashbang 2
 ammo_grenade_limit_total 4
@@ -284,7 +286,8 @@ sv_showimpacts 0
 mp_warmup_end
 ",
 
-                [ConfigFiles.Paths.Knife] = @"
+                [ConfigFiles.Paths.Knife] =
+                    @"
 mp_team_intro_time 0
 mp_ct_default_secondary """"
 mp_free_armor 1
@@ -304,7 +307,8 @@ mp_spectators_max 10
 sv_hide_roundtime_until_seconds 0
 ",
 
-                [ConfigFiles.Paths.Hill] = @"
+                [ConfigFiles.Paths.Hill] =
+                    @"
 mp_ct_default_primary """"
 mp_ct_default_secondary ""weapon_hkp2000""
 mp_t_default_primary """"
@@ -431,7 +435,8 @@ mp_spectators_max 10
 sv_hide_roundtime_until_seconds 0
 ",
 
-                [ConfigFiles.Paths.Live] = @"
+                [ConfigFiles.Paths.Live] =
+                    @"
 ammo_grenade_limit_default 1
 ammo_grenade_limit_flashbang 2
 ammo_grenade_limit_total 4
@@ -547,7 +552,8 @@ mp_warmup_end
 sv_hide_roundtime_until_seconds 0
 ",
 
-                [ConfigFiles.Paths.LiveWingman] = @"
+                [ConfigFiles.Paths.LiveWingman] =
+                    @"
 ammo_grenade_limit_default 1
 ammo_grenade_limit_flashbang 2
 ammo_grenade_limit_total 4
@@ -656,7 +662,8 @@ mp_match_restart_delay 25
 sv_hide_roundtime_until_seconds 0
 ",
 
-                [ConfigFiles.Paths.Practice] = @"
+                [ConfigFiles.Paths.Practice] =
+                    @"
 mp_team_intro_time 0
 mp_freezetime 0
 bot_kick
@@ -716,7 +723,8 @@ sv_hide_roundtime_until_seconds 0
 mp_freezetime 0
 ",
 
-                [ConfigFiles.Paths.Scrim] = @"
+                [ConfigFiles.Paths.Scrim] =
+                    @"
 mp_ct_default_primary """";
 mp_ct_default_secondary ""weapon_hkp2000"";
 mp_t_default_primary """";
@@ -844,7 +852,8 @@ mp_spectators_max 10
 sv_hide_roundtime_until_seconds 0
 ",
 
-                [ConfigFiles.Paths.Sleep] = @"
+                [ConfigFiles.Paths.Sleep] =
+                    @"
 ammo_grenade_limit_default 1
 ammo_grenade_limit_flashbang 2
 ammo_grenade_limit_total 4
@@ -958,7 +967,8 @@ mp_restartgame 1
 sv_hide_roundtime_until_seconds 0
 ",
 
-                [ConfigFiles.Paths.Warmup] = @"
+                [ConfigFiles.Paths.Warmup] =
+                    @"
 bot_kick
 bot_quota 0
 mp_autokick 0
@@ -1008,17 +1018,17 @@ ammo_grenade_limit_default 1
 ammo_grenade_limit_flashbang 2
 ammo_grenade_limit_total 4
 mp_warmup_start
-"
+",
             };
             foreach (var config in configs)
             {
                 CreateConfigFile(config.Key, config.Value);
             }
-            
+
             // Create matchzymaps.cfg separately with default map rotation
             CreateMapRotationFile();
         }
-        
+
         private void CreateMapRotationFile()
         {
             try
@@ -1030,7 +1040,8 @@ mp_warmup_start
                 }
                 if (!File.Exists(filePath))
                 {
-                    string defaultMaps = @"# MatchZy Map Rotation Configuration
+                    string defaultMaps =
+                        @"# MatchZy Map Rotation Configuration
 # 
 # This file controls automatic map changes after matches end
 # 
@@ -1095,7 +1106,7 @@ de_ancient
                         var trimmed = line.Trim();
                         if (string.IsNullOrEmpty(trimmed) || trimmed.StartsWith("#"))
                             continue;
-                        
+
                         maps.Add(trimmed);
                     }
                     Console.WriteLine($"[MatchZy] Loaded {maps.Count} maps from map rotation");

@@ -389,8 +389,6 @@ public void StartAutoPauseCheck()
 
         isAutoPaused = false;
         autoPauseReason = null;
-
-        Log("[AutoPause] Stopped auto-pause monitoring");
     }
 
     public void ResetTechPauses()
@@ -400,6 +398,7 @@ public void StartAutoPauseCheck()
         {
             technicalPauseUsed[team] = 0;
         }
+
         lastTechPauseDuration = 0;
 
         // Reset auto-pause state

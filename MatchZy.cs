@@ -17,7 +17,7 @@ namespace MatchZy
     public partial class MatchZy : BasePlugin
     {
         public override string ModuleName => "MatchZy";
-        public override string ModuleVersion => "0.8.19";
+        public override string ModuleVersion => "0.8.22";
         public override string ModuleAuthor => "WD- Edited by Miksen";
         public override string ModuleDescription => "A plugin for running and managing CS2 practice/pugs/scrims/matches!";
         public string chatPrefix = $"{ChatColors.Green}[MatchZy]{ChatColors.Default}";
@@ -91,7 +91,6 @@ namespace MatchZy
         // Each message is kept in chat display for ~13 seconds, hence setting default chat timer to 13 seconds.
         // Configurable using matchzy_chat_messages_timer_delay <seconds>
         public int chatTimerDelay = 13;
-        public int hudTimerDelay = 1;
         public int afterReadyDelay = 3;
         public int roundKnifeStartMessageDelay = 11;
 

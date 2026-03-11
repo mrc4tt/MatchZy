@@ -1,3 +1,6 @@
+using System.IO.Compression;
+using System.Net.Http.Json;
+using System.Text;
 using CounterStrikeSharp.API;
 using CounterStrikeSharp.API.Core;
 using CounterStrikeSharp.API.Core.Attributes.Registration;
@@ -5,9 +8,6 @@ using CounterStrikeSharp.API.Modules.Commands;
 using CounterStrikeSharp.API.Modules.Cvars;
 using CounterStrikeSharp.API.Modules.Memory;
 using CounterStrikeSharp.API.Modules.Timers;
-using System.IO.Compression;
-using System.Net.Http.Json;
-using System.Text;
 
 namespace MatchZy
 {
@@ -31,7 +31,11 @@ namespace MatchZy
             }
 
             // Check for +tv_enable value
-            string tvEnable = NativeAPI.GetCommandParamValue("+tv_enable", DataType.DATA_TYPE_STRING, "0");
+            string tvEnable = NativeAPI.GetCommandParamValue(
+                "+tv_enable",
+                DataType.DATA_TYPE_STRING,
+                "0"
+            );
             if (tvEnable != "1")
             {
                 return false;
@@ -51,7 +55,9 @@ namespace MatchZy
             string demoFileName = FormatCvarValue(demoNameFormat.Replace(" ", "_")) + ".dem";
             try
             {
-                string? directoryPath = Path.GetDirectoryName(Path.Join(Server.GameDirectory + "/csgo/" + demoPath));
+                string? directoryPath = Path.GetDirectoryName(
+                    Path.Join(Server.GameDirectory + "/csgo/" + demoPath)
+                );
                 if (directoryPath != null)
                 {
                     if (!Directory.Exists(directoryPath))
@@ -67,7 +73,9 @@ namespace MatchZy
             }
             catch (Exception ex)
             {
-                Log($"[StartDemoRecording - FATAL] Error: {ex.Message}. Starting demo recording with path. Name: {demoFileName}");
+                Log(
+                    $"[StartDemoRecording - FATAL] Error: {ex.Message}. Starting demo recording with path. Name: {demoFileName}"
+                );
                 Server.ExecuteCommand($"tv_record {demoFileName}");
                 isDemoRecording = true;
             }

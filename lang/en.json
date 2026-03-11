@@ -154,5 +154,19 @@
     "matchzy.hint.waitingforplayers": "Waiting for players [Ready: {0}/{1}]",
     "matchzy.hint.usereadycommand": "Use !ready to ready up!",
     "matchzy.ah.title": "=== MatchZy Admin Commands Guide ===",
-    "matchzy.ah.checkconsole": "Check console for full command list"
+    "matchzy.ah.checkconsole": "Check console for full command list",
+    "matchzy.backup.teamsagreed": "Both teams agreed! Restoring round...",
+    "matchzy.backup.nobackupavailable": "Error: No backup available to restore!",
+    "matchzy.backup.voteexpired": "Previous .stop vote expired. Starting new vote...",
+    "matchzy.backup.votepending": "Vote expires in {0} seconds.",
+    "matchzy.backup.restartinground": "Restarting round {0}...",
+    "matchzy.veto.commencing": "Map selection commencing in {0}",
+    "matchzy.veto.captainfor": "Captain for {green}{0}{default}: {green}{1}{default}",
+    "matchzy.veto.captainleft": "A team captain left during map selection. Map selection is paused.",
+    "matchzy.veto.captainleft.ready": "Type .ready when you are ready to resume map selection.",
+    "matchzy.veto.mapsdecided": "The maps have been decided:",
+    "matchzy.veto.mapnumber": "Map {0}: {1}.",
+    "matchzy.veto.remainingmaps": "Remaining Maps: {0}",
+    "matchzy.ot.starting": "Match is tied! Overtime starting.",
+    "matchzy.ot.format": "Format: MR{0} (${1} start money)"
 }

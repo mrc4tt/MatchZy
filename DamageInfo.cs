@@ -2,7 +2,6 @@ using CounterStrikeSharp.API;
 using CounterStrikeSharp.API.Core;
 using CounterStrikeSharp.API.Modules.Utils;
 
-
 namespace MatchZy
 {
     public partial class MatchZy
@@ -11,30 +10,39 @@ namespace MatchZy
         {
             foreach (var key in playerData.Keys)
             {
-                if (!playerData[key].IsValid) continue;
-                if (playerData[key].IsBot) continue;
+                if (!playerData[key].IsValid)
+                    continue;
+                if (playerData[key].IsBot)
+                    continue;
                 int attackerId = key;
                 foreach (var key2 in playerData.Keys)
                 {
-                    if (key == key2) continue;
-                    if (!playerData[key2].IsValid || playerData[key2].IsBot) continue;
-                    if (playerData[key].TeamNum == playerData[key2].TeamNum) continue;
+                    if (key == key2)
+                        continue;
+                    if (!playerData[key2].IsValid || playerData[key2].IsBot)
+                        continue;
+                    if (playerData[key].TeamNum == playerData[key2].TeamNum)
+                        continue;
                     if (playerData[key].TeamNum == 2)
                     {
-                        if (playerData[key2].TeamNum != 3) continue;
+                        if (playerData[key2].TeamNum != 3)
+                            continue;
                         int targetId = key2;
                         if (!playerDamageInfo.TryGetValue(attackerId, out var attackerInfo))
-                            playerDamageInfo[attackerId] = attackerInfo = new Dictionary<int, DamagePlayerInfo>();
+                            playerDamageInfo[attackerId] = attackerInfo =
+                                new Dictionary<int, DamagePlayerInfo>();
 
                         if (!attackerInfo.TryGetValue(targetId, out var targetInfo))
                             attackerInfo[targetId] = targetInfo = new DamagePlayerInfo();
                     }
                     else if (playerData[key].TeamNum == 3)
                     {
-                        if (playerData[key2].TeamNum != 2) continue;
+                        if (playerData[key2].TeamNum != 2)
+                            continue;
                         int targetId = key2;
                         if (!playerDamageInfo.TryGetValue(attackerId, out var attackerInfo))
-                            playerDamageInfo[attackerId] = attackerInfo = new Dictionary<int, DamagePlayerInfo>();
+                            playerDamageInfo[attackerId] = attackerInfo =
+                                new Dictionary<int, DamagePlayerInfo>();
 
                         if (!attackerInfo.TryGetValue(targetId, out var targetInfo))
                             attackerInfo[targetId] = targetInfo = new DamagePlayerInfo();
@@ -50,10 +58,12 @@ namespace MatchZy
         {
             CCSPlayerController? attacker = @event.Attacker;
 
-            if (!IsPlayerValid(attacker)) return;
+            if (!IsPlayerValid(attacker))
+                return;
             int attackerId = (int)attacker!.UserId!;
             if (!playerDamageInfo.TryGetValue(attackerId, out var attackerInfo))
-                playerDamageInfo[attackerId] = attackerInfo = new Dictionary<int, DamagePlayerInfo>();
+                playerDamageInfo[attackerId] = attackerInfo =
+                    new Dictionary<int, DamagePlayerInfo>();
 
             if (!attackerInfo.TryGetValue(targetId, out var targetInfo))
                 attackerInfo[targetId] = targetInfo = new DamagePlayerInfo();
@@ -64,7 +74,8 @@ namespace MatchZy
 
         private void ShowDamageInfo()
         {
-            if (!enableDamageReport.Value) return;
+            if (!enableDamageReport.Value)
+                return;
             try
             {
                 HashSet<(int, int)> processedPairs = new HashSet<(int, int)>();
@@ -74,8 +85,10 @@ namespace MatchZy
                     int attackerId = entry.Key;
                     foreach (var (targetId, targetEntry) in entry.Value)
                     {
-                        if (processedPairs.Contains((attackerId, targetId)) ||
-                            processedPairs.Contains((targetId, attackerId)))
+                        if (
+                            processedPairs.Contains((attackerId, targetId))
+                            || processedPairs.Contains((targetId, attackerId))
+                        )
                             continue;
 
                         // Access and use the damage information as needed.
@@ -84,42 +97,64 @@ namespace MatchZy
                         int damageTaken = 0;
                         int hitsTaken = 0;
 
-                        if (playerDamageInfo.TryGetValue(targetId, out var targetInfo) &&
-                            targetInfo.TryGetValue(attackerId, out var takenInfo))
+                        if (
+                            playerDamageInfo.TryGetValue(targetId, out var targetInfo)
+                            && targetInfo.TryGetValue(attackerId, out var takenInfo)
+                        )
                         {
                             damageTaken = takenInfo.DamageHP;
                             hitsTaken = takenInfo.Hits;
                         }
 
-                        if (!playerData.ContainsKey(attackerId) || !playerData.ContainsKey(targetId)) continue;
+                        if (
+                            !playerData.ContainsKey(attackerId) || !playerData.ContainsKey(targetId)
+                        )
+                            continue;
 
                         var attackerController = playerData[attackerId];
                         var targetController = playerData[targetId];
 
                         if (attackerController != null && targetController != null)
                         {
-                            if (!attackerController.IsValid || !targetController.IsValid) continue;
-                            if (attackerController.Connected != PlayerConnectedState.PlayerConnected) continue;
-                            if (targetController.Connected != PlayerConnectedState.PlayerConnected) continue;
-                            if (!attackerController.PlayerPawn.IsValid || !targetController.PlayerPawn.IsValid)
+                            if (!attackerController.IsValid || !targetController.IsValid)
                                 continue;
-                            if (attackerController.PlayerPawn.Value == null ||
-                                targetController.PlayerPawn.Value == null) continue;
+                            if (
+                                attackerController.Connected != PlayerConnectedState.PlayerConnected
+                            )
+                                continue;
+                            if (targetController.Connected != PlayerConnectedState.PlayerConnected)
+                                continue;
+                            if (
+                                !attackerController.PlayerPawn.IsValid
+                                || !targetController.PlayerPawn.IsValid
+                            )
+                                continue;
+                            if (
+                                attackerController.PlayerPawn.Value == null
+                                || targetController.PlayerPawn.Value == null
+                            )
+                                continue;
 
-                            int attackerHP = attackerController.PlayerPawn.Value.Health < 0
-                                ? 0
-                                : attackerController.PlayerPawn.Value.Health;
+                            int attackerHP =
+                                attackerController.PlayerPawn.Value.Health < 0
+                                    ? 0
+                                    : attackerController.PlayerPawn.Value.Health;
                             string attackerName = attackerController.PlayerName;
 
-                            int targetHP = targetController.PlayerPawn.Value.Health < 0
-                                ? 0
-                                : targetController.PlayerPawn.Value.Health;
+                            int targetHP =
+                                targetController.PlayerPawn.Value.Health < 0
+                                    ? 0
+                                    : targetController.PlayerPawn.Value.Health;
                             string targetName = targetController.PlayerName;
 
-                            PrintToPlayerChat(attackerController,
-                                $"{ChatColors.Green}To: [{damageGiven} / {hitsGiven} hits] From: [{damageTaken} / {hitsTaken} hits] - {targetName} - ({targetHP} hp){ChatColors.Default}");
-                            PrintToPlayerChat(targetController,
-                                $"{ChatColors.Green}To: [{damageTaken} / {hitsTaken} hits] From: [{damageGiven} / {hitsGiven} hits] - {attackerName} - ({attackerHP} hp){ChatColors.Default}");
+                            PrintToPlayerChat(
+                                attackerController,
+                                $"{ChatColors.Green}To: [{damageGiven} / {hitsGiven} hits] From: [{damageTaken} / {hitsTaken} hits] - {targetName} - ({targetHP} hp){ChatColors.Default}"
+                            );
+                            PrintToPlayerChat(
+                                targetController,
+                                $"{ChatColors.Green}To: [{damageTaken} / {hitsTaken} hits] From: [{damageGiven} / {hitsGiven} hits] - {attackerName} - ({attackerHP} hp){ChatColors.Default}"
+                            );
                         }
 
                         // Mark this pair as processed to avoid duplicates.

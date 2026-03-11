@@ -154,5 +154,19 @@
     "matchzy.hint.waitingforplayers": "Duke pritur lojtarët [Gati: {0}/{1}]",
     "matchzy.hint.usereadycommand": "Përdorni !ready për t'u bërë gati!",
     "matchzy.ah.title": "=== Udhëzuesi i Komandave të Admin MatchZy ===",
-    "matchzy.ah.checkconsole": "Kontrolloni konsolën për listën e plotë të komandave"
+    "matchzy.ah.checkconsole": "Kontrolloni konsolën për listën e plotë të komandave",
+    "matchzy.backup.teamsagreed": "Të dy skuadrat ranë dakord! Duke rivendosur raundin...",
+    "matchzy.backup.nobackupavailable": "Gabim: Nuk ka backup të disponueshme për rivendosje!",
+    "matchzy.backup.voteexpired": "Votimi i mëparshëm .stop ka skaduar. Duke filluar votim të ri...",
+    "matchzy.backup.votepending": "Votimi skadon për {0} sekonda.",
+    "matchzy.backup.restartinground": "Duke rifilluar raundin {0}...",
+    "matchzy.veto.commencing": "Zgjedhja e hartës fillon për {0}",
+    "matchzy.veto.captainfor": "Kapiteni për {green}{0}{default}: {green}{1}{default}",
+    "matchzy.veto.captainleft": "Një kapiten skuadre u largua gjatë zgjedhjes së hartës. Zgjedhja është pezulluar.",
+    "matchzy.veto.captainleft.ready": "Shkruani .ready kur të jeni gati për të vazhduar zgjedhjen e hartës.",
+    "matchzy.veto.mapsdecided": "Hartat janë vendosur:",
+    "matchzy.veto.mapnumber": "Harta {0}: {1}.",
+    "matchzy.veto.remainingmaps": "Hartat e mbetura: {0}",
+    "matchzy.ot.starting": "Ndeshja është barazim! Koha shtesë fillon.",
+    "matchzy.ot.format": "Formati: MR{0} (${1} para fillestare)"
 }

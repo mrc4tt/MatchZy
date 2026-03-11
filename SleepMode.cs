@@ -1,8 +1,8 @@
 using CounterStrikeSharp.API;
 using CounterStrikeSharp.API.Core;
 using CounterStrikeSharp.API.Core.Attributes.Registration;
-using CounterStrikeSharp.API.Modules.Commands;
 using CounterStrikeSharp.API.Core.Translations;
+using CounterStrikeSharp.API.Modules.Commands;
 
 namespace MatchZy
 {
@@ -12,7 +12,8 @@ namespace MatchZy
 
         public void StartSleepMode()
         {
-            if (matchStarted) return;
+            if (matchStarted)
+                return;
             isSleep = true;
 
             // Reset player settings before leaving practice
@@ -61,7 +62,10 @@ namespace MatchZy
             if (matchStarted)
             {
                 // ReplyToUserCommand(player, "Sleep Mode cannot be started when a match has been started!");
-                ReplyToUserCommand(player, Localizer.ForPlayer(player, "matchzy.sleep.sleepwhenmatchstared"));
+                ReplyToUserCommand(
+                    player,
+                    Localizer.ForPlayer(player, "matchzy.sleep.sleepwhenmatchstared")
+                );
                 return;
             }
 

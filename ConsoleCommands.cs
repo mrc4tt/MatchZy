@@ -314,10 +314,13 @@ namespace MatchZy
             SideSwitchCommand(player, CsTeam.Terrorist);
 
             // Fjern droppede granater med delay
-            AddTimer(0.2f, () =>
-            {
-                CleanupDroppedGrenades();
-            });
+            AddTimer(
+                0.2f,
+                () =>
+                {
+                    CleanupDroppedGrenades();
+                }
+            );
         }
 
         [ConsoleCommand("css_ct", "Switches team to Counter-Terrorist")]
@@ -353,10 +356,13 @@ namespace MatchZy
             SideSwitchCommand(player, CsTeam.CounterTerrorist);
 
             // Fjern droppede granater med delay
-            AddTimer(0.2f, () =>
-            {
-                CleanupDroppedGrenades();
-            });
+            AddTimer(
+                0.2f,
+                () =>
+                {
+                    CleanupDroppedGrenades();
+                }
+            );
         }
 
         private void CleanupDroppedGrenades()
@@ -365,27 +371,35 @@ namespace MatchZy
             {
                 var grenadeNames = new[]
                 {
-            "weapon_flashbang",
-            "weapon_hegrenade",
-            "weapon_smokegrenade",
-            "weapon_molotov",
-            "weapon_incgrenade",
-            "weapon_decoy"
-        };
+                    "weapon_flashbang",
+                    "weapon_hegrenade",
+                    "weapon_smokegrenade",
+                    "weapon_molotov",
+                    "weapon_incgrenade",
+                    "weapon_decoy",
+                };
 
                 foreach (var grenadeName in grenadeNames)
                 {
-                    var entities = Utilities.FindAllEntitiesByDesignerName<CBasePlayerWeapon>(grenadeName);
+                    var entities = Utilities.FindAllEntitiesByDesignerName<CBasePlayerWeapon>(
+                        grenadeName
+                    );
 
                     foreach (var entity in entities)
                     {
                         try
                         {
-                            if (entity == null || !entity.IsValid) continue;
+                            if (entity == null || !entity.IsValid)
+                                continue;
 
                             // Tjek om entityen har en owner (ikke droppet)
                             var ownerEntity = entity.OwnerEntity;
-                            if (ownerEntity != null && ownerEntity.IsValid && ownerEntity.Value != null) continue;
+                            if (
+                                ownerEntity != null
+                                && ownerEntity.IsValid
+                                && ownerEntity.Value != null
+                            )
+                                continue;
 
                             entity.Remove();
                         }
@@ -536,7 +550,10 @@ namespace MatchZy
                             MapNumber = matchConfig.CurrentMapNumber,
                             RoundNumber = GetRoundNumer(),
                         };
-                        Task.Run(async () => { await SendEventAsync(unpauseEvent); });
+                        Task.Run(async () =>
+                        {
+                            await SendEventAsync(unpauseEvent);
+                        });
                     }
                 }
                 else if (unpauseTeamName == "Admin")
@@ -556,7 +573,10 @@ namespace MatchZy
                             MapNumber = matchConfig.CurrentMapNumber,
                             RoundNumber = GetRoundNumer(),
                         };
-                        Task.Run(async () => { await SendEventAsync(unpauseEvent); });
+                        Task.Run(async () =>
+                        {
+                            await SendEventAsync(unpauseEvent);
+                        });
                     }
                 }
                 else
@@ -822,7 +842,10 @@ namespace MatchZy
                 // Block end/reset during endscreen/post-game to avoid instability
                 if (IsPostGamePhase())
                 {
-                    ReplyToUserCommand(player, Localizer.ForPlayer(player, "matchzy.utility.matchended"));
+                    ReplyToUserCommand(
+                        player,
+                        Localizer.ForPlayer(player, "matchzy.utility.matchended")
+                    );
                     return;
                 }
 
@@ -848,7 +871,10 @@ namespace MatchZy
                 // Block during endscreen/post-game
                 if (IsPostGamePhase())
                 {
-                    ReplyToUserCommand(player, Localizer.ForPlayer(player, "matchzy.utility.matchended"));
+                    ReplyToUserCommand(
+                        player,
+                        Localizer.ForPlayer(player, "matchzy.utility.matchended")
+                    );
                     return;
                 }
 
@@ -873,11 +899,15 @@ namespace MatchZy
                 // Block restart during endscreen/post-game to avoid CSTV/server issues
                 if (IsPostGamePhase())
                 {
-                    ReplyToUserCommand(player, Localizer.ForPlayer(player, "matchzy.utility.matchended"));
+                    ReplyToUserCommand(
+                        player,
+                        Localizer.ForPlayer(player, "matchzy.utility.matchended")
+                    );
                     return;
                 }
 
-                if (GuardAgainstDryRun(player)) return;
+                if (GuardAgainstDryRun(player))
+                    return;
                 if (!isPractice)
                 {
                     ResetMatch(true, "restarted");
@@ -901,7 +931,10 @@ namespace MatchZy
             // Block map reload during endscreen/post-game to avoid CSTV/player issues
             if (IsPostGamePhase())
             {
-                ReplyToUserCommand(player, Localizer.ForPlayer(player, "matchzy.utility.matchended"));
+                ReplyToUserCommand(
+                    player,
+                    Localizer.ForPlayer(player, "matchzy.utility.matchended")
+                );
                 return;
             }
             string currentMapName = Server.MapName;
@@ -924,11 +957,15 @@ namespace MatchZy
 
         private bool GuardAgainstDryRun(CCSPlayerController? player)
         {
-            if (!isDryRun) return false;
+            if (!isDryRun)
+                return false;
 
             // Localized message if you have it, otherwise plain text:
             // ReplyToUserCommand(player, Localizer.ForPlayer(player, "matchzy.pm.nostartindry"));
-            ReplyToUserCommand(player, "You can’t start a match while Dry Run is active. Type .exitdry first.");
+            ReplyToUserCommand(
+                player,
+                "You can’t start a match while Dry Run is active. Type .exitdry first."
+            );
             return true; // means: blocked
         }
 
@@ -952,7 +989,8 @@ namespace MatchZy
                     return;
                 }
 
-                if (GuardAgainstDryRun(player)) return;
+                if (GuardAgainstDryRun(player))
+                    return;
 
                 if (matchStarted)
                 {
@@ -980,7 +1018,8 @@ namespace MatchZy
         {
             if (IsPlayerAdmin(player, "css_warmup", "@css/config"))
             {
-                if (GuardAgainstDryRun(player)) return;
+                if (GuardAgainstDryRun(player))
+                    return;
                 if (matchStarted)
                 {
                     ReplyToUserCommand(
@@ -1038,7 +1077,8 @@ namespace MatchZy
                 SendPlayerNotAdminMessage(player);
                 return;
             }
-            if (GuardAgainstDryRun(player)) return;
+            if (GuardAgainstDryRun(player))
+                return;
 
             isKnifeRound = false;
             isKnifeRequired = false;
@@ -1055,7 +1095,10 @@ namespace MatchZy
             StartScrimMode();
             ReplyToUserCommand(player, "Scrim/Full30 Mode has been loaded.");
             ReplyToUserCommand(player, "Knife Round is disabled for this mode.");
-            ReplyToUserCommand(player, "Wait until all players have !ready OR an Admin can !forcestart.");
+            ReplyToUserCommand(
+                player,
+                "Wait until all players have !ready OR an Admin can !forcestart."
+            );
         }
 
         [ConsoleCommand("css_hill", "Starts scrim mode")]
@@ -1066,7 +1109,8 @@ namespace MatchZy
                 SendPlayerNotAdminMessage(player);
                 return;
             }
-            if (GuardAgainstDryRun(player)) return;
+            if (GuardAgainstDryRun(player))
+                return;
 
             isKnifeRequired = false;
             isKnifeRound = false;
@@ -1095,7 +1139,8 @@ namespace MatchZy
                 SendPlayerNotAdminMessage(player);
                 return;
             }
-            if (GuardAgainstDryRun(player)) return;
+            if (GuardAgainstDryRun(player))
+                return;
 
             isKnifeRequired = true;
             string knifeStatus = isKnifeRequired
@@ -1140,7 +1185,8 @@ namespace MatchZy
 
             CleanupAllCollisionTimers();
 
-            if (GuardAgainstDryRun(player)) return;
+            if (GuardAgainstDryRun(player))
+                return;
 
             if (matchStarted)
             {
@@ -1194,7 +1240,6 @@ namespace MatchZy
         //            }
         //        }
 
-
         [ConsoleCommand("matchzy_version", "Displays the current MatchZy version")]
         [ConsoleCommand("css_matchzy_version", "Displays the current MatchZy version")]
         [ConsoleCommand("css_version", "Displays the current MatchZy version")]
@@ -1239,7 +1284,12 @@ namespace MatchZy
         // Overrides noclip console command. Perform the changes on server side.
         public HookResult OnConsoleNoClip(CCSPlayerController? player, CommandInfo cmd)
         {
-            if (player == null || !player.PawnIsAlive || player.Team == CsTeam.Spectator || player.Team == CsTeam.None)
+            if (
+                player == null
+                || !player.PawnIsAlive
+                || player.Team == CsTeam.Spectator
+                || player.Team == CsTeam.None
+            )
                 return HookResult.Stop;
 
             // Additional safety check for PlayerPawn
