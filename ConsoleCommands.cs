@@ -863,7 +863,6 @@ namespace MatchZy
 
         [ConsoleCommand("css_matchgg", "Surrender the match")]
         [ConsoleCommand("css_surrender", "Surrender the match")]
-        [ConsoleCommand("css_gg", "Surrender the match")]
         public void OnSurrenderCommand(CCSPlayerController? player, CommandInfo? command)
         {
             if (IsPlayerAdmin(player, "css_endmatch", "@css/config"))
