@@ -238,6 +238,7 @@ namespace MatchZy
                 { ".p", OnPauseCommand },
                 { ".pause", OnPauseCommand },
                 { ".unpause", OnUnpauseCommand },
+                { ".up", OnUnpauseCommand },
                 { ".forcepause", OnForcePauseCommand },
                 { ".fp", OnForcePauseCommand },
                 { ".forceunpause", OnForceUnpauseCommand },

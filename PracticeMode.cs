@@ -3167,6 +3167,7 @@ namespace MatchZy
 
         [ConsoleCommand("css_throw", "Throws the last thrown grenade")]
         [ConsoleCommand("css_rethrow", "Throws the last thrown grenade")]
+        [ConsoleCommand("css_rt", "Throws the last thrown grenade")]
         public void OnRethrowCommand(CCSPlayerController? player, CommandInfo? command)
         {
             if (!isPractice || player == null || !player.UserId.HasValue)

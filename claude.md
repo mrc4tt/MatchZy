@@ -4,21 +4,21 @@
 
 ## Project Overview
 
-FSHMatchZy is a CounterStrikeSharp plugin based on [MatchZy](https://github.com/shobhit-pathak/MatchZy) - a match management plugin for Counter-Strike 2 competitive servers. This fork includes customizations and integrations specific to game server hosting.
+MatchZy is a CounterStrikeSharp plugin based on [MatchZy](https://github.com/shobhit-pathak/MatchZy) - a match management plugin for Counter-Strike 2 competitive servers. This fork includes customizations and integrations specific to game server hosting.
 
 ## Tech Stack
 
-- **Framework**: [CounterStrikeSharp](https://github.com/roflmuffin/CounterStrikeSharp) (.NET 8)
+- **Framework**: [CounterStrikeSharp](https://github.com/roflmuffin/CounterStrikeSharp) (.NET 8.0)
 - **Language**: C# 12
 - **Target**: Counter-Strike 2 dedicated servers (Linux)
-- **API Version**: CounterStrikeSharp API 1.0.340+
+- **API Version**: CounterStrikeSharp API 1.0.360+
 
 ## Project Structure
 
 ```
-fshmatchzy/
+MatchZy/
 ├── src/
-│   ├── FSHMatchZy.cs          # Main plugin entry point
+│   ├── MatchZy.cs          # Main plugin entry point
 │   ├── Config/                 # Configuration classes
 │   ├── Commands/               # Console/chat commands
 │   ├── Events/                 # Game event handlers
@@ -26,7 +26,7 @@ fshmatchzy/
 │   └── Utils/                  # Helper utilities
 ├── lang/                       # Localization files (JSON)
 ├── cfg/                        # Server config files
-└── FSHMatchZy.csproj          # Project file
+└── MatchZy.csproj          # Project file
 ```
 
 ## Code Conventions
@@ -40,9 +40,9 @@ using CounterStrikeSharp.API.Core.Attributes.Registration;
 using CounterStrikeSharp.API.Modules.Commands;
 using CounterStrikeSharp.API.Modules.Utils;
 
-namespace FSHMatchZy;
+namespace MatchZy;
 
-public class FSHMatchZy : BasePlugin
+public class MatchZy : BasePlugin
 {
     public override string ModuleName => "MatchZy";
     public override string ModuleVersion => "1.0.0";
@@ -159,15 +159,15 @@ player.PrintToChat(Localizer["match.started"]);
 dotnet build -c Release
 
 # Output location
-bin/Release/net8.0/FSHMatchZy.dll
+bin/Release/net8.0/MatchZy.dll
 ```
 
 ## Testing
 
 Deploy to a test CS2 server:
 ```
-/game/csgo/addons/counterstrikesharp/plugins/FSHMatchZy/
-├── FSHMatchZy.dll
+/game/csgo/addons/counterstrikesharp/plugins/MatchZy/
+├── MatchZy.dll
 ├── lang/
 │   └── en.json
 └── cfg/
