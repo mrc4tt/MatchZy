@@ -119,7 +119,7 @@ jobs:
               "https://git.miksen.me/api/v1/repos/${{ github.repository }}/releases/$RELEASE_ID/assets?name=$file" \
               -H "Authorization: token $GITEA_TOKEN" \
               -H "Content-Type: application/octet-stream" \
-              -F "attachment=@$file")
+              --data-binary "@$file"
 
             ASSET_ID=$(echo "$UPLOAD_RESPONSE" | jq -r '.id // empty')
             if [ -z "$ASSET_ID" ]; then
