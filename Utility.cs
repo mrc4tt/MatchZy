@@ -1339,7 +1339,6 @@ namespace MatchZy
                     if (liveMatchId == -1)
                     {
                         Log("[HandleMatchStart] CRITICAL: Database initialization failed! Match stats will NOT be recorded.");
-                        PrintToAllChat($" {ChatColors.Red}WARNING: Database connection failed - match stats will not be recorded!");
                     }
                     else
                     {
