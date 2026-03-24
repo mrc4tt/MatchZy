@@ -146,6 +146,7 @@ namespace MatchZy
                     AddTimer(afterReadyDelay, CheckLiveRequired);
                     // Force update clan tag for this specific player
                     HandleClanTags(forceUpdateSlot: player.Slot);
+                    _readyStatusDirty = true;
                     UnreadyHintMessageStart();
                 }
             }
@@ -186,6 +187,7 @@ namespace MatchZy
 
                     // Force update clan tag for this specific player
                     HandleClanTags(forceUpdateSlot: player.Slot);
+                    _readyStatusDirty = true;
                     UnreadyHintMessageStart();
                 }
             }
@@ -937,21 +939,30 @@ namespace MatchZy
                 return;
             }
             string currentMapName = Server.MapName;
-            if (long.TryParse(currentMapName, out _))
-            { // Check if mapName is a long for workshop map ids
-                Server.ExecuteCommand($"bot_kick");
-                Server.ExecuteCommand($"host_workshop_map \"{currentMapName}\"");
-            }
-            else if (Server.IsMapValid(currentMapName))
+
+            // Stop demo recording before map change to prevent GOTV crash
+            if (isDemoRecording)
             {
-                Server.ExecuteCommand($"bot_kick");
-                Server.ExecuteCommand($"changelevel \"{currentMapName}\"");
+                Server.ExecuteCommand("tv_stoprecord");
+                isDemoRecording = false;
             }
-            else
+            Server.ExecuteCommand("bot_kick");
+
+            Server.NextFrame(() =>
             {
-                // ReplyToUserCommand(player, "Invalid map name!");
-                ReplyToUserCommand(player, Localizer.ForPlayer(player, "matchzy.cc.invalidmap"));
-            }
+                if (long.TryParse(currentMapName, out _))
+                {
+                    Server.ExecuteCommand($"host_workshop_map \"{currentMapName}\"");
+                }
+                else if (Server.IsMapValid(currentMapName))
+                {
+                    Server.ExecuteCommand($"changelevel \"{currentMapName}\"");
+                }
+                else
+                {
+                    ReplyToUserCommand(player, Localizer.ForPlayer(player, "matchzy.cc.invalidmap"));
+                }
+            });
         }
 
         private bool GuardAgainstDryRun(CCSPlayerController? player)

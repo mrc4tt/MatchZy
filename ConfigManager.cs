@@ -706,7 +706,7 @@ mp_buytime 999999
 mp_buy_allow_grenades 1
 mp_respawn_on_death_ct true
 mp_respawn_on_death_t true
-bot_quota_mode fill
+bot_quota_mode normal
 mp_solid_teammates 2
 mp_autoteambalance false
 mp_teammates_are_enemies false

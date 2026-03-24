@@ -164,9 +164,9 @@ namespace MatchZy
 
                 playerDamageInfo.Clear();
             }
-            catch (Exception)
+            catch (Exception e)
             {
-                // Log($"[ShowDamageInfo FATAL] An error occurred: {e.Message}");
+                Log($"[ShowDamageInfo FATAL] An error occurred: {e.Message}");
             }
         }
     }

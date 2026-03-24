@@ -122,38 +122,56 @@ namespace MatchZy
 
             try
             {
-                HttpClient httpClient = new();
-                if (headerName != "")
+                Log($"[LoadMatchFromURL] Fetching match config from URL...");
+
+                // Fetch async to avoid blocking game thread
+                Task.Run(async () =>
                 {
-                    httpClient.DefaultRequestHeaders.Add(headerName, headerValue);
-                }
-
-                HttpResponseMessage response = httpClient.GetAsync(url).Result;
-
-                if (response.IsSuccessStatusCode)
-                {
-                    string jsonData = response.Content.ReadAsStringAsync().Result;
-                    Log($"[LoadMatchFromURL] Received following data: {jsonData}");
-
-                    bool success = LoadMatchFromJSON(jsonData);
-                    if (!success)
+                    try
                     {
-                        // command.ReplyToCommand("Match load failed! Resetting current match");
-                        ReplyToUserCommand(player, Localizer.ForPlayer(player, "matchzy.mm.matchloadfailed"));
-                        ResetMatch();
-                    }
+                        using var request = new HttpRequestMessage(HttpMethod.Get, url);
+                        if (headerName != "")
+                        {
+                            request.Headers.TryAddWithoutValidation(headerName, headerValue);
+                        }
 
-                    loadedConfigFile = url;
-                    // Mark this as a G5API match if loaded via get5_loadmatch_url command
-                    isG5ApiMatch = true;
-                    Log($"[LoadMatchFromURL] G5API match detected and marked");
-                }
-                else
-                {
-                    // command.ReplyToCommand($"[LoadMatchFromURL] HTTP request failed with status code: {response.StatusCode}");
-                    ReplyToUserCommand(player, Localizer.ForPlayer(player, "matchzy.mm.httprequestfailed", response.StatusCode));
-                    Log($"[LoadMatchFromURL] HTTP request failed with status code: {response.StatusCode}");
-                }
+                        var response = await _sharedHttpClient.SendAsync(request);
+
+                        if (response.IsSuccessStatusCode)
+                        {
+                            string jsonData = await response.Content.ReadAsStringAsync();
+                            Log($"[LoadMatchFromURL] Received following data: {jsonData}");
+
+                            // LoadMatchFromJSON uses native APIs — must run on game thread
+                            Server.NextFrame(() =>
+                            {
+                                bool success = LoadMatchFromJSON(jsonData);
+                                if (!success)
+                                {
+                                    ReplyToUserCommand(player, Localizer.ForPlayer(player, "matchzy.mm.matchloadfailed"));
+                                    ResetMatch();
+                                    return;
+                                }
+
+                                loadedConfigFile = url;
+                                isG5ApiMatch = true;
+                                Log($"[LoadMatchFromURL] G5API match detected and marked");
+                            });
+                        }
+                        else
+                        {
+                            Server.NextFrame(() =>
+                            {
+                                ReplyToUserCommand(player, Localizer.ForPlayer(player, "matchzy.mm.httprequestfailed", response.StatusCode));
+                            });
+                            Log($"[LoadMatchFromURL] HTTP request failed with status code: {response.StatusCode}");
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        Log($"[LoadMatchFromURL - FATAL] Async fetch error: {ex.Message}");
+                    }
+                });
             }
             catch (Exception e)
             {
@@ -581,18 +599,11 @@ namespace MatchZy
             // Also set directly on CCSTeam entities for reliability
             try
             {
-                var teamEntities = Utilities.FindAllEntitiesByDesignerName<CCSTeam>("cs_team_manager");
-                foreach (var team in teamEntities)
-                {
-                    if (team.Teamname == "CT")
-                    {
-                        team.ClanTeamname = ctName;
-                    }
-                    else if (team.Teamname == "TERRORIST")
-                    {
-                        team.ClanTeamname = tName;
-                    }
-                }
+                // Use cached entities — no entity scan
+                if (_cachedCtTeam != null && _cachedCtTeam.IsValid)
+                    _cachedCtTeam.ClanTeamname = ctName;
+                if (_cachedTTeam != null && _cachedTTeam.IsValid)
+                    _cachedTTeam.ClanTeamname = tName;
             }
             catch (Exception e)
             {
@@ -820,28 +831,19 @@ namespace MatchZy
                 await SendEventAsync(seriesResultEvent);
             });
 
+            // FIRST: Disable engine auto-change BEFORE restoring cvars — prevents race condition
+            // where ResetChangedConvars re-enables them and engine races the plugin's map change.
+            Server.ExecuteCommand("mp_match_end_changelevel 0");
+            Server.ExecuteCommand("mp_match_end_restart 0");
+            Server.ExecuteCommand("mp_endmatch_votenextmap 0");
+
             if (resetCvarsOnSeriesEnd) ResetChangedConvars();
             isMatchLive = false;
             isConvarMappingSwapped = false;
 
-            // Always disable mp_match_end_changelevel to prevent mapgroup errors
-            var matchEndChangelevelConVar = ConVar.Find("mp_match_end_changelevel");
-            bool wasChangelevelEnabled = matchEndChangelevelConVar?.GetPrimitiveValue<bool>() ?? false;
-            
-            if (wasChangelevelEnabled)
-            {
-                Log($"[EndSeries] mp_match_end_changelevel was enabled, disabling it to prevent mapgroup error");
-                Server.ExecuteCommand("mp_match_end_changelevel 0");
-            }
-
-            // Also disable mp_match_end_restart to avoid engine auto-restart (often ~5s)
-            var matchEndRestartConVar = ConVar.Find("mp_match_end_restart");
-            bool wasRestartEnabled = matchEndRestartConVar?.GetPrimitiveValue<bool>() ?? false;
-            if (wasRestartEnabled)
-            {
-                Log("[EndSeries] mp_match_end_restart was enabled, disabling it to prevent early map restart");
-                Server.ExecuteCommand("mp_match_end_restart 0");
-            }
+            // Re-enforce AFTER convar reset in case ResetChangedConvars restored them
+            Server.ExecuteCommand("mp_match_end_changelevel 0");
+            Server.ExecuteCommand("mp_match_end_restart 0");
 
             // Check if auto changelevel should be disabled
             bool shouldDisableAutoChangelevel = !matchEndAutoChangelevel.Value || isG5ApiMatch;
@@ -863,69 +865,85 @@ namespace MatchZy
 
             // For last map (series end), change after exactly 10 seconds
             float mapChangeDelay = 10.0f;
+
+            // Guard against empty map rotation
+            if (mapRotationList.Count == 0)
+            {
+                Log("[EndSeries] WARNING: Map rotation list is empty! Cannot auto-changelevel. Resetting match on current map.");
+                PrintToAllChat($"{ChatColors.Red}No maps in rotation — staying on current map.");
+                AddTimer(restartDelay, () =>
+                {
+                    ResetMatch(false);
+                });
+                return;
+            }
             
-            Log($"[EndSeries] Match ended at {DateTime.Now:HH:mm:ss}");
-            Log($"[EndSeries] Map change scheduled for {mapChangeDelay} seconds from now");
-            
-            DateTime scheduledChangeTime = DateTime.Now.AddSeconds(mapChangeDelay);
-            Log($"[EndSeries] Expected map change time: {scheduledChangeTime:HH:mm:ss}");
-            
-            // Get the next map for announcement
+            // Get the next map in rotation
             string currentMap = Server.MapName;
             int currentIndex = mapRotationList.IndexOf(currentMap);
             string nextMap = currentIndex >= 0 && currentIndex < mapRotationList.Count - 1
                 ? mapRotationList[currentIndex + 1]
                 : mapRotationList[0];
             
-            Log($"[EndSeries] Current map: {currentMap}, Next map: {nextMap}");
+            Log($"[EndSeries] Current map: {currentMap}, Next map: {nextMap}, Change in {mapChangeDelay}s");
+
+            // Notify players
+            PrintToAllChat($"Next map: {ChatColors.Green}{nextMap}{ChatColors.Default} — changing in {(int)mapChangeDelay} seconds.");
             
             matchEndMapChangeTimer = AddTimer(mapChangeDelay, () =>
             {
-                DateTime actualChangeTime = DateTime.Now;
-                TimeSpan timeDifference = actualChangeTime - scheduledChangeTime;
+                // Reset match state FIRST, then change map — serialized to avoid race condition
+                ResetMatch(false);
                 
                 // Use the appropriate command based on map type
                 ChangeMapFromRotation(nextMap);
                 
                 matchEndMapChangeTimer = null;
             });
-
-            AddTimer(restartDelay, () =>
-            {
-                ResetMatch(false);
-            });
         }
 
         private void ChangeMapFromRotation(string mapName)
         {
+            // Ensure demo is stopped before map change to prevent GOTV flush crash
+            if (isDemoRecording)
+            {
+                Server.ExecuteCommand("tv_stoprecord");
+                isDemoRecording = false;
+            }
+
+            // Prevent engine from racing us with its own map change
+            Server.ExecuteCommand("mp_match_end_changelevel 0");
+            Server.ExecuteCommand("mp_match_end_restart 0");
+            Server.ExecuteCommand("mp_endmatch_votenextmap 0");
+            Server.ExecuteCommand("bot_kick");
+
             // Check if it's a workshop map (starts with "workshop/" or is just a numeric ID)
             bool isWorkshopMap = mapName.StartsWith("workshop/") || long.TryParse(mapName, out _);
             
-            if (isWorkshopMap)
+            // Execute on next frame for engine state safety
+            Server.NextFrame(() =>
             {
-                // Extract workshop ID if format is "workshop/ID" or "workshop/ID/mapname"
-                string workshopId = mapName;
-                if (mapName.StartsWith("workshop/"))
+                if (isWorkshopMap)
                 {
-                    // Extract just the ID part (e.g., "workshop/3070212801" or "workshop/3070212801/de_cache")
-                    string[] parts = mapName.Split('/');
-                    if (parts.Length >= 2)
+                    string workshopId = mapName;
+                    if (mapName.StartsWith("workshop/"))
                     {
-                        workshopId = parts[1];
+                        string[] parts = mapName.Split('/');
+                        if (parts.Length >= 2)
+                        {
+                            workshopId = parts[1];
+                        }
                     }
+                    
+                    Log($"[ChangeMapFromRotation] Workshop map, using host_workshop_map: {workshopId}");
+                    Server.ExecuteCommand($"host_workshop_map {workshopId}");
                 }
-                
-                Log($"[ChangeMapFromRotation] Workshop map detected, using host_workshop_map with ID: {workshopId}");
-                Server.ExecuteCommand($"bot_kick");
-                Server.ExecuteCommand($"host_workshop_map {workshopId}");
-            }
-            else
-            {
-                // Standard map, use changelevel
-                Log($"[ChangeMapFromRotation] Standard map detected, using changelevel: {mapName}");
-                Server.ExecuteCommand($"bot_kick");
-                Server.ExecuteCommand($"changelevel {mapName}");
-            }
+                else
+                {
+                    Log($"[ChangeMapFromRotation] Standard map, using changelevel: {mapName}");
+                    Server.ExecuteCommand($"changelevel {mapName}");
+                }
+            });
         }
 
         public void HandlePlayoutConfig()

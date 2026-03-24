@@ -48,6 +48,7 @@ public partial class MatchZy
             {
                 playerReadyStatus[userId] = true;
             }
+            _readyStatusDirty = true;
 
             // First player connection handling
             if (GetRealPlayersCount() == 1)
@@ -99,6 +100,7 @@ public partial class MatchZy
             {
                 connectedPlayers--;
             }
+            _readyStatusDirty = true;
 
             playerData.Remove(userId);
 
@@ -140,19 +142,16 @@ public partial class MatchZy
     }
 
     public HookResult EventCsWinPanelMatchHandler(EventCsWinPanelMatch @event, GameEventInfo info)
-    //public HookResult OnEventCsIntermissionPost(EventCsIntermission @event, GameEventInfo info)
     {
         try
         {
             HandleMatchEnd();
-            // ResetMatch();
-            isKnifeRequired = !isKnifeRequired;
+            // isKnifeRequired is set explicitly by SetMapSides() / ResetMatch() — never toggle blindly
             return HookResult.Continue;
         }
-        catch (Exception)
+        catch (Exception e)
         {
-            //Log($"[EventCsWinPanelMatch FATAL] An error occurred: {e.Message}");
-            //Log($"[EventCsIntermission FATAL] An error occurred: {e.Message}");
+            Log($"[EventCsWinPanelMatch FATAL] An error occurred: {e.Message}");
             return HookResult.Continue;
         }
     }
@@ -161,14 +160,12 @@ public partial class MatchZy
     {
         try
         {
-            //HandleMatchEnd();
             ResetMatch();
-            isKnifeRequired = !isKnifeRequired;
+            // isKnifeRequired is set explicitly by ResetMatch() — never toggle blindly
         }
-        catch (Exception)
+        catch (Exception e)
         {
-            // Log($"[EventCsWinPanelMatch FATAL] An error occurred: {e.Message}");
-            //Log($"[EventCsIntermission FATAL] An error occurred: {e.Message}");
+            Log($"[OnMapEndHandler FATAL] An error occurred: {e.Message}");
         }
     }
 
@@ -179,9 +176,9 @@ public partial class MatchZy
             HandlePostRoundStartEvent(@event);
             return HookResult.Continue;
         }
-        catch (Exception)
+        catch (Exception e)
         {
-            // Log($"[EventRoundStart FATAL] An error occurred: {e.Message}");
+            Log($"[EventRoundStart FATAL] An error occurred: {e.Message}");
             return HookResult.Continue;
         }
     }
@@ -257,9 +254,9 @@ public partial class MatchZy
             }
             return HookResult.Continue;
         }
-        catch (Exception)
+        catch (Exception e)
         {
-            // Log($"[EventRoundFreezeEnd FATAL] An error occurred: {e.Message}");
+            Log($"[EventRoundFreezeEnd FATAL] An error occurred: {e.Message}");
             return HookResult.Continue;
         }
     }
@@ -419,9 +416,9 @@ public partial class MatchZy
             }
             return HookResult.Continue;
         }
-        catch (Exception)
+        catch (Exception e)
         {
-            // Log($"[EventPlayerDeathPreHandler FATAL] An error occurred: {e.Message}");
+            Log($"[EventPlayerDeathPreHandler FATAL] An error occurred: {e.Message}");
             return HookResult.Continue;
         }
     }
@@ -573,6 +570,7 @@ public partial class MatchZy
             {
                 // Toggle the ready status
                 playerReadyStatus[userId] = !currentStatus;
+                _readyStatusDirty = true;
 
                 // Update the clan tag immediately
                 HandleClanTags(forceUpdateSlot: player.Slot);

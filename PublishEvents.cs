@@ -1,3 +1,4 @@
+using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json;
 
@@ -5,6 +6,13 @@ namespace MatchZy
 {
     public partial class MatchZy
     {
+        // Single HttpClient instance — avoids socket exhaustion from per-request allocation.
+        // HttpClient is thread-safe and designed to be long-lived.
+        private static readonly HttpClient _sharedHttpClient = new()
+        {
+            Timeout = TimeSpan.FromSeconds(10)
+        };
+
         public async Task SendEventAsync(MatchZyEvent @event)
         {
             try
@@ -12,68 +20,50 @@ namespace MatchZy
                 if (string.IsNullOrEmpty(matchConfig.RemoteLogURL))
                     return;
 
-                // Use the event's own MatchId for logging (not the field, which may have been reset by now)
                 long eventMatchId = @event is MatchZyMatchEvent matchEvent
                     ? matchEvent.MatchId
                     : liveMatchId;
-                int eventMapNumber = @event is MatchZyMapEvent mapEvent
-                    ? mapEvent.MapNumber
-                    : matchConfig.CurrentMapNumber;
 
                 // Never send events with an invalid matchId
                 if (eventMatchId == -1)
-                {
-                    //Log($"[SendEventAsync] Skipping event {@event.EventName} — matchId is -1 (match not initialized or already reset)");
                     return;
-                }
 
-                //Log($"[SendEventAsync] Sending Event: {@event.EventName} for matchId: {eventMatchId} mapNumber: {eventMapNumber} on {matchConfig.RemoteLogURL}");
-
-                using var httpClient = new HttpClient();
-                using var jsonContent = new StringContent(
-                    JsonSerializer.Serialize(@event, @event.GetType()),
-                    Encoding.UTF8,
-                    "application/json"
-                );
-
-                string jsonString = await jsonContent.ReadAsStringAsync();
+                string json = JsonSerializer.Serialize(@event, @event.GetType());
+                using var request = new HttpRequestMessage(HttpMethod.Post, matchConfig.RemoteLogURL);
+                request.Content = new StringContent(json, Encoding.UTF8, "application/json");
 
                 if (
                     !string.IsNullOrEmpty(matchConfig.RemoteLogHeaderKey)
                     && !string.IsNullOrEmpty(matchConfig.RemoteLogHeaderValue)
                 )
                 {
-                    httpClient.DefaultRequestHeaders.Add(
+                    request.Headers.TryAddWithoutValidation(
                         matchConfig.RemoteLogHeaderKey,
                         matchConfig.RemoteLogHeaderValue
                     );
                 }
 
-                // Add authentication header if configured
                 if (
                     !string.IsNullOrEmpty(matchConfig.RemoteLogAuthKey)
                     && !string.IsNullOrEmpty(matchConfig.RemoteLogAuthValue)
                 )
                 {
-                    httpClient.DefaultRequestHeaders.Add(
+                    request.Headers.TryAddWithoutValidation(
                         matchConfig.RemoteLogAuthKey,
                         matchConfig.RemoteLogAuthValue
                     );
                 }
 
-                var httpResponseMessage = await httpClient.PostAsync(
-                    matchConfig.RemoteLogURL,
-                    jsonContent
-                );
+                var response = await _sharedHttpClient.SendAsync(request);
 
-                if (httpResponseMessage.IsSuccessStatusCode)
+                if (!response.IsSuccessStatusCode)
                 {
-                    //Log($"[SendEventAsync] Sending {@event.EventName} for matchId: {eventMatchId} mapNumber: {eventMapNumber} successful with status code: {httpResponseMessage.StatusCode}");
+                    Log($"[SendEventAsync] {@event.EventName} failed: {response.StatusCode}");
                 }
-                else
-                {
-                    //Log($"[SendEventAsync] Sending {@event.EventName} for matchId: {eventMatchId} mapNumber: {eventMapNumber} failed with status code: {httpResponseMessage.StatusCode}, ResponseContent: {await httpResponseMessage.Content.ReadAsStringAsync()}");
-                }
+            }
+            catch (TaskCanceledException)
+            {
+                Log($"[SendEventAsync] Request timed out for {@event.EventName}");
             }
             catch (Exception e)
             {

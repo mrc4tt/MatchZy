@@ -135,6 +135,7 @@ public partial class MatchZy
         }
 
         teamReadyOverride[(CsTeam)player.TeamNum] = true;
+        _readyStatusDirty = true;
         CheckLiveRequired();
     }
 }

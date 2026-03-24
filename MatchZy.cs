@@ -80,6 +80,40 @@ namespace MatchZy
         // Admin Data
         private Dictionary<string, string> loadedAdmins = new Dictionary<string, string>();
 
+        // Cached ConVar references — looked up once, avoid per-frame string lookups
+        private ConVar? _cvTvEnable = null;
+        private ConVar? _cvMatchRestartDelay = null;
+        private ConVar? _cvMatchEndChangelevel = null;
+        private ConVar? _cvMatchEndRestart = null;
+
+        // Cached CCSTeam entity references — refreshed on map start, avoids entity scan per event
+        private CCSTeam? _cachedCtTeam = null;
+        private CCSTeam? _cachedTTeam = null;
+
+        /// <summary>
+        /// Refreshes cached CCSTeam entity references. Call on map start and when entities may have changed.
+        /// </summary>
+        private void RefreshTeamEntities()
+        {
+            _cachedCtTeam = null;
+            _cachedTTeam = null;
+            try
+            {
+                var teamEntities = Utilities.FindAllEntitiesByDesignerName<CCSTeam>("cs_team_manager");
+                foreach (var team in teamEntities)
+                {
+                    if (team.Teamname == "CT")
+                        _cachedCtTeam = team;
+                    else if (team.Teamname == "TERRORIST")
+                        _cachedTTeam = team;
+                }
+            }
+            catch (Exception e)
+            {
+                Log($"[RefreshTeamEntities] Failed: {e.Message}");
+            }
+        }
+
         // Timers
         public CounterStrikeSharp.API.Modules.Timers.Timer? unreadyPlayerMessageTimer = null;
         public CounterStrikeSharp.API.Modules.Timers.Timer? sideSelectionMessageTimer = null;
@@ -87,6 +121,10 @@ namespace MatchZy
         public CounterStrikeSharp.API.Modules.Timers.Timer? roundKnifeStartMessageTimer = null;
         public CounterStrikeSharp.API.Modules.Timers.Timer? readyStatusHintTimer = null;
         public CounterStrikeSharp.API.Modules.Timers.Timer? matchEndMapChangeTimer = null;
+
+        // Ready status hint — event-driven with dirty flag to avoid per-second recomputation
+        private bool _readyStatusDirty = true;
+        private string _cachedReadyHintMessage = "";
 
         // Each message is kept in chat display for ~13 seconds, hence setting default chat timer to 13 seconds.
         // Configurable using matchzy_chat_messages_timer_delay <seconds>
@@ -108,6 +146,33 @@ namespace MatchZy
 
         // SQLite/MySQL Database
         private Database database = new();
+
+        /// <summary>
+        /// Count alive non-bot, non-HLTV players per team. Used by scorebot events.
+        /// </summary>
+        private (int ctAlive, int tAlive) CountAlivePlayers()
+        {
+            int ct = 0, t = 0;
+            foreach (var kvp in playerData)
+            {
+                var p = kvp.Value;
+                if (p == null || !p.IsValid || p.IsBot || p.IsHLTV) continue;
+                if (p.PlayerPawn?.Value == null) continue;
+                if (p.PlayerPawn.Value.LifeState != (byte)LifeState_t.LIFE_ALIVE) continue;
+                if (p.TeamNum == (int)CsTeam.CounterTerrorist) ct++;
+                else if (p.TeamNum == (int)CsTeam.Terrorist) t++;
+            }
+            return (ct, t);
+        }
+
+        /// <summary>
+        /// Get a player's side string ("CT" / "T" / "unknown").
+        /// </summary>
+        private static string GetTeamSide(CCSPlayerController? player)
+        {
+            if (player == null || !player.IsValid) return "unknown";
+            return player.TeamNum == (int)CsTeam.CounterTerrorist ? "CT" : "T";
+        }
 
         public void DrawSideSelection()
         {
@@ -166,6 +231,8 @@ namespace MatchZy
 
         public override void Load(bool hotReload)
         {
+            // Blocking is acceptable here — server is starting up, not yet processing game frames.
+            // If this becomes a problem (slow remote MySQL), move to async with a ready flag.
             database.InitializeDatabaseAsync(ModuleDirectory).GetAwaiter().GetResult();
             // This sets default config ConVars (Backup)
             //Server.ExecuteCommand("execifexists matchzy/config.cfg");
@@ -186,6 +253,12 @@ namespace MatchZy
             reverseTeamSides["CT"] = matchzyTeam1;
             reverseTeamSides["TERRORIST"] = matchzyTeam2;
 
+            // Cache ConVar references once — avoids per-frame string-based lookups
+            _cvTvEnable = ConVar.Find("tv_enable");
+            _cvMatchRestartDelay = ConVar.Find("mp_match_restart_delay");
+            _cvMatchEndChangelevel = ConVar.Find("mp_match_end_changelevel");
+            _cvMatchEndRestart = ConVar.Find("mp_match_end_restart");
+
             if (!hotReload)
             {
                 // Give the config time to execute, then read the ConVar and start
@@ -205,6 +278,7 @@ namespace MatchZy
                 // Plugin should not be reloaded while a match is live (this would messup with the match flags which were set)
                 // Only hot-reload the plugin if you are testing something and don't want to restart the server time and again.
                 UpdatePlayersMap();
+                RefreshTeamEntities();
                 
                 // Read the ConVar to preserve autoStartMode on hot-reload
                 var autoStartConVar = ConVar.Find("matchzy_autostart_mode");
@@ -303,6 +377,7 @@ namespace MatchZy
                 { ".removebot", OnNoBotCommand },
                 { ".kickbot", OnNoBotCommand },
                 { ".unbot", OnNoBotCommand },
+                { ".nb", OnNoBotCommand },
                 { ".nobots", OnNoBotsCommand },
                 { ".clearbots", OnNoBotsCommand },
                 { ".removebots", OnNoBotsCommand },
@@ -509,6 +584,9 @@ namespace MatchZy
             {
                 AddTimer(1.0f, () =>
                 {
+                    // Refresh cached team entities after map load (entities aren't available immediately)
+                    RefreshTeamEntities();
+
                     if (!isMatchSetup)
                     {
                         AutoStart();
@@ -557,22 +635,7 @@ namespace MatchZy
                 bool isSuicide = attacker == null || !attacker.IsValid || attacker == victim;
 
                 // Count alive players per team AFTER this death
-                int ctAlive = 0, tAlive = 0;
-                foreach (var kvp in playerData)
-                {
-                    var p = kvp.Value;
-                    if (p == null || !p.IsValid || p.IsBot || p.IsHLTV) continue;
-                    if (p.PlayerPawn?.Value == null) continue;
-                    if (p.PlayerPawn.Value.LifeState != (byte)LifeState_t.LIFE_ALIVE) continue;
-                    if (p.TeamNum == (int)CsTeam.CounterTerrorist) ctAlive++;
-                    else if (p.TeamNum == (int)CsTeam.Terrorist) tAlive++;
-                }
-
-                string TeamSide(CCSPlayerController? player)
-                {
-                    if (player == null || !player.IsValid) return "unknown";
-                    return player.TeamNum == (int)CsTeam.CounterTerrorist ? "CT" : "T";
-                }
+                var (ctAlive, tAlive) = CountAlivePlayers();
 
                 var deathEvent = new PlayerDeathLiveEvent
                 {
@@ -581,10 +644,10 @@ namespace MatchZy
                     RoundNumber = GetRoundNumer(),
                     AttackerName = isSuicide ? null : attacker?.PlayerName,
                     AttackerSteamId = isSuicide ? null : attacker?.SteamID.ToString(),
-                    AttackerTeam = isSuicide ? null : TeamSide(attacker),
+                    AttackerTeam = isSuicide ? null : GetTeamSide(attacker),
                     VictimName = victim.PlayerName,
                     VictimSteamId = victim.SteamID.ToString(),
-                    VictimTeam = TeamSide(victim),
+                    VictimTeam = GetTeamSide(victim),
                     AssisterName = assister != null && assister.IsValid ? assister.PlayerName : null,
                     AssisterSteamId = assister != null && assister.IsValid ? assister.SteamID.ToString() : null,
                     Weapon = @event.Weapon ?? "unknown",
@@ -612,16 +675,7 @@ namespace MatchZy
                 if (player == null || !player.IsValid) return HookResult.Continue;
 
                 // Count alive players
-                int ctAlive = 0, tAlive = 0;
-                foreach (var kvp in playerData)
-                {
-                    var p = kvp.Value;
-                    if (p == null || !p.IsValid || p.IsBot || p.IsHLTV) continue;
-                    if (p.PlayerPawn?.Value == null) continue;
-                    if (p.PlayerPawn.Value.LifeState != (byte)LifeState_t.LIFE_ALIVE) continue;
-                    if (p.TeamNum == (int)CsTeam.CounterTerrorist) ctAlive++;
-                    else if (p.TeamNum == (int)CsTeam.Terrorist) tAlive++;
-                }
+                var (ctAlive, tAlive) = CountAlivePlayers();
 
                 var plantEvent = new BombPlantedLiveEvent
                 {
@@ -649,16 +703,7 @@ namespace MatchZy
                 if (player == null || !player.IsValid) return HookResult.Continue;
 
                 // Count alive players
-                int ctAlive = 0, tAlive = 0;
-                foreach (var kvp in playerData)
-                {
-                    var p = kvp.Value;
-                    if (p == null || !p.IsValid || p.IsBot || p.IsHLTV) continue;
-                    if (p.PlayerPawn?.Value == null) continue;
-                    if (p.PlayerPawn.Value.LifeState != (byte)LifeState_t.LIFE_ALIVE) continue;
-                    if (p.TeamNum == (int)CsTeam.CounterTerrorist) ctAlive++;
-                    else if (p.TeamNum == (int)CsTeam.Terrorist) tAlive++;
-                }
+                var (ctAlive, tAlive) = CountAlivePlayers();
 
                 var defuseEvent = new BombDefusedLiveEvent
                 {
@@ -777,12 +822,6 @@ namespace MatchZy
                 bool hasDamage = @event.DmgHealth > 0 || @event.DmgArmor > 0;
                 if (!hasDamage) return HookResult.Continue;
 
-                string TeamSide(CCSPlayerController? player)
-                {
-                    if (player == null || !player.IsValid) return "unknown";
-                    return player.TeamNum == (int)CsTeam.CounterTerrorist ? "CT" : "T";
-                }
-
                 var hurtEvent = new PlayerHurtLiveEvent
                 {
                     MatchId = liveMatchId,
@@ -792,7 +831,7 @@ namespace MatchZy
                     AttackerSteamId = attacker != null && attacker.IsValid && !attacker.IsBot ? attacker.SteamID.ToString() : null,
                     VictimName = victim.PlayerName,
                     VictimSteamId = victim.SteamID.ToString(),
-                    VictimTeam = TeamSide(victim),
+                    VictimTeam = GetTeamSide(victim),
                     HpRemaining = @event.Health,
                     ArmorRemaining = @event.Armor,
                     DamageHealth = @event.DmgHealth,
@@ -855,10 +894,12 @@ namespace MatchZy
                     return HookResult.Continue;
                 }
 
-                // Handling player commands
-                if (commandActions.ContainsKey(message))
+                // Handling player commands — exact match first, then prefix-based
+                if (commandActions.TryGetValue(message, out var action))
                 {
-                    commandActions[message](player, null);
+                    action(player, null);
+                    // Exact match found — skip prefix checks (these commands take no args)
+                    return HookResult.Continue;
                 }
 
                 if (message.StartsWith(".readyrequired"))

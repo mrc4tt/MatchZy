@@ -23,5 +23,9 @@
   <ItemGroup>
     <None Include="lang\**\*.*" CopyToOutputDirectory="PreserveNewest" />
     <None Update="spawns\**\*.*" CopyToOutputDirectory="PreserveNewest" />
+    <!-- css_gg surrender vote system — disabled, exclude from build -->
+    <Compile Remove="GGSystem.cs" />
+    <!-- Dead code — see comments in file for explanation -->
+    <Compile Remove="SynchronizationContextManagement.cs" />
   </ItemGroup>
 </Project>
