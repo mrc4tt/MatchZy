@@ -20,7 +20,6 @@ namespace MatchZy
 {
     public partial class MatchZy
     {
-        // Backup for current setup reserved shared files & until symlink ready.
         public const string warmupCfgPath = "matchzy/warmup.cfg";
         public const string knifeCfgPath = "matchzy/knife.cfg";
         public const string liveCfgPath = "matchzy/live.cfg";
@@ -1544,7 +1543,6 @@ namespace MatchZy
 
             // Collect match stats JSON on main thread (accesses native APIs like Server.MapName)
             MatchStatsJson? matchStatsForExport = null;
-            string? gameDirectory = null;
             if (demoFilename != null)
             {
                 matchStatsForExport = CollectMatchStatsForExport(
@@ -1554,7 +1552,6 @@ namespace MatchZy
                     playerStatsListTeam1,
                     playerStatsListTeam2
                 );
-                gameDirectory = Server.GameDirectory;
             }
 
             // Capture matchId before async context — liveMatchId may be reset to -1 by ResetMatch
@@ -1576,12 +1573,12 @@ namespace MatchZy
                 await database.WritePlayerStatsToCsvAsync(statsPath, matchId, currentMapNumber);
 
                 // Write pre-collected HLTV-style JSON stats (file I/O only, no native calls)
-                if (matchStatsForExport != null && demoFilename != null && gameDirectory != null)
+                if (matchStatsForExport != null && demoFilename != null)
                 {
                     await WriteMatchStatsJsonAsync(
                         matchStatsForExport,
                         demoFilename,
-                        gameDirectory
+                        statsPath
                     );
                 }
             });

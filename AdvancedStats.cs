@@ -552,19 +552,18 @@ public partial class MatchZy
     public async Task WriteMatchStatsJsonAsync(
         MatchStatsJson matchStats,
         string demoFilename,
-        string gameDirectory
+        string statsDirectory
     )
     {
         try
         {
-            string statsDir = gameDirectory + "/csgo/demos";
-            if (!Directory.Exists(statsDir))
+            if (!Directory.Exists(statsDirectory))
             {
-                Directory.CreateDirectory(statsDir);
+                Directory.CreateDirectory(statsDirectory);
             }
 
             string statsFilename = Path.GetFileNameWithoutExtension(demoFilename) + "_stats.json";
-            string statsPath = Path.Combine(statsDir, statsFilename);
+            string statsPath = Path.Combine(statsDirectory, statsFilename);
 
             var options = new JsonSerializerOptions
             {
