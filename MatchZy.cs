@@ -17,7 +17,7 @@ namespace MatchZy
     public partial class MatchZy : BasePlugin
     {
         public override string ModuleName => "MatchZy";
-        public override string ModuleVersion => "0.8.25";
+        public override string ModuleVersion => "0.8.26";
         public override string ModuleAuthor => "WD- Edited by Miksen";
         public override string ModuleDescription => "A plugin for running and managing CS2 practice/pugs/scrims/matches!";
         public string chatPrefix = $"{ChatColors.Green}[MatchZy]{ChatColors.Default}";
@@ -556,15 +556,18 @@ namespace MatchZy
                 {
                     if (isDryRun)
                     {
-                        // Return cleanly from dry to practice
+                        // Mark dryrun as finished immediately so no other handlers treat this as dryrun
                         isDryRun = false;
-                        StartPracticeMode();
 
-                        // Send chat message to everyone
-                        PrintToAllChat($"{ChatColors.Green}Practice Mode has been restored. You can run .dry again if you wish.");
-
-                        // Optionally respawn into practice state
-                        Server.ExecuteCommand("mp_warmup_start; mp_warmup_pausetimer 1; mp_restartgame 1");
+                        // CRITICAL: Do NOT call StartPracticeMode() or mp_restartgame synchronously
+                        // inside EventRoundEnd — the engine is mid-round-transition and player/entity
+                        // state is not stable. Defer to a short timer so the round end completes cleanly.
+                        AddTimer(0.5f, () =>
+                        {
+                            StartPracticeMode();
+                            PrintToAllChat($"{ChatColors.Green}Practice Mode has been restored. You can run .dry again if you wish.");
+                            Server.ExecuteCommand("mp_warmup_start; mp_warmup_pausetimer 1; mp_restartgame 1");
+                        });
 
                         return HookResult.Continue;
                     }

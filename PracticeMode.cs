@@ -1144,11 +1144,11 @@ namespace MatchZy
                 return;
             }
 
-            // Allow starting dry run regardless of isPractice.
-            // Optional: short-circuit if already in dry run.
+            // If already in dryrun, just restart the round instead of blocking
             if (isDryRun)
             {
-                ReplyToUserCommand(player, "Already in dry run.");
+                Server.ExecuteCommand("mp_restartgame 1");
+                PrintToAllChat($"{ChatColors.Green}Dryrun restarted!");
                 return;
             }
 
