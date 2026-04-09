@@ -648,8 +648,12 @@ namespace MatchZy
                     break;
 
                 case 2:
-                    if (matchConfig.MapsPool.Count < 5)
+                    if (matchConfig.MapsPool.Count < 7)
                     {
+                        matchConfig.MapBanOrder.Add(startingVetoTeam == matchzyTeam1 ? "team1_ban"
+                                                                        : "team2_ban");
+                        matchConfig.MapBanOrder.Add(startingVetoTeam == matchzyTeam1 ? "team2_ban"
+                                                                        : "team1_ban");
                         matchConfig.MapBanOrder.Add(startingVetoTeam == matchzyTeam1
                             ? "team1_pick"
                             : "team2_pick");
@@ -682,9 +686,13 @@ namespace MatchZy
                     {
                         // 7 >= 3 + 2
                         int numberOfPicks = matchConfig.NumMaps - 1; // 2 picks in a Bo3
+                        int totalNumberOfBans =
+                            matchConfig.MapsPool.Count - 1 - numberOfPicks;
                         // Determine how many bans before we start picking (may be 0):
                         int numberOfStartBans =
-                            matchConfig.MapsPool.Count - (matchConfig.NumMaps + 2); // 7 - (3 + 2) = 2
+                            matchConfig.NumMaps >= 5
+                                ? totalNumberOfBans
+                                : matchConfig.MapsPool.Count - (matchConfig.NumMaps + 2); // Bo3 with 7 maps: 7 - (3 + 2) = 2
                         if (numberOfStartBans > 0)
                         {
                             // == 2
@@ -707,8 +715,7 @@ namespace MatchZy
                         }
 
                         // Determine how many bans to append to the end (may be 0):
-                        int numberOfEndBans =
-                            matchConfig.MapsPool.Count - 1 - numberOfPicks - numberOfStartBans; // 7 - 2 - 2 - 1 = 2
+                        int numberOfEndBans = totalNumberOfBans - numberOfStartBans;
                         if (numberOfEndBans > 0)
                         {
                             // == 2
