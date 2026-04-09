@@ -7,13 +7,13 @@
   </PropertyGroup>
   
   <ItemGroup>
-    <PackageReference Include="CounterStrikeSharp.API" Version="1.0.363">
+    <PackageReference Include="CounterStrikeSharp.API" Version="1.0.364">
       <PrivateAssets>none</PrivateAssets>
       <ExcludeAssets>runtime</ExcludeAssets>
       <IncludeAssets>compile; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
     </PackageReference>
     <PackageReference Include="CsvHelper" Version="33.1.0" />
-    <PackageReference Include="Dapper" Version="2.1.66" />
+    <PackageReference Include="Dapper" Version="2.1.72" />
     <PackageReference Include="Microsoft.Data.Sqlite" Version="8.0.0" />
     <PackageReference Include="SQLitePCLRaw.bundle_e_sqlite3" Version="2.1.6" />
     <PackageReference Include="MySqlConnector" Version="2.4.0" />
