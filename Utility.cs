@@ -2727,7 +2727,7 @@ namespace MatchZy
                 "css_teamsize - Set number of players required to ready (default: 10)"
             );
             player.PrintToConsole(
-                "css_options / css_settings / css_config - Show current match configuration"
+                "css_options / css_settings / css_configs - Show current match configuration"
             );
             player.PrintToConsole(
                 "css_autopause / css_autopause_minplayers / css_autopause_delay - Configure auto-pause"

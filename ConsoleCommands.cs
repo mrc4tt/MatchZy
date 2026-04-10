@@ -770,7 +770,7 @@ namespace MatchZy
 
         [ConsoleCommand("css_options", "Shows the current match configuration/settings")]
         [ConsoleCommand("css_settings", "Shows the current match configuration/settings")]
-        [ConsoleCommand("css_config", "Show match configuration/settings")]
+        [ConsoleCommand("css_configs", "Show match configuration/settings")]
         public void OnMatchSettingsCommand(CCSPlayerController? player, CommandInfo? command)
         {
             if (player == null)
