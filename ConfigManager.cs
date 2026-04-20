@@ -44,6 +44,10 @@ namespace MatchZy
             {
                 [ConfigFiles.Paths.Config] =
                     @"
+// Whether warmup mode is enabled. Default value: true
+// If set to false, warmup.cfg will not be loaded/executed when entering warmup phases.
+matchzy_warmup_enabled true
+
 // Whether whitelist is enabled by default or not. Default value: false
 // This is the default value, but whitelist can be toggled by admin using .whitelist command
 matchzy_whitelist_enabled_default false
@@ -1025,8 +1029,103 @@ mp_warmup_start
                 CreateConfigFile(config.Key, config.Value);
             }
 
+            // Append any cvars missing from an existing config.cfg (preserves user edits)
+            MergeMissingConfigCvars(configs[ConfigFiles.Paths.Config]);
+
             // Create matchzymaps.cfg separately with default map rotation
             CreateMapRotationFile();
+        }
+
+        private void MergeMissingConfigCvars(string templateContent)
+        {
+            try
+            {
+                string filePath = Path.Combine(_serverPath, ConfigFiles.Paths.Config);
+                if (!File.Exists(filePath))
+                {
+                    return;
+                }
+
+                string existing = File.ReadAllText(filePath);
+                var existingCvars = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                foreach (var rawLine in existing.Split('\n'))
+                {
+                    var line = rawLine.Trim();
+                    if (line.Length == 0 || line.StartsWith("//"))
+                    {
+                        continue;
+                    }
+                    var name = line.Split(new[] { ' ', '\t' }, 2)[0];
+                    if (name.Length > 0)
+                    {
+                        existingCvars.Add(name);
+                    }
+                }
+
+                var missingBlocks = new List<string>();
+                var currentBlock = new List<string>();
+
+                void FlushBlock()
+                {
+                    if (currentBlock.Count == 0)
+                    {
+                        return;
+                    }
+                    string? cvarName = null;
+                    foreach (var bl in currentBlock)
+                    {
+                        var t = bl.Trim();
+                        if (t.Length == 0 || t.StartsWith("//"))
+                        {
+                            continue;
+                        }
+                        cvarName = t.Split(new[] { ' ', '\t' }, 2)[0];
+                        break;
+                    }
+                    if (cvarName != null && !existingCvars.Contains(cvarName))
+                    {
+                        missingBlocks.Add(string.Join("\n", currentBlock));
+                    }
+                    currentBlock.Clear();
+                }
+
+                foreach (var rawLine in templateContent.Split('\n'))
+                {
+                    var line = rawLine.TrimEnd('\r');
+                    if (string.IsNullOrWhiteSpace(line))
+                    {
+                        FlushBlock();
+                    }
+                    else
+                    {
+                        currentBlock.Add(line);
+                    }
+                }
+                FlushBlock();
+
+                if (missingBlocks.Count == 0)
+                {
+                    return;
+                }
+
+                var sb = new System.Text.StringBuilder();
+                if (!existing.EndsWith("\n"))
+                {
+                    sb.Append('\n');
+                }
+                sb.Append("\n// --- Added by MatchZy update (missing cvars appended) ---\n");
+                foreach (var block in missingBlocks)
+                {
+                    sb.Append(block);
+                    sb.Append("\n\n");
+                }
+                File.AppendAllText(filePath, sb.ToString());
+                Console.WriteLine($"[MatchZy] Appended {missingBlocks.Count} missing cvar(s) to {ConfigFiles.Paths.Config}.");
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error merging {ConfigFiles.Paths.Config}: {ex.Message}");
+            }
         }
 
         private void CreateMapRotationFile()

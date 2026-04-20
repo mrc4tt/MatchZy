@@ -1037,6 +1037,13 @@ namespace MatchZy
                         "Warmup command cannot be used if match is already started! If you want to stop match, please use .endmatch"
                     );
                 }
+                else if (!warmupEnabled.Value)
+                {
+                    ReplyToUserCommand(
+                        player,
+                        "Warmup mode is disabled via matchzy_warmup_enabled. Set it to true to use this command."
+                    );
+                }
                 else
                 {
                     var absolutePath = Path.Join(Server.GameDirectory + "/csgo/cfg" + "/matchzy");

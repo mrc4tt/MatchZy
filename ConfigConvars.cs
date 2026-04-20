@@ -16,6 +16,12 @@ namespace MatchZy
             false
         );
 
+        public FakeConVar<bool> warmupEnabled = new(
+            "matchzy_warmup_enabled",
+            "Whether warmup mode is enabled. If false, warmup.cfg will not be loaded. Default: true",
+            true
+        );
+
         public FakeConVar<bool> techPauseEnabled = new(
             "matchzy_enable_tech_pause",
             "Whether .tech command is enabled or not. Default: true",

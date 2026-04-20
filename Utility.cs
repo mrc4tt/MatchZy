@@ -344,6 +344,10 @@ namespace MatchZy
 
         private void ExecWarmupCfg()
         {
+            if (!warmupEnabled.Value)
+            {
+                return;
+            }
             // Backup
             var absolutePath = Path.Join(Server.GameDirectory, "csgo", "cfg", warmupCfgPath);
             if (File.Exists(Path.Join(Server.GameDirectory + "/csgo/cfg", warmupCfgPath)))
