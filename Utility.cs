@@ -3317,6 +3317,11 @@ namespace MatchZy
                 && player.PlayerPawn.Value.IsValid;
         }
 
+        public bool IsHumanPlayerValid(CCSPlayerController? player)
+        {
+            return IsPlayerValid(player) && !player!.IsBot && !player.IsHLTV;
+        }
+
         public static Color GetPlayerTeammateColor(CCSPlayerController playerController)
         {
             return playerController.CompTeammateColor switch

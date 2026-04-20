@@ -140,7 +140,7 @@ public bool IsAutoPauseActive()
     
     foreach (var p in playerData.Values)
     {
-        if (IsPlayerValid(p) && !p.IsBot && !p.IsHLTV)
+        if (IsHumanPlayerValid(p))
         {
             totalPlayers++;
             if (totalPlayers >= 10) return true; // Early exit
@@ -251,7 +251,7 @@ private int GetTeamPlayerCount(CsTeam team)
     
     foreach (var p in playerData.Values)
     {
-        if (IsPlayerValid(p) && !p.IsBot && !p.IsHLTV 
+        if (IsHumanPlayerValid(p)
             && p.Team == team && !coaches.Contains(p))
         {
             count++;

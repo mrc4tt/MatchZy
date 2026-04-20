@@ -16,15 +16,11 @@ public partial class MatchZy
         {
             CCSPlayerController? player = @event.Userid;
 
-            // Early validation with combined check
-            if (!IsPlayerValid(player) || !player!.UserId.HasValue)
+            // Early validation — must be a connected human player with a UserId
+            if (!IsHumanPlayerValid(player) || !player!.UserId.HasValue)
                 return HookResult.Continue;
 
             int userId = player.UserId.Value;
-
-            // Skip bots and HLTV
-            if (player.IsBot || player.IsHLTV)
-                return HookResult.Continue;
 
             // Whitelist/match validation
             if (isMatchSetup || matchModeOnly)

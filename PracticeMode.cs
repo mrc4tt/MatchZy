@@ -265,17 +265,22 @@ namespace MatchZy
             // Collect ALL CT spawns with the minimum priority
             // IMPORTANT: We need all competitive spawns (not just 5) so that when a coach is present,
             // there are enough spawn points for the 5 regular players to use
+            int ctSkipped = 0;
             foreach (var spawn in spawnsct)
             {
                 if (spawn.IsValid && spawn.Enabled && spawn.Priority == minPriority)
                 {
+                    // Some workshop maps ship spawn entities without a fully-populated
+                    // CBodyComponent/SceneNode; constructing a Position from null would NRE.
+                    var origin = spawn.CBodyComponent?.SceneNode?.AbsOrigin;
+                    var rotation = spawn.CBodyComponent?.SceneNode?.AbsRotation;
+                    if (origin == null || rotation == null)
+                    {
+                        ctSkipped++;
+                        continue;
+                    }
                     spawnsData[(byte)CsTeam.CounterTerrorist]
-                        .Add(
-                            new Position(
-                                spawn.CBodyComponent?.SceneNode?.AbsOrigin!,
-                                spawn.CBodyComponent?.SceneNode?.AbsRotation!
-                            )
-                        );
+                        .Add(new Position(origin, rotation));
                 }
             }
 
@@ -298,22 +303,26 @@ namespace MatchZy
             // Collect ALL T spawns with the minimum priority
             // IMPORTANT: We need all competitive spawns (not just 5) so that when a coach is present,
             // there are enough spawn points for the 5 regular players to use
+            int tSkipped = 0;
             foreach (var spawn in spawnst)
             {
                 if (spawn.IsValid && spawn.Enabled && spawn.Priority == minPriority)
                 {
+                    var origin = spawn.CBodyComponent?.SceneNode?.AbsOrigin;
+                    var rotation = spawn.CBodyComponent?.SceneNode?.AbsRotation;
+                    if (origin == null || rotation == null)
+                    {
+                        tSkipped++;
+                        continue;
+                    }
                     spawnsData[(byte)CsTeam.Terrorist]
-                        .Add(
-                            new Position(
-                                spawn.CBodyComponent?.SceneNode?.AbsOrigin!,
-                                spawn.CBodyComponent?.SceneNode?.AbsRotation!
-                            )
-                        );
+                        .Add(new Position(origin, rotation));
                 }
             }
 
             Log(
                 $"[GetSpawns] Loaded {spawnsData[(byte)CsTeam.CounterTerrorist].Count} CT spawns, {spawnsData[(byte)CsTeam.Terrorist].Count} T spawns"
+                + (ctSkipped + tSkipped > 0 ? $" (skipped {ctSkipped} CT / {tSkipped} T with null body/scene components)" : "")
             );
 
             GetCoachSpawns();
