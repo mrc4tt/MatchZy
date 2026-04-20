@@ -320,6 +320,9 @@ public partial class MatchZy
                         || !player.PlayerPawn.IsValid
                     )
                         return;
+                    var throwerSceneNode = player.PlayerPawn.Value.CBodyComponent?.SceneNode;
+                    if (throwerSceneNode?.AbsOrigin == null)
+                        return;
                     int client = player.UserId!.Value;
 
                     Vector position = new(
@@ -353,7 +356,7 @@ public partial class MatchZy
                         position,
                         angle,
                         velocity,
-                        player.PlayerPawn.Value.CBodyComponent!.SceneNode!.AbsOrigin,
+                        throwerSceneNode.AbsOrigin,
                         player.PlayerPawn.Value.EyeAngles,
                         nadeType,
                         DateTime.Now,

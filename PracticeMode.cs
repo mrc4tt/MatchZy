@@ -431,11 +431,19 @@ namespace MatchZy
                     playerSteamID = "default";
                 }
 
-                QAngle playerAngle = player!.PlayerPawn.Value!.EyeAngles;
-                Vector playerPos = player.Pawn.Value!.CBodyComponent!.SceneNode!.AbsOrigin;
+                var pawn = player!.Pawn.Value;
+                var playerPawn = player.PlayerPawn.Value;
+                var sceneNode = pawn?.CBodyComponent?.SceneNode;
+                if (playerPawn == null || sceneNode == null || sceneNode.AbsOrigin == null)
+                {
+                    ReplyToUserCommand(player, "Unable to read your position on this map.");
+                    return;
+                }
+                QAngle playerAngle = playerPawn.EyeAngles;
+                Vector playerPos = sceneNode.AbsOrigin;
                 string currentMapName = Server.MapName;
                 string nadeType = GetNadeType(
-                    player.PlayerPawn.Value.WeaponServices!.ActiveWeapon.Value!.DesignerName
+                    playerPawn.WeaponServices!.ActiveWeapon.Value!.DesignerName
                 );
 
                 // Define the file path
@@ -3783,7 +3791,9 @@ namespace MatchZy
         {
             if (!spawnsData.TryGetValue(teamNum, out List<Position>? teamSpawns))
                 return;
-            Vector playerPosition = player!.PlayerPawn!.Value!.CBodyComponent!.SceneNode!.AbsOrigin;
+            var playerPawn = player?.PlayerPawn?.Value;
+            var playerPosition = playerPawn?.CBodyComponent?.SceneNode?.AbsOrigin;
+            if (playerPawn == null || playerPosition == null) return;
             int closestIndex = -1;
             double minDistance = double.MaxValue;
             for (int index = 0; index < teamSpawns.Count; index++)
@@ -3798,7 +3808,7 @@ namespace MatchZy
                 }
             }
 
-            player!.PlayerPawn.Value!.Teleport(
+            playerPawn.Teleport(
                 teamSpawns[closestIndex].PlayerPosition,
                 teamSpawns[closestIndex].PlayerAngle,
                 new Vector(0, 0, 0)
@@ -3809,7 +3819,9 @@ namespace MatchZy
         {
             if (!spawnsData.TryGetValue(teamNum, out List<Position>? teamSpawns))
                 return;
-            Vector playerPosition = player!.PlayerPawn!.Value!.CBodyComponent!.SceneNode!.AbsOrigin;
+            var playerPawn = player?.PlayerPawn?.Value;
+            var playerPosition = playerPawn?.CBodyComponent?.SceneNode?.AbsOrigin;
+            if (playerPawn == null || playerPosition == null) return;
             int farthestIndex = -1;
             double maxDistance = double.MinValue;
             for (int index = 0; index < teamSpawns.Count; index++)
@@ -3824,7 +3836,7 @@ namespace MatchZy
                 }
             }
 
-            player!.PlayerPawn.Value!.Teleport(
+            playerPawn.Teleport(
                 teamSpawns[farthestIndex].PlayerPosition,
                 teamSpawns[farthestIndex].PlayerAngle,
                 new Vector(0, 0, 0)
