@@ -966,7 +966,7 @@ namespace MatchZy
                         continue;
 
                     // Early continue if not connected
-                    if (player.Connected != PlayerConnectedState.PlayerConnected)
+                    if (player.Connected != PlayerConnectedState.Connected)
                         continue;
 
                     // Early continue if no UserId
@@ -3311,7 +3311,7 @@ namespace MatchZy
         {
             return player != null
                 && player.IsValid
-                && player.Connected == PlayerConnectedState.PlayerConnected
+                && player.Connected == PlayerConnectedState.Connected
                 && player.PlayerPawn.IsValid
                 && player.PlayerPawn.Value != null
                 && player.PlayerPawn.Value.IsValid;

@@ -1497,7 +1497,7 @@ namespace MatchZy
                     if (
                         target != null
                         && target.IsValid
-                        && target.Connected == PlayerConnectedState.PlayerConnected
+                        && target.Connected == PlayerConnectedState.Connected
                         && target.PlayerPawn?.IsValid == true
                         && target.PlayerPawn.Value != null
                     )
@@ -1599,7 +1599,7 @@ namespace MatchZy
                         if (
                             targetPlayer != null
                             && targetPlayer.IsValid
-                            && targetPlayer.Connected == PlayerConnectedState.PlayerConnected
+                            && targetPlayer.Connected == PlayerConnectedState.Connected
                         )
                         {
                             SpawnBot(targetPlayer, crouch);
@@ -1664,8 +1664,8 @@ namespace MatchZy
                         if (
                             !IsPlayerValid(bot)
                             || !IsPlayerValid(botOwner)
-                            || bot.Connected != PlayerConnectedState.PlayerConnected
-                            || botOwner.Connected != PlayerConnectedState.PlayerConnected
+                            || bot.Connected != PlayerConnectedState.Connected
+                            || botOwner.Connected != PlayerConnectedState.Connected
                         )
                         {
                             invalidBotIds.Add(userId);
@@ -2094,8 +2094,8 @@ namespace MatchZy
             if (
                 !IsPlayerValid(p1)
                 || !IsPlayerValid(p2)
-                || p1.Connected != PlayerConnectedState.PlayerConnected
-                || p2.Connected != PlayerConnectedState.PlayerConnected
+                || p1.Connected != PlayerConnectedState.Connected
+                || p2.Connected != PlayerConnectedState.Connected
             )
             {
                 return;
@@ -2537,7 +2537,7 @@ namespace MatchZy
                     if (
                         closestBot.IsValid
                         && closestBot.PlayerPawn?.IsValid == true
-                        && closestBot.Connected == PlayerConnectedState.PlayerConnected
+                        && closestBot.Connected == PlayerConnectedState.Connected
                     )
                     {
                         Server.ExecuteCommand($"bot_kick {botName}");

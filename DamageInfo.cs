@@ -119,10 +119,10 @@ namespace MatchZy
                             if (!attackerController.IsValid || !targetController.IsValid)
                                 continue;
                             if (
-                                attackerController.Connected != PlayerConnectedState.PlayerConnected
+                                attackerController.Connected != PlayerConnectedState.Connected
                             )
                                 continue;
-                            if (targetController.Connected != PlayerConnectedState.PlayerConnected)
+                            if (targetController.Connected != PlayerConnectedState.Connected)
                                 continue;
                             if (
                                 !attackerController.PlayerPawn.IsValid

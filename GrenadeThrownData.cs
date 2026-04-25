@@ -59,7 +59,7 @@ public class GrenadeThrownData
         if (
             player == null
             || !player.IsValid
-            || player.Connected != PlayerConnectedState.PlayerConnected
+            || player.Connected != PlayerConnectedState.Connected
             || !player.PlayerPawn.IsValid
             || player.PlayerPawn.Value == null
         )
