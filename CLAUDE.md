@@ -8,7 +8,7 @@ MatchZy is a CounterStrikeSharp plugin for CS2 match management — warmup, knif
 
 ## Tech Stack
 
-- **Framework**: CounterStrikeSharp API 1.0.363 (.NET 8.0, C# 12)
+- **Framework**: CounterStrikeSharp API 1.0.367 (.NET 8.0, C# 12)
 - **Database**: SQLite (default) or MySQL via Dapper
 - **Serialization**: Newtonsoft.Json (match configs), System.Text.Json (events/stats)
 - **CSV Export**: CsvHelper 33.1.0
@@ -89,7 +89,7 @@ Parallel modes: `isPractice`, `isDryRun`, `isPlayOutEnabled`, `isPlayOutEnabled2
 ### Null Safety — Required Pattern
 ```csharp
 if (!IsPlayerValid(player)) return HookResult.Continue;
-// IsPlayerValid checks: not-null, IsValid, Connected == PlayerConnected, PlayerPawn valid + non-null
+// IsPlayerValid checks: not-null, IsValid, Connected == PlayerConnectedState.Connected, PlayerPawn valid + non-null
 // (Does NOT check UserId.HasValue — check that separately when you need player.UserId.Value.)
 
 // When you need a connected HUMAN player (excludes bots + HLTV), use:
@@ -161,7 +161,7 @@ commandActions = new Dictionary<string, Action<CCSPlayerController?, CommandInfo
 
 | Package | Version | Purpose |
 |---------|---------|---------|
-| CounterStrikeSharp.API | 1.0.364 | Core CSS framework |
+| CounterStrikeSharp.API | 1.0.367 | Core CSS framework |
 | Newtonsoft.Json | 13.0.3 | Match config JSON parsing (JObject/JToken) |
 | Dapper | 2.1.72 | Lightweight DB ORM |
 | Microsoft.Data.Sqlite | 8.0.0 | SQLite provider |

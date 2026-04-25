@@ -7,7 +7,7 @@
   </PropertyGroup>
   
   <ItemGroup>
-    <PackageReference Include="CounterStrikeSharp.API" Version="1.0.364">
+    <PackageReference Include="CounterStrikeSharp.API" Version="1.0.367">
       <PrivateAssets>none</PrivateAssets>
       <ExcludeAssets>runtime</ExcludeAssets>
       <IncludeAssets>compile; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
@@ -23,9 +23,5 @@
   <ItemGroup>
     <None Include="lang\**\*.*" CopyToOutputDirectory="PreserveNewest" />
     <None Update="spawns\**\*.*" CopyToOutputDirectory="PreserveNewest" />
-    <!-- css_gg surrender vote system — disabled, exclude from build -->
-    <Compile Remove="GGSystem.cs" />
-    <!-- Dead code — see comments in file for explanation -->
-    <Compile Remove="SynchronizationContextManagement.cs" />
   </ItemGroup>
 </Project>
