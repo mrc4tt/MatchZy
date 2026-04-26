@@ -1395,8 +1395,6 @@ namespace MatchZy
             if (!readyAvailable)
                 return;
 
-            bool shouldUpdate = false;
-
             foreach (var player in Utilities.GetPlayers())
             {
                 if (player == null || !player.IsValid || player.IsBot || !player.UserId.HasValue)
@@ -1405,29 +1403,12 @@ namespace MatchZy
                 int userId = player.UserId.Value;
                 string clanTag = GetPlayerClanTag(player, userId);
 
-                // Force update if this is the player who changed status
-                if (forceUpdateSlot.HasValue && player.Slot == forceUpdateSlot.Value)
+                bool isForced = forceUpdateSlot.HasValue && player.Slot == forceUpdateSlot.Value;
+                if (isForced || player.Clan != clanTag)
                 {
                     player.Clan = clanTag;
                     Utilities.SetStateChanged(player, "CCSPlayerController", "m_szClan");
-                    shouldUpdate = true;
                 }
-                else if (player.Clan != clanTag)
-                {
-                    player.Clan = clanTag;
-                    shouldUpdate = true;
-                }
-            }
-
-            if (shouldUpdate)
-            {
-                AddTimer(
-                    0.1f,
-                    () =>
-                    {
-                        new EventNextlevelChanged(force: false).FireEvent(false);
-                    }
-                );
             }
         }
 
@@ -1435,8 +1416,6 @@ namespace MatchZy
         {
             try
             {
-                bool shouldUpdate = false;
-
                 foreach (var player in Utilities.GetPlayers())
                 {
                     if (player == null || !player.IsValid || player.IsBot)
@@ -1445,19 +1424,8 @@ namespace MatchZy
                     if (!string.IsNullOrEmpty(player.Clan))
                     {
                         player.Clan = string.Empty;
-                        shouldUpdate = true;
+                        Utilities.SetStateChanged(player, "CCSPlayerController", "m_szClan");
                     }
-                }
-
-                if (shouldUpdate)
-                {
-                    AddTimer(
-                        0.1f,
-                        () =>
-                        {
-                            new EventNextlevelChanged(force: false).FireEvent(false);
-                        }
-                    );
                 }
             }
             catch (Exception)
