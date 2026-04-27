@@ -1120,7 +1120,9 @@ mp_warmup_start
                     sb.Append("\n\n");
                 }
                 File.AppendAllText(filePath, sb.ToString());
-                Console.WriteLine($"[MatchZy] Appended {missingBlocks.Count} missing cvar(s) to {ConfigFiles.Paths.Config}.");
+                Console.WriteLine(
+                    $"[MatchZy] Appended {missingBlocks.Count} missing cvar(s) to {ConfigFiles.Paths.Config}."
+                );
             }
             catch (Exception ex)
             {

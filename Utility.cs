@@ -237,7 +237,15 @@ namespace MatchZy
                 }
 
                 // Broadcast cached message (center HUD text expires after a few seconds, so repeat is still needed)
-                VirtualFunctions.ClientPrintAll(HudDestination.Center, _cachedReadyHintMessage, 0, 0, 0, 0, 0);
+                VirtualFunctions.ClientPrintAll(
+                    HudDestination.Center,
+                    _cachedReadyHintMessage,
+                    0,
+                    0,
+                    0,
+                    0,
+                    0
+                );
             }
             catch (Exception)
             {
@@ -1320,8 +1328,15 @@ namespace MatchZy
             Task.Run(async () =>
             {
                 long newMatchId = await database.InitMatchAsync(
-                    team1Name, team2Name, "-", matchSetup,
-                    currentMatchId, currentMapNum, seriesType, mapName, serverIp
+                    team1Name,
+                    team2Name,
+                    "-",
+                    matchSetup,
+                    currentMatchId,
+                    currentMapNum,
+                    seriesType,
+                    mapName,
+                    serverIp
                 );
 
                 // Retry once if database init failed
@@ -1329,8 +1344,15 @@ namespace MatchZy
                 {
                     Log("[HandleMatchStart] WARNING: InitMatchAsync returned -1, retrying...");
                     newMatchId = await database.InitMatchAsync(
-                        team1Name, team2Name, "-", matchSetup,
-                        currentMatchId, currentMapNum, seriesType, mapName, serverIp
+                        team1Name,
+                        team2Name,
+                        "-",
+                        matchSetup,
+                        currentMatchId,
+                        currentMapNum,
+                        seriesType,
+                        mapName,
+                        serverIp
                     );
                 }
 
@@ -1341,11 +1363,15 @@ namespace MatchZy
 
                     if (liveMatchId == -1)
                     {
-                        Log("[HandleMatchStart] CRITICAL: Database initialization failed! Match stats will NOT be recorded.");
+                        Log(
+                            "[HandleMatchStart] CRITICAL: Database initialization failed! Match stats will NOT be recorded."
+                        );
                     }
                     else
                     {
-                        Log($"[HandleMatchStart] Match initialized successfully with matchId: {liveMatchId}");
+                        Log(
+                            $"[HandleMatchStart] Match initialized successfully with matchId: {liveMatchId}"
+                        );
                     }
 
                     SetupRoundBackupFile();
@@ -1371,7 +1397,10 @@ namespace MatchZy
                     {
                         StartLive();
                     }
-                    if (matchStartMessage.Value.Trim() != "" && matchStartMessage.Value.Trim() != "\"\"")
+                    if (
+                        matchStartMessage.Value.Trim() != ""
+                        && matchStartMessage.Value.Trim() != "\"\""
+                    )
                     {
                         List<string> matchStartMessages = [.. matchStartMessage.Value.Split("$$$")];
                         foreach (string message in matchStartMessages)
@@ -1454,8 +1483,7 @@ namespace MatchZy
 
             // Get restart delay from server config (no GOTV broadcast delay needed)
             // With tv_record_immediate 1, demo writes in real-time, no flush delay needed
-            int restartDelay =
-                _cvMatchRestartDelay?.GetPrimitiveValue<int>() ?? 25;
+            int restartDelay = _cvMatchRestartDelay?.GetPrimitiveValue<int>() ?? 25;
 
             int currentMapNumber = matchConfig.CurrentMapNumber;
             Log(
@@ -1547,11 +1575,7 @@ namespace MatchZy
                 // Write pre-collected HLTV-style JSON stats (file I/O only, no native calls)
                 if (matchStatsForExport != null && demoFilename != null)
                 {
-                    await WriteMatchStatsJsonAsync(
-                        matchStatsForExport,
-                        demoFilename,
-                        statsPath
-                    );
+                    await WriteMatchStatsJsonAsync(matchStatsForExport, demoFilename, statsPath);
                 }
             });
 
@@ -1689,7 +1713,9 @@ namespace MatchZy
                         }
                         else
                         {
-                            Log($"[ChangeMap] WARNING: Map '{mapName}' is not valid, cannot change!");
+                            Log(
+                                $"[ChangeMap] WARNING: Map '{mapName}' is not valid, cannot change!"
+                            );
                         }
                     });
                 }
@@ -1725,12 +1751,16 @@ namespace MatchZy
             CCSTeam? team1Entity = null;
             CCSTeam? team2Entity = null;
 
-            string team1Side = teamSides[matchzyTeam1];   // "CT" or "TERRORIST"
+            string team1Side = teamSides[matchzyTeam1]; // "CT" or "TERRORIST"
             string team2Side = teamSides[matchzyTeam2];
 
             // Map sides to cached entities
-            if (_cachedCtTeam != null && _cachedCtTeam.IsValid &&
-                _cachedTTeam != null && _cachedTTeam.IsValid)
+            if (
+                _cachedCtTeam != null
+                && _cachedCtTeam.IsValid
+                && _cachedTTeam != null
+                && _cachedTTeam.IsValid
+            )
             {
                 team1Entity = team1Side == "CT" ? _cachedCtTeam : _cachedTTeam;
                 team2Entity = team2Side == "CT" ? _cachedCtTeam : _cachedTTeam;
@@ -1746,8 +1776,10 @@ namespace MatchZy
                 }
             }
 
-            if (team1Entity != null) t1score = team1Entity.Score;
-            if (team2Entity != null) t2score = team2Entity.Score;
+            if (team1Entity != null)
+                t1score = team1Entity.Score;
+            if (team2Entity != null)
+                t2score = team2Entity.Score;
 
             return (t1score, t2score);
         }

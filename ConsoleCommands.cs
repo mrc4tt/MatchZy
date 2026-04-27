@@ -960,7 +960,10 @@ namespace MatchZy
                 }
                 else
                 {
-                    ReplyToUserCommand(player, Localizer.ForPlayer(player, "matchzy.cc.invalidmap"));
+                    ReplyToUserCommand(
+                        player,
+                        Localizer.ForPlayer(player, "matchzy.cc.invalidmap")
+                    );
                 }
             });
         }
@@ -1261,7 +1264,7 @@ namespace MatchZy
         [ConsoleCommand("css_matchzy_version", "Displays the current MatchZy version")]
         [ConsoleCommand("css_version", "Displays the current MatchZy version")]
         [ConsoleCommand("version", "Returns server version")]
-        public void OnVersionCommand(CCSPlayerController? player, CommandInfo? command)
+        public void OnMatchZyVersionCommand(CCSPlayerController? player, CommandInfo? command)
         {
             if (command == null)
                 return;

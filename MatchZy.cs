@@ -1,16 +1,15 @@
 using CounterStrikeSharp.API;
 using CounterStrikeSharp.API.Core;
-using CounterStrikeSharp.API.Modules.Commands;
-using CounterStrikeSharp.API.Modules.Utils;
 using CounterStrikeSharp.API.Core.Attributes;
-using CounterStrikeSharp.API.Modules.Timers;
-using CounterStrikeSharp.API.Modules.Memory;
+using CounterStrikeSharp.API.Core.Translations;
+using CounterStrikeSharp.API.Modules.Commands;
 using CounterStrikeSharp.API.Modules.Cvars;
 using CounterStrikeSharp.API.Modules.Entities;
-using CounterStrikeSharp.API.Core.Attributes.Registration;
-using Microsoft.Extensions.Logging;
-using CounterStrikeSharp.API.Core.Translations;
 using CounterStrikeSharp.API.Modules.Events;
+using CounterStrikeSharp.API.Modules.Memory;
+using CounterStrikeSharp.API.Modules.Timers;
+using CounterStrikeSharp.API.Modules.Utils;
+using Microsoft.Extensions.Logging;
 
 namespace MatchZy
 {
@@ -19,10 +18,16 @@ namespace MatchZy
         public override string ModuleName => "MatchZy";
         public override string ModuleVersion => "0.8.29";
         public override string ModuleAuthor => "WD- Edited by Miksen";
-        public override string ModuleDescription => "A plugin for running and managing CS2 practice/pugs/scrims/matches!";
+        public override string ModuleDescription =>
+            "A plugin for running and managing CS2 practice/pugs/scrims/matches!";
         public string chatPrefix = $"{ChatColors.Green}[MatchZy]{ChatColors.Default}";
         public string adminChatPrefix = $"[{ChatColors.Red}ADMIN{ChatColors.Default}]";
-        private readonly string _matchzyConfigPath = Path.Combine(Server.GameDirectory, "csgo", "cfg", "matchzy");
+        private readonly string _matchzyConfigPath = Path.Combine(
+            Server.GameDirectory,
+            "csgo",
+            "cfg",
+            "matchzy"
+        );
 
         // Plugin start phase data
         public bool isPractice = false;
@@ -46,7 +51,7 @@ namespace MatchZy
         {
             { "ct", false },
             { "t", false },
-            { "pauseTeam", "" }
+            { "pauseTeam", "" },
         };
 
         bool isPauseCommandForTactical = false;
@@ -58,23 +63,30 @@ namespace MatchZy
         // Players Data (including admins)
         public int connectedPlayers = 0;
         private Dictionary<int, bool> playerReadyStatus = new Dictionary<int, bool>();
-        private Dictionary<int, CCSPlayerController> playerData = new Dictionary<int, CCSPlayerController>();
+        private Dictionary<int, CCSPlayerController> playerData =
+            new Dictionary<int, CCSPlayerController>();
 
         private void SetupRestartConfirmationCleanup()
         {
-            AddTimer(10.0f, () =>
-            {
-                var now = DateTime.Now;
-                var expired = pendingRestartConfirmations
-                    .Where(kvp => (now - kvp.Value).TotalSeconds > RESTART_CONFIRMATION_TIMEOUT_SECONDS)
-                    .Select(kvp => kvp.Key)
-                    .ToList();
-
-                foreach (var steamId in expired)
+            AddTimer(
+                10.0f,
+                () =>
                 {
-                    pendingRestartConfirmations.Remove(steamId);
-                }
-            }, TimerFlags.REPEAT);
+                    var now = DateTime.Now;
+                    var expired = pendingRestartConfirmations
+                        .Where(kvp =>
+                            (now - kvp.Value).TotalSeconds > RESTART_CONFIRMATION_TIMEOUT_SECONDS
+                        )
+                        .Select(kvp => kvp.Key)
+                        .ToList();
+
+                    foreach (var steamId in expired)
+                    {
+                        pendingRestartConfirmations.Remove(steamId);
+                    }
+                },
+                TimerFlags.REPEAT
+            );
         }
 
         // Admin Data
@@ -99,7 +111,9 @@ namespace MatchZy
             _cachedTTeam = null;
             try
             {
-                var teamEntities = Utilities.FindAllEntitiesByDesignerName<CCSTeam>("cs_team_manager");
+                var teamEntities = Utilities.FindAllEntitiesByDesignerName<CCSTeam>(
+                    "cs_team_manager"
+                );
                 foreach (var team in teamEntities)
                 {
                     if (team.Teamname == "CT")
@@ -152,15 +166,21 @@ namespace MatchZy
         /// </summary>
         private (int ctAlive, int tAlive) CountAlivePlayers()
         {
-            int ct = 0, t = 0;
+            int ct = 0,
+                t = 0;
             foreach (var kvp in playerData)
             {
                 var p = kvp.Value;
-                if (p == null || !p.IsValid || p.IsBot || p.IsHLTV) continue;
-                if (p.PlayerPawn?.Value == null) continue;
-                if (p.PlayerPawn.Value.LifeState != (byte)LifeState_t.LIFE_ALIVE) continue;
-                if (p.TeamNum == (int)CsTeam.CounterTerrorist) ct++;
-                else if (p.TeamNum == (int)CsTeam.Terrorist) t++;
+                if (p == null || !p.IsValid || p.IsBot || p.IsHLTV)
+                    continue;
+                if (p.PlayerPawn?.Value == null)
+                    continue;
+                if (p.PlayerPawn.Value.LifeState != (byte)LifeState_t.LIFE_ALIVE)
+                    continue;
+                if (p.TeamNum == (int)CsTeam.CounterTerrorist)
+                    ct++;
+                else if (p.TeamNum == (int)CsTeam.Terrorist)
+                    t++;
             }
             return (ct, t);
         }
@@ -170,63 +190,82 @@ namespace MatchZy
         /// </summary>
         private static string GetTeamSide(CCSPlayerController? player)
         {
-            if (player == null || !player.IsValid) return "unknown";
+            if (player == null || !player.IsValid)
+                return "unknown";
             return player.TeamNum == (int)CsTeam.CounterTerrorist ? "CT" : "T";
         }
 
         public void DrawSideSelection()
         {
-            if (!isSideSelectionPhase) return;
+            if (!isSideSelectionPhase)
+                return;
 
             SideSelectionTimer?.Kill();
             SideSelectionTimer = null;
 
-
-            SideSelectionTimer = AddTimer(60.0f, () =>
-            {
-
-                Server.NextFrame(() =>
+            SideSelectionTimer = AddTimer(
+                60.0f,
+                () =>
                 {
-                    if (!isSideSelectionPhase) return;
+                    Server.NextFrame(() =>
+                    {
+                        if (!isSideSelectionPhase)
+                            return;
 
-                    PrintToAllChat(Localizer["matchzy.knife.decidedtostay", knifeWinnerName]);
-                    StartLive();
-                });
-            });
+                        PrintToAllChat(Localizer["matchzy.knife.decidedtostay", knifeWinnerName]);
+                        StartLive();
+                    });
+                }
+            );
 
             // Timers for alerts - these are safe as they only display messages
-            AddTimer(20.0f, () =>
-            {
-                if (isSideSelectionPhase)
+            AddTimer(
+                20.0f,
+                () =>
                 {
-                    Server.NextFrame(() =>
+                    if (isSideSelectionPhase)
                     {
-                        PrintToAllChat($"{ChatColors.Green}{knifeWinnerName}{ChatColors.Default} has 40 seconds left to choose side!");
-                    });
+                        Server.NextFrame(() =>
+                        {
+                            PrintToAllChat(
+                                $"{ChatColors.Green}{knifeWinnerName}{ChatColors.Default} has 40 seconds left to choose side!"
+                            );
+                        });
+                    }
                 }
-            });
+            );
 
-            AddTimer(40.0f, () =>
-            {
-                if (isSideSelectionPhase)
+            AddTimer(
+                40.0f,
+                () =>
                 {
-                    Server.NextFrame(() =>
+                    if (isSideSelectionPhase)
                     {
-                        PrintToAllChat($"{ChatColors.Green}{knifeWinnerName}{ChatColors.Default} has 20 seconds left to choose side!");
-                    });
+                        Server.NextFrame(() =>
+                        {
+                            PrintToAllChat(
+                                $"{ChatColors.Green}{knifeWinnerName}{ChatColors.Default} has 20 seconds left to choose side!"
+                            );
+                        });
+                    }
                 }
-            });
+            );
 
-            AddTimer(50.0f, () =>
-            {
-                if (isSideSelectionPhase)
+            AddTimer(
+                50.0f,
+                () =>
                 {
-                    Server.NextFrame(() =>
+                    if (isSideSelectionPhase)
                     {
-                        PrintToAllChat($"{ChatColors.Green}{knifeWinnerName}{ChatColors.Default} has 10 seconds left to choose side!");
-                    });
+                        Server.NextFrame(() =>
+                        {
+                            PrintToAllChat(
+                                $"{ChatColors.Green}{knifeWinnerName}{ChatColors.Default} has 10 seconds left to choose side!"
+                            );
+                        });
+                    }
                 }
-            });
+            );
         }
 
         public override void Load(bool hotReload)
@@ -242,7 +281,13 @@ namespace MatchZy
             configManager.InitializeConfigs();
             mapRotationList = configManager.LoadMapRotation();
 
-            var configPath = Path.Combine(Server.GameDirectory, "csgo", "cfg", "matchzy", ConfigFiles.Paths.Config);
+            var configPath = Path.Combine(
+                Server.GameDirectory,
+                "csgo",
+                "cfg",
+                "matchzy",
+                ConfigFiles.Paths.Config
+            );
             if (File.Exists(configPath))
             {
                 Server.ExecuteCommand($"execifexists matchzy/{ConfigFiles.Paths.Config}");
@@ -262,16 +307,19 @@ namespace MatchZy
             if (!hotReload)
             {
                 // Give the config time to execute, then read the ConVar and start
-                AddTimer(0.1f, () =>
-                {
-                    var autoStartConVar = ConVar.Find("matchzy_autostart_mode");
-                    if (autoStartConVar != null)
+                AddTimer(
+                    0.1f,
+                    () =>
                     {
-                        autoStartMode = autoStartConVar.GetPrimitiveValue<int>();
-                        Log($"[Load] Read autoStartMode from ConVar: {autoStartMode}");
+                        var autoStartConVar = ConVar.Find("matchzy_autostart_mode");
+                        if (autoStartConVar != null)
+                        {
+                            autoStartMode = autoStartConVar.GetPrimitiveValue<int>();
+                            Log($"[Load] Read autoStartMode from ConVar: {autoStartMode}");
+                        }
+                        AutoStart();
                     }
-                    AutoStart();
-                });
+                );
             }
             else
             {
@@ -279,7 +327,7 @@ namespace MatchZy
                 // Only hot-reload the plugin if you are testing something and don't want to restart the server time and again.
                 UpdatePlayersMap();
                 RefreshTeamEntities();
-                
+
                 // Read the ConVar to preserve autoStartMode on hot-reload
                 var autoStartConVar = ConVar.Find("matchzy_autostart_mode");
                 if (autoStartConVar != null)
@@ -287,7 +335,7 @@ namespace MatchZy
                     autoStartMode = autoStartConVar.GetPrimitiveValue<int>();
                     Log($"[HotReload] Restored autoStartMode from ConVar: {autoStartMode}");
                 }
-                
+
                 AutoStart();
             }
 
@@ -439,24 +487,30 @@ namespace MatchZy
                 { ".worsttspawn", OnWorstTSpawnCommand },
                 { ".savepos", OnSavePosCommand },
                 { ".loadpos", OnLoadPosCommand },
-                { ".version", OnVersionCommand },
+                { ".version", OnMatchZyVersionCommand },
                 { ".readycheck", OnReadyCheckCommand },
                 { ".rcheck", OnReadyCheckCommand },
                 { ".rc", OnReadyCheckCommand },
-                { ".mhelp", OnAdminHelpCommand }
+                { ".mhelp", OnAdminHelpCommand },
                 //{ ".color", OnColorCommand }
                 //{ ".gg", OnGGCommand }
             };
 
             RegisterEventHandler<EventPlayerConnectFull>(EventPlayerConnectFullHandler);
             RegisterEventHandler<EventPlayerDisconnect>(EventPlayerDisconnectHandler);
-            RegisterEventHandler<EventCsWinPanelRound>(EventCsWinPanelRoundHandler, hookMode: HookMode.Pre);
+            RegisterEventHandler<EventCsWinPanelRound>(
+                EventCsWinPanelRoundHandler,
+                hookMode: HookMode.Pre
+            );
             RegisterEventHandler<EventCsWinPanelMatch>(EventCsWinPanelMatchHandler);
             RegisterEventHandler<EventRoundStart>(EventRoundStartHandler);
             RegisterEventHandler<EventRoundFreezeEnd>(EventRoundFreezeEndHandler);
             RegisterEventHandler<EventPlayerSpawn>(OnCoachPlayerSpawn, HookMode.Post);
             RegisterEventHandler<EventPlayerGivenC4>(EventPlayerGivenC4);
-            RegisterEventHandler<EventPlayerDeath>(EventPlayerDeathPreHandler, hookMode: HookMode.Pre);
+            RegisterEventHandler<EventPlayerDeath>(
+                EventPlayerDeathPreHandler,
+                hookMode: HookMode.Pre
+            );
             RegisterEventHandler<EventPlayerPing>(EventPlayerPingHandler);
             //RegisterEventHandler<EventCsIntermission>(OnEventCsIntermissionPost);
             RegisterListener<Listeners.OnMapEnd>(OnMapEndHandler);
@@ -468,579 +522,729 @@ namespace MatchZy
             });
 
             RegisterListener<Listeners.OnEntitySpawned>(OnEntitySpawnedHandler);
-            RegisterEventHandler<EventPlayerTeam>((@event, info) =>
-            {
-                CCSPlayerController? player = @event.Userid;
-                if (!IsPlayerValid(player)) return HookResult.Continue;
-
-                if (matchzyTeam1.coach.Contains(player!) || matchzyTeam2.coach.Contains(player!))
+            RegisterEventHandler<EventPlayerTeam>(
+                (@event, info) =>
                 {
-                    @event.Silent = true;
-                    return HookResult.Changed;
-                }
-                return HookResult.Continue;
-            }, HookMode.Pre);
+                    CCSPlayerController? player = @event.Userid;
+                    if (!IsPlayerValid(player))
+                        return HookResult.Continue;
 
-            RegisterEventHandler<EventPlayerTeam>((@event, info) =>
-            {
-                if (!isMatchSetup && !isVeto) return HookResult.Continue;
+                    if (
+                        matchzyTeam1.coach.Contains(player!) || matchzyTeam2.coach.Contains(player!)
+                    )
+                    {
+                        @event.Silent = true;
+                        return HookResult.Changed;
+                    }
+                    return HookResult.Continue;
+                },
+                HookMode.Pre
+            );
 
-                CCSPlayerController? player = @event.Userid;
-
-                if (!IsPlayerValid(player)) return HookResult.Continue;
-
-                if (player!.IsHLTV || player.IsBot)
+            RegisterEventHandler<EventPlayerTeam>(
+                (@event, info) =>
                 {
+                    if (!isMatchSetup && !isVeto)
+                        return HookResult.Continue;
+
+                    CCSPlayerController? player = @event.Userid;
+
+                    if (!IsPlayerValid(player))
+                        return HookResult.Continue;
+
+                    if (player!.IsHLTV || player.IsBot)
+                    {
+                        return HookResult.Continue;
+                    }
+
+                    CsTeam playerTeam = GetPlayerTeam(player);
+
+                    SwitchPlayerTeam(player, playerTeam);
+
                     return HookResult.Continue;
                 }
+            );
 
-                CsTeam playerTeam = GetPlayerTeam(player);
-
-                SwitchPlayerTeam(player, playerTeam);
-
-                return HookResult.Continue;
-            });
-
-            AddCommandListener("jointeam", (player, info) =>
-            {
-                if ((isMatchSetup || isVeto) && player != null && player.IsValid)
+            AddCommandListener(
+                "jointeam",
+                (player, info) =>
                 {
-                    if (int.TryParse(info.ArgByIndex(1), out int joiningTeam))
+                    if ((isMatchSetup || isVeto) && player != null && player.IsValid)
                     {
-                        int playerTeam = (int)GetPlayerTeam(player);
-                        
-                        // Allow spectators to join freely (team 1 = spectator in CS2)
-                        if (joiningTeam == 1)
+                        if (int.TryParse(info.ArgByIndex(1), out int joiningTeam))
                         {
-                            return HookResult.Continue;
-                        }
-                        
-                        // For other teams, restrict to assigned team
-                        if (joiningTeam != playerTeam)
-                        {
-                            return HookResult.Stop;
+                            int playerTeam = (int)GetPlayerTeam(player);
+
+                            // Allow spectators to join freely (team 1 = spectator in CS2)
+                            if (joiningTeam == 1)
+                            {
+                                return HookResult.Continue;
+                            }
+
+                            // For other teams, restrict to assigned team
+                            if (joiningTeam != playerTeam)
+                            {
+                                return HookResult.Stop;
+                            }
                         }
                     }
+                    return HookResult.Continue;
                 }
-                return HookResult.Continue;
-            });
+            );
 
             AddCommandListener("noclip", OnConsoleNoClip); // Override noclip
 
-            RegisterEventHandler<EventRoundEnd>((@event, info) =>
-            {
-                if (!isKnifeRound) return HookResult.Continue;
-
-                DetermineKnifeWinner();
-                @event.Winner = knifeWinner;
-                int finalEvent = 10;
-                if (knifeWinner == 3)
+            RegisterEventHandler<EventRoundEnd>(
+                (@event, info) =>
                 {
-                    finalEvent = 8;
-                }
-                else if (knifeWinner == 2)
-                {
-                    finalEvent = 9;
-                }
-                @event.Reason = finalEvent;
-                isSideSelectionPhase = true;
-                isKnifeRound = false;
-                StartAfterKnifeWarmup();
+                    if (!isKnifeRound)
+                        return HookResult.Continue;
 
-                return HookResult.Changed;
-            }, HookMode.Pre);
-
-            RegisterEventHandler<EventRoundEnd>((@event, info) =>
-            {
-                try
-                {
-                    if (isDryRun)
+                    DetermineKnifeWinner();
+                    @event.Winner = knifeWinner;
+                    int finalEvent = 10;
+                    if (knifeWinner == 3)
                     {
-                        // Mark dryrun as finished immediately so no other handlers treat this as dryrun
-                        isDryRun = false;
+                        finalEvent = 8;
+                    }
+                    else if (knifeWinner == 2)
+                    {
+                        finalEvent = 9;
+                    }
+                    @event.Reason = finalEvent;
+                    isSideSelectionPhase = true;
+                    isKnifeRound = false;
+                    StartAfterKnifeWarmup();
 
-                        // CRITICAL: Do NOT call StartPracticeMode() or mp_restartgame synchronously
-                        // inside EventRoundEnd — the engine is mid-round-transition and player/entity
-                        // state is not stable. Defer to a short timer so the round end completes cleanly.
-                        AddTimer(0.5f, () =>
+                    return HookResult.Changed;
+                },
+                HookMode.Pre
+            );
+
+            RegisterEventHandler<EventRoundEnd>(
+                (@event, info) =>
+                {
+                    try
+                    {
+                        if (isDryRun)
                         {
-                            StartPracticeMode();
-                            PrintToAllChat($"{ChatColors.Green}Practice Mode has been restored. You can run .dry again if you wish.");
-                            Server.ExecuteCommand("mp_warmup_start; mp_warmup_pausetimer 1; mp_restartgame 1");
-                        });
+                            // Mark dryrun as finished immediately so no other handlers treat this as dryrun
+                            isDryRun = false;
 
+                            // CRITICAL: Do NOT call StartPracticeMode() or mp_restartgame synchronously
+                            // inside EventRoundEnd — the engine is mid-round-transition and player/entity
+                            // state is not stable. Defer to a short timer so the round end completes cleanly.
+                            AddTimer(
+                                0.5f,
+                                () =>
+                                {
+                                    StartPracticeMode();
+                                    PrintToAllChat(
+                                        $"{ChatColors.Green}Practice Mode has been restored. You can run .dry again if you wish."
+                                    );
+                                    Server.ExecuteCommand(
+                                        "mp_warmup_start; mp_warmup_pausetimer 1; mp_restartgame 1"
+                                    );
+                                }
+                            );
+
+                            return HookResult.Continue;
+                        }
+
+                        if (!isMatchLive)
+                            return HookResult.Continue;
+                        HandlePostRoundEndEvent(@event);
                         return HookResult.Continue;
                     }
-
-                    if (!isMatchLive) return HookResult.Continue;
-                    HandlePostRoundEndEvent(@event);
-                    return HookResult.Continue;
-                }
-                catch (Exception e)
-                {
-                    Log($"[EventRoundEnd FATAL] An error occurred: {e.Message}");
-                    return HookResult.Continue;
-                }
-            }, HookMode.Post);
+                    catch (Exception e)
+                    {
+                        Log($"[EventRoundEnd FATAL] An error occurred: {e.Message}");
+                        return HookResult.Continue;
+                    }
+                },
+                HookMode.Post
+            );
 
             RegisterListener<Listeners.OnMapStart>(mapName =>
             {
-                AddTimer(1.0f, () =>
-                {
-                    // Refresh cached team entities after map load (entities aren't available immediately)
-                    RefreshTeamEntities();
-
-                    if (!isMatchSetup)
+                AddTimer(
+                    1.0f,
+                    () =>
                     {
-                        AutoStart();
-                        return;
+                        // Refresh cached team entities after map load (entities aren't available immediately)
+                        RefreshTeamEntities();
+
+                        if (!isMatchSetup)
+                        {
+                            AutoStart();
+                            return;
+                        }
+                        if (isWarmup)
+                            StartWarmup();
+                        if (isPractice)
+                            StartPracticeMode();
                     }
-                    if (isWarmup) StartWarmup();
-                    if (isPractice) StartPracticeMode();
-                });
+                );
             });
 
-            RegisterEventHandler<EventPlayerDeath>((@event, info) =>
-            {
-                // Setting money back to 16000 when a player dies in warmup
-                var player = @event.Userid;
-                if (!isWarmup) return HookResult.Continue;
-                if (!IsPlayerValid(player)) return HookResult.Continue;
-                if (player!.InGameMoneyServices != null) player.InGameMoneyServices.Account = 16000;
-                return HookResult.Continue;
-            });
+            RegisterEventHandler<EventPlayerDeath>(
+                (@event, info) =>
+                {
+                    // Setting money back to 16000 when a player dies in warmup
+                    var player = @event.Userid;
+                    if (!isWarmup)
+                        return HookResult.Continue;
+                    if (!IsPlayerValid(player))
+                        return HookResult.Continue;
+                    if (player!.InGameMoneyServices != null)
+                        player.InGameMoneyServices.Account = 16000;
+                    return HookResult.Continue;
+                }
+            );
 
             // Advanced stats tracking for player deaths
-            RegisterEventHandler<EventPlayerDeath>((@event, info) =>
-            {
-                if (!isMatchLive) return HookResult.Continue;
-                
-                var victim = @event.Userid;
-                var attacker = @event.Attacker;
-                var assister = @event.Assister;
-                
-                OnAdvancedStatsPlayerDeath(victim, attacker, assister);
-                
-                return HookResult.Continue;
-            });
+            RegisterEventHandler<EventPlayerDeath>(
+                (@event, info) =>
+                {
+                    if (!isMatchLive)
+                        return HookResult.Continue;
+
+                    var victim = @event.Userid;
+                    var attacker = @event.Attacker;
+                    var assister = @event.Assister;
+
+                    OnAdvancedStatsPlayerDeath(victim, attacker, assister);
+
+                    return HookResult.Continue;
+                }
+            );
 
             // ── Live scorebot: player_death event ──
-            RegisterEventHandler<EventPlayerDeath>((@event, info) =>
-            {
-                if (!matchStarted) return HookResult.Continue;
-                if (string.IsNullOrEmpty(matchConfig.RemoteLogURL)) return HookResult.Continue;
-
-                var victim = @event.Userid;
-                if (victim == null || !victim.IsValid) return HookResult.Continue;
-
-                var attacker = @event.Attacker;
-                var assister = @event.Assister;
-                bool isSuicide = attacker == null || !attacker.IsValid || attacker == victim;
-
-                // Count alive players per team AFTER this death
-                var (ctAlive, tAlive) = CountAlivePlayers();
-
-                var deathEvent = new PlayerDeathLiveEvent
+            RegisterEventHandler<EventPlayerDeath>(
+                (@event, info) =>
                 {
-                    MatchId = liveMatchId,
-                    MapNumber = matchConfig.CurrentMapNumber,
-                    RoundNumber = GetRoundNumer(),
-                    AttackerName = isSuicide ? null : attacker?.PlayerName,
-                    AttackerSteamId = isSuicide ? null : attacker?.SteamID.ToString(),
-                    AttackerTeam = isSuicide ? null : GetTeamSide(attacker),
-                    VictimName = victim.PlayerName,
-                    VictimSteamId = victim.SteamID.ToString(),
-                    VictimTeam = GetTeamSide(victim),
-                    AssisterName = assister != null && assister.IsValid ? assister.PlayerName : null,
-                    AssisterSteamId = assister != null && assister.IsValid ? assister.SteamID.ToString() : null,
-                    Weapon = @event.Weapon ?? "unknown",
-                    Headshot = @event.Headshot,
-                    Penetrated = @event.Penetrated > 0,
-                    Noscope = @event.Noscope,
-                    Thrusmoke = @event.Thrusmoke,
-                    Attackerblind = @event.Attackerblind,
-                    IsSuicide = isSuicide,
-                    CtAlive = ctAlive,
-                    TAlive = tAlive,
-                };
+                    if (!matchStarted)
+                        return HookResult.Continue;
+                    if (string.IsNullOrEmpty(matchConfig.RemoteLogURL))
+                        return HookResult.Continue;
 
-                Task.Run(async () => { await SendEventAsync(deathEvent); });
-                return HookResult.Continue;
-            }, HookMode.Post);
+                    var victim = @event.Userid;
+                    if (victim == null || !victim.IsValid)
+                        return HookResult.Continue;
+
+                    var attacker = @event.Attacker;
+                    var assister = @event.Assister;
+                    bool isSuicide = attacker == null || !attacker.IsValid || attacker == victim;
+
+                    // Count alive players per team AFTER this death
+                    var (ctAlive, tAlive) = CountAlivePlayers();
+
+                    var deathEvent = new PlayerDeathLiveEvent
+                    {
+                        MatchId = liveMatchId,
+                        MapNumber = matchConfig.CurrentMapNumber,
+                        RoundNumber = GetRoundNumer(),
+                        AttackerName = isSuicide ? null : attacker?.PlayerName,
+                        AttackerSteamId = isSuicide ? null : attacker?.SteamID.ToString(),
+                        AttackerTeam = isSuicide ? null : GetTeamSide(attacker),
+                        VictimName = victim.PlayerName,
+                        VictimSteamId = victim.SteamID.ToString(),
+                        VictimTeam = GetTeamSide(victim),
+                        AssisterName =
+                            assister != null && assister.IsValid ? assister.PlayerName : null,
+                        AssisterSteamId =
+                            assister != null && assister.IsValid
+                                ? assister.SteamID.ToString()
+                                : null,
+                        Weapon = @event.Weapon ?? "unknown",
+                        Headshot = @event.Headshot,
+                        Penetrated = @event.Penetrated > 0,
+                        Noscope = @event.Noscope,
+                        Thrusmoke = @event.Thrusmoke,
+                        Attackerblind = @event.Attackerblind,
+                        IsSuicide = isSuicide,
+                        CtAlive = ctAlive,
+                        TAlive = tAlive,
+                    };
+
+                    Task.Run(async () =>
+                    {
+                        await SendEventAsync(deathEvent);
+                    });
+                    return HookResult.Continue;
+                },
+                HookMode.Post
+            );
 
             // ── Live scorebot: bomb_planted event ──
-            RegisterEventHandler<EventBombPlanted>((@event, info) =>
-            {
-                if (!matchStarted) return HookResult.Continue;
-                if (string.IsNullOrEmpty(matchConfig.RemoteLogURL)) return HookResult.Continue;
-
-                var player = @event.Userid;
-                if (player == null || !player.IsValid) return HookResult.Continue;
-
-                // Count alive players
-                var (ctAlive, tAlive) = CountAlivePlayers();
-
-                var plantEvent = new BombPlantedLiveEvent
+            RegisterEventHandler<EventBombPlanted>(
+                (@event, info) =>
                 {
-                    MatchId = liveMatchId,
-                    MapNumber = matchConfig.CurrentMapNumber,
-                    RoundNumber = GetRoundNumer(),
-                    PlayerName = player.PlayerName,
-                    PlayerSteamId = player.SteamID.ToString(),
-                    Site = @event.Site == 0 ? "A" : "B",
-                    CtAlive = ctAlive,
-                    TAlive = tAlive,
-                };
+                    if (!matchStarted)
+                        return HookResult.Continue;
+                    if (string.IsNullOrEmpty(matchConfig.RemoteLogURL))
+                        return HookResult.Continue;
 
-                Task.Run(async () => { await SendEventAsync(plantEvent); });
-                return HookResult.Continue;
-            });
+                    var player = @event.Userid;
+                    if (player == null || !player.IsValid)
+                        return HookResult.Continue;
+
+                    // Count alive players
+                    var (ctAlive, tAlive) = CountAlivePlayers();
+
+                    var plantEvent = new BombPlantedLiveEvent
+                    {
+                        MatchId = liveMatchId,
+                        MapNumber = matchConfig.CurrentMapNumber,
+                        RoundNumber = GetRoundNumer(),
+                        PlayerName = player.PlayerName,
+                        PlayerSteamId = player.SteamID.ToString(),
+                        Site = @event.Site == 0 ? "A" : "B",
+                        CtAlive = ctAlive,
+                        TAlive = tAlive,
+                    };
+
+                    Task.Run(async () =>
+                    {
+                        await SendEventAsync(plantEvent);
+                    });
+                    return HookResult.Continue;
+                }
+            );
 
             // ── Live scorebot: bomb_defused event ──
-            RegisterEventHandler<EventBombDefused>((@event, info) =>
-            {
-                if (!matchStarted) return HookResult.Continue;
-                if (string.IsNullOrEmpty(matchConfig.RemoteLogURL)) return HookResult.Continue;
-
-                var player = @event.Userid;
-                if (player == null || !player.IsValid) return HookResult.Continue;
-
-                // Count alive players
-                var (ctAlive, tAlive) = CountAlivePlayers();
-
-                var defuseEvent = new BombDefusedLiveEvent
+            RegisterEventHandler<EventBombDefused>(
+                (@event, info) =>
                 {
-                    MatchId = liveMatchId,
-                    MapNumber = matchConfig.CurrentMapNumber,
-                    RoundNumber = GetRoundNumer(),
-                    PlayerName = player.PlayerName,
-                    PlayerSteamId = player.SteamID.ToString(),
-                    Site = @event.Site == 0 ? "A" : "B",
-                    CtAlive = ctAlive,
-                    TAlive = tAlive,
-                };
+                    if (!matchStarted)
+                        return HookResult.Continue;
+                    if (string.IsNullOrEmpty(matchConfig.RemoteLogURL))
+                        return HookResult.Continue;
 
-                Task.Run(async () => { await SendEventAsync(defuseEvent); });
-                return HookResult.Continue;
-            });
+                    var player = @event.Userid;
+                    if (player == null || !player.IsValid)
+                        return HookResult.Continue;
+
+                    // Count alive players
+                    var (ctAlive, tAlive) = CountAlivePlayers();
+
+                    var defuseEvent = new BombDefusedLiveEvent
+                    {
+                        MatchId = liveMatchId,
+                        MapNumber = matchConfig.CurrentMapNumber,
+                        RoundNumber = GetRoundNumer(),
+                        PlayerName = player.PlayerName,
+                        PlayerSteamId = player.SteamID.ToString(),
+                        Site = @event.Site == 0 ? "A" : "B",
+                        CtAlive = ctAlive,
+                        TAlive = tAlive,
+                    };
+
+                    Task.Run(async () =>
+                    {
+                        await SendEventAsync(defuseEvent);
+                    });
+                    return HookResult.Continue;
+                }
+            );
 
             // ── Live scorebot: freezetime_end event ──
-            RegisterEventHandler<EventRoundFreezeEnd>((@event, info) =>
-            {
-                if (!matchStarted) return HookResult.Continue;
-                if (string.IsNullOrEmpty(matchConfig.RemoteLogURL)) return HookResult.Continue;
-
-                int ctAlive = 0, tAlive = 0;
-                var players = new List<LivePlayerInfo>();
-
-                foreach (var kvp in playerData)
+            RegisterEventHandler<EventRoundFreezeEnd>(
+                (@event, info) =>
                 {
-                    var p = kvp.Value;
-                    if (p == null || !p.IsValid || p.IsBot || p.IsHLTV) continue;
-                    if (p.PlayerPawn?.Value == null) continue;
-                    
-                    var pawn = p.PlayerPawn.Value;
-                    bool alive = pawn.LifeState == (byte)LifeState_t.LIFE_ALIVE;
-                    string side = p.TeamNum == (int)CsTeam.CounterTerrorist ? "CT" : 
-                                  p.TeamNum == (int)CsTeam.Terrorist ? "T" : "SPEC";
-                    if (side == "SPEC") continue;
+                    if (!matchStarted)
+                        return HookResult.Continue;
+                    if (string.IsNullOrEmpty(matchConfig.RemoteLogURL))
+                        return HookResult.Continue;
 
-                    if (alive)
+                    int ctAlive = 0,
+                        tAlive = 0;
+                    var players = new List<LivePlayerInfo>();
+
+                    foreach (var kvp in playerData)
                     {
-                        if (side == "CT") ctAlive++;
-                        else tAlive++;
+                        var p = kvp.Value;
+                        if (p == null || !p.IsValid || p.IsBot || p.IsHLTV)
+                            continue;
+                        if (p.PlayerPawn?.Value == null)
+                            continue;
+
+                        var pawn = p.PlayerPawn.Value;
+                        bool alive = pawn.LifeState == (byte)LifeState_t.LIFE_ALIVE;
+                        string side =
+                            p.TeamNum == (int)CsTeam.CounterTerrorist ? "CT"
+                            : p.TeamNum == (int)CsTeam.Terrorist ? "T"
+                            : "SPEC";
+                        if (side == "SPEC")
+                            continue;
+
+                        if (alive)
+                        {
+                            if (side == "CT")
+                                ctAlive++;
+                            else
+                                tAlive++;
+                        }
+
+                        players.Add(
+                            new LivePlayerInfo
+                            {
+                                Name = p.PlayerName,
+                                SteamId = p.SteamID.ToString(),
+                                Team = side,
+                                Hp = alive ? pawn.Health : 0,
+                                Armor = pawn.ArmorValue,
+                                HasHelmet =
+                                    p.PlayerPawn.Value.ItemServices != null
+                                    && (
+                                        p.PlayerPawn.Value.ItemServices as CCSPlayer_ItemServices
+                                    )?.HasHelmet == true,
+                                HasDefuser =
+                                    p.PlayerPawn.Value.ItemServices != null
+                                    && (
+                                        p.PlayerPawn.Value.ItemServices as CCSPlayer_ItemServices
+                                    )?.HasDefuser == true,
+                                Money = p.InGameMoneyServices?.Account ?? 0,
+                            }
+                        );
                     }
 
-                    players.Add(new LivePlayerInfo
+                    var freezeEndEvent = new FreezetimeEndLiveEvent
                     {
-                        Name = p.PlayerName,
-                        SteamId = p.SteamID.ToString(),
-                        Team = side,
-                        Hp = alive ? pawn.Health : 0,
-                        Armor = pawn.ArmorValue,
-                        HasHelmet = p.PlayerPawn.Value.ItemServices != null && 
-                                    (p.PlayerPawn.Value.ItemServices as CCSPlayer_ItemServices)?.HasHelmet == true,
-                        HasDefuser = p.PlayerPawn.Value.ItemServices != null &&
-                                     (p.PlayerPawn.Value.ItemServices as CCSPlayer_ItemServices)?.HasDefuser == true,
-                        Money = p.InGameMoneyServices?.Account ?? 0,
+                        MatchId = liveMatchId,
+                        MapNumber = matchConfig.CurrentMapNumber,
+                        RoundNumber = GetRoundNumer(),
+                        CtAlive = ctAlive,
+                        TAlive = tAlive,
+                        Players = players,
+                    };
+
+                    Task.Run(async () =>
+                    {
+                        await SendEventAsync(freezeEndEvent);
                     });
-                }
-
-                var freezeEndEvent = new FreezetimeEndLiveEvent
-                {
-                    MatchId = liveMatchId,
-                    MapNumber = matchConfig.CurrentMapNumber,
-                    RoundNumber = GetRoundNumer(),
-                    CtAlive = ctAlive,
-                    TAlive = tAlive,
-                    Players = players,
-                };
-
-                Task.Run(async () => { await SendEventAsync(freezeEndEvent); });
-                return HookResult.Continue;
-            });
-
-            RegisterEventHandler<EventPlayerHurt>((@event, info) =>
-            {
-                CCSPlayerController? attacker = @event.Attacker;
-                CCSPlayerController? victim = @event.Userid;
-
-                if (!IsPlayerValid(attacker) || !IsPlayerValid(victim)) return HookResult.Continue;
-
-                if (isPractice && victim!.IsBot)
-                {
-                    int damage = @event.DmgHealth;
-                    int postDamageHealth = @event.Health;
-                    PrintToPlayerChat(attacker!,
-                        Localizer.ForPlayer(attacker!, "matchzy.pracc.damage", damage, victim.PlayerName, postDamageHealth));
                     return HookResult.Continue;
                 }
+            );
 
-                if (!attacker!.IsValid)
-                    return HookResult.Continue;
-
-                bool isDamageDealt = @event.DmgHealth > 0 || @event.DmgArmor > 0;
-                if (attacker.IsBot && !isDamageDealt)
-                    return HookResult.Continue;
-                if (matchStarted && victim!.TeamNum != attacker.TeamNum)
+            RegisterEventHandler<EventPlayerHurt>(
+                (@event, info) =>
                 {
-                    int targetId = (int)victim.UserId!;
-                    UpdatePlayerDamageInfo(@event, targetId);
-                    if (attacker != victim) playerHasTakenDamage = true;
-                }
+                    CCSPlayerController? attacker = @event.Attacker;
+                    CCSPlayerController? victim = @event.Userid;
 
-                return HookResult.Continue;
-            });
+                    if (!IsPlayerValid(attacker) || !IsPlayerValid(victim))
+                        return HookResult.Continue;
 
-            // ── Live scorebot: player_hurt event ──
-            RegisterEventHandler<EventPlayerHurt>((@event, info) =>
-            {
-                if (!isMatchLive) return HookResult.Continue;
-                if (string.IsNullOrEmpty(matchConfig.RemoteLogURL)) return HookResult.Continue;
-
-                var victim = @event.Userid;
-                if (victim == null || !victim.IsValid || victim.IsBot) return HookResult.Continue;
-
-                var attacker = @event.Attacker;
-                bool hasDamage = @event.DmgHealth > 0 || @event.DmgArmor > 0;
-                if (!hasDamage) return HookResult.Continue;
-
-                var hurtEvent = new PlayerHurtLiveEvent
-                {
-                    MatchId = liveMatchId,
-                    MapNumber = matchConfig.CurrentMapNumber,
-                    RoundNumber = GetRoundNumer(),
-                    AttackerName = attacker != null && attacker.IsValid && !attacker.IsBot ? attacker.PlayerName : null,
-                    AttackerSteamId = attacker != null && attacker.IsValid && !attacker.IsBot ? attacker.SteamID.ToString() : null,
-                    VictimName = victim.PlayerName,
-                    VictimSteamId = victim.SteamID.ToString(),
-                    VictimTeam = GetTeamSide(victim),
-                    HpRemaining = @event.Health,
-                    ArmorRemaining = @event.Armor,
-                    DamageHealth = @event.DmgHealth,
-                    DamageArmor = @event.DmgArmor,
-                    Weapon = @event.Weapon ?? "unknown",
-                    Hitgroup = @event.Hitgroup,
-                };
-
-                Task.Run(async () => { await SendEventAsync(hurtEvent); });
-                return HookResult.Continue;
-            });
-
-            RegisterEventHandler<EventPlayerChat>((@event, info) =>
-            {
-                int currentVersion = Api.GetVersion();
-                int index = @event.Userid + 1;
-
-                // Validate the userid before proceeding
-                if (@event.Userid < 0)
-                {
-                    // This is likely a console command or invalid event, skip processing
-                    return HookResult.Continue;
-                }
-
-                var playerUserId = NativeAPI.GetUseridFromIndex(index);
-
-                var originalMessage = @event.Text.Trim();
-                var message = @event.Text.Trim().ToLower();
-
-                var parts = originalMessage.Split(' ');
-                var messageCommand = parts.Length > 0 ? parts[0] : string.Empty;
-                var messageCommandArg = parts.Length > 1 ? string.Join(' ', parts.Skip(1)) : string.Empty;
-
-                CCSPlayerController? player = null;
-                if (playerData.TryGetValue(playerUserId, out CCSPlayerController? value))
-                {
-                    player = value;
-                }
-
-                if (player == null)
-                {
-                    // Somehow we did not have the player in playerData, hence updating the maps again before getting the player
-                    UpdatePlayersMap();
-
-                    // Add validation before accessing the dictionary
-                    if (playerData.TryGetValue(playerUserId, out CCSPlayerController? playerValue))
+                    if (isPractice && victim!.IsBot)
                     {
-                        player = playerValue;
-                    }
-                    else
-                    {
-                        // Player not found even after updating, skip processing
+                        int damage = @event.DmgHealth;
+                        int postDamageHealth = @event.Health;
+                        PrintToPlayerChat(
+                            attacker!,
+                            Localizer.ForPlayer(
+                                attacker!,
+                                "matchzy.pracc.damage",
+                                damage,
+                                victim.PlayerName,
+                                postDamageHealth
+                            )
+                        );
                         return HookResult.Continue;
                     }
-                }
 
-                // Final null check - if player is still null after all attempts, return
-                if (player == null)
-                {
-                    return HookResult.Continue;
-                }
+                    if (!attacker!.IsValid)
+                        return HookResult.Continue;
 
-                // Handling player commands — exact match first, then prefix-based
-                if (commandActions.TryGetValue(message, out var action))
-                {
-                    action(player, null);
-                    // Exact match found — skip prefix checks (these commands take no args)
-                    return HookResult.Continue;
-                }
-
-                if (message.StartsWith(".readyrequired"))
-                {
-                    HandleReadyRequiredCommand(player, messageCommandArg);
-                }
-
-                if (message.StartsWith(".teamsize"))
-                {
-                    HandleReadyRequiredCommand(player, messageCommandArg);
-                }
-
-                if (message.StartsWith(".restore"))
-                {
-                    HandleRestoreCommand(player, messageCommandArg);
-                }
-
-                if (message.StartsWith(".savenade") || message.StartsWith(".sn"))
-                {
-                    HandleSaveNadeCommand(player, messageCommandArg);
-                }
-
-                if (message.StartsWith(".delnade") || message.StartsWith(".dn"))
-                {
-                    HandleDeleteNadeCommand(player, messageCommandArg);
-                }
-
-                if (message.StartsWith(".deletenade"))
-                {
-                    HandleDeleteNadeCommand(player, messageCommandArg);
-                }
-
-                if (message.StartsWith(".importnade"))
-                {
-                    HandleImportNadeCommand(player, messageCommandArg);
-                }
-
-                if (message.StartsWith(".listnades") || message.StartsWith(".lin"))
-                {
-                    HandleListNadesCommand(player, messageCommandArg);
-                }
-
-                if (message.StartsWith(".loadnade") || message.StartsWith(".ln"))
-                {
-                    HandleLoadNadeCommand(player, messageCommandArg);
-                }
-
-                if (message.StartsWith(".spawn") || message.StartsWith(".sp"))
-                {
-                    HandleSpawnCommand(player, messageCommandArg, player.TeamNum, "spawn");
-                }
-
-                if (message.StartsWith(".ctspawn") || message.StartsWith(".cts"))
-                {
-                    HandleSpawnCommand(player, messageCommandArg, (byte)CsTeam.CounterTerrorist, "ctspawn");
-                }
-
-                if (message.StartsWith(".tspawn") || message.StartsWith(".ts"))
-                {
-                    HandleSpawnCommand(player, messageCommandArg, (byte)CsTeam.Terrorist, "tspawn");
-                }
-
-                if (message.StartsWith(".team1") || message.StartsWith(".ctname"))
-                {
-                    HandleTeamNameChangeCommand(player, messageCommandArg, 1);
-                }
-
-                if (message.StartsWith(".team2") || message.StartsWith(".tname"))
-                {
-                    HandleTeamNameChangeCommand(player, messageCommandArg, 2);
-                }
-
-                if (message.StartsWith(".coach"))
-                {
-                    HandleCoachCommand(player, messageCommandArg);
-                }
-
-                if (message.StartsWith(".ban"))
-                {
-                    HandeMapBanCommand(player, messageCommandArg);
-                }
-
-                if (message.StartsWith(".pick"))
-                {
-                    HandeMapPickCommand(player, messageCommandArg);
-                }
-
-                if (message.StartsWith(".back"))
-                {
-                    HandleBackCommand(player, messageCommandArg);
-                }
-
-                if (message.StartsWith(".delay"))
-                {
-                    HandleDelayCommand(player, messageCommandArg);
-                }
-
-                if (message.StartsWith(".throwindex"))
-                {
-                    HandleThrowIndexCommand(player, messageCommandArg);
-                }
-
-                if (message.StartsWith(".throwidx"))
-                {
-                    HandleThrowIndexCommand(player, messageCommandArg);
-                }
-
-                return HookResult.Continue;
-            });
-
-            RegisterEventHandler<EventPlayerBlind>((@event, info) =>
-            {
-                CCSPlayerController? player = @event.Userid;
-                CCSPlayerController? attacker = @event.Attacker;
-                if (!isPractice) return HookResult.Continue;
-
-                if (!IsPlayerValid(player) || !IsPlayerValid(attacker)) return HookResult.Continue;
-
-                if (attacker!.IsValid)
-                {
-                    double roundedBlindDuration = Math.Round(@event.BlindDuration, 2);
-                    PrintToPlayerChat(attacker,
-                        Localizer.ForPlayer(attacker, "matchzy.pracc.blind", player!.PlayerName, roundedBlindDuration));
-                }
-
-                var userId = player!.UserId;
-                if (userId != null && noFlashList.Contains((int)userId))
-                {
-                    Server.NextFrame(() => 
+                    bool isDamageDealt = @event.DmgHealth > 0 || @event.DmgArmor > 0;
+                    if (attacker.IsBot && !isDamageDealt)
+                        return HookResult.Continue;
+                    if (matchStarted && victim!.TeamNum != attacker.TeamNum)
                     {
-                        // Re-validate player - may have disconnected
-                        if (!IsPlayerValid(player)) return;
-                        KillFlashEffect(player);
-                    });
-                }
+                        int targetId = (int)victim.UserId!;
+                        UpdatePlayerDamageInfo(@event, targetId);
+                        if (attacker != victim)
+                            playerHasTakenDamage = true;
+                    }
 
-                return HookResult.Continue;
-            });
+                    return HookResult.Continue;
+                }
+            );
+
+            // ── Live scorebot: player_hurt event ──
+            RegisterEventHandler<EventPlayerHurt>(
+                (@event, info) =>
+                {
+                    if (!isMatchLive)
+                        return HookResult.Continue;
+                    if (string.IsNullOrEmpty(matchConfig.RemoteLogURL))
+                        return HookResult.Continue;
+
+                    var victim = @event.Userid;
+                    if (victim == null || !victim.IsValid || victim.IsBot)
+                        return HookResult.Continue;
+
+                    var attacker = @event.Attacker;
+                    bool hasDamage = @event.DmgHealth > 0 || @event.DmgArmor > 0;
+                    if (!hasDamage)
+                        return HookResult.Continue;
+
+                    var hurtEvent = new PlayerHurtLiveEvent
+                    {
+                        MatchId = liveMatchId,
+                        MapNumber = matchConfig.CurrentMapNumber,
+                        RoundNumber = GetRoundNumer(),
+                        AttackerName =
+                            attacker != null && attacker.IsValid && !attacker.IsBot
+                                ? attacker.PlayerName
+                                : null,
+                        AttackerSteamId =
+                            attacker != null && attacker.IsValid && !attacker.IsBot
+                                ? attacker.SteamID.ToString()
+                                : null,
+                        VictimName = victim.PlayerName,
+                        VictimSteamId = victim.SteamID.ToString(),
+                        VictimTeam = GetTeamSide(victim),
+                        HpRemaining = @event.Health,
+                        ArmorRemaining = @event.Armor,
+                        DamageHealth = @event.DmgHealth,
+                        DamageArmor = @event.DmgArmor,
+                        Weapon = @event.Weapon ?? "unknown",
+                        Hitgroup = @event.Hitgroup,
+                    };
+
+                    Task.Run(async () =>
+                    {
+                        await SendEventAsync(hurtEvent);
+                    });
+                    return HookResult.Continue;
+                }
+            );
+
+            RegisterEventHandler<EventPlayerChat>(
+                (@event, info) =>
+                {
+                    int currentVersion = Api.GetVersion();
+                    int index = @event.Userid + 1;
+
+                    // Validate the userid before proceeding
+                    if (@event.Userid < 0)
+                    {
+                        // This is likely a console command or invalid event, skip processing
+                        return HookResult.Continue;
+                    }
+
+                    var playerUserId = NativeAPI.GetUseridFromIndex(index);
+
+                    var originalMessage = @event.Text.Trim();
+                    var message = @event.Text.Trim().ToLower();
+
+                    var parts = originalMessage.Split(' ');
+                    var messageCommand = parts.Length > 0 ? parts[0] : string.Empty;
+                    var messageCommandArg =
+                        parts.Length > 1 ? string.Join(' ', parts.Skip(1)) : string.Empty;
+
+                    CCSPlayerController? player = null;
+                    if (playerData.TryGetValue(playerUserId, out CCSPlayerController? value))
+                    {
+                        player = value;
+                    }
+
+                    if (player == null)
+                    {
+                        // Somehow we did not have the player in playerData, hence updating the maps again before getting the player
+                        UpdatePlayersMap();
+
+                        // Add validation before accessing the dictionary
+                        if (
+                            playerData.TryGetValue(
+                                playerUserId,
+                                out CCSPlayerController? playerValue
+                            )
+                        )
+                        {
+                            player = playerValue;
+                        }
+                        else
+                        {
+                            // Player not found even after updating, skip processing
+                            return HookResult.Continue;
+                        }
+                    }
+
+                    // Final null check - if player is still null after all attempts, return
+                    if (player == null)
+                    {
+                        return HookResult.Continue;
+                    }
+
+                    // Handling player commands — exact match first, then prefix-based
+                    if (commandActions.TryGetValue(message, out var action))
+                    {
+                        action(player, null);
+                        // Exact match found — skip prefix checks (these commands take no args)
+                        return HookResult.Continue;
+                    }
+
+                    if (message.StartsWith(".readyrequired"))
+                    {
+                        HandleReadyRequiredCommand(player, messageCommandArg);
+                    }
+
+                    if (message.StartsWith(".teamsize"))
+                    {
+                        HandleReadyRequiredCommand(player, messageCommandArg);
+                    }
+
+                    if (message.StartsWith(".restore"))
+                    {
+                        HandleRestoreCommand(player, messageCommandArg);
+                    }
+
+                    if (message.StartsWith(".savenade") || message.StartsWith(".sn"))
+                    {
+                        HandleSaveNadeCommand(player, messageCommandArg);
+                    }
+
+                    if (message.StartsWith(".delnade") || message.StartsWith(".dn"))
+                    {
+                        HandleDeleteNadeCommand(player, messageCommandArg);
+                    }
+
+                    if (message.StartsWith(".deletenade"))
+                    {
+                        HandleDeleteNadeCommand(player, messageCommandArg);
+                    }
+
+                    if (message.StartsWith(".importnade"))
+                    {
+                        HandleImportNadeCommand(player, messageCommandArg);
+                    }
+
+                    if (message.StartsWith(".listnades") || message.StartsWith(".lin"))
+                    {
+                        HandleListNadesCommand(player, messageCommandArg);
+                    }
+
+                    if (message.StartsWith(".loadnade") || message.StartsWith(".ln"))
+                    {
+                        HandleLoadNadeCommand(player, messageCommandArg);
+                    }
+
+                    if (message.StartsWith(".spawn") || message.StartsWith(".sp"))
+                    {
+                        HandleSpawnCommand(player, messageCommandArg, player.TeamNum, "spawn");
+                    }
+
+                    if (message.StartsWith(".ctspawn") || message.StartsWith(".cts"))
+                    {
+                        HandleSpawnCommand(
+                            player,
+                            messageCommandArg,
+                            (byte)CsTeam.CounterTerrorist,
+                            "ctspawn"
+                        );
+                    }
+
+                    if (message.StartsWith(".tspawn") || message.StartsWith(".ts"))
+                    {
+                        HandleSpawnCommand(
+                            player,
+                            messageCommandArg,
+                            (byte)CsTeam.Terrorist,
+                            "tspawn"
+                        );
+                    }
+
+                    if (message.StartsWith(".team1") || message.StartsWith(".ctname"))
+                    {
+                        HandleTeamNameChangeCommand(player, messageCommandArg, 1);
+                    }
+
+                    if (message.StartsWith(".team2") || message.StartsWith(".tname"))
+                    {
+                        HandleTeamNameChangeCommand(player, messageCommandArg, 2);
+                    }
+
+                    if (message.StartsWith(".coach"))
+                    {
+                        HandleCoachCommand(player, messageCommandArg);
+                    }
+
+                    if (message.StartsWith(".ban"))
+                    {
+                        HandeMapBanCommand(player, messageCommandArg);
+                    }
+
+                    if (message.StartsWith(".pick"))
+                    {
+                        HandeMapPickCommand(player, messageCommandArg);
+                    }
+
+                    if (message.StartsWith(".back"))
+                    {
+                        HandleBackCommand(player, messageCommandArg);
+                    }
+
+                    if (message.StartsWith(".delay"))
+                    {
+                        HandleDelayCommand(player, messageCommandArg);
+                    }
+
+                    if (message.StartsWith(".throwindex"))
+                    {
+                        HandleThrowIndexCommand(player, messageCommandArg);
+                    }
+
+                    if (message.StartsWith(".throwidx"))
+                    {
+                        HandleThrowIndexCommand(player, messageCommandArg);
+                    }
+
+                    return HookResult.Continue;
+                }
+            );
+
+            RegisterEventHandler<EventPlayerBlind>(
+                (@event, info) =>
+                {
+                    CCSPlayerController? player = @event.Userid;
+                    CCSPlayerController? attacker = @event.Attacker;
+                    if (!isPractice)
+                        return HookResult.Continue;
+
+                    if (!IsPlayerValid(player) || !IsPlayerValid(attacker))
+                        return HookResult.Continue;
+
+                    if (attacker!.IsValid)
+                    {
+                        double roundedBlindDuration = Math.Round(@event.BlindDuration, 2);
+                        PrintToPlayerChat(
+                            attacker,
+                            Localizer.ForPlayer(
+                                attacker,
+                                "matchzy.pracc.blind",
+                                player!.PlayerName,
+                                roundedBlindDuration
+                            )
+                        );
+                    }
+
+                    var userId = player!.UserId;
+                    if (userId != null && noFlashList.Contains((int)userId))
+                    {
+                        Server.NextFrame(() =>
+                        {
+                            // Re-validate player - may have disconnected
+                            if (!IsPlayerValid(player))
+                                return;
+                            KillFlashEffect(player);
+                        });
+                    }
+
+                    return HookResult.Continue;
+                }
+            );
 
             RegisterEventHandler<EventSmokegrenadeDetonate>(EventSmokegrenadeDetonateHandler);
             RegisterEventHandler<EventFlashbangDetonate>(EventFlashbangDetonateHandler);

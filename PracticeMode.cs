@@ -154,7 +154,7 @@ namespace MatchZy
         //			new MemoryFunctionWithReturn<CCSGameRules, nint>("55 48 89 E5 41 57 41 56 41 55 41 54 53 48 81 EC ? ? ? ? 48 89 BD ? ? ? ? E8 ? ? ? ? 66 83 F8").Invoke;
         // 55 48 89 e5 41 57 41 56 ?? ?? 41 54 53 48 81 EC A8 10 00 00
 
-        private readonly static Func<CCSGameRules, nint> CCSGameRules_PostCleanUp =
+        private static readonly Func<CCSGameRules, nint> CCSGameRules_PostCleanUp =
             new MemoryFunctionWithReturn<CCSGameRules, nint>(
                 "55 48 89 E5 41 57 49 89 FF 41 56 41 55 41 54 53 48 81 EC ? ? ? ? E8 ? ? ? ? 66 83 F8"
             ).Invoke;
@@ -279,8 +279,7 @@ namespace MatchZy
                         ctSkipped++;
                         continue;
                     }
-                    spawnsData[(byte)CsTeam.CounterTerrorist]
-                        .Add(new Position(origin, rotation));
+                    spawnsData[(byte)CsTeam.CounterTerrorist].Add(new Position(origin, rotation));
                 }
             }
 
@@ -315,14 +314,17 @@ namespace MatchZy
                         tSkipped++;
                         continue;
                     }
-                    spawnsData[(byte)CsTeam.Terrorist]
-                        .Add(new Position(origin, rotation));
+                    spawnsData[(byte)CsTeam.Terrorist].Add(new Position(origin, rotation));
                 }
             }
 
             Log(
                 $"[GetSpawns] Loaded {spawnsData[(byte)CsTeam.CounterTerrorist].Count} CT spawns, {spawnsData[(byte)CsTeam.Terrorist].Count} T spawns"
-                + (ctSkipped + tSkipped > 0 ? $" (skipped {ctSkipped} CT / {tSkipped} T with null body/scene components)" : "")
+                    + (
+                        ctSkipped + tSkipped > 0
+                            ? $" (skipped {ctSkipped} CT / {tSkipped} T with null body/scene components)"
+                            : ""
+                    )
             );
 
             GetCoachSpawns();
@@ -3793,7 +3795,8 @@ namespace MatchZy
                 return;
             var playerPawn = player?.PlayerPawn?.Value;
             var playerPosition = playerPawn?.CBodyComponent?.SceneNode?.AbsOrigin;
-            if (playerPawn == null || playerPosition == null) return;
+            if (playerPawn == null || playerPosition == null)
+                return;
             int closestIndex = -1;
             double minDistance = double.MaxValue;
             for (int index = 0; index < teamSpawns.Count; index++)
@@ -3821,7 +3824,8 @@ namespace MatchZy
                 return;
             var playerPawn = player?.PlayerPawn?.Value;
             var playerPosition = playerPawn?.CBodyComponent?.SceneNode?.AbsOrigin;
-            if (playerPawn == null || playerPosition == null) return;
+            if (playerPawn == null || playerPosition == null)
+                return;
             int farthestIndex = -1;
             double maxDistance = double.MinValue;
             for (int index = 0; index < teamSpawns.Count; index++)

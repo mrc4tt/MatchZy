@@ -10,7 +10,7 @@ namespace MatchZy
         // HttpClient is thread-safe and designed to be long-lived.
         private static readonly HttpClient _sharedHttpClient = new()
         {
-            Timeout = TimeSpan.FromSeconds(10)
+            Timeout = TimeSpan.FromSeconds(10),
         };
 
         public async Task SendEventAsync(MatchZyEvent @event)
@@ -29,7 +29,10 @@ namespace MatchZy
                     return;
 
                 string json = JsonSerializer.Serialize(@event, @event.GetType());
-                using var request = new HttpRequestMessage(HttpMethod.Post, matchConfig.RemoteLogURL);
+                using var request = new HttpRequestMessage(
+                    HttpMethod.Post,
+                    matchConfig.RemoteLogURL
+                );
                 request.Content = new StringContent(json, Encoding.UTF8, "application/json");
 
                 if (

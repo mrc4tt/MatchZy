@@ -1,10 +1,10 @@
 using CounterStrikeSharp.API;
 using CounterStrikeSharp.API.Core;
-using CounterStrikeSharp.API.Modules.Commands;
-using CounterStrikeSharp.API.Modules.Utils;
 using CounterStrikeSharp.API.Core.Attributes.Registration;
-using CounterStrikeSharp.API.Modules.Timers;
+using CounterStrikeSharp.API.Modules.Commands;
 using CounterStrikeSharp.API.Modules.Cvars;
+using CounterStrikeSharp.API.Modules.Timers;
+using CounterStrikeSharp.API.Modules.Utils;
 
 namespace MatchZy;
 
@@ -21,7 +21,8 @@ public partial class MatchZy
     public void TechPause(CCSPlayerController? player, CommandInfo? command)
     {
 #pragma warning disable CS0162 // Unreachable code detected
-        if (!isMatchLive) return;
+        if (!isMatchLive)
+            return;
 
         // Handle console usage
         if (player == null)
@@ -54,7 +55,8 @@ public partial class MatchZy
             return;
         }
 
-        if (player.Team == CsTeam.Spectator || player.Team == CsTeam.None) return;
+        if (player.Team == CsTeam.Spectator || player.Team == CsTeam.None)
+            return;
 
         if (!techPauseEnabled.Value && player != null)
         {
@@ -62,7 +64,8 @@ public partial class MatchZy
             return;
         }
 
-        if (maxTechPausesAllowed.Value <= 0) return;
+        if (maxTechPausesAllowed.Value <= 0)
+            return;
 
         // Initialize team if it doesn't exist yet in the dictionary
         if (!reverseTeamSides.ContainsKey("CT") || !reverseTeamSides.ContainsKey("TERRORIST"))
@@ -71,7 +74,10 @@ public partial class MatchZy
             return;
         }
 
-        Team playerTeam = (player!.Team == CsTeam.CounterTerrorist) ? reverseTeamSides["CT"] : reverseTeamSides["TERRORIST"];
+        Team playerTeam =
+            (player!.Team == CsTeam.CounterTerrorist)
+                ? reverseTeamSides["CT"]
+                : reverseTeamSides["TERRORIST"];
 
         // Ensure this team is in our tracking dictionary
         if (!technicalPauseUsed.ContainsKey(playerTeam))
@@ -134,21 +140,22 @@ public partial class MatchZy
     /// Autopause only works for 5v5 (10 total players)
     /// For smaller player counts (1v1, 2v2, 3v3, 4v4, 4v5), autopause is disabled
     /// </summary>
-public bool IsAutoPauseActive()
-{
-    int totalPlayers = 0;
-    
-    foreach (var p in playerData.Values)
+    public bool IsAutoPauseActive()
     {
-        if (IsHumanPlayerValid(p))
+        int totalPlayers = 0;
+
+        foreach (var p in playerData.Values)
         {
-            totalPlayers++;
-            if (totalPlayers >= 10) return true; // Early exit
+            if (IsHumanPlayerValid(p))
+            {
+                totalPlayers++;
+                if (totalPlayers >= 10)
+                    return true; // Early exit
+            }
         }
+
+        return totalPlayers >= 10;
     }
-    
-    return totalPlayers >= 10;
-}
 
     /// <summary>
     /// MatchZy's auto-pause system - automatically pauses when a team has fewer than 5 players
@@ -157,10 +164,14 @@ public bool IsAutoPauseActive()
     /// </summary>
     public void CheckAutoResumeOrAutoPause()
     {
-        if (!isMatchLive) return;
-        if (!autoPauseEnabled.Value) return; // Check if auto-pause is enabled via ConVar
-        if (!IsAutoPauseActive()) return; // Only autopause for 5v5 (10 players)
-        if (IsHalfTimePhase() || IsPostGamePhase()) return;
+        if (!isMatchLive)
+            return;
+        if (!autoPauseEnabled.Value)
+            return; // Check if auto-pause is enabled via ConVar
+        if (!IsAutoPauseActive())
+            return; // Only autopause for 5v5 (10 players)
+        if (IsHalfTimePhase() || IsPostGamePhase())
+            return;
 
         int minPlayers = autoPauseMinPlayers.Value;
         int ctPlayerCount = GetTeamPlayerCount(CsTeam.CounterTerrorist);
@@ -172,7 +183,9 @@ public bool IsAutoPauseActive()
             string teamWithIssue = ctPlayerCount < minPlayers ? "CT" : "T";
             int playerCount = ctPlayerCount < minPlayers ? ctPlayerCount : tPlayerCount;
 
-            Log($"[AutoPause] Triggering auto-pause - {teamWithIssue} team has {playerCount}/{minPlayers} players");
+            Log(
+                $"[AutoPause] Triggering auto-pause - {teamWithIssue} team has {playerCount}/{minPlayers} players"
+            );
 
             Server.ExecuteCommand("mp_pause_match");
             isPaused = true;
@@ -184,8 +197,12 @@ public bool IsAutoPauseActive()
             unpauseData["t"] = false;
             unpauseData["pauseTeam"] = "AUTO";
 
-            PrintToAllChat($"{ChatColors.Gold}[AUTO-PAUSE]{ChatColors.Default} Match paused - {autoPauseReason}");
-            PrintToAllChat($"{ChatColors.Grey}Match will auto-resume when both teams have {minPlayers} players, or use {ChatColors.Green}.unpause{ChatColors.Default}");
+            PrintToAllChat(
+                $"{ChatColors.Gold}[AUTO-PAUSE]{ChatColors.Default} Match paused - {autoPauseReason}"
+            );
+            PrintToAllChat(
+                $"{ChatColors.Grey}Match will auto-resume when both teams have {minPlayers} players, or use {ChatColors.Green}.unpause{ChatColors.Default}"
+            );
 
             // Send webhook for live scorebot
             if (!string.IsNullOrEmpty(matchConfig.RemoteLogURL))
@@ -199,67 +216,85 @@ public bool IsAutoPauseActive()
                     MaxDuration = null,
                     RoundNumber = GetRoundNumer(),
                 };
-                Task.Run(async () => { await SendEventAsync(pauseEvent); });
+                Task.Run(async () =>
+                {
+                    await SendEventAsync(pauseEvent);
+                });
             }
         }
         // Check if we can auto-resume (both teams back to min players)
-        else if (isPaused && isAutoPaused && ctPlayerCount >= minPlayers && tPlayerCount >= minPlayers)
+        else if (
+            isPaused
+            && isAutoPaused
+            && ctPlayerCount >= minPlayers
+            && tPlayerCount >= minPlayers
+        )
         {
-            Log($"[AutoPause] Auto-resuming - both teams now have {minPlayers} players (CT: {ctPlayerCount}, T: {tPlayerCount})");
+            Log(
+                $"[AutoPause] Auto-resuming - both teams now have {minPlayers} players (CT: {ctPlayerCount}, T: {tPlayerCount})"
+            );
 
             int resumeDelay = autoResumeDelay.Value;
-            PrintToAllChat($"{ChatColors.Green}[AUTO-RESUME]{ChatColors.Default} Both teams now have {minPlayers} players. Match resuming in {resumeDelay} seconds...");
+            PrintToAllChat(
+                $"{ChatColors.Green}[AUTO-RESUME]{ChatColors.Default} Both teams now have {minPlayers} players. Match resuming in {resumeDelay} seconds..."
+            );
 
-            AddTimer((float)resumeDelay, () =>
-            {
-                if (!isPaused) return; // Already unpaused manually
-
-                Server.ExecuteCommand("mp_unpause_match");
-                isPaused = false;
-                isAutoPaused = false;
-                autoPauseReason = null;
-
-                // Reset unpause data
-                unpauseData["ct"] = false;
-                unpauseData["t"] = false;
-                unpauseData["pauseTeam"] = "";
-
-                PrintToAllChat($"{ChatColors.Green}Match resumed!{ChatColors.Default}");
-
-                // Send webhook for live scorebot
-                if (!string.IsNullOrEmpty(matchConfig.RemoteLogURL))
+            AddTimer(
+                (float)resumeDelay,
+                () =>
                 {
-                    var unpauseEvent = new MatchUnpausedLiveEvent
+                    if (!isPaused)
+                        return; // Already unpaused manually
+
+                    Server.ExecuteCommand("mp_unpause_match");
+                    isPaused = false;
+                    isAutoPaused = false;
+                    autoPauseReason = null;
+
+                    // Reset unpause data
+                    unpauseData["ct"] = false;
+                    unpauseData["t"] = false;
+                    unpauseData["pauseTeam"] = "";
+
+                    PrintToAllChat($"{ChatColors.Green}Match resumed!{ChatColors.Default}");
+
+                    // Send webhook for live scorebot
+                    if (!string.IsNullOrEmpty(matchConfig.RemoteLogURL))
                     {
-                        MatchId = liveMatchId,
-                        MapNumber = matchConfig.CurrentMapNumber,
-                        RoundNumber = GetRoundNumer(),
-                    };
-                    Task.Run(async () => { await SendEventAsync(unpauseEvent); });
+                        var unpauseEvent = new MatchUnpausedLiveEvent
+                        {
+                            MatchId = liveMatchId,
+                            MapNumber = matchConfig.CurrentMapNumber,
+                            RoundNumber = GetRoundNumer(),
+                        };
+                        Task.Run(async () =>
+                        {
+                            await SendEventAsync(unpauseEvent);
+                        });
+                    }
                 }
-            });
+            );
         }
     }
 
     /// <summary>
     /// Get the count of non-coach players on a team
     /// </summary>
-private int GetTeamPlayerCount(CsTeam team)
-{
-    HashSet<CCSPlayerController> coaches = GetAllCoaches();
-    int count = 0;
-    
-    foreach (var p in playerData.Values)
+    private int GetTeamPlayerCount(CsTeam team)
     {
-        if (IsHumanPlayerValid(p)
-            && p.Team == team && !coaches.Contains(p))
+        HashSet<CCSPlayerController> coaches = GetAllCoaches();
+        int count = 0;
+
+        foreach (var p in playerData.Values)
         {
-            count++;
+            if (IsHumanPlayerValid(p) && p.Team == team && !coaches.Contains(p))
+            {
+                count++;
+            }
         }
+
+        return count;
     }
-    
-    return count;
-}
 
     /// <summary>
     /// Enhanced unpause handler that works with both manual pauses and auto-pauses
@@ -285,7 +320,10 @@ private int GetTeamPlayerCount(CsTeam team)
 
             if (ctCount < minPlayers || tCount < minPlayers)
             {
-                ReplyToUserCommand(player, $"Cannot unpause - teams still unbalanced (CT: {ctCount}/{minPlayers}, T: {tCount}/{minPlayers})");
+                ReplyToUserCommand(
+                    player,
+                    $"Cannot unpause - teams still unbalanced (CT: {ctCount}/{minPlayers}, T: {tCount}/{minPlayers})"
+                );
                 return false;
             }
         }
@@ -293,13 +331,17 @@ private int GetTeamPlayerCount(CsTeam team)
         else if (isAutoPaused && !IsAutoPauseActive())
         {
             // Autopause inactive for small player counts - allow unpause
-            ReplyToUserCommand(player, $"Match paused. You may now use .unpause to continue (players may be unbalanced).");
+            ReplyToUserCommand(
+                player,
+                $"Match paused. You may now use .unpause to continue (players may be unbalanced)."
+            );
         }
 
         string teamKey = player.Team == CsTeam.CounterTerrorist ? "ct" : "t";
-        string teamName = player.Team == CsTeam.CounterTerrorist
-            ? ConVar.Find("mp_teamname_1")!.StringValue
-            : ConVar.Find("mp_teamname_2")!.StringValue;
+        string teamName =
+            player.Team == CsTeam.CounterTerrorist
+                ? ConVar.Find("mp_teamname_1")!.StringValue
+                : ConVar.Find("mp_teamname_2")!.StringValue;
 
         if (string.IsNullOrEmpty(teamName))
         {
@@ -321,7 +363,9 @@ private int GetTeamPlayerCount(CsTeam team)
             isAutoPaused = false;
             autoPauseReason = null;
 
-            PrintToAllChat($"{ChatColors.Green}Match unpaused!{ChatColors.Default} Both teams ready.");
+            PrintToAllChat(
+                $"{ChatColors.Green}Match unpaused!{ChatColors.Default} Both teams ready."
+            );
 
             // Reset unpause data
             unpauseData["ct"] = false;
@@ -337,7 +381,10 @@ private int GetTeamPlayerCount(CsTeam team)
                     MapNumber = matchConfig.CurrentMapNumber,
                     RoundNumber = GetRoundNumer(),
                 };
-                Task.Run(async () => { await SendEventAsync(unpauseEvent); });
+                Task.Run(async () =>
+                {
+                    await SendEventAsync(unpauseEvent);
+                });
             }
 
             return true;
@@ -355,28 +402,32 @@ private int GetTeamPlayerCount(CsTeam team)
     /// Start the auto-pause monitoring timer
     /// Call this when match goes live
     /// </summary>
-public void StartAutoPauseCheck()
-{
-    if (!autoPauseEnabled.Value)
+    public void StartAutoPauseCheck()
     {
-        Log("[AutoPause] Auto-pause is disabled - not starting monitoring timer");
-        return;
-    }
-
-    // Kill existing timer if any
-    autoPauseCheckTimer?.Kill();
-
-    // Check every 10 seconds for player count changes
-    autoPauseCheckTimer = AddTimer(10.0f, () =>
-    {
-        if (isMatchLive)
+        if (!autoPauseEnabled.Value)
         {
-            CheckAutoResumeOrAutoPause();
+            Log("[AutoPause] Auto-pause is disabled - not starting monitoring timer");
+            return;
         }
-    }, TimerFlags.REPEAT);
 
-    Log("[AutoPause] Started auto-pause monitoring with 10s interval");  // Changed this line
-}
+        // Kill existing timer if any
+        autoPauseCheckTimer?.Kill();
+
+        // Check every 10 seconds for player count changes
+        autoPauseCheckTimer = AddTimer(
+            10.0f,
+            () =>
+            {
+                if (isMatchLive)
+                {
+                    CheckAutoResumeOrAutoPause();
+                }
+            },
+            TimerFlags.REPEAT
+        );
+
+        Log("[AutoPause] Started auto-pause monitoring with 10s interval"); // Changed this line
+    }
 
     /// <summary>
     /// Stop the auto-pause monitoring timer
