@@ -12,7 +12,7 @@ MatchZy is a CounterStrikeSharp plugin for CS2 match management — warmup, knif
 - **Database**: SQLite (default) or MySQL via Dapper
 - **Serialization**: Newtonsoft.Json (match configs), System.Text.Json (events/stats)
 - **CSV Export**: CsvHelper 33.1.0
-- **Target**: CS2 dedicated servers (Linux), deployed via Pterodactyl Panel + Wings
+- **Target**: CS2 dedicated servers (Linux)
 
 ## Architecture
 

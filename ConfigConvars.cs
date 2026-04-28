@@ -16,6 +16,18 @@ namespace MatchZy
             false
         );
 
+        public FakeConVar<bool> matchSummaryPanelEnabled = new(
+            "matchzy_match_summary_panel",
+            "Show end-of-match center HTML panel with top fragger / clutch / rating. Default: true",
+            true
+        );
+
+        public FakeConVar<int> matchSummaryPanelDuration = new(
+            "matchzy_match_summary_panel_duration",
+            "How many seconds to display the end-of-match summary panel. Default: 12",
+            12
+        );
+
         public FakeConVar<bool> warmupEnabled = new(
             "matchzy_warmup_enabled",
             "Whether warmup mode is enabled. If false, warmup.cfg will not be loaded. Default: true",

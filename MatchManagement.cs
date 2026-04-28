@@ -233,6 +233,7 @@ namespace MatchZy
                 switch (field)
                 {
                     case "matchid":
+                        break;
                     case "players_per_team":
                     case "min_players_to_ready":
                     case "min_spectators_to_ready":
@@ -871,6 +872,16 @@ namespace MatchZy
             isConvarMappingSwapped = !isConvarMappingSwapped;
         }
 
+        // Returns true when at least one team has a non-empty player whitelist.
+        // When false (e.g. matches created via .matchsetup wizard), team locking is bypassed
+        // so players can freely choose T/CT without being forced back to spectator.
+        private bool IsTeamWhitelistConfigured()
+        {
+            int t1Count = matchzyTeam1.teamPlayers is JObject t1Obj ? t1Obj.Count : 0;
+            int t2Count = matchzyTeam2.teamPlayers is JObject t2Obj ? t2Obj.Count : 0;
+            return t1Count > 0 || t2Count > 0;
+        }
+
         private CsTeam GetPlayerTeam(CCSPlayerController player)
         {
             CsTeam playerTeam = CsTeam.None;
@@ -1012,8 +1023,8 @@ namespace MatchZy
                 return;
             }
 
-            // For last map (series end), change after exactly 10 seconds
-            float mapChangeDelay = 10.0f;
+            // For last map (series end), change after exactly 15 seconds
+            float mapChangeDelay = 15.0f;
 
             // Guard against empty map rotation
             if (mapRotationList.Count == 0)

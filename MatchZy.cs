@@ -492,6 +492,10 @@ namespace MatchZy
                 { ".rcheck", OnReadyCheckCommand },
                 { ".rc", OnReadyCheckCommand },
                 { ".mhelp", OnAdminHelpCommand },
+                { ".matchadmin", OnMatchAdminCommand },
+                { ".ma", OnMatchAdminCommand },
+                { ".matchsetup", OnMatchSetupCommand },
+                { ".lastmatch", OnLastMatchCommand },
                 //{ ".color", OnColorCommand }
                 //{ ".gg", OnGGCommand }
             };
@@ -547,6 +551,10 @@ namespace MatchZy
                     if (!isMatchSetup && !isVeto)
                         return HookResult.Continue;
 
+                    // Open-join matches (no team whitelist, e.g. .matchsetup wizard): let players choose freely.
+                    if (!IsTeamWhitelistConfigured())
+                        return HookResult.Continue;
+
                     CCSPlayerController? player = @event.Userid;
 
                     if (!IsPlayerValid(player))
@@ -569,7 +577,12 @@ namespace MatchZy
                 "jointeam",
                 (player, info) =>
                 {
-                    if ((isMatchSetup || isVeto) && player != null && player.IsValid)
+                    if (
+                        (isMatchSetup || isVeto)
+                        && player != null
+                        && player.IsValid
+                        && IsTeamWhitelistConfigured()
+                    )
                     {
                         if (int.TryParse(info.ArgByIndex(1), out int joiningTeam))
                         {
@@ -1099,6 +1112,11 @@ namespace MatchZy
                     if (message.StartsWith(".restore"))
                     {
                         HandleRestoreCommand(player, messageCommandArg);
+                    }
+
+                    if (message.StartsWith(".stats"))
+                    {
+                        HandleStatsCommand(player, messageCommandArg);
                     }
 
                     if (message.StartsWith(".savenade") || message.StartsWith(".sn"))

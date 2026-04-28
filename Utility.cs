@@ -1542,17 +1542,15 @@ namespace MatchZy
             };
 
             // Collect match stats JSON on main thread (accesses native APIs like Server.MapName)
-            MatchStatsJson? matchStatsForExport = null;
-            if (demoFilename != null)
-            {
-                matchStatsForExport = CollectMatchStatsForExport(
-                    demoFilename,
-                    t1score,
-                    t2score,
-                    playerStatsListTeam1,
-                    playerStatsListTeam2
-                );
-            }
+            MatchStatsJson? matchStatsForExport = CollectMatchStatsForExport(
+                demoFilename ?? string.Empty,
+                t1score,
+                t2score,
+                playerStatsListTeam1,
+                playerStatsListTeam2
+            );
+
+            ShowMatchSummaryPanel(matchStatsForExport, t1score, t2score, winnerName);
 
             // Capture matchId before async context — liveMatchId may be reset to -1 by ResetMatch
             long matchId = liveMatchId;
@@ -1652,8 +1650,8 @@ namespace MatchZy
                 Server.ExecuteCommand("mp_match_end_restart 0");
             }
 
-            // For multi-map series, change map after exactly 10 seconds
-            float mapChangeDelay = 10.0f;
+            // For multi-map series, change map after exactly 15 seconds
+            float mapChangeDelay = 15.0f;
             matchEndMapChangeTimer = AddTimer(
                 mapChangeDelay,
                 () =>
@@ -2491,7 +2489,7 @@ namespace MatchZy
                     $" {ChatColors.Green}Nades:{ChatColors.Default} .savenade .loadnade .listnades .rethrow .throwindex"
                 );
                 player.PrintToChat(
-                    $" {ChatColors.Green}Utility:{ChatColors.Default} .clear .ff .god .traj .impacts .break .timer"
+                    $" {ChatColors.Green}Utility:{ChatColors.Default} .clear .ff .god .traj .impacts .break .cam .timer"
                 );
                 player.PrintToChat(
                     $" {ChatColors.Green}Teams:{ChatColors.Default} .ct .t .spec .fas"
