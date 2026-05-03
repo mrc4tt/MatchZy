@@ -24,6 +24,8 @@ public class GrenadeThrownData
 
     public UInt16 ItemIndex { get; set; }
 
+    public float DuckAmount { get; private set; }
+
     public GrenadeThrownData(
         Vector nadePosition,
         QAngle nadeAngle,
@@ -32,7 +34,8 @@ public class GrenadeThrownData
         QAngle playerAngle,
         string grenadeType,
         DateTime thrownTime,
-        UInt16 itemIndex
+        UInt16 itemIndex,
+        float duckAmount = 0.0f
     )
     {
         Position = new Vector(nadePosition.X, nadePosition.Y, nadePosition.Z);
@@ -44,13 +47,23 @@ public class GrenadeThrownData
         ThrownTime = thrownTime;
         Delay = 0;
         ItemIndex = itemIndex;
+        // Snap to fully-standing or fully-ducked — anything in-between produces
+        // the "MJ peak" half-crouch when restored (issue #391).
+        DuckAmount = duckAmount >= 0.5f ? 1.0f : 0.0f;
     }
 
     public void LoadPosition(CCSPlayerController player)
     {
         if (player == null || player.PlayerPawn.Value == null)
             return;
-        player.PlayerPawn.Value.Teleport(PlayerPosition, PlayerAngle, new Vector(0, 0, 0));
+        var pawn = player.PlayerPawn.Value;
+        pawn.Teleport(PlayerPosition, PlayerAngle, new Vector(0, 0, 0));
+        // Throw animation can leave DuckAmount stuck mid-interpolation,
+        // making the model render permanently shorter (issue #391). Force-snap.
+        if (pawn.MovementServices != null && pawn.MovementServices.Handle != IntPtr.Zero)
+        {
+            new CCSPlayer_MovementServices(pawn.MovementServices.Handle).DuckAmount = DuckAmount;
+        }
     }
 
     public void Throw(CCSPlayerController player)

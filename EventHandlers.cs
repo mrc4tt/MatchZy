@@ -355,6 +355,15 @@ public partial class MatchZy
                         nadeSpecificLastGrenadeData[client] = new() { };
                     }
 
+                    float duckAmount = 0.0f;
+                    if (player.PlayerPawn.Value.MovementServices != null
+                        && player.PlayerPawn.Value.MovementServices.Handle != IntPtr.Zero)
+                    {
+                        duckAmount = new CCSPlayer_MovementServices(
+                            player.PlayerPawn.Value.MovementServices.Handle
+                        ).DuckAmount;
+                    }
+
                     GrenadeThrownData lastGrenadeThrown = new(
                         position,
                         angle,
@@ -363,7 +372,8 @@ public partial class MatchZy
                         player.PlayerPawn.Value.EyeAngles,
                         nadeType,
                         DateTime.Now,
-                        projectile.ItemIndex
+                        projectile.ItemIndex,
+                        duckAmount
                     );
 
                     nadeSpecificLastGrenadeData[client][nadeType] = lastGrenadeThrown;
