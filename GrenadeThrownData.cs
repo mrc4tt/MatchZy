@@ -58,12 +58,23 @@ public class GrenadeThrownData
             return;
         var pawn = player.PlayerPawn.Value;
         pawn.Teleport(PlayerPosition, PlayerAngle, new Vector(0, 0, 0));
-        // Throw animation can leave DuckAmount stuck mid-interpolation,
-        // making the model render permanently shorter (issue #391). Force-snap.
-        if (pawn.MovementServices != null && pawn.MovementServices.Handle != IntPtr.Zero)
-        {
-            new CCSPlayer_MovementServices(pawn.MovementServices.Handle).DuckAmount = DuckAmount;
-        }
+
+        // Issue #391: throw animation leaves the duck state stuck. DuckAmount
+        // alone is insufficient — the engine re-derives it next tick from the
+        // bDucked/bDucking/bDesiresDuck/bDuckOverride flags, so all of them
+        // must be cleared together. DuckRootOffset and DuckViewOffset control
+        // the eye/model height interpolation and can also be stuck mid-anim.
+        if (pawn.MovementServices == null || pawn.MovementServices.Handle == IntPtr.Zero)
+            return;
+        var ms = new CCSPlayer_MovementServices(pawn.MovementServices.Handle);
+        bool wantDucked = DuckAmount >= 0.5f;
+        ms.DuckAmount = wantDucked ? 1.0f : 0.0f;
+        ms.Ducked = wantDucked;
+        ms.Ducking = false;
+        ms.DesiresDuck = wantDucked;
+        ms.DuckOverride = false;
+        ms.DuckRootOffset = 0.0f;
+        ms.DuckViewOffset = wantDucked ? 1.0f : 0.0f;
     }
 
     public void Throw(CCSPlayerController player)
