@@ -52,9 +52,12 @@ public partial class MatchZy
                 if (readyAvailable && !matchStarted)
                 {
                     ExecUnpracCommands();
-                    AutoStart();
-                    isKnifeRequired = true;
+                    if (!isMatchSetup)
+                    {
+                        AutoStart();
+                    }
 
+                    isKnifeRequired = true;
                     PrintToPlayerChat(player, Localizer.ForPlayer(player, "matchzy.eh.warmup"));
                     PrintToPlayerChat(player, Localizer.ForPlayer(player, "matchzy.eh.start"));
                     PrintToAdmins(Localizer.ForPlayer(player, "matchzy.eh.prac"));
