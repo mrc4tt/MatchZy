@@ -150,8 +150,8 @@ namespace MatchZy
             var menu = new WasdMenu($"{chatPrefix} Pick Maps — {s.SelectedMaps.Count}/{s.NumMaps}", this);
             foreach (var map in mapRotationList)
             {
-                bool picked = s.SelectedMaps.Contains(map);
-                string label = picked ? $"[X] {map}" : $"[ ] {map}";
+                int pickIdx = s.SelectedMaps.IndexOf(map);
+                string label = pickIdx >= 0 ? $"[{pickIdx + 1}] {map}" : $"[ ] {map}";
                 string capturedMap = map;
                 menu.AddItem(
                     label,
@@ -211,7 +211,7 @@ namespace MatchZy
             var menu = new WasdMenu($"{chatPrefix} Confirm Match", this);
             menu.AddItem($"BO{s.NumMaps} — change", (p, _) => OpenSeriesMenu(p));
             string mapSummary = s.SkipVeto
-                ? $"Maps: {string.Join(", ", s.SelectedMaps)}"
+                ? $"Maps ({s.SelectedMaps.Count}/{s.NumMaps}): {string.Join(" → ", s.SelectedMaps)}"
                 : $"Veto pool: {s.SelectedMaps.Count} maps";
             menu.AddItem(mapSummary, (p, _) => OpenMapModeMenu(p));
             menu.AddItem(
@@ -224,7 +224,7 @@ namespace MatchZy
                 {
                     ReplyToUserCommand(
                         p,
-                        "Use .team1name <x> / .team2name <x> in chat — menu will stay open."
+                        "Type .team1 <name> / .team2 <name> in chat — menu refreshes automatically."
                     );
                     o.PostSelectAction = CS2MenuManager.API.Enum.PostSelectAction.Nothing;
                 }

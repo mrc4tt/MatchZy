@@ -855,6 +855,14 @@ namespace MatchZy
                     teamName
                 )
             );
+
+            // Refresh the wizard's Confirm menu so the new team name is visible
+            // immediately. Defer one frame so the chat broadcast doesn't clobber
+            // the menu render (same race ChatMenu has with EventPlayerChat).
+            if (player != null && activeSetup != null && activeSetup.AdminSteamId == player.SteamID)
+            {
+                Server.NextFrame(() => OpenConfirmMenu(player));
+            }
         }
 
         public void SwapSidesInTeamData(bool swapTeams)
