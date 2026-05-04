@@ -220,11 +220,14 @@ namespace MatchZy
             );
             menu.AddItem(
                 $"Teams: {team1} vs {team2}",
-                (p, _) =>
+                (p, o) =>
+                {
                     ReplyToUserCommand(
                         p,
-                        "Use .team1name <x> / .team2name <x> outside the menu, then re-open to confirm."
-                    )
+                        "Use .team1name <x> / .team2name <x> in chat — menu will stay open."
+                    );
+                    o.PostSelectAction = CS2MenuManager.API.Enum.PostSelectAction.Nothing;
+                }
             );
             menu.AddItem(
                 $"{ChatColors.Green}>> START MATCH",
