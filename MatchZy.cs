@@ -16,7 +16,7 @@ namespace MatchZy
     public partial class MatchZy : BasePlugin
     {
         public override string ModuleName => "MatchZy";
-        public override string ModuleVersion => "0.8.32";
+        public override string ModuleVersion => "0.8.33";
         public override string ModuleAuthor => "WD- Edited by Miksen";
         public override string ModuleDescription =>
             "A plugin for running and managing CS2 practice/pugs/scrims/matches!";
@@ -270,9 +270,26 @@ namespace MatchZy
 
         public override void Load(bool hotReload)
         {
-            // Blocking is acceptable here — server is starting up, not yet processing game frames.
-            // If this becomes a problem (slow remote MySQL), move to async with a ready flag.
-            database.InitializeDatabaseAsync(ModuleDirectory).GetAwaiter().GetResult();
+            // Run DB init on a background thread instead of blocking Load with
+            // .GetAwaiter().GetResult(). Blocking here races with other plugins'
+            // SQLite native init on worker threads (observed crash: concurrent
+            // open from CS2_SimpleAdmin + MatchZy main-thread open during Load
+            // segfaulted in EnsureConnectionOpen). The Database type now serializes
+            // its own connection access, so DB-dependent calls elsewhere are safe
+            // to fire before this completes — they will block on the lock.
+            string moduleDir = ModuleDirectory;
+            string gameDir = Server.GameDirectory;
+            _ = Task.Run(async () =>
+            {
+                try
+                {
+                    await database.InitializeDatabaseAsync(moduleDir, gameDir);
+                }
+                catch (Exception ex)
+                {
+                    Log($"[Load] Database init failed: {ex.Message}");
+                }
+            });
             // This sets default config ConVars (Backup)
             //Server.ExecuteCommand("execifexists matchzy/config.cfg");
 

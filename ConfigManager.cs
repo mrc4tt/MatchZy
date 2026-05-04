@@ -11,7 +11,6 @@ namespace MatchZy
     public class ConfigManager
     {
         private readonly string _serverPath;
-        private Database database = new();
 
         public ConfigManager()
         {

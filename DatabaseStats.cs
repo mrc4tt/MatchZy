@@ -3,6 +3,7 @@ using System.Data;
 using System.Globalization;
 using System.IO;
 using System.Text.Json;
+using System.Threading;
 using CounterStrikeSharp.API;
 using CounterStrikeSharp.API.Core;
 using CounterStrikeSharp.API.Modules.Cvars;
@@ -19,18 +20,46 @@ namespace MatchZy
     {
         public void Dispose()
         {
-            connection?.Close();
-            connection?.Dispose();
+            lock (_connectionLock)
+            {
+                connection?.Close();
+                connection?.Dispose();
+                connection = null;
+            }
         }
 
         private IDbConnection? connection;
+        private readonly object _connectionLock = new();
+
+        // Guards SQLitePCLRaw native initialization across plugins. The native
+        // e_sqlite3 provider is not safe to initialize concurrently from multiple
+        // threads; if another plugin (e.g. CS2_SimpleAdmin) opens a SqliteConnection
+        // on a worker thread at the same moment we open ours on the main thread,
+        // the native bootstrap can segfault. Pre-initialize once, eagerly.
+        private static int _sqliteInitDone;
+
+        private static void EnsureSqliteProviderInitialized()
+        {
+            if (Interlocked.CompareExchange(ref _sqliteInitDone, 1, 0) != 0)
+                return;
+            try
+            {
+                SQLitePCL.Batteries_V2.Init();
+            }
+            catch
+            {
+                // Another loader (Microsoft.Data.Sqlite static ctor or another
+                // plugin) may have already initialized. Safe to ignore.
+            }
+        }
 
         DatabaseConfig? config;
         public DatabaseType databaseType { get; set; }
 
-        public async Task InitializeDatabaseAsync(string directory)
+        public async Task InitializeDatabaseAsync(string directory, string gameDirectory)
         {
-            ConnectDatabase(directory);
+            EnsureSqliteProviderInitialized();
+            ConnectDatabase(directory, gameDirectory);
             try
             {
                 EnsureConnectionOpen();
@@ -61,6 +90,14 @@ namespace MatchZy
         }
 
         private void EnsureConnectionOpen()
+        {
+            lock (_connectionLock)
+            {
+                EnsureConnectionOpenLocked();
+            }
+        }
+
+        private void EnsureConnectionOpenLocked()
         {
             if (connection == null)
             {
@@ -130,11 +167,11 @@ namespace MatchZy
             }
         }
 
-        public void ConnectDatabase(string directory)
+        public void ConnectDatabase(string directory, string gameDirectory)
         {
             try
             {
-                SetDatabaseConfig(directory);
+                SetDatabaseConfig(gameDirectory);
 
                 if (databaseType == DatabaseType.SQLite)
                 {
@@ -766,10 +803,10 @@ namespace MatchZy
             Log($"[InitializeDatabase] Default configuration file created at: {configFile}");
         }
 
-        private void SetDatabaseConfig(string directory)
+        private void SetDatabaseConfig(string gameDirectory)
         {
             string fileName = "database.json";
-            string configFile = Path.Combine(Server.GameDirectory + "/csgo/cfg/matchzy", fileName);
+            string configFile = Path.Combine(gameDirectory + "/csgo/cfg/matchzy", fileName);
             if (!File.Exists(configFile))
             {
                 // Create a default configuration if the file doesn't exist
