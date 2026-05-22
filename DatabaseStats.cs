@@ -29,6 +29,7 @@ namespace MatchZy
         }
 
         private IDbConnection? connection;
+        private string? _connectionString;
         private readonly object _connectionLock = new();
 
         // Guards SQLitePCLRaw native initialization across plugins. The native
@@ -175,23 +176,21 @@ namespace MatchZy
 
                 if (databaseType == DatabaseType.SQLite)
                 {
-                    connection = new SqliteConnection(
-                        $"Data Source={Path.Join(directory, "matchzy.db")}"
-                    );
+                    _connectionString = $"Data Source={Path.Join(directory, "matchzy.db")}";
+                    connection = new SqliteConnection(_connectionString);
                     Log("[ConnectDatabase] SQLite connection created");
                 }
                 else if (config != null && databaseType == DatabaseType.MySQL)
                 {
-                    string connectionString =
+                    _connectionString =
                         $"Server={config.MySqlHost};Port={config.MySqlPort};Database={config.MySqlDatabase};User Id={config.MySqlUsername};Password={config.MySqlPassword};";
-                    connection = new MySqlConnection(connectionString);
+                    connection = new MySqlConnection(_connectionString);
                     Log("[ConnectDatabase] MySQL connection created");
                 }
                 else
                 {
-                    connection = new SqliteConnection(
-                        $"Data Source={Path.Join(directory, "matchzy.db")}"
-                    );
+                    _connectionString = $"Data Source={Path.Join(directory, "matchzy.db")}";
+                    connection = new SqliteConnection(_connectionString);
                     databaseType = DatabaseType.SQLite;
                     Log("[ConnectDatabase] Fallback to SQLite connection created");
                 }
@@ -201,6 +200,20 @@ namespace MatchZy
                 Log($"[ConnectDatabase - ERROR] Failed to create connection: {ex.Message}");
                 throw;
             }
+        }
+
+        // Creates a fresh, dedicated DB connection from the pool. Used by
+        // operations that must not interleave with other DB work on the shared
+        // `connection` — notably matchid allocation, where LAST_INSERT_ID() /
+        // last_insert_rowid() are connection-scoped and corrupt under concurrency.
+        private IDbConnection CreateNewConnection()
+        {
+            if (_connectionString == null)
+                throw new InvalidOperationException("Database connection string is not initialized");
+
+            return databaseType == DatabaseType.MySQL
+                ? new MySqlConnection(_connectionString)
+                : new SqliteConnection(_connectionString);
         }
 
         private async Task CreateRequiredTablesSQLiteAsync()
@@ -375,16 +388,20 @@ namespace MatchZy
         {
             try
             {
-                EnsureConnectionOpen();
+                using IDbConnection conn = CreateNewConnection();
+                conn.Open();
                 long matchId;
 
-                if (isMatchSetup && currentMatchId != -1)
+                // matchid=0 is never a valid autoincrement value; treat as "no
+                // existing match" so we allocate a fresh parent row instead of
+                // FK-violating against a non-existent matchid=0.
+                if (isMatchSetup && currentMatchId > 0)
                 {
                     // Reuse existing match
                     matchId = currentMatchId;
 
                     // Insert new map data
-                    await connection!.ExecuteAsync(
+                    await conn.ExecuteAsync(
                         @"
                         INSERT INTO matchzy_stats_maps (matchid, mapnumber, start_time, mapname)
                         VALUES (@MatchId, @MapNumber, @StartTime, @MapName)",
@@ -399,8 +416,12 @@ namespace MatchZy
                 }
                 else
                 {
-                    // Create new match
-                    await connection!.ExecuteAsync(
+                    // Create new match. The INSERT and the id read run on the
+                    // same dedicated connection with nothing else able to
+                    // interleave, so LAST_INSERT_ID() / last_insert_rowid()
+                    // (both connection-scoped) return this INSERT's id rather
+                    // than a concurrent operation's.
+                    await conn.ExecuteAsync(
                         @"
                         INSERT INTO matchzy_stats_matches (start_time, team1_name, team2_name, winner, series_type, server_ip)
                         VALUES (@StartTime, @Team1Name, @Team2Name, @Winner, @SeriesType, @ServerIp)",
@@ -416,21 +437,31 @@ namespace MatchZy
                     );
 
                     // Get the new match ID
-                    if (connection is SqliteConnection)
+                    if (conn is SqliteConnection)
                     {
-                        matchId = await connection!.ExecuteScalarAsync<long>(
+                        matchId = await conn.ExecuteScalarAsync<long>(
                             "SELECT last_insert_rowid()"
                         );
                     }
                     else
                     {
-                        matchId = await connection!.ExecuteScalarAsync<long>(
+                        matchId = await conn.ExecuteScalarAsync<long>(
                             "SELECT LAST_INSERT_ID()"
                         );
                     }
 
+                    // last_insert_rowid()/LAST_INSERT_ID() return 0 if the INSERT
+                    // didn't actually take effect (silent failure, rolled-back
+                    // transaction, or scalar run on a connection with no prior
+                    // INSERT). Surface as -1 so callers don't write garbage FKs.
+                    if (matchId <= 0)
+                    {
+                        Log($"[InitMatch - ERROR] last_insert returned {matchId}; treating as failure.");
+                        return -1;
+                    }
+
                     // Insert map data
-                    await connection!.ExecuteAsync(
+                    await conn.ExecuteAsync(
                         @"
                         INSERT INTO matchzy_stats_maps (matchid, mapnumber, start_time, mapname)
                         VALUES (@MatchId, @MapNumber, @StartTime, @MapName)",
@@ -518,6 +549,26 @@ namespace MatchZy
             catch (Exception ex)
             {
                 Log($"[SetMatchEndData - FATAL] Error: {ex.Message}");
+            }
+        }
+
+        public async Task UpdateTeamNamesAsync(long matchId, string team1Name, string team2Name)
+        {
+            if (matchId <= 0)
+                return;
+            try
+            {
+                EnsureConnectionOpen();
+                await connection!.ExecuteAsync(
+                    @"UPDATE matchzy_stats_matches
+                      SET team1_name = @Team1Name, team2_name = @Team2Name
+                      WHERE matchid = @MatchId",
+                    new { Team1Name = team1Name, Team2Name = team2Name, MatchId = matchId }
+                );
+            }
+            catch (Exception ex)
+            {
+                Log($"[UpdateTeamNames - FATAL] Error: {ex.Message}");
             }
         }
 

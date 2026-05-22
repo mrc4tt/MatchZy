@@ -402,7 +402,7 @@ public partial class MatchZy
                     break;
             }
 
-            Log($"[AdvancedStats] Clutch started: {clutcher.PlayerName} 1v{opponents}");
+            //Log($"[AdvancedStats] Clutch started: {clutcher.PlayerName} 1v{opponents}");
         }
     }
 
@@ -445,11 +445,11 @@ public partial class MatchZy
                     break;
             }
 
-            Log($"[AdvancedStats] Clutch WON: {clutcherPlayer.PlayerName} 1v{clutchOpponents}");
+            //Log($"[AdvancedStats] Clutch WON: {clutcherPlayer.PlayerName} 1v{clutchOpponents}");
         }
         else
         {
-            Log($"[AdvancedStats] Clutch LOST: {clutcherPlayer.PlayerName} 1v{clutchOpponents}");
+            //Log($"[AdvancedStats] Clutch LOST: {clutcherPlayer.PlayerName} 1v{clutchOpponents}");
         }
     }
 
@@ -541,7 +541,7 @@ public partial class MatchZy
         }
         catch (Exception ex)
         {
-            Log($"[AdvancedStats] Failed to collect stats: {ex.Message}");
+            //Log($"[AdvancedStats] Failed to collect stats: {ex.Message}");
             return null;
         }
     }
@@ -574,11 +574,11 @@ public partial class MatchZy
             string json = JsonSerializer.Serialize(matchStats, options);
             await File.WriteAllTextAsync(statsPath, json);
 
-            Log($"[AdvancedStats] Match stats exported to: {statsPath}");
+            //Log($"[AdvancedStats] Match stats exported to: {statsPath}");
         }
         catch (Exception ex)
         {
-            Log($"[AdvancedStats] Failed to export stats: {ex.Message}");
+            //Log($"[AdvancedStats] Failed to export stats: {ex.Message}");
         }
     }
 

@@ -550,9 +550,15 @@ namespace MatchZy
                 }
 
                 // MatchID is set first to avoid generating a new one.
-                if (backupData.TryGetValue("matchid", out var matchId))
+                if (backupData.TryGetValue("matchid", out var matchId)
+                    && long.TryParse(matchId, out var parsedBackupId)
+                    && parsedBackupId > 0)
                 {
-                    liveMatchId = long.Parse(matchId);
+                    liveMatchId = parsedBackupId;
+                }
+                else if (matchId != null)
+                {
+                    Log($"[BackupRestore] Backup contains invalid matchid='{matchId}'; ignoring.");
                 }
                 if (backupData.TryGetValue("match_loaded", out var matchLoaded))
                 {

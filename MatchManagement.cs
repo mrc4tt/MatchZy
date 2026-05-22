@@ -365,7 +365,13 @@ namespace MatchZy
 
             if (jsonDataObject["matchid"] != null)
             {
-                liveMatchId = (long)jsonDataObject["matchid"]!;
+                long parsedId = (long)jsonDataObject["matchid"]!;
+                // Only honor positive matchids. Zero/negative means "no existing
+                // match" — let InitMatchAsync allocate a fresh autoincrement row.
+                if (parsedId > 0)
+                    liveMatchId = parsedId;
+                else
+                    Log($"[LoadMatchFromJSON] Ignoring invalid matchid={parsedId} from JSON; will allocate new.");
             }
 
             JToken team1 = jsonDataObject["team1"]!;
@@ -498,20 +504,73 @@ namespace MatchZy
             SetTeamNames();
             UpdatePlayersMap();
 
-            var seriesStartedEvent = new MatchZySeriesStartedEvent
-            {
-                MatchId = liveMatchId,
-                NumberOfMaps = matchConfig.NumMaps,
-                Team1 = new(matchzyTeam1.id, matchzyTeam1.teamName),
-                Team2 = new(matchzyTeam2.id, matchzyTeam2.teamName),
-            };
+            // Eagerly allocate matchid right after config validates so liveMatchId
+            // is set well before HandleMatchStart fires. Avoids -1 leaking into
+            // events, demo filenames, and round-backup names during warmup/knife.
+            // If JSON already supplied a valid matchid (positive), skip alloc.
+            string seriesType = "BO" + matchConfig.NumMaps.ToString();
+            string mapNameForInit = Server.MapName;
+            string serverIpForInit = ConVar.Find("ip")?.StringValue ?? "0";
+            string team1NameForInit = matchzyTeam1.teamName;
+            string team2NameForInit = matchzyTeam2.teamName;
+            int currentMapNumForInit = matchConfig.CurrentMapNumber;
+            long preassignedId = liveMatchId;
+
+            int seriesNumMaps = matchConfig.NumMaps;
+            string matchzyTeam1Id = matchzyTeam1.id;
+            string matchzyTeam2Id = matchzyTeam2.id;
+            string matchzyTeam1Name = matchzyTeam1.teamName;
+            string matchzyTeam2Name = matchzyTeam2.teamName;
 
             Task.Run(async () =>
             {
-                await SendEventAsync(seriesStartedEvent);
+                long allocatedId = preassignedId;
+                if (allocatedId <= 0)
+                {
+                    int[] backoffMs = { 0, 200, 500, 1000, 2000 };
+                    for (int attempt = 0; attempt < backoffMs.Length; attempt++)
+                    {
+                        if (backoffMs[attempt] > 0)
+                            await Task.Delay(backoffMs[attempt]);
+                        allocatedId = await database.InitMatchAsync(
+                            team1NameForInit,
+                            team2NameForInit,
+                            "-",
+                            false,
+                            -1,
+                            currentMapNumForInit,
+                            seriesType,
+                            mapNameForInit,
+                            serverIpForInit
+                        );
+                        if (allocatedId > 0)
+                            break;
+                        Log($"[LoadMatchFromJSON] eager alloc attempt {attempt + 1}/{backoffMs.Length} returned {allocatedId}, retrying...");
+                    }
+                }
+
+                Server.NextFrame(() =>
+                {
+                    if (allocatedId > 0)
+                    {
+                        liveMatchId = allocatedId;
+                        Log($"[LoadMatchFromJSON] Success with matchid: {liveMatchId}");
+                    }
+                    else
+                    {
+                        Log("[LoadMatchFromJSON] WARNING: eager alloc failed; HandleMatchStart will retry.");
+                    }
+                });
+
+                await SendEventAsync(new MatchZySeriesStartedEvent
+                {
+                    MatchId = allocatedId,
+                    NumberOfMaps = seriesNumMaps,
+                    Team1 = new(matchzyTeam1Id, matchzyTeam1Name),
+                    Team2 = new(matchzyTeam2Id, matchzyTeam2Name),
+                });
             });
 
-            Log($"[LoadMatchFromJSON] Success with matchid: {liveMatchId}!");
             return true;
         }
 
@@ -844,6 +903,17 @@ namespace MatchZy
             }
 
             SetTeamNames();
+
+            // Propagate rename to DB so matchzy_stats_matches.team{1,2}_name
+            // matches in-memory state. Snapshot before Task.Run to avoid
+            // native-thread access.
+            long matchIdSnap = liveMatchId;
+            string t1Snap = matchzyTeam1.teamName;
+            string t2Snap = matchzyTeam2.teamName;
+            if (matchIdSnap > 0)
+            {
+                Task.Run(() => database.UpdateTeamNamesAsync(matchIdSnap, t1Snap, t2Snap));
+            }
 
             // Add confirmation message
             ReplyToUserCommand(

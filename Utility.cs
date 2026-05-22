@@ -624,7 +624,10 @@ namespace MatchZy
         private void StartLive()
         {
             SetupLiveFlagsAndCfg();
-            StartDemoRecording();
+            // mp_restartgame in live.cfg fires ~1s after exec; calling tv_record
+            // synchronously here gets clobbered by the restart, producing empty
+            // demos. Defer past the restart so tv_record sticks.
+            AddTimer(2.0f, () => StartDemoRecording());
             ClearClanTags();
 
             // Storing 0-0 score backup file as lastBackupFileName, so that .stop functions properly in first round.
@@ -673,7 +676,10 @@ namespace MatchZy
         private void StartScrim()
         {
             SetupScrimFlagsAndCfg();
-            StartDemoRecording();
+            // mp_restartgame in scrim.cfg fires ~1s after exec; calling tv_record
+            // synchronously here gets clobbered by the restart, producing empty
+            // demos. Defer past the restart so tv_record sticks.
+            AddTimer(2.0f, () => StartDemoRecording());
             ClearClanTags();
 
             // Storing 0-0 score backup file as lastBackupFileName, so that .stop functions properly in first round.
@@ -714,7 +720,10 @@ namespace MatchZy
         private void StartHill()
         {
             SetupHillFlagsAndCfg();
-            StartDemoRecording();
+            // mp_restartgame in hill.cfg fires ~1s after exec; calling tv_record
+            // synchronously here gets clobbered by the restart, producing empty
+            // demos. Defer past the restart so tv_record sticks.
+            AddTimer(2.0f, () => StartDemoRecording());
             ClearClanTags();
 
             // Storing 0-0 score backup file as lastBackupFileName, so that .stop functions properly in first round.
@@ -831,34 +840,26 @@ namespace MatchZy
                 isPaused = false;
                 isMatchSetup = false;
                 isG5ApiMatch = false;
-
                 isWarmup = true;
                 isKnifeRound = false;
                 isSideSelectionPhase = false;
                 isMatchLive = false;
                 isConvarMappingSwapped = false;
-
-                // Stop auto-pause monitoring when match ends
                 StopAutoPauseCheck();
-
                 liveMatchId = -1;
                 isPractice = false;
                 isDryRun = false;
                 isVeto = false;
                 isPreVeto = false;
-
                 isKnifeRequired = true;
                 isMatchModeEnabled = true;
                 isPlayOutEnabled = false;
                 isPlayOutEnabled2 = false;
-
                 lastBackupFileName = "";
                 lastMatchZyBackupFileName = "";
-
                 isRoundRestorePending = false;
                 playerHasTakenDamage = false;
 
-                // Unready all players
                 foreach (var key in playerReadyStatus.Keys)
                 {
                     playerReadyStatus[key] = false;
@@ -873,8 +874,6 @@ namespace MatchZy
                 };
 
                 HandleClanTags();
-
-                // Reset unpause data
                 Dictionary<string, object> unpauseData = new()
                 {
                     { "ct", false },
@@ -882,23 +881,17 @@ namespace MatchZy
                     { "pauseTeam", "" },
                 };
 
-                // Reset stop data
                 stopData["ct"] = false;
                 stopData["t"] = false;
-
-                // Reset owned bots data
                 pracUsedBots = new Dictionary<int, Dictionary<string, object>>();
                 noFlashList = new();
                 lastGrenadesData = new();
                 nadeSpecificLastGrenadeData = new();
                 UnpauseMatch();
-
                 matchzyTeam1.teamName = "COUNTER-TERRORISTS";
                 matchzyTeam2.teamName = "TERRORISTS";
-
                 matchzyTeam1.teamPlayers = null;
                 matchzyTeam2.teamPlayers = null;
-
                 HashSet<CCSPlayerController> coaches = GetAllCoaches();
 
                 foreach (var coach in coaches)
@@ -1327,22 +1320,15 @@ namespace MatchZy
 
             Task.Run(async () =>
             {
-                long newMatchId = await database.InitMatchAsync(
-                    team1Name,
-                    team2Name,
-                    "-",
-                    matchSetup,
-                    currentMatchId,
-                    currentMapNum,
-                    seriesType,
-                    mapName,
-                    serverIp
-                );
-
-                // Retry once if database init failed
-                if (newMatchId == -1)
+                // Allocate (or reuse) matchid with exponential backoff so a
+                // transient DB blip doesn't leave liveMatchId stuck at -1.
+                // 5 attempts: 0ms, 200ms, 500ms, 1s, 2s.
+                long newMatchId = -1;
+                int[] backoffMs = { 0, 200, 500, 1000, 2000 };
+                for (int attempt = 0; attempt < backoffMs.Length; attempt++)
                 {
-                    Log("[HandleMatchStart] WARNING: InitMatchAsync returned -1, retrying...");
+                    if (backoffMs[attempt] > 0)
+                        await Task.Delay(backoffMs[attempt]);
                     newMatchId = await database.InitMatchAsync(
                         team1Name,
                         team2Name,
@@ -1354,6 +1340,9 @@ namespace MatchZy
                         mapName,
                         serverIp
                     );
+                    if (newMatchId > 0)
+                        break;
+                    Log($"[HandleMatchStart] InitMatchAsync attempt {attempt + 1}/{backoffMs.Length} returned {newMatchId}, retrying...");
                 }
 
                 // Continue match start on game thread
@@ -1659,6 +1648,7 @@ namespace MatchZy
                     if (!isMatchSetup)
                         return;
                     // Trigger change immediately once outer delay elapses
+                    Server.ExecuteCommand("mp_match_end_restart false");
                     ChangeMap(nextMap, 0.0f);
                     matchStarted = false;
                     readyAvailable = true;
@@ -1672,7 +1662,7 @@ namespace MatchZy
                     isPractice = false;
                     isDryRun = false;
                     matchEndMapChangeTimer = null;
-                    StartWarmup();
+                    //StartWarmup();
                     SetMapSides();
                 }
             );
@@ -1935,7 +1925,7 @@ namespace MatchZy
 
                     bool swapRequired = IsTeamSwapRequired();
                     Log(
-                        $"[HandlePostRoundEndEvent] swapRequired={swapRequired}, isRoundRestoring={isRoundRestoring}"
+                        //$"[HandlePostRoundEndEvent] swapRequired={swapRequired}, isRoundRestoring={isRoundRestoring}"
                     );
 
                     // If isRoundRestoring is true, sides will be swapped from round restore if required!

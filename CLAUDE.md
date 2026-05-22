@@ -1,31 +1,42 @@
-# MatchZy — Miksen Fork
+# CLAUDE.md
+
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+
+> **Response style:** use `/caveman ultra` — terse, abbreviated prose (DB/auth/config/req/res/fn/impl), arrows for causality, drop articles/filler. Code, commits, PRs, and security warnings stay normal prose.
+
+# MatchZy -- Miksen Fork
 
 > Customized MatchZy fork for CS2 competitive servers
 
 ## Project Overview
 
-MatchZy is a CounterStrikeSharp plugin for CS2 match management — warmup, knife rounds, ready system, live matches, scrims, practice mode, backup/restore, map veto, demo recording, and live scorebot events. This fork adds custom integrations for game server hosting (remote log API, G5API compat, auto changelevel, advanced stats, coach system, pause overhauls, etc.).
+MatchZy is a CounterStrikeSharp plugin for CS2 match management — warmup, knife rounds, ready system, live matches, scrims, practice mode, backup/restore, map veto, demo recording, and live scorebot events. This fork adds custom integrations for game server hosting: remote log API, G5API compat, auto changelevel, advanced stats, coach system, pause overhauls, in-game admin/match-setup menus, and in-game stats commands.
 
 ## Tech Stack
 
 - **Framework**: CounterStrikeSharp API 1.0.367 (.NET 8.0, C# 12)
 - **Database**: SQLite (default) or MySQL via Dapper
 - **Serialization**: Newtonsoft.Json (match configs), System.Text.Json (events/stats)
+- **In-game menus**: CS2MenuManager 1.0.42 (`WasdMenu`)
 - **CSV Export**: CsvHelper 33.1.0
 - **Target**: CS2 dedicated servers (Linux)
 
 ## Architecture
 
-This is a **single partial class** (`MatchZy : BasePlugin`) split across ~20 files. There are no folders/namespaces for sub-concerns — all `.cs` files live flat in the repo root and share state via fields on the partial class.
+This is a **single partial class** (`MatchZy : BasePlugin`) split across ~40 files. There are no folders/namespaces for sub-concerns — all `.cs` files live flat in the repo root and share state via fields on the partial class. Every file is `namespace MatchZy { public partial class MatchZy { ... } }`.
 
 ```
 matchzy/                       # Repo root (== project root, no src/ subfolder)
-├── MatchZy.cs                 # Entry point: Load(), event registrations, command map, inline event handlers
+├── MatchZy.cs                 # Entry point: Load(), event registrations, commandActions map, inline event handlers
 ├── MatchZy.csproj             # .NET 8.0 project file
 ├── EventHandlers.cs           # Named event handler methods (connect, disconnect, round start/end, entity spawn, etc.)
 ├── MatchManagement.cs         # Match setup: LoadMatch JSON/URL, team management, series end, map change
+├── MatchSetupWizard.cs        # In-game .matchsetup wizard — WasdMenu flow that builds match JSON, calls LoadMatchFromJSON
 ├── Utility.cs                 # 3500+ lines: StartWarmup, StartLive, ResetMatch, ChangeMap, HandleMatchEnd, AutoStart, cfg builders, helpers
 ├── ConsoleCommands.cs         # css_* console commands + admin commands
+├── StatsCommands.cs           # .lastmatch / .stats in-game commands — async DB reads, prints scoreboards to chat
+├── AdminMenu.cs               # .matchadmin (.ma) WasdMenu — match control / pause / modes
+├── MatchSummaryPanel.cs       # End-of-match center-HTML summary panel (MVP, clutch king, top frags)
 ├── ConfigConvars.cs           # FakeConVar definitions for plugin settings
 ├── ConfigManager.cs           # Hardcoded CFG string builders for all game modes (live/scrim/hill/warmup/prac/sleep)
 ├── ConfigFiles.cs             # Static path constants for cfg files
@@ -41,7 +52,7 @@ matchzy/                       # Repo root (== project root, no src/ subfolder)
 ├── PublishEvents.cs           # SendEventAsync — HTTP POST events to remote log URL
 ├── AdvancedStats.cs           # HLTV 2.0 rating, KAST, clutch tracking, opening duels
 ├── FFWSystem.cs               # Forfeit/walkover system
-├── GGSystem.cs                # Surrender/vote system — DISABLED (excluded from build via <Compile Remove> in csproj)
+├── GGSystem.cs                # Surrender / GG-vote system — COMPILED & ACTIVE (css_gg). See note below.
 ├── MapVeto.cs                 # Map ban/pick veto flow
 ├── ReadySystem.cs             # Ready check logic
 ├── Teams.cs                   # Team class definition
@@ -56,15 +67,17 @@ matchzy/                       # Repo root (== project root, no src/ subfolder)
 ├── PlayerLocationData.cs      # Position data class
 ├── PlayerPracticeTimer.cs     # Practice timer class
 ├── Constants.cs               # Projectile type mappings
-├── SynchronizationContextManagement.cs # Dead code — excluded from build via <Compile Remove> in csproj
+├── SynchronizationContextManagement.cs # SourceSynchronizationContext / SyncContextScope helpers — compiled but unused (no callers)
 ├── cfg/                       # Server config files (warmup, knife, live, live_wingman, scrim, hill, prac, dryrun, sleep, config, matchzymaps)
 ├── lang/                      # Localization (en.json, da.json, sq.json)
-└── spawns/coach/              # Coach spawn position JSONs per map
+└── spawns/coach/              # Coach spawn position JSONs per map (10 maps: ancient, ancient_night, anubis, dust2, inferno, mirage, nuke, overpass, train, vertigo)
 ```
+
+> **Build inclusion:** the `.csproj` no longer has any `<Compile Remove>` entries — every `.cs` file in the repo root is compiled. `GGSystem.cs` and `SynchronizationContextManagement.cs` were excluded in older revisions; that exclusion is gone. `GGSystem.cs` now compiles and its `css_gg` console command is registered (the `.gg` chat alias is still commented out in `commandActions`). `SynchronizationContextManagement.cs` compiles but has no callers.
 
 ## Key State Machine
 
-The plugin operates as a state machine driven by boolean flags:
+The plugin operates as a state machine driven by boolean flags on the partial class:
 
 ```
 SLEEP (isSleep=true)
@@ -133,22 +146,24 @@ myTimer = null;
 // CORRECT: Capture all native data BEFORE Task.Run
 long matchId = liveMatchId;
 string mapName = Server.MapName;
+string gameDir = Server.GameDirectory;   // even ModuleDirectory / GameDirectory must be captured first
 Task.Run(async () =>
 {
     await SendEventAsync(someEvent);           // HTTP I/O — safe
     await database.SomeQueryAsync(matchId);    // DB I/O — safe
     // NEVER: Server.ExecuteCommand() or Utilities.GetPlayers() here — CRASH
+    // To touch the game again, marshal back: Server.NextFrame(() => { ... });
 });
 ```
 
 ### Command Registration
 ```csharp
-// Console commands (server + client)
+// Console commands (server + client). CSS auto-registers [ConsoleCommand] on plugin methods.
 [ConsoleCommand("css_ready", "Mark yourself as ready")]
 [CommandHelper(minArgs: 0, usage: "", whoCanExecute: CommandUsage.CLIENT_ONLY)]
 public void OnReadyCommand(CCSPlayerController? player, CommandInfo command) { }
 
-// Chat commands via dictionary lookup in EventPlayerChat handler
+// Chat commands via dictionary lookup in EventPlayerChat handler (MatchZy.cs ~line 361)
 commandActions = new Dictionary<string, Action<CCSPlayerController?, CommandInfo?>>
 {
     { ".ready", OnPlayerReady },
@@ -156,6 +171,20 @@ commandActions = new Dictionary<string, Action<CCSPlayerController?, CommandInfo
     // ...
 };
 ```
+
+### In-game Menus — CS2MenuManager `WasdMenu`
+```csharp
+using CS2MenuManager.API.Class;
+using CS2MenuManager.API.Menu;
+
+var menu = new WasdMenu("Title", this);
+menu.AddItem("Label", (p, option) => { /* handler */ });
+menu.Display(player, 0);
+
+// Submenu — set PrevMenu to get a built-in back button:
+var sub = new WasdMenu("Sub", this) { PrevMenu = menu };
+```
+When opening a menu from a **chat-command dispatch** (a `.command` routed via `commandActions`), defer the open with `Server.NextFrame(() => OpenMenu(player))` — otherwise the menu render is clobbered by the chat line still broadcasting on the same tick. See `AdminMenu.cs` / `MatchSetupWizard.cs`.
 
 ## Dependencies & NuGet
 
@@ -168,6 +197,7 @@ commandActions = new Dictionary<string, Action<CCSPlayerController?, CommandInfo
 | SQLitePCLRaw.bundle_e_sqlite3 | 2.1.6 | Native SQLite binaries |
 | MySqlConnector | 2.4.0 | MySQL provider |
 | CsvHelper | 33.1.0 | Player stats CSV export |
+| CS2MenuManager | 1.0.42 | In-game `WasdMenu` UI (admin menu, match setup wizard) |
 
 ## Build & Deploy
 
@@ -176,6 +206,25 @@ dotnet build -c Release
 # Output: bin/Release/net8.0/MatchZy.dll + dependencies
 # Deploy to: /game/csgo/addons/counterstrikesharp/plugins/MatchZy/
 ```
+
+There is **no test suite or lint tooling** — `dotnet build -c Release` is the only automated correctness check. The plugin only runs inside a live CS2 dedicated server with CounterStrikeSharp installed; it cannot be run or exercised locally.
+
+## Working with Claude Code Skills
+
+This is a **CounterStrikeSharp** plugin. Skills useful here, and when to reach for them:
+
+| Skill | Use it for |
+|-------|------------|
+| `code-review` | Review the current uncommitted diff for correctness bugs before committing. Good after any non-trivial change to event handlers / async / state flags. |
+| `security-review` | Audit branch changes for vulnerabilities — relevant for the remote-log HTTP API, DB queries (SQL injection), and any external input parsing (match JSON/URL loading). |
+| `review` | Review a GitHub PR. |
+| `verify` / `run` | Limited value here — the plugin needs a live CS2 server. Cannot launch the app locally; do not claim a change is "verified" without server testing. State that explicitly. |
+| `caveman-commit` | Generate a compressed Conventional-Commits message when committing. |
+| `init` | (Re)generate this CLAUDE.md. |
+
+**Do NOT use the `swiftlys2` skill for this repo.** SwiftlyS2 is a *different* CS2 server-mod framework (.NET 10). This project targets CounterStrikeSharp 1.0.367 on .NET 8.0 — the two APIs are not interchangeable. The `swiftlys2` skill only applies under `/home/mikkel/Hentet/swiftlys2-cs2-plugins/` or when explicitly porting to SwiftlyS2.
+
+For CounterStrikeSharp API questions, consult the docs link below rather than guessing — the API surface (especially enum names like `PlayerConnectedState`) has churned between minor versions.
 
 ---
 

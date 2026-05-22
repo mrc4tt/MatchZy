@@ -2848,31 +2848,6 @@ namespace MatchZy
                 );
         }
 
-        // CsTeam.None is a special value to mean force all other players to spectator
-        // private void SideSwitchCommand(CCSPlayerController player, CsTeam team)
-        // {
-        //     if (team > CsTeam.None)
-        //     {
-        //         if (player.TeamNum == (byte)CsTeam.Spectator)
-        //         {
-        //             // ReplyToUserCommand(player, "Switching to a team from spectator is currently broken, use the team menu.");
-        //             ReplyToUserCommand(player, Localizer.ForPlayer(player, "matchzy.pm.spectatorbroken"));
-        //             return;
-        //         }
-
-        //         player.ChangeTeam(team);
-        //         return;
-        //     }
-
-        //     Utilities.GetPlayers().ForEach((x) =>
-        //     {
-        //         if (x.IsValid && !x.IsBot && x.UserId != player.UserId)
-        //         {
-        //             x.ChangeTeam(CsTeam.Spectator);
-        //         }
-        //     });
-        // }
-
         // RemoveGrenadeEntities SAFE
         public void RemoveGrenadeEntities()
         {
@@ -3503,11 +3478,8 @@ namespace MatchZy
                 return;
 
             int solidValue = ConVar.Find("mp_solid_teammates")!.GetPrimitiveValue<int>();
-
             int newSolidValue = (solidValue == 0 || solidValue == 1) ? 2 : 1;
-
             ConVar.Find("mp_solid_teammates")!.SetValue(newSolidValue);
-
             PrintToAllChat($"mp_solid_teammates is now set to {newSolidValue}");
         }
 
@@ -3596,10 +3568,7 @@ namespace MatchZy
         [ConsoleCommand("css_previewnade", "Toggles nade preview mode for practices")]
         [ConsoleCommand("css_cam", "Toggles nade preview mode for practices")]
         [ConsoleCommand("css_nadecam", "Toggles nade preview mode for practices")]
-        [ConsoleCommand(
-            "css_traj",
-            "Toggles sv_grenade_trajectory_prac_pipreview in practice mode"
-        )]
+        [ConsoleCommand("css_traj", "Toggles sv_grenade_trajectory_prac_pipreview in practice mode")]
         [ConsoleCommand("css_pip", "Toggles sv_grenade_trajectory_prac_pipreview in practice mode")]
         public void OnTrajCommand(CCSPlayerController? player, CommandInfo? command)
         {
@@ -3618,18 +3587,6 @@ namespace MatchZy
                 $" {ChatColors.Green}GrenadePreviewCam: {ChatColors.Default}{enabled}"
             );
         }
-
-        // BACKUP TRAJ
-        // public void OnTrajCommand(CCSPlayerController? player, CommandInfo? command)
-        // {
-        //     if (!isPractice || !IsPlayerValid(player)) return;
-
-        //     bool trajValue = ConVar.Find("sv_grenade_trajectory_prac_pipreview")!.GetPrimitiveValue<bool>();
-
-        //     Server.ExecuteCommand($"sv_grenade_trajectory_prac_pipreview {!trajValue}");
-
-        //     PrintToAllChat($"{ChatColors.Green}Grenade-Preview Cam: {ChatColors.Default}{!trajValue}");
-        // }
 
         [ConsoleCommand(
             "css_bestspawn",
