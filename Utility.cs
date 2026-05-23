@@ -1344,7 +1344,9 @@ namespace MatchZy
                     );
                     if (newMatchId > 0)
                         break;
-                    Log($"[HandleMatchStart] InitMatchAsync attempt {attempt + 1}/{backoffMs.Length} returned {newMatchId}, retrying...");
+                    Log(
+                        $"[HandleMatchStart] InitMatchAsync attempt {attempt + 1}/{backoffMs.Length} returned {newMatchId}, retrying..."
+                    );
                 }
 
                 // Continue match start on game thread
@@ -1927,7 +1929,7 @@ namespace MatchZy
 
                     bool swapRequired = IsTeamSwapRequired();
                     Log(
-                        //$"[HandlePostRoundEndEvent] swapRequired={swapRequired}, isRoundRestoring={isRoundRestoring}"
+                        $"[HandlePostRoundEndEvent] swapRequired={swapRequired}, isRoundRestoring={isRoundRestoring}"
                     );
 
                     // If isRoundRestoring is true, sides will be swapped from round restore if required!

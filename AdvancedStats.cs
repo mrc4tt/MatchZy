@@ -541,7 +541,7 @@ public partial class MatchZy
         }
         catch (Exception ex)
         {
-            //Log($"[AdvancedStats] Failed to collect stats: {ex.Message}");
+            Log($"[AdvancedStats] Failed to collect stats: {ex.Message}");
             return null;
         }
     }
@@ -578,7 +578,7 @@ public partial class MatchZy
         }
         catch (Exception ex)
         {
-            //Log($"[AdvancedStats] Failed to export stats: {ex.Message}");
+            Log($"[AdvancedStats] Failed to export stats: {ex.Message}");
         }
     }
 
