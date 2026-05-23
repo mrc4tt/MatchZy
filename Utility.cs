@@ -595,6 +595,7 @@ namespace MatchZy
                 () =>
                 {
                     ExecuteChangedConvars();
+                    HandlePlayoutConfig();
                     SetTeamNames();
                 }
             );
@@ -616,6 +617,7 @@ namespace MatchZy
                 () =>
                 {
                     ExecuteChangedConvars();
+                    HandlePlayoutConfig();
                     SetTeamNames();
                 }
             );
