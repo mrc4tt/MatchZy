@@ -617,10 +617,12 @@ namespace MatchZy
                     return;
                 }
 
-                var gameRules = Utilities
-                    .FindAllEntitiesByDesignerName<CCSGameRulesProxy>("cs_gamerules")
-                    .First()
-                    .GameRules!;
+                var gameRules = GetGameRules();
+                if (gameRules == null)
+                {
+                    ReplyToUserCommand(player, "Failed to get game rules.");
+                    return;
+                }
                 if (player.TeamNum == 2)
                 {
                     if (gameRules.TerroristTimeOuts > 0)
@@ -1113,6 +1115,10 @@ namespace MatchZy
             }
 
             StartScrimMode();
+            // Apply clinch=0/overtime=0 NOW during warmup so client trophy UI slot
+            // is allocated correctly at the upcoming warmup→live phase transition.
+            // Mid-live convar flips can't move trophy after the slot is allocated.
+            HandlePlayoutConfig();
             ReplyToUserCommand(player, "Scrim/Full30 Mode has been loaded.");
             ReplyToUserCommand(player, "Knife Round is disabled for this mode.");
             ReplyToUserCommand(
@@ -1149,6 +1155,8 @@ namespace MatchZy
             isKnifeRequired = false;
             isMatchModeEnabled = false;
             StartHillMode();
+            // Apply clinch=0/overtime=0 in warmup → see OnScrimCommand for rationale.
+            HandlePlayoutConfig();
         }
 
         [ConsoleCommand("css_match", "Starts match mode")]
@@ -1182,6 +1190,10 @@ namespace MatchZy
 
             isPlayOutEnabled = false;
             StartMatchMode();
+            // Apply clinch=1/overtime=1 from live.cfg NOW during warmup so client
+            // trophy UI slot is allocated at warmup→knife/live phase transition.
+            // Required when transitioning back from scrim/hill where clinch=0 leaked.
+            HandlePlayoutConfig();
         }
 
         [ConsoleCommand("css_exitprac", "Starts match mode")]

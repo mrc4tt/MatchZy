@@ -41,6 +41,7 @@ namespace MatchZy
         public bool isConvarMappingSwapped = false;
         public long liveMatchId = -1;
         public int autoStartMode = 1;
+        private bool autoStartLatched = false;
         public bool mapReloadRequired = false;
 
         public CounterStrikeSharp.API.Modules.Timers.Timer? SideSelectionTimer = null;
@@ -697,6 +698,8 @@ namespace MatchZy
 
             RegisterListener<Listeners.OnMapStart>(mapName =>
             {
+                // Re-arm AutoStart latch: allow exactly one AutoStart for this new map.
+                autoStartLatched = false;
                 AddTimer(
                     1.0f,
                     () =>

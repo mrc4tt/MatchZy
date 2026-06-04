@@ -1201,33 +1201,34 @@ namespace MatchZy
 
         public void HandlePlayoutConfig()
         {
-            if (isPlayOutEnabled)
+            if (isPlayOutEnabled || isPlayOutEnabled2)
             {
                 Server.ExecuteCommand("mp_overtime_enable 0");
-                Server.ExecuteCommand("mp_match_can_clinch false");
+                Server.ExecuteCommand("mp_match_can_clinch 0");
+                Server.ExecuteCommand("mp_match_end_changelevel 0");
+                Server.ExecuteCommand("mp_match_end_restart 0");
+                Server.ExecuteCommand("mp_endmatch_votenextmap 0");
+                Log("[HandlePlayoutConfig] Scrim/Hill playout — clinch=0, overtime=0");
+                return;
             }
-            else if (isPlayOutEnabled2)
-            {
-                Server.ExecuteCommand("mp_overtime_enable 0");
-                Server.ExecuteCommand("mp_match_can_clinch false");
-            }
-            else
-            {
-                var absoluteCfgPath = Path.Join(
-                    Server.GameDirectory + "/csgo/cfg",
-                    GetGameMode() == 1 ? liveCfgPath : liveWingmanCfgPath
-                );
-                string? matchCanClinch = GetConvarValueFromCFGFile(
-                    absoluteCfgPath,
-                    "mp_match_can_clinch"
-                );
-                string? overtimeEnabled = GetConvarValueFromCFGFile(
-                    absoluteCfgPath,
-                    "mp_overtime_enable"
-                );
-                Server.ExecuteCommand($"mp_match_can_clinch {matchCanClinch ?? "1"}");
-                Server.ExecuteCommand($"mp_overtime_enable {overtimeEnabled ?? "1"}");
-            }
+
+            var absoluteCfgPath = Path.Join(
+                Server.GameDirectory + "/csgo/cfg",
+                GetGameMode() == 1 ? liveCfgPath : liveWingmanCfgPath
+            );
+            string? matchCanClinch = GetConvarValueFromCFGFile(
+                absoluteCfgPath,
+                "mp_match_can_clinch"
+            );
+            string? overtimeEnabled = GetConvarValueFromCFGFile(
+                absoluteCfgPath,
+                "mp_overtime_enable"
+            );
+            Server.ExecuteCommand($"mp_match_can_clinch {matchCanClinch ?? "1"}");
+            Server.ExecuteCommand($"mp_overtime_enable {overtimeEnabled ?? "1"}");
+            Log(
+                $"[HandlePlayoutConfig] Match mode — cfg={absoluteCfgPath} clinch={matchCanClinch ?? "1(default)"} overtime={overtimeEnabled ?? "1(default)"}"
+            );
         }
     }
 }

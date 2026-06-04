@@ -18,6 +18,9 @@ public class PlayerLocationData
     {
         if (player == null || player.PlayerPawn.Value == null)
             return;
-        player.PlayerPawn.Value.Teleport(Position, Angle, new Vector(0, 0, 0));
+        // Issues #391/#393 (AG2): teleport + clear any stuck throw pose via a
+        // weapon re-deploy. No grenade slot to restore here, so re-deploy onto
+        // the primary (slot1).
+        MatchZy.TeleportAndClearPose(player, Position, Angle, switchSlot: "slot1");
     }
 }

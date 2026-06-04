@@ -37,6 +37,7 @@ namespace MatchZy
             Server.ExecuteCommand("mp_pause_match");
             isPaused = true;
             unpauseData["pauseTeam"] = "Admin";
+            vetoStateTimer?.Kill();
             vetoStateTimer = AddTimer(1, VetoCountdown, TimerFlags.REPEAT);
             isVeto = true;
             readyAvailable = false;

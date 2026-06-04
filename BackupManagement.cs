@@ -519,6 +519,11 @@ namespace MatchZy
             }
 
             var gameRules = GetGameRules();
+            if (gameRules == null)
+            {
+                ReplyToUserCommand(player, "Failed to get game rules.");
+                return;
+            }
             bool liveSetupRequired = false;
 
             // We set active timeouts to false so that timeout does not start after the round has been restored.

@@ -945,35 +945,28 @@ namespace MatchZy
                                         float.Parse(angArray[2])
                                     );
 
-                                    // Teleport player
-                                    player!.PlayerPawn!.Value!.Teleport(
+                                    // Issues #391/#393 (AG2): teleport to the
+                                    // lineup position and clear any stuck throw
+                                    // pose via a weapon re-deploy (no respawn).
+                                    // The grenade slot for this lineup type is
+                                    // re-deployed by TeleportAndClearPose.
+                                    string nadeType = lineupInfo["Type"];
+                                    string nadeSlot = nadeType switch
+                                    {
+                                        "Flash" => "slot7",
+                                        "Smoke" => "slot8",
+                                        "HE" => "slot6",
+                                        "Decoy" => "slot9",
+                                        "Molly" => "slot10",
+                                        _ => "slot8",
+                                    };
+                                    TeleportAndClearPose(
+                                        player,
                                         loadedPlayerPos,
                                         loadedPlayerAngle,
-                                        new Vector(0, 0, 0)
+                                        wantDucked: false,
+                                        switchSlot: nadeSlot
                                     );
-
-                                    // Change player inv slot
-                                    switch (lineupInfo["Type"])
-                                    {
-                                        case "Flash":
-                                            player.ExecuteClientCommand("slot7");
-                                            break;
-                                        case "Smoke":
-                                            player.ExecuteClientCommand("slot8");
-                                            break;
-                                        case "HE":
-                                            player.ExecuteClientCommand("slot6");
-                                            break;
-                                        case "Decoy":
-                                            player.ExecuteClientCommand("slot9");
-                                            break;
-                                        case "Molly":
-                                            player.ExecuteClientCommand("slot10");
-                                            break;
-                                        case "":
-                                            player.ExecuteClientCommand("slot8");
-                                            break;
-                                    }
 
                                     // Extract description, if available
                                     string? lineupDesc = lineupInfo.ContainsKey("Desc")

@@ -239,21 +239,29 @@ public partial class MatchZy
             var killerTeam =
                 victimTeam == CsTeam.Terrorist ? CsTeam.CounterTerrorist : CsTeam.Terrorist;
 
-            // Check if this kill avenges a recent teammate death
-            var recentTeammateDeaths = roundDeaths
-                .Where(d =>
+            // Check if this kill avenges a recent teammate death.
+            // Perf: manual scan for the first match instead of .Where().ToList()
+            // + .Any() + .First() — this runs on every death (~10x/round) and the
+            // LINQ chain allocated a closure + List each call.
+            var now = DateTime.UtcNow;
+            RoundDeath? tradedDeath = null;
+            foreach (var d in roundDeaths)
+            {
+                if (
                     d.VictimTeam == killerTeam
-                    && d.KillerSteamId == victimSteamId
-                    && // The person who just died killed our teammate
-                    !d.WasTraded
-                    && (DateTime.UtcNow - d.Time).TotalSeconds <= 5
+                    && d.KillerSteamId == victimSteamId // the person who just died killed our teammate
+                    && !d.WasTraded
+                    && (now - d.Time).TotalSeconds <= 5
                 )
-                .ToList();
+                {
+                    tradedDeath = d;
+                    break;
+                }
+            }
 
-            if (recentTeammateDeaths.Any())
+            if (tradedDeath != null)
             {
                 // This is a trade kill!
-                var tradedDeath = recentTeammateDeaths.First();
                 tradedDeath.WasTraded = true;
 
                 // Mark the killer's trade kill stat
@@ -316,7 +324,10 @@ public partial class MatchZy
         aliveT = 0;
         aliveCT = 0;
 
-        foreach (var player in Utilities.GetPlayers())
+        // Perf: iterate the cached playerData dict instead of Utilities.GetPlayers()
+        // — this runs on every player death during live matches (~10x/round), and
+        // GetPlayers() allocates a List + crosses the native boundary each call.
+        foreach (var player in playerData.Values)
         {
             if (player == null || !player.IsValid || player.IsBot)
                 continue;

@@ -384,6 +384,83 @@ namespace MatchZy
             _readyStatusDirty = true; // Force recompute on warmup start
             ExecWarmupCfg();
 
+            // Force full reset of round history (W/L dots, death skulls, player stats).
+            // Plain mp_restartgame 1 may not clear per-round client-side trackers when
+            // chained after mp_warmup_start. Cycle: end → restart → start.
+            Server.ExecuteCommand("mp_warmup_end; mp_restartgame 1; mp_warmup_start;");
+
+            // Delay memory wipe until AFTER mp_restartgame 1 fires (~T+1s) so the
+            // restart doesn't re-populate cached state on top of our zeroed memory.
+            // Also resets player money to mp_startmoney via InGameMoneyServices.
+            AddTimer(
+                2.0f,
+                () =>
+                {
+                    try
+                    {
+                        var rules = GetGameRules();
+                        var proxy = Utilities
+                            .FindAllEntitiesByDesignerName<CCSGameRulesProxy>("cs_gamerules")
+                            .FirstOrDefault();
+                        if (rules != null && proxy != null)
+                        {
+                            rules.MatchStats_RoundResults.Clear();
+                            rules.MatchStats_PlayersAlive_CT.Clear();
+                            rules.MatchStats_PlayersAlive_T.Clear();
+                            Utilities.SetStateChanged(proxy, "CCSGameRulesProxy", "m_pGameRules");
+                        }
+
+                        int startMoney =
+                            ConVar.Find("mp_startmoney")?.GetPrimitiveValue<int>() ?? 800;
+
+                        foreach (var p in Utilities.GetPlayers())
+                        {
+                            if (p == null || !p.IsValid)
+                                continue;
+                            try
+                            {
+                                p.Score = 0;
+                                var ats = p.ActionTrackingServices;
+                                if (ats != null)
+                                {
+                                    var ms = ats.MatchStats;
+                                    ms.Kills = 0;
+                                    ms.Deaths = 0;
+                                    ms.Assists = 0;
+                                    ms.Damage = 0;
+                                    ms.HeadShotKills = 0;
+                                    ms.EnemiesFlashed = 0;
+                                    ms.EquipmentValue = 0;
+                                    ms.MoneySaved = 0;
+                                    ms.KillReward = 0;
+                                    ms.LiveTime = 0;
+                                    ms.Objective = 0;
+                                    ms.UtilityDamage = 0;
+                                }
+                                var moneyServices = p.InGameMoneyServices;
+                                if (moneyServices != null)
+                                {
+                                    moneyServices.Account = startMoney;
+                                    moneyServices.StartAccount = startMoney;
+                                    moneyServices.TotalCashSpent = 0;
+                                    moneyServices.CashSpentThisRound = 0;
+                                }
+                            }
+                            catch (Exception pex)
+                            {
+                                Log(
+                                    $"[StartWarmup per-player reset] slot={p.Slot} {pex.Message}"
+                                );
+                            }
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        Log($"[StartWarmup reset deferred] {ex.Message}");
+                    }
+                }
+            );
+
             // Ensure spectator limit is properly set
             Server.ExecuteCommand("mp_spectators_max 20");
 
@@ -566,15 +643,35 @@ namespace MatchZy
             // swap state, so reset our tracking flag to match the engine.
             isConvarMappingSwapped = false;
 
-            // Adding timer here to make sure that CFG execution is completed till then
+            // Bumped to 3s + HandlePlayoutConfig so transition from scrim/hill back
+            // to .match re-applies clinch=1/overtime convars from live.cfg, forcing
+            // client UI refresh of trophy icons.
             AddTimer(
-                1,
+                3,
                 () =>
                 {
                     ExecuteChangedConvars();
+                    HandlePlayoutConfig();
                     // Re-apply team names after live CFG to ensure scoreboard
                     // shows correct names after knife round side selection.
                     SetTeamNames();
+
+                    AddTimer(
+                        1,
+                        () =>
+                        {
+                            var clinch = ConVar
+                                .Find("mp_match_can_clinch")
+                                ?.GetPrimitiveValue<bool>();
+                            var maxr = ConVar.Find("mp_maxrounds")?.GetPrimitiveValue<int>();
+                            var ot = ConVar
+                                .Find("mp_overtime_enable")
+                                ?.GetPrimitiveValue<bool>();
+                            Log(
+                                $"[MatchDebug] clinch={clinch} maxrounds={maxr} overtime={ot}"
+                            );
+                        }
+                    );
                 }
             );
         }
@@ -589,14 +686,33 @@ namespace MatchZy
             // swap state, so reset our tracking flag to match the engine.
             isConvarMappingSwapped = false;
 
-            // Adding timer here to make sure that CFG execution is completed till then
+            // Bumped to 3s: scrim.cfg + ExecScrimCFG both queue mp_restartgame 1 →
+            // engine restart fires ~T=1s. Need to set playout convars AFTER restart
+            // settles, otherwise our mp_match_can_clinch override loses the race.
             AddTimer(
-                1,
+                3,
                 () =>
                 {
                     ExecuteChangedConvars();
                     HandlePlayoutConfig();
                     SetTeamNames();
+
+                    AddTimer(
+                        1,
+                        () =>
+                        {
+                            var clinch = ConVar
+                                .Find("mp_match_can_clinch")
+                                ?.GetPrimitiveValue<bool>();
+                            var maxr = ConVar.Find("mp_maxrounds")?.GetPrimitiveValue<int>();
+                            var ot = ConVar
+                                .Find("mp_overtime_enable")
+                                ?.GetPrimitiveValue<bool>();
+                            Log(
+                                $"[ScrimDebug] clinch={clinch} maxrounds={maxr} overtime={ot}"
+                            );
+                        }
+                    );
                 }
             );
         }
@@ -611,9 +727,9 @@ namespace MatchZy
             // swap state, so reset our tracking flag to match the engine.
             isConvarMappingSwapped = false;
 
-            // Adding timer here to make sure that CFG execution is completed till then
+            // Bumped to 3s: see SetupScrimFlagsAndCfg for race-condition rationale.
             AddTimer(
-                1,
+                3,
                 () =>
                 {
                     ExecuteChangedConvars();
@@ -626,6 +742,9 @@ namespace MatchZy
         private void StartLive()
         {
             SetupLiveFlagsAndCfg();
+            // Early clinch/overtime apply from live.cfg → forces UI to refresh trophy
+            // icons when transitioning from scrim/hill back to match mode.
+            Server.NextFrame(() => HandlePlayoutConfig());
             // mp_restartgame in live.cfg fires ~1s after exec; calling tv_record
             // synchronously here gets clobbered by the restart, producing empty
             // demos. Defer past the restart so tv_record sticks.
@@ -678,6 +797,13 @@ namespace MatchZy
         private void StartScrim()
         {
             SetupScrimFlagsAndCfg();
+            // Early playout-convar apply so trophy/clinch UI renders correctly on round 1.
+            // SetupScrimFlagsAndCfg also re-applies at +3s to win over cfg restart race.
+            Server.NextFrame(() =>
+            {
+                HandlePlayoutConfig();
+                ForceScoreboardRefresh();
+            });
             // mp_restartgame in scrim.cfg fires ~1s after exec; calling tv_record
             // synchronously here gets clobbered by the restart, producing empty
             // demos. Defer past the restart so tv_record sticks.
@@ -722,6 +848,12 @@ namespace MatchZy
         private void StartHill()
         {
             SetupHillFlagsAndCfg();
+            // Early playout-convar apply so trophy/clinch UI renders correctly on round 1.
+            Server.NextFrame(() =>
+            {
+                HandlePlayoutConfig();
+                ForceScoreboardRefresh();
+            });
             // mp_restartgame in hill.cfg fires ~1s after exec; calling tv_record
             // synchronously here gets clobbered by the restart, producing empty
             // demos. Defer past the restart so tv_record sticks.
@@ -761,6 +893,31 @@ namespace MatchZy
             {
                 await SendEventAsync(goingLiveEvent);
             });
+        }
+
+        // Bumps m_nRoundEndCount netvar so client re-evaluates scoreboard UI
+        // (trophy/clinch icons, per-round dots). Used after HandlePlayoutConfig at
+        // match-start so cosmetic UI matches the actual playout convars before round 1.
+        private void ForceScoreboardRefresh()
+        {
+            try
+            {
+                var proxy = Utilities
+                    .FindAllEntitiesByDesignerName<CCSGameRulesProxy>("cs_gamerules")
+                    .FirstOrDefault();
+                var rules = GetGameRules();
+                if (proxy == null || rules == null)
+                    return;
+                rules.RoundEndCount = unchecked((byte)(rules.RoundEndCount + 1));
+                // m_nRoundEndCount is nested under m_pGameRules pointer in proxy → can't
+                // resolve direct offset. Mark parent pointer dirty → full re-replicate.
+                Utilities.SetStateChanged(proxy, "CCSGameRulesProxy", "m_pGameRules");
+                Log($"[ForceScoreboardRefresh] m_nRoundEndCount={rules.RoundEndCount}");
+            }
+            catch (Exception ex)
+            {
+                Log($"[ForceScoreboardRefresh] {ex.Message}");
+            }
         }
 
         private void KillPhaseTimers()
@@ -1789,6 +1946,27 @@ namespace MatchZy
                 RandomizeSpawns();
             if (!matchStarted)
                 return;
+
+            // Re-apply clinch/overtime convars on round 1 so trophy/clinch UI refreshes
+            // immediately rather than waiting for round 2. Runs for ALL match types
+            // (scrim/hill/match) — match mode needs it so trophy reappears when
+            // transitioning back from scrim/hill where clinch was disabled.
+            if (isMatchLive)
+            {
+                try
+                {
+                    int roundsPlayed = GetGameRules()?.TotalRoundsPlayed ?? 99;
+                    if (roundsPlayed <= 1)
+                    {
+                        HandlePlayoutConfig();
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Log($"[HandlePostRoundStartEvent playout-reapply] {ex.Message}");
+                }
+            }
+
             playerHasTakenDamage = false;
             HandleCoaches();
             CreateMatchZyRoundDataBackup();
@@ -1950,10 +2128,9 @@ namespace MatchZy
         public bool IsTeamSwapRequired()
         {
             // Handling OTs and side swaps (Referred from Get5)
-            var gameRules = Utilities
-                .FindAllEntitiesByDesignerName<CCSGameRulesProxy>("cs_gamerules")
-                .First()
-                .GameRules!;
+            var gameRules = GetGameRules();
+            if (gameRules == null)
+                return false;
             int roundsPlayed = gameRules.TotalRoundsPlayed;
 
             int roundsPerHalf = ConVar.Find("mp_maxrounds")!.GetPrimitiveValue<int>() / 2;
@@ -3014,17 +3191,22 @@ namespace MatchZy
             Server.ExecuteCommand($"hostname {formattedHostname}");
         }
 
-        public CCSGameRules GetGameRules()
+        // Returns null when the cs_gamerules entity is momentarily absent (map /
+        // round / phase transitions). The old .First() threw InvalidOperationException
+        // there, crashing the server mid-match. Callers MUST null-check.
+        public CCSGameRules? GetGameRules()
         {
             return Utilities
                 .FindAllEntitiesByDesignerName<CCSGameRulesProxy>("cs_gamerules")
-                .First()
-                .GameRules!;
+                .FirstOrDefault()
+                ?.GameRules;
         }
 
+        // -1 when gamerules absent (no real phase is negative), so callers comparing
+        // == 4 / == 5 just get false instead of a throw.
         public int GetGamePhase()
         {
-            return GetGameRules().GamePhase;
+            return GetGameRules()?.GamePhase ?? -1;
         }
 
         public bool IsHalfTimePhase()
@@ -3055,10 +3237,9 @@ namespace MatchZy
 
         public bool IsTacticalTimeoutActive()
         {
-            var gameRules = Utilities
-                .FindAllEntitiesByDesignerName<CCSGameRulesProxy>("cs_gamerules")
-                .First()
-                .GameRules!;
+            var gameRules = GetGameRules();
+            if (gameRules == null)
+                return false;
 
             return (gameRules.CTTimeOutActive || gameRules.TerroristTimeOutActive)
                 && gameRules.FreezePeriod;
@@ -3074,11 +3255,8 @@ namespace MatchZy
                 new Dictionary<ulong, Dictionary<string, object>>();
             List<StatsPlayer> playerStatsListTeam1 = new();
             List<StatsPlayer> playerStatsListTeam2 = new();
-            var gameRules = Utilities
-                .FindAllEntitiesByDesignerName<CCSGameRulesProxy>("cs_gamerules")
-                .First()
-                .GameRules!;
-            int roundsPlayed = gameRules.TotalRoundsPlayed;
+            var gameRules = GetGameRules();
+            int roundsPlayed = gameRules?.TotalRoundsPlayed ?? 0;
             try
             {
                 foreach (int key in playerData.Keys)
@@ -3231,6 +3409,15 @@ namespace MatchZy
 
         private void AutoStart()
         {
+            // Per-map latch: AutoStart is triggered from multiple sites (Load timer, OnMapStart,
+            // first player connect). Run at most once per map load; latch is re-armed in OnMapStart.
+            if (autoStartLatched)
+            {
+                //Log($"[AutoStart] skipped duplicate (autoStartMode: {autoStartMode})");
+                return;
+            }
+            autoStartLatched = true;
+
             Log($"[AutoStart] autoStartMode: {autoStartMode}");
             if (autoStartMode == 0)
             {
@@ -3312,6 +3499,74 @@ namespace MatchZy
         public bool IsHumanPlayerValid(CCSPlayerController? player)
         {
             return IsPlayerValid(player) && !player!.IsBot && !player.IsHLTV;
+        }
+
+        // Issues #391/#393: after .last / .loadnade / .back, the engine can
+        // leave the player stuck in a half-crouch ("MJ peek" / swimming peek).
+        // Resetting the duck flags addresses the cases where the duck state is
+        // the visible cause.
+        //
+        // The full-body throw/lean pose (post-AG2 / Animation Graph 2.0) cannot
+        // be cleared from here: it lives in m_pGraphInstanceAG2, which CSS does
+        // not expose (no SetAnimGraphParameter, and bumping the serialized-recipe
+        // version + networked dirty flags has no visible effect — tested). The
+        // reliable fix is to rebuild the pawn via Respawn(); see
+        // RespawnAndTeleport, which the teleport commands now route through.
+        public static void ResetPlayerCrouch(CCSPlayerController? player, bool wantDucked = false)
+        {
+            if (player == null || !player.IsValid || player.PlayerPawn.Value == null)
+                return;
+            var pawn = player.PlayerPawn.Value;
+            if (pawn.MovementServices == null || pawn.MovementServices.Handle == IntPtr.Zero)
+                return;
+            var ms = new CCSPlayer_MovementServices(pawn.MovementServices.Handle);
+            ms.DuckAmount = wantDucked ? 1.0f : 0.0f;
+            ms.Ducked = wantDucked;
+            ms.Ducking = false;
+            ms.DesiresDuck = wantDucked;
+            ms.DuckOverride = false;
+            ms.DuckRootOffset = 0.0f;
+            ms.DuckViewOffset = wantDucked ? 1.0f : 0.0f;
+            ms.LastDuckTime = 0.0f;
+        }
+
+        // Issues #391/#393 (AG2): teleport to the target position and clear any
+        // stuck throw/lean pose WITHOUT respawning (respawn wipes the inventory,
+        // which loses the thrown grenade and forces a fragile re-give/re-equip
+        // dance). Instead, after teleporting we force the held weapon to
+        // holster + re-deploy by cycling the inventory slot: a deploy retriggers
+        // the weapon's anim graph, which overrides the frozen throw pose.
+        // afterRestore runs after the teleport (used by callers to put the
+        // correct grenade in hand). switchSlot, if given, is the inventory slot
+        // command ("slot8" etc.) to re-deploy onto.
+        public static void TeleportAndClearPose(
+            CCSPlayerController? player,
+            Vector position,
+            QAngle angle,
+            bool wantDucked = false,
+            string? switchSlot = null,
+            Action? afterRestore = null
+        )
+        {
+            if (player == null || !player.IsValid || player.PlayerPawn.Value == null)
+                return;
+            var pawn = player.PlayerPawn.Value;
+
+            pawn.Teleport(position, angle, new Vector(0, 0, 0));
+            ResetPlayerCrouch(player, wantDucked);
+
+            afterRestore?.Invoke();
+
+            // Pose kick: holster (knife) this frame, re-deploy the target slot
+            // next frame. The deploy animation overrides the stuck throw pose.
+            player.ExecuteClientCommand("slot3");
+            Server.NextFrame(() =>
+            {
+                if (player == null || !player.IsValid || player.PlayerPawn.Value == null)
+                    return;
+                if (!string.IsNullOrEmpty(switchSlot))
+                    player.ExecuteClientCommand(switchSlot);
+            });
         }
 
         public static Color GetPlayerTeammateColor(CCSPlayerController playerController)
@@ -3461,7 +3716,7 @@ namespace MatchZy
                 {
                     player.SwitchTeam(team);
                     var gameRules = GetGameRules();
-                    if (gameRules.WarmupPeriod)
+                    if (gameRules != null && gameRules.WarmupPeriod)
                     {
                         player.Respawn();
                     }

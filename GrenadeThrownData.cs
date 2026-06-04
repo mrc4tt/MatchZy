@@ -1,3 +1,4 @@
+using System.Linq;
 using CounterStrikeSharp.API;
 using CounterStrikeSharp.API.Core;
 using CounterStrikeSharp.API.Modules.Utils;
@@ -56,25 +57,55 @@ public class GrenadeThrownData
     {
         if (player == null || player.PlayerPawn.Value == null)
             return;
-        var pawn = player.PlayerPawn.Value;
-        pawn.Teleport(PlayerPosition, PlayerAngle, new Vector(0, 0, 0));
 
-        // Issue #391: throw animation leaves the duck state stuck. DuckAmount
-        // alone is insufficient — the engine re-derives it next tick from the
-        // bDucked/bDucking/bDesiresDuck/bDuckOverride flags, so all of them
-        // must be cleared together. DuckRootOffset and DuckViewOffset control
-        // the eye/model height interpolation and can also be stuck mid-anim.
-        if (pawn.MovementServices == null || pawn.MovementServices.Handle == IntPtr.Zero)
-            return;
-        var ms = new CCSPlayer_MovementServices(pawn.MovementServices.Handle);
-        bool wantDucked = DuckAmount >= 0.5f;
-        ms.DuckAmount = wantDucked ? 1.0f : 0.0f;
-        ms.Ducked = wantDucked;
-        ms.Ducking = false;
-        ms.DesiresDuck = wantDucked;
-        ms.DuckOverride = false;
-        ms.DuckRootOffset = 0.0f;
-        ms.DuckViewOffset = wantDucked ? 1.0f : 0.0f;
+        // molotov maps to weapon_incgrenade on CT, weapon_molotov on T.
+        bool isCT = player.TeamNum == (byte)CsTeam.CounterTerrorist;
+        string? nadeWeapon = Type switch
+        {
+            "smoke" => "weapon_smokegrenade",
+            "hegrenade" => "weapon_hegrenade",
+            "decoy" => "weapon_decoy",
+            "flash" => "weapon_flashbang",
+            "molotov" => isCT ? "weapon_incgrenade" : "weapon_molotov",
+            _ => null,
+        };
+        // Inventory slot for the thrown grenade type, used to re-deploy it after
+        // the teleport so it's in hand at the lineup position.
+        string? nadeSlot = Type switch
+        {
+            "hegrenade" => "slot6",
+            "flash" => "slot7",
+            "smoke" => "slot8",
+            "decoy" => "slot9",
+            "molotov" => "slot10",
+            _ => null,
+        };
+
+        // Issues #391/#393 (AG2): teleport back to the throw position and clear
+        // the stuck throw pose via a weapon re-deploy (no respawn, so the rest
+        // of the inventory is untouched). The thrown grenade itself was consumed,
+        // so re-give it in afterRestore before the re-deploy kicks in.
+        MatchZy.TeleportAndClearPose(
+            player,
+            PlayerPosition,
+            PlayerAngle,
+            wantDucked: DuckAmount >= 0.5f,
+            switchSlot: nadeSlot,
+            afterRestore: nadeWeapon == null
+                ? null
+                : () =>
+                {
+                    var pawn = player.PlayerPawn.Value;
+                    bool alreadyHas =
+                        pawn?.WeaponServices?.MyWeapons.Any(h =>
+                            h.Value != null
+                            && h.Value.IsValid
+                            && h.Value.DesignerName == nadeWeapon
+                        ) ?? false;
+                    if (!alreadyHas)
+                        player.GiveNamedItem(nadeWeapon);
+                }
+        );
     }
 
     public void Throw(CCSPlayerController player)

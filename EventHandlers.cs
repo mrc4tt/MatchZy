@@ -114,6 +114,14 @@ public partial class MatchZy
             lastGrenadesData.Remove(userId);
             nadeSpecificLastGrenadeData.Remove(userId);
 
+            // Leak fix: a .timer repeating timer (0.2s REPEAT) keeps firing
+            // DisplayPracticeTimerCenter(userId) forever if the player disconnects
+            // mid-timer. Kill it + drop the dict entry. savedPlayerLocationData is
+            // add-only otherwise → unbounded growth across churning players.
+            if (playerTimers.Remove(userId, out var practiceTimer))
+                practiceTimer.KillTimer();
+            savedPlayerLocationData.Remove(userId);
+
             if (isMatchLive && autoPauseEnabled.Value)
             {
                 AddTimer(1.0f, () => CheckAutoResumeOrAutoPause());
@@ -356,8 +364,10 @@ public partial class MatchZy
                     }
 
                     float duckAmount = 0.0f;
-                    if (player.PlayerPawn.Value.MovementServices != null
-                        && player.PlayerPawn.Value.MovementServices.Handle != IntPtr.Zero)
+                    if (
+                        player.PlayerPawn.Value.MovementServices != null
+                        && player.PlayerPawn.Value.MovementServices.Handle != IntPtr.Zero
+                    )
                     {
                         duckAmount = new CCSPlayer_MovementServices(
                             player.PlayerPawn.Value.MovementServices.Handle
