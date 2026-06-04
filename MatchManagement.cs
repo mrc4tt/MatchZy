@@ -744,14 +744,21 @@ namespace MatchZy
                 Server.ExecuteCommand($"mp_teamname_1 {ctName}; mp_teamname_2 {tName}");
             }
 
-            // Also set directly on CCSTeam entities for reliability
+            // Also set directly on CCSTeam entities for reliability.
+            // Re-fetch fresh — cached refs can be stale right after a changelevel
+            // (SetTeamNames may run before the post-map RefreshTeamEntities timer fires),
+            // and a stale CCSTeam handle NREs on the ClanTeamname setter.
             try
             {
-                // Use cached entities — no entity scan
-                if (_cachedCtTeam != null && _cachedCtTeam.IsValid)
-                    _cachedCtTeam.ClanTeamname = ctName;
-                if (_cachedTTeam != null && _cachedTTeam.IsValid)
-                    _cachedTTeam.ClanTeamname = tName;
+                foreach (var team in Utilities.FindAllEntitiesByDesignerName<CCSTeam>("cs_team_manager"))
+                {
+                    if (team == null || !team.IsValid)
+                        continue;
+                    if (team.Teamname == "CT")
+                        team.ClanTeamname = ctName;
+                    else if (team.Teamname == "TERRORIST")
+                        team.ClanTeamname = tName;
+                }
             }
             catch (Exception e)
             {
