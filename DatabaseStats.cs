@@ -18,6 +18,17 @@ namespace MatchZy
 {
     public class Database : IDisposable
     {
+        // Initialize the SQLite native provider eagerly, on the main thread, as soon
+        // as the Database type is first touched (MatchZy's `database = new()` field
+        // initializer runs in the plugin ctor — before Load() and before the async
+        // DB-init Task). Doing it here, synchronously, shrinks the window in which a
+        // concurrent SqliteConnection open from another plugin (e.g. CS2_SimpleAdmin)
+        // on a worker thread can race our open during the native bootstrap and segfault.
+        static Database()
+        {
+            EnsureSqliteProviderInitialized();
+        }
+
         public void Dispose()
         {
             lock (_connectionLock)

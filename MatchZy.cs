@@ -22,12 +22,6 @@ namespace MatchZy
             "A plugin for running and managing CS2 practice/pugs/scrims/matches!";
         public string chatPrefix = $"{ChatColors.Green}[MatchZy]{ChatColors.Default}";
         public string adminChatPrefix = $"[{ChatColors.Red}ADMIN{ChatColors.Default}]";
-        private readonly string _matchzyConfigPath = Path.Combine(
-            Server.GameDirectory,
-            "csgo",
-            "cfg",
-            "matchzy"
-        );
 
         // Plugin start phase data
         public bool isPractice = false;
@@ -291,70 +285,87 @@ namespace MatchZy
                     Log($"[Load] Database init failed: {ex.Message}");
                 }
             });
-            // This sets default config ConVars (Backup)
-            //Server.ExecuteCommand("execifexists matchzy/config.cfg");
-
-            //Loads CFGs from ConfigFiles.cs (Source Code)
-            var configManager = new ConfigManager();
-            configManager.InitializeConfigs();
-            mapRotationList = configManager.LoadMapRotation();
-
-            var configPath = Path.Combine(
-                Server.GameDirectory,
-                "csgo",
-                "cfg",
-                "matchzy",
-                ConfigFiles.Paths.Config
-            );
-            if (File.Exists(configPath))
+            // Wrap startup config/ConVar/AutoStart init in try/catch. A throw anywhere
+            // here (missing/locked cfg file, transient I/O error, null ConVar) would
+            // otherwise propagate out of Load() and make CSS abort the plugin load —
+            // the observed "sometimes the plugin doesn't load". Treat as non-fatal.
+            try
             {
-                Server.ExecuteCommand($"execifexists matchzy/{ConfigFiles.Paths.Config}");
-            }
+                // This sets default config ConVars (Backup)
+                //Server.ExecuteCommand("execifexists matchzy/config.cfg");
 
-            teamSides[matchzyTeam1] = "CT";
-            teamSides[matchzyTeam2] = "TERRORIST";
-            reverseTeamSides["CT"] = matchzyTeam1;
-            reverseTeamSides["TERRORIST"] = matchzyTeam2;
+                //Loads CFGs from ConfigFiles.cs (Source Code)
+                var configManager = new ConfigManager();
+                configManager.InitializeConfigs();
+                mapRotationList = configManager.LoadMapRotation();
 
-            // Cache ConVar references once — avoids per-frame string-based lookups
-            _cvTvEnable = ConVar.Find("tv_enable");
-            _cvMatchRestartDelay = ConVar.Find("mp_match_restart_delay");
-            _cvMatchEndChangelevel = ConVar.Find("mp_match_end_changelevel");
-            _cvMatchEndRestart = ConVar.Find("mp_match_end_restart");
-
-            if (!hotReload)
-            {
-                // Give the config time to execute, then read the ConVar and start
-                AddTimer(
-                    0.1f,
-                    () =>
-                    {
-                        var autoStartConVar = ConVar.Find("matchzy_autostart_mode");
-                        if (autoStartConVar != null)
-                        {
-                            autoStartMode = autoStartConVar.GetPrimitiveValue<int>();
-                            Log($"[Load] Read autoStartMode from ConVar: {autoStartMode}");
-                        }
-                        AutoStart();
-                    }
+                var configPath = Path.Combine(
+                    Server.GameDirectory,
+                    "csgo",
+                    "cfg",
+                    "matchzy",
+                    ConfigFiles.Paths.Config
                 );
-            }
-            else
-            {
-                // Plugin should not be reloaded while a match is live (this would messup with the match flags which were set)
-                // Only hot-reload the plugin if you are testing something and don't want to restart the server time and again.
-                UpdatePlayersMap();
-                RefreshTeamEntities();
-
-                // Read the ConVar to preserve autoStartMode on hot-reload
-                var autoStartConVar = ConVar.Find("matchzy_autostart_mode");
-                if (autoStartConVar != null)
+                if (File.Exists(configPath))
                 {
-                    autoStartMode = autoStartConVar.GetPrimitiveValue<int>();
-                    Log($"[HotReload] Restored autoStartMode from ConVar: {autoStartMode}");
+                    Server.ExecuteCommand($"execifexists matchzy/{ConfigFiles.Paths.Config}");
                 }
 
-                AutoStart();
+                teamSides[matchzyTeam1] = "CT";
+                teamSides[matchzyTeam2] = "TERRORIST";
+                reverseTeamSides["CT"] = matchzyTeam1;
+                reverseTeamSides["TERRORIST"] = matchzyTeam2;
+
+                // Cache ConVar references once — avoids per-frame string-based lookups
+                _cvTvEnable = ConVar.Find("tv_enable");
+                _cvMatchRestartDelay = ConVar.Find("mp_match_restart_delay");
+                _cvMatchEndChangelevel = ConVar.Find("mp_match_end_changelevel");
+                _cvMatchEndRestart = ConVar.Find("mp_match_end_restart");
+
+                if (!hotReload)
+                {
+                    // Initial autostart for the already-running map. OnMapStart does not
+                    // replay for the map that was loaded before the plugin, so this timer
+                    // is the only initial trigger. Use the same 1.0s delay + entity refresh
+                    // as the OnMapStart path: 0.1s was too early — config.cfg exec hadn't
+                    // applied (stale autoStartMode) and team entities weren't ready yet
+                    // (AutoStart → StartWarmup touches entities → intermittent NRE).
+                    AddTimer(
+                        1.0f,
+                        () =>
+                        {
+                            var autoStartConVar = ConVar.Find("matchzy_autostart_mode");
+                            if (autoStartConVar != null)
+                            {
+                                autoStartMode = autoStartConVar.GetPrimitiveValue<int>();
+                                Log($"[Load] Read autoStartMode from ConVar: {autoStartMode}");
+                            }
+                            RefreshTeamEntities();
+                            AutoStart();
+                        }
+                    );
+                }
+                else
+                {
+                    // Plugin should not be reloaded while a match is live (this would messup with the match flags which were set)
+                    // Only hot-reload the plugin if you are testing something and don't want to restart the server time and again.
+                    UpdatePlayersMap();
+                    RefreshTeamEntities();
+
+                    // Read the ConVar to preserve autoStartMode on hot-reload
+                    var autoStartConVar = ConVar.Find("matchzy_autostart_mode");
+                    if (autoStartConVar != null)
+                    {
+                        autoStartMode = autoStartConVar.GetPrimitiveValue<int>();
+                        Log($"[HotReload] Restored autoStartMode from ConVar: {autoStartMode}");
+                    }
+
+                    AutoStart();
+                }
+            }
+            catch (Exception ex)
+            {
+                Log($"[Load FATAL] Startup config/init failed (non-fatal, plugin still loaded): {ex}");
             }
 
             SetupRestartConfirmationCleanup();

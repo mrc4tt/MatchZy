@@ -53,8 +53,31 @@ public partial class MatchZy
             && coachTeamSpawns.Count > 0
         )
         {
-            Random random = new();
-            Position newPosition = coachTeamSpawns[random.Next(0, coachTeamSpawns.Count)];
+            // Deterministic per-coach assignment so multiple coaches on the same side never
+            // collide on the same viewing position. The previous `new Random()` was seeded by
+            // wall-clock time, so coaches spawning on the same tick drew identical indices and
+            // stacked on top of each other.
+            List<CCSPlayerController> sideCoaches = coaches
+                .Where(c => IsPlayerValid(c) && c.TeamNum == player.TeamNum)
+                .OrderBy(c => c.Slot)
+                .ToList();
+            int coachIdx = sideCoaches.IndexOf(player);
+            if (coachIdx < 0)
+                coachIdx = 0;
+
+            // If a side has more coaches than configured viewing positions, wrap around the
+            // position list and nudge each extra coach by an offset so they don't perfectly
+            // overlap. Handles 1-5+ coaches per side without needing per-map JSON edits.
+            Position basePosition = coachTeamSpawns[coachIdx % coachTeamSpawns.Count];
+            int overflow = coachIdx / coachTeamSpawns.Count;
+            Position newPosition = new(
+                new Vector(
+                    basePosition.PlayerPosition.X + overflow * 40.0f,
+                    basePosition.PlayerPosition.Y,
+                    basePosition.PlayerPosition.Z + overflow * 8.0f
+                ),
+                basePosition.PlayerAngle
+            );
 
             // Immediate teleport during spawn event
             AddTimer(
@@ -220,7 +243,82 @@ public partial class MatchZy
             AddTimer(0.5f, () => HandleCoachTeam(coach));
         }
 
+        // After coaches are relocated to their viewing spots, force the real (non-coach)
+        // players onto the canonical competitive spawns. The game allocates spawn points to
+        // ALL bodies on a team, coaches included, so coaches can grab the good min-priority
+        // spawns and bump real players to far/wrong ones. Relocating coaches alone does not
+        // fix the already-bumped players — this does, making coach count (1-5+) irrelevant.
+        AddTimer(0.6f, EnforceCompetitiveSpawns);
+
         Log($"[HandleCoaches] Handled {coaches.Count} coach(es)");
+    }
+
+    /// <summary>
+    /// Re-seats non-coach players onto their team's canonical competitive spawns (the
+    /// min-priority set from <see cref="GetSpawns"/>). Spawn-centric greedy: each competitive
+    /// spawn claims its nearest unclaimed player, so every spawn gets filled and no two players
+    /// share one. If a side has more players than competitive spawns (e.g. bot_quota fill while
+    /// testing), the extra players are left where the engine put them rather than stacked.
+    /// Only invoked when coaches are present, so coachless matches keep vanilla spawns.
+    /// </summary>
+    private void EnforceCompetitiveSpawns()
+    {
+        HashSet<CCSPlayerController> coaches = GetAllCoaches();
+
+        foreach (byte side in new[] { (byte)CsTeam.CounterTerrorist, (byte)CsTeam.Terrorist })
+        {
+            List<CCSPlayerController> realPlayers = Utilities
+                .GetPlayers()
+                .Where(p =>
+                    IsPlayerValid(p)
+                    && p.TeamNum == side
+                    && !coaches.Contains(p)
+                    && p.PawnIsAlive
+                    && p.PlayerPawn.Value?.CBodyComponent?.SceneNode != null
+                )
+                .ToList();
+            if (realPlayers.Count == 0)
+                continue;
+
+            List<Position> spawns = spawnsData[side];
+            if (spawns.Count < realPlayers.Count)
+            {
+                // Overflow (more players than competitive spawns). We still seat as many as we
+                // have spawns; leftover players stay put. Log it so it's visible during testing.
+                Log(
+                    $"[EnforceCompetitiveSpawns] Team {side}: {realPlayers.Count} players > {spawns.Count} spawns, seating nearest {spawns.Count}"
+                );
+            }
+
+            // Each competitive spawn pulls in its nearest remaining player.
+            foreach (Position spawn in spawns)
+            {
+                if (realPlayers.Count == 0)
+                    break;
+
+                Vector sp = spawn.PlayerPosition;
+                int best = -1;
+                float bestDist = float.MaxValue;
+                for (int i = 0; i < realPlayers.Count; i++)
+                {
+                    Vector pos = realPlayers[i].PlayerPawn.Value!.CBodyComponent!.SceneNode!.AbsOrigin;
+                    float dx = sp.X - pos.X;
+                    float dy = sp.Y - pos.Y;
+                    float dz = sp.Z - pos.Z;
+                    float dist = dx * dx + dy * dy + dz * dz;
+                    if (dist < bestDist)
+                    {
+                        bestDist = dist;
+                        best = i;
+                    }
+                }
+                if (best < 0)
+                    break;
+
+                new Position(spawn).Teleport(realPlayers[best]);
+                realPlayers.RemoveAt(best); // claim the player so no spawn reuses it
+            }
+        }
     }
 
     private void MoveCoachToPosition(CCSPlayerController coach, Position position, string timing)
@@ -358,49 +456,67 @@ public partial class MatchZy
         HashSet<CCSPlayerController> coaches = GetAllCoaches();
         if (coaches.Count == 0)
             return;
-        string suicidePenalty = GetConvarStringValue(ConVar.Find("mp_suicide_penalty"));
-        string specFreezeTime = GetConvarStringValue(ConVar.Find("spec_freeze_time"));
-        string specFreezeTimeLock = GetConvarStringValue(ConVar.Find("spec_freeze_time_lock"));
-        string specFreezeDeathanim = GetConvarStringValue(
-            ConVar.Find("spec_freeze_deathanim_time")
-        );
-        Server.ExecuteCommand(
-            "mp_suicide_penalty 0;spec_freeze_time 0; spec_freeze_time_lock 0; spec_freeze_deathanim_time 0;"
-        );
+        // Capture the ConVar objects (not just their values) so we can mutate them
+        // synchronously. Server.ExecuteCommand queues to the command buffer and runs at
+        // frame-end, AFTER the CommitSuicide() calls below execute inline — so the old
+        // ExecuteCommand("mp_suicide_penalty 0") never took effect before the suicides and
+        // coaches still ate the suicide penalty. SetConvarValue writes the live cvar now.
+        ConVar? suicidePenaltyCvar = ConVar.Find("mp_suicide_penalty");
+        ConVar? specFreezeTimeCvar = ConVar.Find("spec_freeze_time");
+        ConVar? specFreezeTimeLockCvar = ConVar.Find("spec_freeze_time_lock");
+        ConVar? specFreezeDeathanimCvar = ConVar.Find("spec_freeze_deathanim_time");
 
-        foreach (var coach in coaches)
+        string suicidePenalty = GetConvarStringValue(suicidePenaltyCvar);
+        string specFreezeTime = GetConvarStringValue(specFreezeTimeCvar);
+        string specFreezeTimeLock = GetConvarStringValue(specFreezeTimeLockCvar);
+        string specFreezeDeathanim = GetConvarStringValue(specFreezeDeathanimCvar);
+
+        SetConvarValue(suicidePenaltyCvar, "0");
+        SetConvarValue(specFreezeTimeCvar, "0");
+        SetConvarValue(specFreezeTimeLockCvar, "0");
+        SetConvarValue(specFreezeDeathanimCvar, "0");
+
+        try
         {
-            if (!IsPlayerValid(coach))
-                continue;
-            if (isPaused || IsTacticalTimeoutActive())
-                continue;
+            foreach (var coach in coaches)
+            {
+                if (!IsPlayerValid(coach))
+                    continue;
+                if (isPaused || IsTacticalTimeoutActive())
+                    continue;
 
-            // Additional safety check for pawn components
-            if (
-                !coach.PlayerPawn.IsValid
-                || coach.PlayerPawn.Value == null
-                || coach.PlayerPawn.Value.CBodyComponent?.SceneNode == null
-            )
-                continue;
+                // Additional safety check for pawn components
+                if (
+                    !coach.PlayerPawn.IsValid
+                    || coach.PlayerPawn.Value == null
+                    || coach.PlayerPawn.Value.CBodyComponent?.SceneNode == null
+                )
+                    continue;
 
-            Position coachPosition = new(
-                coach.PlayerPawn.Value.CBodyComponent.SceneNode.AbsOrigin,
-                coach.PlayerPawn.Value.CBodyComponent.SceneNode.AbsRotation
-            );
-            coach.PlayerPawn.Value.Teleport(
-                new Vector(
-                    coachPosition.PlayerPosition.X,
-                    coachPosition.PlayerPosition.Y,
-                    coachPosition.PlayerPosition.Z + 20.0f
-                ),
-                coachPosition.PlayerAngle,
-                new Vector(0, 0, 0)
-            );
-            coach.PlayerPawn.Value.CommitSuicide(explode: false, force: true);
+                Position coachPosition = new(
+                    coach.PlayerPawn.Value.CBodyComponent.SceneNode.AbsOrigin,
+                    coach.PlayerPawn.Value.CBodyComponent.SceneNode.AbsRotation
+                );
+                coach.PlayerPawn.Value.Teleport(
+                    new Vector(
+                        coachPosition.PlayerPosition.X,
+                        coachPosition.PlayerPosition.Y,
+                        coachPosition.PlayerPosition.Z + 20.0f
+                    ),
+                    coachPosition.PlayerAngle,
+                    new Vector(0, 0, 0)
+                );
+                coach.PlayerPawn.Value.CommitSuicide(explode: false, force: true);
+            }
         }
-        Server.ExecuteCommand(
-            $"mp_suicide_penalty {suicidePenalty}; spec_freeze_time {specFreezeTime}; spec_freeze_time_lock {specFreezeTimeLock}; spec_freeze_deathanim_time {specFreezeDeathanim};"
-        );
+        finally
+        {
+            // Restore originals synchronously, even if a suicide above threw.
+            SetConvarValue(suicidePenaltyCvar, suicidePenalty);
+            SetConvarValue(specFreezeTimeCvar, specFreezeTime);
+            SetConvarValue(specFreezeTimeLockCvar, specFreezeTimeLock);
+            SetConvarValue(specFreezeDeathanimCvar, specFreezeDeathanim);
+        }
     }
 
     private void GetCoachSpawns()

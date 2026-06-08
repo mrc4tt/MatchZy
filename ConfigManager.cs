@@ -10,21 +10,19 @@ namespace MatchZy
 {
     public class ConfigManager
     {
-        private readonly string _serverPath;
-
-        public ConfigManager()
-        {
-            _serverPath = Path.Combine(Server.GameDirectory, "csgo", "cfg", "matchzy");
-        }
+        // Lazy: avoids calling native Server.GameDirectory in the ctor, which CSS
+        // may construct before the engine pointer is ready (would throw → load abort).
+        private string ServerPath =>
+            Path.Combine(Server.GameDirectory, "csgo", "cfg", "matchzy");
 
         private void CreateConfigFile(string fileName, string content)
         {
             try
             {
-                string filePath = Path.Combine(_serverPath, fileName);
-                if (!Directory.Exists(_serverPath))
+                string filePath = Path.Combine(ServerPath, fileName);
+                if (!Directory.Exists(ServerPath))
                 {
-                    Directory.CreateDirectory(_serverPath);
+                    Directory.CreateDirectory(ServerPath);
                 }
                 if (!File.Exists(filePath))
                 {
@@ -1039,7 +1037,7 @@ mp_warmup_start
         {
             try
             {
-                string filePath = Path.Combine(_serverPath, ConfigFiles.Paths.Config);
+                string filePath = Path.Combine(ServerPath, ConfigFiles.Paths.Config);
                 if (!File.Exists(filePath))
                 {
                     return;
@@ -1133,10 +1131,10 @@ mp_warmup_start
         {
             try
             {
-                string filePath = Path.Combine(_serverPath, "matchzymaps.cfg");
-                if (!Directory.Exists(_serverPath))
+                string filePath = Path.Combine(ServerPath, "matchzymaps.cfg");
+                if (!Directory.Exists(ServerPath))
                 {
-                    Directory.CreateDirectory(_serverPath);
+                    Directory.CreateDirectory(ServerPath);
                 }
                 if (!File.Exists(filePath))
                 {
@@ -1197,7 +1195,7 @@ de_ancient
             var maps = new List<string>();
             try
             {
-                string filePath = Path.Combine(_serverPath, "matchzymaps.cfg");
+                string filePath = Path.Combine(ServerPath, "matchzymaps.cfg");
                 if (File.Exists(filePath))
                 {
                     var lines = File.ReadAllLines(filePath);

@@ -3117,10 +3117,12 @@ namespace MatchZy
             {
                 {
                     ConVarType.Bool,
+                    // Accept both numeric ("0"/"1") and textual ("true"/"false") forms.
+                    // The old expression fell through to Convert.ToBoolean("0"), which throws
+                    // "String '0' was not recognized as a valid Boolean".
                     v =>
                         cvar.SetValue(
-                            int.TryParse(v, out int intValue) && intValue >= 1
-                                || Convert.ToBoolean(v)
+                            int.TryParse(v, out int intValue) ? intValue >= 1 : Convert.ToBoolean(v)
                         )
                 },
                 { ConVarType.Float32, v => cvar.SetValue(Convert.ToSingle(v)) },
