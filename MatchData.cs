@@ -164,15 +164,7 @@ public class MatchZyStatsTeam : MatchZyTeamWrapper
     [JsonPropertyName("players")]
     public List<StatsPlayer> Players { get; set; }
 
-    public MatchZyStatsTeam(
-        string id,
-        string name,
-        int seriesScore,
-        int score,
-        int scoreCt,
-        int scoreT,
-        List<StatsPlayer> players
-    )
+    public MatchZyStatsTeam(string id, string name, int seriesScore, int score, int scoreCt, int scoreT, List<StatsPlayer> players)
         : base(id, name)
     {
         SeriesScore = seriesScore;

@@ -31,11 +31,7 @@ namespace MatchZy
             }
 
             // Check for +tv_enable value
-            string tvEnable = NativeAPI.GetCommandParamValue(
-                "+tv_enable",
-                DataType.DATA_TYPE_STRING,
-                "0"
-            );
+            string tvEnable = NativeAPI.GetCommandParamValue("+tv_enable", DataType.DATA_TYPE_STRING, "0");
             if (tvEnable != "1")
             {
                 return false;
@@ -55,9 +51,7 @@ namespace MatchZy
             string demoFileName = FormatCvarValue(demoNameFormat.Replace(" ", "_")) + ".dem";
             try
             {
-                string? directoryPath = Path.GetDirectoryName(
-                    Path.Join(Server.GameDirectory + "/csgo/" + demoPath)
-                );
+                string? directoryPath = Path.GetDirectoryName(Path.Join(Server.GameDirectory + "/csgo/" + demoPath));
                 if (directoryPath != null)
                 {
                     if (!Directory.Exists(directoryPath))
@@ -73,9 +67,7 @@ namespace MatchZy
             }
             catch (Exception ex)
             {
-                Log(
-                    $"[StartDemoRecording - FATAL] Error: {ex.Message}. Starting demo recording with path. Name: {demoFileName}"
-                );
+                Log($"[StartDemoRecording - FATAL] Error: {ex.Message}. Starting demo recording with path. Name: {demoFileName}");
                 Server.ExecuteCommand($"tv_record {demoFileName}");
                 isDemoRecording = true;
             }
@@ -98,14 +90,7 @@ namespace MatchZy
         {
             string formattedTime = DateTime.Now.ToString("yyyy-MM-dd HH-mm-ss");
 
-            var demoName = demoNameFormat
-                .Replace("{TIME}", formattedTime)
-                .Replace("{MATCH_ID}", $"{liveMatchId}")
-                .Replace("{MAP}", Server.MapName)
-                .Replace("{MAPNUMBER}", matchConfig.CurrentMapNumber.ToString())
-                .Replace("{TEAM1}", matchzyTeam1.teamName)
-                .Replace("{TEAM2}", matchzyTeam2.teamName)
-                .Replace(" ", "_");
+            var demoName = demoNameFormat.Replace("{TIME}", formattedTime).Replace("{MATCH_ID}", $"{liveMatchId}").Replace("{MAP}", Server.MapName).Replace("{MAPNUMBER}", matchConfig.CurrentMapNumber.ToString()).Replace("{TEAM1}", matchzyTeam1.teamName).Replace("{TEAM2}", matchzyTeam2.teamName).Replace(" ", "_");
             return $"{demoName}.dem";
         }
     }

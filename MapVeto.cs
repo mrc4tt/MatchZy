@@ -60,12 +60,7 @@ namespace MatchZy
                 int team1Captain = vetoCaptains["team1"];
                 int team2Captain = vetoCaptains["team2"];
                 warningsPrinted = 0;
-                if (
-                    !playerData.ContainsKey(team1Captain)
-                    || !playerData.ContainsKey(team2Captain)
-                    || !playerData[team1Captain].IsValid
-                    || !playerData[team2Captain].IsValid
-                )
+                if (!playerData.ContainsKey(team1Captain) || !playerData.ContainsKey(team2Captain) || !playerData[team1Captain].IsValid || !playerData[team2Captain].IsValid)
                 {
                     AbortVeto();
                     vetoStateTimer?.Kill();
@@ -73,16 +68,8 @@ namespace MatchZy
                     return;
                 }
 
-                PrintLocalizedToAll(
-                    "matchzy.veto.captainfor",
-                    matchzyTeam1.teamName,
-                    playerData[team1Captain].PlayerName
-                );
-                PrintLocalizedToAll(
-                    "matchzy.veto.captainfor",
-                    matchzyTeam2.teamName,
-                    playerData[team2Captain].PlayerName
-                );
+                PrintLocalizedToAll("matchzy.veto.captainfor", matchzyTeam1.teamName, playerData[team1Captain].PlayerName);
+                PrintLocalizedToAll("matchzy.veto.captainfor", matchzyTeam2.teamName, playerData[team2Captain].PlayerName);
 
                 HandleVetoStep();
                 vetoStateTimer?.Kill();
@@ -145,26 +132,22 @@ namespace MatchZy
             switch (option)
             {
                 case "team1_ban":
-                    action =
-                        $"{ChatColors.Green}{matchzyTeam1.teamName}{ChatColors.Default} must now {ChatColors.Red}BAN{ChatColors.Default} a map.";
+                    action = $"{ChatColors.Green}{matchzyTeam1.teamName}{ChatColors.Default} must now {ChatColors.Red}BAN{ChatColors.Default} a map.";
                     client = vetoCaptains["team1"];
                     stepMessage = $"Use .ban <map> to ban a map";
                     break;
                 case "team2_ban":
-                    action =
-                        $"{ChatColors.Green}{matchzyTeam2.teamName}{ChatColors.Default} must now {ChatColors.Red}BAN{ChatColors.Default} a map.";
+                    action = $"{ChatColors.Green}{matchzyTeam2.teamName}{ChatColors.Default} must now {ChatColors.Red}BAN{ChatColors.Default} a map.";
                     client = vetoCaptains["team2"];
                     stepMessage = $"Use .ban <map> to ban a map";
                     break;
                 case "team1_pick":
-                    action =
-                        $"{ChatColors.Green}{matchzyTeam1.teamName}{ChatColors.Default} must now {ChatColors.Green}PICK{ChatColors.Default} a map to play as map {matchConfig.Maplist.Count + 1}.";
+                    action = $"{ChatColors.Green}{matchzyTeam1.teamName}{ChatColors.Default} must now {ChatColors.Green}PICK{ChatColors.Default} a map to play as map {matchConfig.Maplist.Count + 1}.";
                     client = vetoCaptains["team1"];
                     stepMessage = $"Use .pick <map> to pick a map.";
                     break;
                 case "team2_pick":
-                    action =
-                        $"{ChatColors.Green}{matchzyTeam2.teamName}{ChatColors.Default} must now {ChatColors.Green}PICK{ChatColors.Default} a map to play as map {matchConfig.Maplist.Count + 1}.";
+                    action = $"{ChatColors.Green}{matchzyTeam2.teamName}{ChatColors.Default} must now {ChatColors.Green}PICK{ChatColors.Default} a map to play as map {matchConfig.Maplist.Count + 1}.";
                     client = vetoCaptains["team2"];
                     stepMessage = $"Use .pick <map> to pick a map.";
                     break;
@@ -288,9 +271,7 @@ namespace MatchZy
             if (team != 0)
             {
                 matchzyTeam = (team == 2) ? reverseTeamSides["TERRORIST"] : reverseTeamSides["CT"];
-                Server.PrintToChatAll(
-                    $"{chatPrefix} {ChatColors.Green}{matchzyTeam.teamName}{ChatColors.Default} picked {ChatColors.Green}{mapRemovedName}{ChatColors.Default} as map {matchConfig.Maplist.Count + 1}"
-                );
+                Server.PrintToChatAll($"{chatPrefix} {ChatColors.Green}{matchzyTeam.teamName}{ChatColors.Default} picked {ChatColors.Green}{mapRemovedName}{ChatColors.Default} as map {matchConfig.Maplist.Count + 1}");
             }
 
             matchConfig.Maplist.Add(mapRemovedName);
@@ -325,9 +306,7 @@ namespace MatchZy
             if (team != 0)
             {
                 matchzyTeam = (team == 2) ? reverseTeamSides["TERRORIST"] : reverseTeamSides["CT"];
-                Server.PrintToChatAll(
-                    $"{chatPrefix} {ChatColors.Green}{matchzyTeam.teamName}{ChatColors.Default} banned {ChatColors.LightRed}{mapRemovedName}{ChatColors.Default}"
-                );
+                Server.PrintToChatAll($"{chatPrefix} {ChatColors.Green}{matchzyTeam.teamName}{ChatColors.Default} banned {ChatColors.LightRed}{mapRemovedName}{ChatColors.Default}");
             }
 
             var mapMapVetoedEvent = new MatchZyMapVetoedEvent
@@ -385,11 +364,7 @@ namespace MatchZy
 
             for (int i = mapNumber; i < matchConfig.Maplist.Count; i++)
             {
-                PrintLocalizedToAll(
-                    "matchzy.veto.mapnumber",
-                    i + 1 - mapNumber,
-                    matchConfig.Maplist[i]
-                );
+                PrintLocalizedToAll("matchzy.veto.mapnumber", i + 1 - mapNumber, matchConfig.Maplist[i]);
             }
 
             string currentMapName = Server.MapName;
@@ -404,11 +379,7 @@ namespace MatchZy
                 playerReadyStatus[key] = false;
             }
 
-            if (
-                IsMapReloadRequiredForGameMode(matchConfig.Wingman)
-                || mapReloadRequired
-                || currentMapName != mapToPlay
-            )
+            if (IsMapReloadRequiredForGameMode(matchConfig.Wingman) || mapReloadRequired || currentMapName != mapToPlay)
             {
                 SetCorrectGameMode();
                 //float delay = 7.0f;
@@ -459,9 +430,7 @@ namespace MatchZy
         {
             // Number of banned maps must be: original pool - (current pool + picked);
             // 7 - (4 + 2) = 1; if 4 are left and 2 were picked, 1 must have been banned.
-            int mapsBanned =
-                matchConfig.MapsPool.Count
-                - (matchConfig.MapsLeftInVetoPool.Count + matchConfig.Maplist.Count);
+            int mapsBanned = matchConfig.MapsPool.Count - (matchConfig.MapsLeftInVetoPool.Count + matchConfig.Maplist.Count);
             int index = matchConfig.Maplist.Count + mapsBanned;
             if (index > matchConfig.MapBanOrder.Count - 1)
             {
@@ -473,8 +442,7 @@ namespace MatchZy
 
         public bool SidePickPending()
         {
-            return matchConfig.MapSides.Count < matchConfig.Maplist.Count
-                && matchConfig.MatchSideType == "standard";
+            return matchConfig.MapSides.Count < matchConfig.Maplist.Count && matchConfig.MatchSideType == "standard";
         }
 
         public void HandleAutomaticSideSelection()
@@ -485,9 +453,7 @@ namespace MatchZy
             }
             else
             {
-                matchConfig.MapSides.Add(
-                    matchConfig.MatchSideType == "never_knife" ? "team1_ct" : "knife"
-                );
+                matchConfig.MapSides.Add(matchConfig.MatchSideType == "never_knife" ? "team1_ct" : "knife");
             }
         }
 
@@ -548,15 +514,10 @@ namespace MatchZy
         public void PromptForSideSelectionInChat(CsTeam team)
         {
             string mapName = matchConfig.Maplist[^1];
-            Team matchzyTeam =
-                (team == CsTeam.CounterTerrorist)
-                    ? reverseTeamSides["CT"]
-                    : reverseTeamSides["TERRORIST"];
+            Team matchzyTeam = (team == CsTeam.CounterTerrorist) ? reverseTeamSides["CT"] : reverseTeamSides["TERRORIST"];
             string teamString = (matchzyTeam == matchzyTeam1) ? "team1" : "team2";
 
-            Server.PrintToChatAll(
-                $"{chatPrefix} {ChatColors.Green}{matchzyTeam.teamName}{ChatColors.Default} must now pick a side to play on {ChatColors.Green}{mapName}{ChatColors.Default}"
-            );
+            Server.PrintToChatAll($"{chatPrefix} {ChatColors.Green}{matchzyTeam.teamName}{ChatColors.Default} must now pick a side to play on {ChatColors.Green}{mapName}{ChatColors.Default}");
 
             int client = vetoCaptains[teamString];
             if (!playerData.ContainsKey(client) || !playerData[client].IsValid)
@@ -586,21 +547,14 @@ namespace MatchZy
             // Example: In a Bo3, at least 2 of the options must be picks to avoid randomly selecting map order of remaining maps.
             if (matchConfig.NumMaps > 1 && numberOfPicks < matchConfig.NumMaps - 1)
             {
-                Log(
-                    $"[ValidateMapBanLogic] In a series of {matchConfig.NumMaps} maps, at least {matchConfig.NumMaps - 1} veto options must be picks. Found {numberOfPicks} pick(s)."
-                );
+                Log($"[ValidateMapBanLogic] In a series of {matchConfig.NumMaps} maps, at least {matchConfig.NumMaps - 1} veto options must be picks. Found {numberOfPicks} pick(s).");
                 return false;
             }
 
-            if (
-                matchConfig.MapsPool.Count - 1 != matchConfig.MapBanOrder.Count
-                && numberOfPicks != matchConfig.NumMaps
-            )
+            if (matchConfig.MapsPool.Count - 1 != matchConfig.MapBanOrder.Count && numberOfPicks != matchConfig.NumMaps)
             {
                 // Example: Map pool of 7 requires 6 picks/bans *unless* we have picks for all maps.
-                Log(
-                    $"[ValidateMapBanLogic] The number of maps in the pool {matchConfig.MapsPool.Count} must be one larger than the number of map picks/bans {matchConfig.MapBanOrder.Count}, unless the number of picks {numberOfPicks} matches the series length {matchConfig.NumMaps}."
-                );
+                Log($"[ValidateMapBanLogic] The number of maps in the pool {matchConfig.MapsPool.Count} must be one larger than the number of map picks/bans {matchConfig.MapBanOrder.Count}, unless the number of picks {numberOfPicks} matches the series length {matchConfig.NumMaps}.");
                 return false;
             }
 
@@ -653,9 +607,7 @@ namespace MatchZy
 
             Team matchzyTeam = (team == "team1") ? matchzyTeam1 : matchzyTeam2;
 
-            Server.PrintToChatAll(
-                $"{chatPrefix} {ChatColors.Green}{matchzyTeam.teamName}{ChatColors.Default} elected to start as {ChatColors.Green}{sideFormatted}{ChatColors.Default} on {ChatColors.Green}{mapName}{ChatColors.Default}."
-            );
+            Server.PrintToChatAll($"{chatPrefix} {ChatColors.Green}{matchzyTeam.teamName}{ChatColors.Default} elected to start as {ChatColors.Green}{sideFormatted}{ChatColors.Default} on {ChatColors.Green}{mapName}{ChatColors.Default}.");
 
             var sidePickedEvent = new MatchZySidePickedEvent
             {
@@ -695,11 +647,7 @@ namespace MatchZy
                     int numberOfBans = matchConfig.MapsPool.Count - 1; // Last map either played by default or ignored.
                     for (int i = 0; i < numberOfBans; i++)
                     {
-                        matchConfig.MapBanOrder.Add(
-                            i % 2 == 0
-                                ? (startingVetoTeam == matchzyTeam1 ? "team1_ban" : "team2_ban")
-                                : (startingVetoTeam == matchzyTeam1 ? "team2_ban" : "team1_ban")
-                        );
+                        matchConfig.MapBanOrder.Add(i % 2 == 0 ? (startingVetoTeam == matchzyTeam1 ? "team1_ban" : "team2_ban") : (startingVetoTeam == matchzyTeam1 ? "team2_ban" : "team1_ban"));
                     }
 
                     break;
@@ -707,33 +655,17 @@ namespace MatchZy
                 case 2:
                     if (matchConfig.MapsPool.Count < 7)
                     {
-                        matchConfig.MapBanOrder.Add(
-                            startingVetoTeam == matchzyTeam1 ? "team1_ban" : "team2_ban"
-                        );
-                        matchConfig.MapBanOrder.Add(
-                            startingVetoTeam == matchzyTeam1 ? "team2_ban" : "team1_ban"
-                        );
-                        matchConfig.MapBanOrder.Add(
-                            startingVetoTeam == matchzyTeam1 ? "team1_pick" : "team2_pick"
-                        );
-                        matchConfig.MapBanOrder.Add(
-                            startingVetoTeam == matchzyTeam1 ? "team2_pick" : "team1_pick"
-                        );
+                        matchConfig.MapBanOrder.Add(startingVetoTeam == matchzyTeam1 ? "team1_ban" : "team2_ban");
+                        matchConfig.MapBanOrder.Add(startingVetoTeam == matchzyTeam1 ? "team2_ban" : "team1_ban");
+                        matchConfig.MapBanOrder.Add(startingVetoTeam == matchzyTeam1 ? "team1_pick" : "team2_pick");
+                        matchConfig.MapBanOrder.Add(startingVetoTeam == matchzyTeam1 ? "team2_pick" : "team1_pick");
                     }
                     else
                     {
-                        matchConfig.MapBanOrder.Add(
-                            startingVetoTeam == matchzyTeam1 ? "team1_ban" : "team2_ban"
-                        );
-                        matchConfig.MapBanOrder.Add(
-                            startingVetoTeam == matchzyTeam1 ? "team2_ban" : "team1_ban"
-                        );
-                        matchConfig.MapBanOrder.Add(
-                            startingVetoTeam == matchzyTeam1 ? "team1_pick" : "team2_pick"
-                        );
-                        matchConfig.MapBanOrder.Add(
-                            startingVetoTeam == matchzyTeam1 ? "team2_pick" : "team1_pick"
-                        );
+                        matchConfig.MapBanOrder.Add(startingVetoTeam == matchzyTeam1 ? "team1_ban" : "team2_ban");
+                        matchConfig.MapBanOrder.Add(startingVetoTeam == matchzyTeam1 ? "team2_ban" : "team1_ban");
+                        matchConfig.MapBanOrder.Add(startingVetoTeam == matchzyTeam1 ? "team1_pick" : "team2_pick");
+                        matchConfig.MapBanOrder.Add(startingVetoTeam == matchzyTeam1 ? "team2_pick" : "team1_pick");
                     }
 
                     break;
@@ -747,47 +679,20 @@ namespace MatchZy
                         int numberOfPicks = matchConfig.NumMaps - 1; // 2 picks in a Bo3
                         int totalNumberOfBans = matchConfig.MapsPool.Count - 1 - numberOfPicks;
                         // Determine how many bans before we start picking (may be 0):
-                        int numberOfStartBans =
-                            matchConfig.NumMaps >= 5
-                                ? totalNumberOfBans
-                                : matchConfig.MapsPool.Count - (matchConfig.NumMaps + 2); // Bo3 with 7 maps: 7 - (3 + 2) = 2
+                        int numberOfStartBans = matchConfig.NumMaps >= 5 ? totalNumberOfBans : matchConfig.MapsPool.Count - (matchConfig.NumMaps + 2); // Bo3 with 7 maps: 7 - (3 + 2) = 2
                         if (numberOfStartBans > 0)
                         {
                             // == 2
                             for (int i = 0; i < numberOfStartBans; i++)
                             {
-                                matchConfig.MapBanOrder.Add(
-                                    matchConfig.MapBanOrder.Count % 2 == 0
-                                        ? (
-                                            startingVetoTeam == matchzyTeam1
-                                                ? "team1_ban"
-                                                : "team2_ban"
-                                        )
-                                        : (
-                                            startingVetoTeam == matchzyTeam1
-                                                ? "team2_ban"
-                                                : "team1_ban"
-                                        )
-                                );
+                                matchConfig.MapBanOrder.Add(matchConfig.MapBanOrder.Count % 2 == 0 ? (startingVetoTeam == matchzyTeam1 ? "team1_ban" : "team2_ban") : (startingVetoTeam == matchzyTeam1 ? "team2_ban" : "team1_ban"));
                             }
                         }
 
                         // After the initial bans, add the picks:
                         for (int i = 0; i < numberOfPicks; i++)
                         {
-                            matchConfig.MapBanOrder.Add(
-                                matchConfig.MapBanOrder.Count % 2 == 0
-                                    ? (
-                                        startingVetoTeam == matchzyTeam1
-                                            ? "team1_pick"
-                                            : "team2_pick"
-                                    )
-                                    : (
-                                        startingVetoTeam == matchzyTeam1
-                                            ? "team2_pick"
-                                            : "team1_pick"
-                                    )
-                            );
+                            matchConfig.MapBanOrder.Add(matchConfig.MapBanOrder.Count % 2 == 0 ? (startingVetoTeam == matchzyTeam1 ? "team1_pick" : "team2_pick") : (startingVetoTeam == matchzyTeam1 ? "team2_pick" : "team1_pick"));
                         }
 
                         // Determine how many bans to append to the end (may be 0):
@@ -797,19 +702,7 @@ namespace MatchZy
                             // == 2
                             for (int i = 0; i < numberOfEndBans; i++)
                             {
-                                matchConfig.MapBanOrder.Add(
-                                    matchConfig.MapBanOrder.Count % 2 == 0
-                                        ? (
-                                            startingVetoTeam == matchzyTeam1
-                                                ? "team1_ban"
-                                                : "team2_ban"
-                                        )
-                                        : (
-                                            startingVetoTeam == matchzyTeam1
-                                                ? "team2_ban"
-                                                : "team1_ban"
-                                        )
-                                );
+                                matchConfig.MapBanOrder.Add(matchConfig.MapBanOrder.Count % 2 == 0 ? (startingVetoTeam == matchzyTeam1 ? "team1_ban" : "team2_ban") : (startingVetoTeam == matchzyTeam1 ? "team2_ban" : "team1_ban"));
                             }
                         }
                     }
@@ -818,19 +711,7 @@ namespace MatchZy
                         // else we just alternate picks and ignore the last map.
                         for (int i = 0; i < matchConfig.NumMaps; i++)
                         {
-                            matchConfig.MapBanOrder.Add(
-                                i % 2 == 0
-                                    ? (
-                                        startingVetoTeam == matchzyTeam1
-                                            ? "team1_pick"
-                                            : "team2_pick"
-                                    )
-                                    : (
-                                        startingVetoTeam == matchzyTeam1
-                                            ? "team2_pick"
-                                            : "team1_pick"
-                                    )
-                            );
+                            matchConfig.MapBanOrder.Add(i % 2 == 0 ? (startingVetoTeam == matchzyTeam1 ? "team1_pick" : "team2_pick") : (startingVetoTeam == matchzyTeam1 ? "team2_pick" : "team1_pick"));
                         }
                     }
 

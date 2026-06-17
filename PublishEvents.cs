@@ -8,10 +8,7 @@ namespace MatchZy
     {
         // Single HttpClient instance — avoids socket exhaustion from per-request allocation.
         // HttpClient is thread-safe and designed to be long-lived.
-        private static readonly HttpClient _sharedHttpClient = new()
-        {
-            Timeout = TimeSpan.FromSeconds(10),
-        };
+        private static readonly HttpClient _sharedHttpClient = new() { Timeout = TimeSpan.FromSeconds(10) };
 
         public async Task SendEventAsync(MatchZyEvent @event)
         {
@@ -20,41 +17,24 @@ namespace MatchZy
                 if (string.IsNullOrEmpty(matchConfig.RemoteLogURL))
                     return;
 
-                long eventMatchId = @event is MatchZyMatchEvent matchEvent
-                    ? matchEvent.MatchId
-                    : liveMatchId;
+                long eventMatchId = @event is MatchZyMatchEvent matchEvent ? matchEvent.MatchId : liveMatchId;
 
                 // Never send events with an invalid matchId
                 if (eventMatchId == -1)
                     return;
 
                 string json = JsonSerializer.Serialize(@event, @event.GetType());
-                using var request = new HttpRequestMessage(
-                    HttpMethod.Post,
-                    matchConfig.RemoteLogURL
-                );
+                using var request = new HttpRequestMessage(HttpMethod.Post, matchConfig.RemoteLogURL);
                 request.Content = new StringContent(json, Encoding.UTF8, "application/json");
 
-                if (
-                    !string.IsNullOrEmpty(matchConfig.RemoteLogHeaderKey)
-                    && !string.IsNullOrEmpty(matchConfig.RemoteLogHeaderValue)
-                )
+                if (!string.IsNullOrEmpty(matchConfig.RemoteLogHeaderKey) && !string.IsNullOrEmpty(matchConfig.RemoteLogHeaderValue))
                 {
-                    request.Headers.TryAddWithoutValidation(
-                        matchConfig.RemoteLogHeaderKey,
-                        matchConfig.RemoteLogHeaderValue
-                    );
+                    request.Headers.TryAddWithoutValidation(matchConfig.RemoteLogHeaderKey, matchConfig.RemoteLogHeaderValue);
                 }
 
-                if (
-                    !string.IsNullOrEmpty(matchConfig.RemoteLogAuthKey)
-                    && !string.IsNullOrEmpty(matchConfig.RemoteLogAuthValue)
-                )
+                if (!string.IsNullOrEmpty(matchConfig.RemoteLogAuthKey) && !string.IsNullOrEmpty(matchConfig.RemoteLogAuthValue))
                 {
-                    request.Headers.TryAddWithoutValidation(
-                        matchConfig.RemoteLogAuthKey,
-                        matchConfig.RemoteLogAuthValue
-                    );
+                    request.Headers.TryAddWithoutValidation(matchConfig.RemoteLogAuthKey, matchConfig.RemoteLogAuthValue);
                 }
 
                 var response = await _sharedHttpClient.SendAsync(request);

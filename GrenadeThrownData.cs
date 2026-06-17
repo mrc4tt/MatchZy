@@ -27,17 +27,7 @@ public class GrenadeThrownData
 
     public float DuckAmount { get; private set; }
 
-    public GrenadeThrownData(
-        Vector nadePosition,
-        QAngle nadeAngle,
-        Vector nadeVelocity,
-        Vector playerPosition,
-        QAngle playerAngle,
-        string grenadeType,
-        DateTime thrownTime,
-        UInt16 itemIndex,
-        float duckAmount = 0.0f
-    )
+    public GrenadeThrownData(Vector nadePosition, QAngle nadeAngle, Vector nadeVelocity, Vector playerPosition, QAngle playerAngle, string grenadeType, DateTime thrownTime, UInt16 itemIndex, float duckAmount = 0.0f)
     {
         Position = new Vector(nadePosition.X, nadePosition.Y, nadePosition.Z);
         Angle = new QAngle(nadeAngle.X, nadeAngle.Y, nadeAngle.Z);
@@ -96,12 +86,7 @@ public class GrenadeThrownData
                 : () =>
                 {
                     var pawn = player.PlayerPawn.Value;
-                    bool alreadyHas =
-                        pawn?.WeaponServices?.MyWeapons.Any(h =>
-                            h.Value != null
-                            && h.Value.IsValid
-                            && h.Value.DesignerName == nadeWeapon
-                        ) ?? false;
+                    bool alreadyHas = pawn?.WeaponServices?.MyWeapons.Any(h => h.Value != null && h.Value.IsValid && h.Value.DesignerName == nadeWeapon) ?? false;
                     if (!alreadyHas)
                         player.GiveNamedItem(nadeWeapon);
                 }
@@ -111,13 +96,7 @@ public class GrenadeThrownData
     public void Throw(CCSPlayerController player)
     {
         // Validate player before accessing any properties
-        if (
-            player == null
-            || !player.IsValid
-            || player.Connected != PlayerConnectedState.Connected
-            || !player.PlayerPawn.IsValid
-            || player.PlayerPawn.Value == null
-        )
+        if (player == null || !player.IsValid || player.Connected != PlayerConnectedState.Connected || !player.PlayerPawn.IsValid || player.PlayerPawn.Value == null)
             return;
 
         CBaseCSGrenadeProjectile? grenadeEntity = null;
@@ -125,58 +104,27 @@ public class GrenadeThrownData
         {
             case "smoke":
             {
-                grenadeEntity = GrenadeFunctions.CSmokeGrenadeProjectile_CreateFunc.Invoke(
-                    Position.Handle,
-                    Angle.Handle,
-                    Velocity.Handle,
-                    Velocity.Handle,
-                    IntPtr.Zero,
-                    ItemIndex,
-                    (int)player.Team
-                );
+                grenadeEntity = GrenadeFunctions.CSmokeGrenadeProjectile_CreateFunc.Invoke(Position.Handle, Angle.Handle, Velocity.Handle, Velocity.Handle, IntPtr.Zero, ItemIndex, (int)player.Team);
                 break;
             }
             case "molotov":
             {
-                grenadeEntity = GrenadeFunctions.CMolotovProjectile_CreateFunc.Invoke(
-                    Position.Handle,
-                    Angle.Handle,
-                    Velocity.Handle,
-                    Velocity.Handle,
-                    IntPtr.Zero,
-                    ItemIndex
-                );
+                grenadeEntity = GrenadeFunctions.CMolotovProjectile_CreateFunc.Invoke(Position.Handle, Angle.Handle, Velocity.Handle, Velocity.Handle, IntPtr.Zero, ItemIndex);
                 break;
             }
             case "hegrenade":
             {
-                grenadeEntity = GrenadeFunctions.CHEGrenadeProjectile_CreateFunc.Invoke(
-                    Position.Handle,
-                    Angle.Handle,
-                    Velocity.Handle,
-                    Velocity.Handle,
-                    IntPtr.Zero,
-                    ItemIndex
-                );
+                grenadeEntity = GrenadeFunctions.CHEGrenadeProjectile_CreateFunc.Invoke(Position.Handle, Angle.Handle, Velocity.Handle, Velocity.Handle, IntPtr.Zero, ItemIndex);
                 break;
             }
             case "decoy":
             {
-                grenadeEntity = GrenadeFunctions.CDecoyProjectile_CreateFunc.Invoke(
-                    Position.Handle,
-                    Angle.Handle,
-                    Velocity.Handle,
-                    Velocity.Handle,
-                    IntPtr.Zero,
-                    ItemIndex
-                );
+                grenadeEntity = GrenadeFunctions.CDecoyProjectile_CreateFunc.Invoke(Position.Handle, Angle.Handle, Velocity.Handle, Velocity.Handle, IntPtr.Zero, ItemIndex);
                 break;
             }
             case "flash":
             {
-                grenadeEntity = Utilities.CreateEntityByName<CFlashbangProjectile>(
-                    "flashbang_projectile"
-                );
+                grenadeEntity = Utilities.CreateEntityByName<CFlashbangProjectile>("flashbang_projectile");
                 if (grenadeEntity == null)
                     return;
                 grenadeEntity.DispatchSpawn();

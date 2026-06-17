@@ -23,8 +23,7 @@ public partial class MatchZy
     private List<RoundDeath> roundDeaths = new List<RoundDeath>();
 
     // Track per-player round stats for KAST calculation
-    private Dictionary<ulong, PlayerRoundStats> playerRoundStats =
-        new Dictionary<ulong, PlayerRoundStats>();
+    private Dictionary<ulong, PlayerRoundStats> playerRoundStats = new Dictionary<ulong, PlayerRoundStats>();
 
     // Track alive players per team for clutch detection
     private int aliveT = 0;
@@ -34,8 +33,7 @@ public partial class MatchZy
     private int clutchOpponents = 0;
 
     // Advanced stats storage (persists across rounds)
-    private Dictionary<ulong, AdvancedPlayerStats> advancedStats =
-        new Dictionary<ulong, AdvancedPlayerStats>();
+    private Dictionary<ulong, AdvancedPlayerStats> advancedStats = new Dictionary<ulong, AdvancedPlayerStats>();
 
     // Total rounds played (for percentage calculations)
     private int totalRoundsPlayed = 0;
@@ -84,8 +82,7 @@ public partial class MatchZy
         public int Clutch1v5Attempts { get; set; } = 0;
         public int Clutch1v5Wins { get; set; } = 0;
 
-        public double KastPercentage =>
-            RoundsPlayed > 0 ? (double)KastRounds / RoundsPlayed * 100 : 0;
+        public double KastPercentage => RoundsPlayed > 0 ? (double)KastRounds / RoundsPlayed * 100 : 0;
     }
 
     // ═══════════════════════════════════════════════════════════════════
@@ -153,11 +150,7 @@ public partial class MatchZy
             stats.RoundsPlayed++;
 
             // KAST: Kill OR Assist OR Survived OR Traded
-            bool kast =
-                roundStats.GotKill
-                || roundStats.GotAssist
-                || roundStats.Survived
-                || roundStats.WasTraded;
+            bool kast = roundStats.GotKill || roundStats.GotAssist || roundStats.Survived || roundStats.WasTraded;
             if (kast)
             {
                 stats.KastRounds++;
@@ -179,11 +172,7 @@ public partial class MatchZy
     // Kill event handler (call this from EventPlayerDeath)
     // ═══════════════════════════════════════════════════════════════════
 
-    public void OnAdvancedStatsPlayerDeath(
-        CCSPlayerController? victim,
-        CCSPlayerController? attacker,
-        CCSPlayerController? assister
-    )
+    public void OnAdvancedStatsPlayerDeath(CCSPlayerController? victim, CCSPlayerController? attacker, CCSPlayerController? assister)
     {
         if (!isMatchLive || victim == null || !victim.IsValid || victim.IsBot)
             return;
@@ -201,8 +190,7 @@ public partial class MatchZy
         var death = new RoundDeath
         {
             VictimSteamId = victimSteamId,
-            KillerSteamId =
-                attacker != null && attacker.IsValid && !attacker.IsBot ? attacker.SteamID : null,
+            KillerSteamId = attacker != null && attacker.IsValid && !attacker.IsBot ? attacker.SteamID : null,
             VictimTeam = victimTeam,
             Time = DateTime.UtcNow,
         };
@@ -221,10 +209,7 @@ public partial class MatchZy
             }
 
             // Mark opening kill
-            if (
-                death.KillerSteamId.HasValue
-                && playerRoundStats.TryGetValue(death.KillerSteamId.Value, out var krs)
-            )
+            if (death.KillerSteamId.HasValue && playerRoundStats.TryGetValue(death.KillerSteamId.Value, out var krs))
             {
                 krs.WasOpeningKill = true;
             }
@@ -236,8 +221,7 @@ public partial class MatchZy
         if (death.KillerSteamId.HasValue)
         {
             var killerSteamId = death.KillerSteamId.Value;
-            var killerTeam =
-                victimTeam == CsTeam.Terrorist ? CsTeam.CounterTerrorist : CsTeam.Terrorist;
+            var killerTeam = victimTeam == CsTeam.Terrorist ? CsTeam.CounterTerrorist : CsTeam.Terrorist;
 
             // Check if this kill avenges a recent teammate death.
             // Perf: manual scan for the first match instead of .Where().ToList()
@@ -272,12 +256,7 @@ public partial class MatchZy
                 advancedStats[killerSteamId].TradeKills++;
 
                 // Mark the traded player's round stats
-                if (
-                    playerRoundStats.TryGetValue(
-                        tradedDeath.VictimSteamId,
-                        out var tradedPlayerStats
-                    )
-                )
+                if (playerRoundStats.TryGetValue(tradedDeath.VictimSteamId, out var tradedPlayerStats))
                 {
                     tradedPlayerStats.WasTraded = true;
                 }
@@ -353,31 +332,13 @@ public partial class MatchZy
         if (aliveT == 1 && aliveCT > 0)
         {
             // T is clutching
-            clutcher = Utilities
-                .GetPlayers()
-                .FirstOrDefault(p =>
-                    p != null
-                    && p.IsValid
-                    && !p.IsBot
-                    && p.TeamNum == (int)CsTeam.Terrorist
-                    && p.PlayerPawn?.Value != null
-                    && p.PlayerPawn.Value.Health > 0
-                );
+            clutcher = Utilities.GetPlayers().FirstOrDefault(p => p != null && p.IsValid && !p.IsBot && p.TeamNum == (int)CsTeam.Terrorist && p.PlayerPawn?.Value != null && p.PlayerPawn.Value.Health > 0);
             opponents = aliveCT;
         }
         else if (aliveCT == 1 && aliveT > 0)
         {
             // CT is clutching
-            clutcher = Utilities
-                .GetPlayers()
-                .FirstOrDefault(p =>
-                    p != null
-                    && p.IsValid
-                    && !p.IsBot
-                    && p.TeamNum == (int)CsTeam.CounterTerrorist
-                    && p.PlayerPawn?.Value != null
-                    && p.PlayerPawn.Value.Health > 0
-                );
+            clutcher = Utilities.GetPlayers().FirstOrDefault(p => p != null && p.IsValid && !p.IsBot && p.TeamNum == (int)CsTeam.CounterTerrorist && p.PlayerPawn?.Value != null && p.PlayerPawn.Value.Health > 0);
             opponents = aliveT;
         }
 
@@ -422,11 +383,7 @@ public partial class MatchZy
         if (!clutchPlayer.HasValue || !advancedStats.ContainsKey(clutchPlayer.Value))
             return;
 
-        var clutcherPlayer = Utilities
-            .GetPlayers()
-            .FirstOrDefault(p =>
-                p != null && p.IsValid && !p.IsBot && p.SteamID == clutchPlayer.Value
-            );
+        var clutcherPlayer = Utilities.GetPlayers().FirstOrDefault(p => p != null && p.IsValid && !p.IsBot && p.SteamID == clutchPlayer.Value);
 
         if (clutcherPlayer == null)
             return;
@@ -497,13 +454,7 @@ public partial class MatchZy
     /// Collects all match stats data on the MAIN THREAD. Call this before Task.Run().
     /// Returns a pre-built MatchStatsJson object safe to serialize on any thread.
     /// </summary>
-    public MatchStatsJson? CollectMatchStatsForExport(
-        string demoFilename,
-        int t1score,
-        int t2score,
-        List<StatsPlayer> playerStatsListTeam1,
-        List<StatsPlayer> playerStatsListTeam2
-    )
+    public MatchStatsJson? CollectMatchStatsForExport(string demoFilename, int t1score, int t2score, List<StatsPlayer> playerStatsListTeam1, List<StatsPlayer> playerStatsListTeam2)
     {
         try
         {
@@ -511,15 +462,11 @@ public partial class MatchZy
 
             foreach (var player in playerStatsListTeam1)
             {
-                allPlayers.Add(
-                    CreateMatchStatsPlayer(player, matchzyTeam1.teamName, totalRoundsPlayed)
-                );
+                allPlayers.Add(CreateMatchStatsPlayer(player, matchzyTeam1.teamName, totalRoundsPlayed));
             }
             foreach (var player in playerStatsListTeam2)
             {
-                allPlayers.Add(
-                    CreateMatchStatsPlayer(player, matchzyTeam2.teamName, totalRoundsPlayed)
-                );
+                allPlayers.Add(CreateMatchStatsPlayer(player, matchzyTeam2.teamName, totalRoundsPlayed));
             }
 
             return new MatchStatsJson
@@ -533,19 +480,13 @@ public partial class MatchZy
                 {
                     Name = matchzyTeam1.teamName,
                     Score = t1score,
-                    Players = allPlayers
-                        .Where(p => p.Team == matchzyTeam1.teamName)
-                        .OrderByDescending(p => p.Rating)
-                        .ToList(),
+                    Players = allPlayers.Where(p => p.Team == matchzyTeam1.teamName).OrderByDescending(p => p.Rating).ToList(),
                 },
                 Team2 = new TeamStatsJson
                 {
                     Name = matchzyTeam2.teamName,
                     Score = t2score,
-                    Players = allPlayers
-                        .Where(p => p.Team == matchzyTeam2.teamName)
-                        .OrderByDescending(p => p.Rating)
-                        .ToList(),
+                    Players = allPlayers.Where(p => p.Team == matchzyTeam2.teamName).OrderByDescending(p => p.Rating).ToList(),
                 },
                 Winner = t1score > t2score ? matchzyTeam1.teamName : matchzyTeam2.teamName,
             };
@@ -560,11 +501,7 @@ public partial class MatchZy
     /// <summary>
     /// Writes pre-collected match stats to disk. Safe to call from a background thread.
     /// </summary>
-    public async Task WriteMatchStatsJsonAsync(
-        MatchStatsJson matchStats,
-        string demoFilename,
-        string statsDirectory
-    )
+    public async Task WriteMatchStatsJsonAsync(MatchStatsJson matchStats, string demoFilename, string statsDirectory)
     {
         try
         {
@@ -576,11 +513,7 @@ public partial class MatchZy
             string statsFilename = Path.GetFileNameWithoutExtension(demoFilename) + "_stats.json";
             string statsPath = Path.Combine(statsDirectory, statsFilename);
 
-            var options = new JsonSerializerOptions
-            {
-                WriteIndented = true,
-                PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
-            };
+            var options = new JsonSerializerOptions { WriteIndented = true, PropertyNamingPolicy = JsonNamingPolicy.CamelCase };
 
             string json = JsonSerializer.Serialize(matchStats, options);
             await File.WriteAllTextAsync(statsPath, json);
@@ -609,17 +542,9 @@ public partial class MatchZy
         // HLTV 2.0 Rating calculation (simplified)
         // Rating = 0.0073*KAST + 0.3591*KPR - 0.5329*DPR + 0.2372*Impact + 0.0032*ADR + 0.1587
         // Impact is hard to calculate, so we use a simplified version
-        double impact =
-            kpr * 0.5
-            + (stats.Kills5 * 0.5 + stats.Kills4 * 0.3 + stats.Kills3 * 0.2) / Math.Max(1, rounds);
+        double impact = kpr * 0.5 + (stats.Kills5 * 0.5 + stats.Kills4 * 0.3 + stats.Kills3 * 0.2) / Math.Max(1, rounds);
 
-        double rating =
-            0.0073 * kastPercent
-            + 0.3591 * kpr
-            - 0.5329 * dpr
-            + 0.2372 * impact
-            + 0.0032 * adr
-            + 0.1587;
+        double rating = 0.0073 * kastPercent + 0.3591 * kpr - 0.5329 * dpr + 0.2372 * impact + 0.0032 * adr + 0.1587;
 
         // Clamp rating to reasonable range
         rating = Math.Max(0.0, Math.Min(3.0, rating));

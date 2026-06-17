@@ -65,9 +65,7 @@ namespace MatchZy
                 catch (Exception ex)
                 {
                     Log($"[lastmatch FATAL] {ex.Message}");
-                    Server.NextFrame(() =>
-                        ReplyToUserCommand(player, "Stats lookup failed (see server log).")
-                    );
+                    Server.NextFrame(() => ReplyToUserCommand(player, "Stats lookup failed (see server log)."));
                 }
             });
         }
@@ -95,19 +93,14 @@ namespace MatchZy
                 catch (Exception ex)
                 {
                     Log($"[stats FATAL] {ex.Message}");
-                    Server.NextFrame(() =>
-                        ReplyToUserCommand(player, "Stats lookup failed (see server log).")
-                    );
+                    Server.NextFrame(() => ReplyToUserCommand(player, "Stats lookup failed (see server log)."));
                 }
             });
         }
 
         // ─── DB queries (background thread only) ───────────────────────────────────
 
-        private async Task<(string? header, List<string> rows)> QueryLastMatchAsync(
-            string gameDir,
-            string moduleDir
-        )
+        private async Task<(string? header, List<string> rows)> QueryLastMatchAsync(string gameDir, string moduleDir)
         {
             using var conn = OpenStatsConnection(gameDir, moduleDir);
 
@@ -142,9 +135,7 @@ namespace MatchZy
                 )
             ).ToList();
 
-            string header =
-                $"{ChatColors.Green}Last match #{matchId}{ChatColors.Default} on {ChatColors.Yellow}{mapName}{ChatColors.Default} — "
-                + $"{ChatColors.Green}{team1} {t1}{ChatColors.Default}:{ChatColors.Green}{t2} {team2}";
+            string header = $"{ChatColors.Green}Last match #{matchId}{ChatColors.Default} on {ChatColors.Yellow}{mapName}{ChatColors.Default} — " + $"{ChatColors.Green}{team1} {t1}{ChatColors.Default}:{ChatColors.Green}{t2} {team2}";
 
             var rows = new List<string>();
             int i = 1;
@@ -157,22 +148,13 @@ namespace MatchZy
                 int hs = Convert.ToInt32(p.HS);
                 string name = (string)(p.Name ?? "?");
                 string team = (string)(p.Team ?? "");
-                rows.Add(
-                    $" {i, 2}. {ChatColors.Yellow}{name}{ChatColors.Default} [{team}]  "
-                        + $"{ChatColors.Green}{k}{ChatColors.Default}/{ChatColors.Red}{d}{ChatColors.Default}/"
-                        + $"{ChatColors.LightBlue}{a}{ChatColors.Default}  "
-                        + $"DMG {dmg}  HS {hs}"
-                );
+                rows.Add($" {i, 2}. {ChatColors.Yellow}{name}{ChatColors.Default} [{team}]  " + $"{ChatColors.Green}{k}{ChatColors.Default}/{ChatColors.Red}{d}{ChatColors.Default}/" + $"{ChatColors.LightBlue}{a}{ChatColors.Default}  " + $"DMG {dmg}  HS {hs}");
                 i++;
             }
             return (header, rows);
         }
 
-        private async Task<List<string>> QueryCareerStatsAsync(
-            string nameQuery,
-            string gameDir,
-            string moduleDir
-        )
+        private async Task<List<string>> QueryCareerStatsAsync(string nameQuery, string gameDir, string moduleDir)
         {
             using var conn = OpenStatsConnection(gameDir, moduleDir);
 
@@ -196,38 +178,23 @@ namespace MatchZy
             string trimmed = nameQuery.Trim();
             if (trimmed.Length == 17 && trimmed.All(char.IsDigit))
             {
-                rows = (
-                    await conn.QueryAsync(
-                        aggregateSql + " WHERE steamid64 = @Sid GROUP BY steamid64",
-                        new { Sid = ulong.Parse(trimmed) }
-                    )
-                ).ToList();
+                rows = (await conn.QueryAsync(aggregateSql + " WHERE steamid64 = @Sid GROUP BY steamid64", new { Sid = ulong.Parse(trimmed) })).ToList();
             }
             else
             {
                 // Aggregate every player, then filter client-side using a normalized
                 // (alphanumeric-only, lowercased) substring match. This means a query
                 // for "Miksen" matches stored names like "- Miksen" or "[CLAN] Miksen".
-                var allRows = (
-                    await conn.QueryAsync(aggregateSql + " GROUP BY steamid64")
-                ).ToList();
+                var allRows = (await conn.QueryAsync(aggregateSql + " GROUP BY steamid64")).ToList();
                 string normQuery = NormalizeName(trimmed);
-                rows = string.IsNullOrEmpty(normQuery)
-                    ? new List<dynamic>()
-                    : allRows
-                        .Where(r => NormalizeName((string)(r.Name ?? "")).Contains(normQuery))
-                        .OrderByDescending(r => Convert.ToInt64(r.K))
-                        .Take(5)
-                        .ToList();
+                rows = string.IsNullOrEmpty(normQuery) ? new List<dynamic>() : allRows.Where(r => NormalizeName((string)(r.Name ?? "")).Contains(normQuery)).OrderByDescending(r => Convert.ToInt64(r.K)).Take(5).ToList();
             }
 
             var lines = new List<string>();
             if (rows.Count == 0)
                 return lines;
 
-            lines.Add(
-                $"{ChatColors.Green}Career stats matching {ChatColors.Yellow}\"{nameQuery}\"{ChatColors.Default}:"
-            );
+            lines.Add($"{ChatColors.Green}Career stats matching {ChatColors.Yellow}\"{nameQuery}\"{ChatColors.Default}:");
             int i = 1;
             foreach (var r in rows)
             {
@@ -241,11 +208,7 @@ namespace MatchZy
                 double kd = d > 0 ? (double)k / d : k;
                 double hsPct = k > 0 ? (double)hs / k * 100 : 0;
                 string name = (string)(r.Name ?? "?");
-                lines.Add(
-                    $" {i}. {ChatColors.Yellow}{name}{ChatColors.Default}  "
-                        + $"Maps {maps}  K/D {kd:F2} ({k}/{d})  A {a}  "
-                        + $"DMG {dmg}  HS {hsPct:F0}%  3K+/{multiK}"
-                );
+                lines.Add($" {i}. {ChatColors.Yellow}{name}{ChatColors.Default}  " + $"Maps {maps}  K/D {kd:F2} ({k}/{d})  A {a}  " + $"DMG {dmg}  HS {hsPct:F0}%  3K+/{multiK}");
                 i++;
             }
             return lines;
@@ -273,9 +236,7 @@ namespace MatchZy
             {
                 try
                 {
-                    cfg = System.Text.Json.JsonSerializer.Deserialize<DatabaseConfig>(
-                        File.ReadAllText(configFile)
-                    );
+                    cfg = System.Text.Json.JsonSerializer.Deserialize<DatabaseConfig>(File.ReadAllText(configFile));
                     dbType = cfg?.DatabaseType?.Trim().ToLower() ?? "sqlite";
                 }
                 catch
@@ -287,9 +248,7 @@ namespace MatchZy
             IDbConnection conn;
             if (dbType == "mysql" && cfg != null)
             {
-                conn = new MySqlConnection(
-                    $"Server={cfg.MySqlHost};Port={cfg.MySqlPort};Database={cfg.MySqlDatabase};User Id={cfg.MySqlUsername};Password={cfg.MySqlPassword};"
-                );
+                conn = new MySqlConnection($"Server={cfg.MySqlHost};Port={cfg.MySqlPort};Database={cfg.MySqlDatabase};User Id={cfg.MySqlUsername};Password={cfg.MySqlPassword};");
             }
             else
             {

@@ -94,9 +94,7 @@ namespace MatchZy
             }
             catch (Exception ex)
             {
-                Log(
-                    $"[InitializeDatabase - FATAL] Database connection or table creation error: {ex.Message}"
-                );
+                Log($"[InitializeDatabase - FATAL] Database connection or table creation error: {ex.Message}");
                 Log($"[InitializeDatabase - FATAL] Stack trace: {ex.StackTrace}");
             }
         }
@@ -124,9 +122,7 @@ namespace MatchZy
                 }
                 catch (Exception ex)
                 {
-                    Log(
-                        $"[EnsureConnectionOpen] Failed to open connection: {ex.Message}, attempting reconnect..."
-                    );
+                    Log($"[EnsureConnectionOpen] Failed to open connection: {ex.Message}, attempting reconnect...");
                     // For MySQL, try closing and reopening to handle stale connections
                     if (connection is MySqlConnection mysqlConn)
                     {
@@ -138,9 +134,7 @@ namespace MatchZy
                         }
                         catch (Exception reconnectEx)
                         {
-                            Log(
-                                $"[EnsureConnectionOpen - FATAL] Reconnect failed: {reconnectEx.Message}"
-                            );
+                            Log($"[EnsureConnectionOpen - FATAL] Reconnect failed: {reconnectEx.Message}");
                             throw;
                         }
                     }
@@ -159,9 +153,7 @@ namespace MatchZy
                 }
                 catch (Exception ex)
                 {
-                    Log(
-                        $"[EnsureConnectionOpen] MySQL stale connection detected: {ex.Message}, reconnecting..."
-                    );
+                    Log($"[EnsureConnectionOpen] MySQL stale connection detected: {ex.Message}, reconnecting...");
                     try
                     {
                         connection.Close();
@@ -170,9 +162,7 @@ namespace MatchZy
                     }
                     catch (Exception reconnectEx)
                     {
-                        Log(
-                            $"[EnsureConnectionOpen - FATAL] Reconnect failed: {reconnectEx.Message}"
-                        );
+                        Log($"[EnsureConnectionOpen - FATAL] Reconnect failed: {reconnectEx.Message}");
                         throw;
                     }
                 }
@@ -193,8 +183,7 @@ namespace MatchZy
                 }
                 else if (config != null && databaseType == DatabaseType.MySQL)
                 {
-                    _connectionString =
-                        $"Server={config.MySqlHost};Port={config.MySqlPort};Database={config.MySqlDatabase};User Id={config.MySqlUsername};Password={config.MySqlPassword};";
+                    _connectionString = $"Server={config.MySqlHost};Port={config.MySqlPort};Database={config.MySqlDatabase};User Id={config.MySqlUsername};Password={config.MySqlPassword};";
                     connection = new MySqlConnection(_connectionString);
                     Log("[ConnectDatabase] MySQL connection created");
                 }
@@ -222,9 +211,7 @@ namespace MatchZy
             if (_connectionString == null)
                 throw new InvalidOperationException("Database connection string is not initialized");
 
-            return databaseType == DatabaseType.MySQL
-                ? new MySqlConnection(_connectionString)
-                : new SqliteConnection(_connectionString);
+            return databaseType == DatabaseType.MySQL ? new MySqlConnection(_connectionString) : new SqliteConnection(_connectionString);
         }
 
         private async Task CreateRequiredTablesSQLiteAsync()
@@ -385,17 +372,7 @@ namespace MatchZy
             );
         }
 
-        public async Task<long> InitMatchAsync(
-            string team1Name,
-            string team2Name,
-            string winner,
-            bool isMatchSetup,
-            long currentMatchId,
-            int currentMapNumber,
-            string seriesType,
-            string mapName,
-            string serverIp
-        )
+        public async Task<long> InitMatchAsync(string team1Name, string team2Name, string winner, bool isMatchSetup, long currentMatchId, int currentMapNumber, string seriesType, string mapName, string serverIp)
         {
             try
             {
@@ -450,15 +427,11 @@ namespace MatchZy
                     // Get the new match ID
                     if (conn is SqliteConnection)
                     {
-                        matchId = await conn.ExecuteScalarAsync<long>(
-                            "SELECT last_insert_rowid()"
-                        );
+                        matchId = await conn.ExecuteScalarAsync<long>("SELECT last_insert_rowid()");
                     }
                     else
                     {
-                        matchId = await conn.ExecuteScalarAsync<long>(
-                            "SELECT LAST_INSERT_ID()"
-                        );
+                        matchId = await conn.ExecuteScalarAsync<long>("SELECT LAST_INSERT_ID()");
                     }
 
                     // last_insert_rowid()/LAST_INSERT_ID() return 0 if the INSERT
@@ -495,16 +468,7 @@ namespace MatchZy
             }
         }
 
-        public async Task SetMatchEndDataAsync(
-            long matchId,
-            int mapNumber,
-            string mapWinner,
-            int team1Score,
-            int team2Score,
-            string matchWinner,
-            int matchTeam1Score,
-            int matchTeam2Score
-        )
+        public async Task SetMatchEndDataAsync(long matchId, int mapNumber, string mapWinner, int team1Score, int team2Score, string matchWinner, int matchTeam1Score, int matchTeam2Score)
         {
             if (matchId == -1)
             {
@@ -574,7 +538,12 @@ namespace MatchZy
                     @"UPDATE matchzy_stats_matches
                       SET team1_name = @Team1Name, team2_name = @Team2Name
                       WHERE matchid = @MatchId",
-                    new { Team1Name = team1Name, Team2Name = team2Name, MatchId = matchId }
+                    new
+                    {
+                        Team1Name = team1Name,
+                        Team2Name = team2Name,
+                        MatchId = matchId,
+                    }
                 );
             }
             catch (Exception ex)
@@ -583,11 +552,7 @@ namespace MatchZy
             }
         }
 
-        public async Task UpdatePlayerStatsAsync(
-            long matchId,
-            int mapNumber,
-            Dictionary<long, Dictionary<string, object>> playerStatsDictionary
-        )
+        public async Task UpdatePlayerStatsAsync(long matchId, int mapNumber, Dictionary<long, Dictionary<string, object>> playerStatsDictionary)
         {
             if (matchId == -1)
             {
@@ -793,25 +758,15 @@ namespace MatchZy
                 }
 
                 using (var writer = new StreamWriter(csvFilePath))
-                using (
-                    var csv = new CsvWriter(
-                        writer,
-                        new CsvConfiguration(CultureInfo.InvariantCulture)
-                    )
-                )
+                using (var csv = new CsvWriter(writer, new CsvConfiguration(CultureInfo.InvariantCulture)))
                 {
-                    IEnumerable<dynamic> playerStatsData = await connection!.QueryAsync(
-                        "SELECT * FROM matchzy_stats_players WHERE matchid = @MatchId AND mapnumber = @MapNumber ORDER BY team, kills DESC",
-                        new { MatchId = matchId, MapNumber = mapNumber }
-                    );
+                    IEnumerable<dynamic> playerStatsData = await connection!.QueryAsync("SELECT * FROM matchzy_stats_players WHERE matchid = @MatchId AND mapnumber = @MapNumber ORDER BY team, kills DESC", new { MatchId = matchId, MapNumber = mapNumber });
 
                     // Use the first data row to get the column names
                     dynamic? firstDataRow = playerStatsData.FirstOrDefault();
                     if (firstDataRow != null)
                     {
-                        foreach (
-                            var propertyName in ((IDictionary<string, object>)firstDataRow).Keys
-                        )
+                        foreach (var propertyName in ((IDictionary<string, object>)firstDataRow).Keys)
                         {
                             csv.WriteField(propertyName);
                         }
@@ -820,11 +775,7 @@ namespace MatchZy
                         // Write data to the CSV file
                         foreach (var playerStats in playerStatsData)
                         {
-                            foreach (
-                                var propertyValue in (
-                                    (IDictionary<string, object>)playerStats
-                                ).Values
-                            )
+                            foreach (var propertyValue in ((IDictionary<string, object>)playerStats).Values)
                             {
                                 csv.WriteField(propertyValue);
                             }
@@ -832,9 +783,7 @@ namespace MatchZy
                         }
                     }
                 }
-                Log(
-                    $"[WritePlayerStatsToCsv] Match stats for ID: {matchId} written successfully at: {csvFilePath}"
-                );
+                Log($"[WritePlayerStatsToCsv] Match stats for ID: {matchId} written successfully at: {csvFilePath}");
             }
             catch (Exception ex)
             {
@@ -856,10 +805,7 @@ namespace MatchZy
             };
 
             // Serialize and save the default configuration to the file
-            string defaultConfigJson = JsonSerializer.Serialize(
-                defaultConfig,
-                new JsonSerializerOptions { WriteIndented = true }
-            );
+            string defaultConfigJson = JsonSerializer.Serialize(defaultConfig, new JsonSerializerOptions { WriteIndented = true });
             File.WriteAllText(configFile, defaultConfigJson);
 
             Log($"[InitializeDatabase] Default configuration file created at: {configFile}");
@@ -900,16 +846,12 @@ namespace MatchZy
             }
             catch (JsonException ex)
             {
-                Log(
-                    $"[SetDatabaseConfig - ERROR] Error deserializing database.json: {ex.Message}. Using SQLite DB"
-                );
+                Log($"[SetDatabaseConfig - ERROR] Error deserializing database.json: {ex.Message}. Using SQLite DB");
                 databaseType = DatabaseType.SQLite;
             }
             catch (Exception ex)
             {
-                Log(
-                    $"[SetDatabaseConfig - ERROR] Unexpected error reading database.json: {ex.Message}. Using SQLite DB"
-                );
+                Log($"[SetDatabaseConfig - ERROR] Unexpected error reading database.json: {ex.Message}. Using SQLite DB");
                 databaseType = DatabaseType.SQLite;
             }
         }

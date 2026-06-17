@@ -62,11 +62,7 @@ namespace MatchZy
             }
         }
 
-        private void ReplyToUserCommand(
-            CCSPlayerController? player,
-            string message,
-            bool console = false
-        )
+        private void ReplyToUserCommand(CCSPlayerController? player, string message, bool console = false)
         {
             if (player == null)
             {
@@ -85,11 +81,7 @@ namespace MatchZy
             }
         }
 
-        private bool IsPlayerAdmin(
-            CCSPlayerController? player,
-            string command = "",
-            params string[] permissions
-        )
+        private bool IsPlayerAdmin(CCSPlayerController? player, string command = "", params string[] permissions)
         {
             if (everyoneIsAdmin.Value)
                 return true; // Everyone is treated as admin if matchzy_everyone_is_admin is true.
@@ -125,12 +117,7 @@ namespace MatchZy
             if (unreadyPlayers.Count > 0)
             {
                 string unreadyPlayerList = string.Join(", ", unreadyPlayers);
-                string minimumReadyRequiredMessage = isMatchSetup
-                    ? ""
-                    : Localizer[
-                        "matchzy.minimum.ready.required",
-                        $"{ChatColors.Green}{minimumReadyRequired}{ChatColors.Default}"
-                    ];
+                string minimumReadyRequiredMessage = isMatchSetup ? "" : Localizer["matchzy.minimum.ready.required", $"{ChatColors.Green}{minimumReadyRequired}{ChatColors.Default}"];
 
                 if (isRoundRestorePending)
                 {
@@ -150,13 +137,7 @@ namespace MatchZy
                 }
                 else
                 {
-                    PrintToAllChat(
-                        Localizer[
-                            "matchzy.utility.minimumreadyplayers",
-                            minimumReadyRequired,
-                            countOfReadyPlayers
-                        ]
-                    );
+                    PrintToAllChat(Localizer["matchzy.utility.minimumreadyplayers", minimumReadyRequired, countOfReadyPlayers]);
                 }
             }
         }
@@ -212,11 +193,7 @@ namespace MatchZy
 
                     foreach (var key in playerReadyStatus.Keys)
                     {
-                        if (
-                            playerData.TryGetValue(key, out var player)
-                            && player != null
-                            && player.IsValid
-                        )
+                        if (playerData.TryGetValue(key, out var player) && player != null && player.IsValid)
                         {
                             totalPlayers++;
                             if (playerReadyStatus[key])
@@ -226,26 +203,14 @@ namespace MatchZy
                         }
                     }
 
-                    string line1 = Localizer[
-                        "matchzy.hint.waitingforplayers",
-                        readyCount,
-                        totalPlayers
-                    ];
+                    string line1 = Localizer["matchzy.hint.waitingforplayers", readyCount, totalPlayers];
                     string line2 = Localizer["matchzy.hint.usereadycommand"];
                     _cachedReadyHintMessage = $"{line1}\n{line2}";
                     _readyStatusDirty = false;
                 }
 
                 // Broadcast cached message (center HUD text expires after a few seconds, so repeat is still needed)
-                VirtualFunctions.ClientPrintAll(
-                    HudDestination.Center,
-                    _cachedReadyHintMessage,
-                    0,
-                    0,
-                    0,
-                    0,
-                    0
-                );
+                VirtualFunctions.ClientPrintAll(HudDestination.Center, _cachedReadyHintMessage, 0, 0, 0, 0, 0);
             }
             catch (Exception)
             {
@@ -275,33 +240,17 @@ namespace MatchZy
                 {
                     PrintToAllChat(Localizer["matchzy.pause.adminpausedthematch"]);
                 }
-                else if (
-                    (string)pauseTeamName == "RoundRestore"
-                    && !(bool)unpauseData["t"]
-                    && !(bool)unpauseData["ct"]
-                )
+                else if ((string)pauseTeamName == "RoundRestore" && !(bool)unpauseData["t"] && !(bool)unpauseData["ct"])
                 {
                     PrintToAllChat(Localizer["matchzy.pause.pausedbecauserestore"]);
                 }
                 else if ((bool)unpauseData["t"] && !(bool)unpauseData["ct"])
                 {
-                    PrintToAllChat(
-                        Localizer[
-                            "matchzy.pause.teamwantstounpause",
-                            reverseTeamSides["TERRORIST"].teamName,
-                            reverseTeamSides["CT"].teamName
-                        ]
-                    );
+                    PrintToAllChat(Localizer["matchzy.pause.teamwantstounpause", reverseTeamSides["TERRORIST"].teamName, reverseTeamSides["CT"].teamName]);
                 }
                 else if (!(bool)unpauseData["t"] && (bool)unpauseData["ct"])
                 {
-                    PrintToAllChat(
-                        Localizer[
-                            "matchzy.pause.teamwantstounpause",
-                            reverseTeamSides["CT"].teamName,
-                            reverseTeamSides["TERRORIST"].teamName
-                        ]
-                    );
+                    PrintToAllChat(Localizer["matchzy.pause.teamwantstounpause", reverseTeamSides["CT"].teamName, reverseTeamSides["TERRORIST"].teamName]);
                 }
                 else if (!(bool)unpauseData["t"] && !(bool)unpauseData["ct"])
                 {
@@ -319,33 +268,17 @@ namespace MatchZy
                 {
                     PrintToAllChat(Localizer["matchzy.pause.adminpausedthematch"]);
                 }
-                else if (
-                    (string)pauseTeamName == "RoundRestore"
-                    && !(bool)unpauseData["t"]
-                    && !(bool)unpauseData["ct"]
-                )
+                else if ((string)pauseTeamName == "RoundRestore" && !(bool)unpauseData["t"] && !(bool)unpauseData["ct"])
                 {
                     PrintToAllChat(Localizer["matchzy.pause.pausedbecauserestore"]);
                 }
                 else if ((bool)unpauseData["t"] && !(bool)unpauseData["ct"])
                 {
-                    PrintToAllChat(
-                        Localizer[
-                            "matchzy.pause.teamwantstounpause",
-                            reverseTeamSides["TERRORIST"].teamName,
-                            reverseTeamSides["CT"].teamName
-                        ]
-                    );
+                    PrintToAllChat(Localizer["matchzy.pause.teamwantstounpause", reverseTeamSides["TERRORIST"].teamName, reverseTeamSides["CT"].teamName]);
                 }
                 else if (!(bool)unpauseData["t"] && (bool)unpauseData["ct"])
                 {
-                    PrintToAllChat(
-                        Localizer[
-                            "matchzy.pause.teamwantstounpause",
-                            reverseTeamSides["CT"].teamName,
-                            reverseTeamSides["TERRORIST"].teamName
-                        ]
-                    );
+                    PrintToAllChat(Localizer["matchzy.pause.teamwantstounpause", reverseTeamSides["CT"].teamName, reverseTeamSides["TERRORIST"].teamName]);
                 }
             }
         }
@@ -364,9 +297,7 @@ namespace MatchZy
             }
             else
             {
-                Server.ExecuteCommand(
-                    "bot_kick;bot_quota 0;mp_autokick 0;mp_autoteambalance 0;mp_buy_anywhere 0;mp_buytime 15;mp_death_drop_gun 0;mp_free_armor 0;mp_ignore_round_win_conditions 0;mp_limitteams 0;mp_radar_showall 0;mp_respawn_on_death_ct 0;mp_respawn_on_death_t 0;mp_solid_teammates 0;mp_spectators_max 20;mp_maxmoney 16000;mp_startmoney 16000;mp_timelimit 0;sv_alltalk 0;sv_auto_full_alltalk_during_warmup_half_end 0;sv_deadtalk 1;sv_full_alltalk 0;sv_grenade_trajectory 0;sv_hibernate_when_empty 0;mp_weapons_allow_typecount -1;sv_infinite_ammo 0;sv_showimpacts 0;sv_voiceenable 1;sm_cvar sv_mute_players_with_social_penalties 0;sv_mute_players_with_social_penalties 0;tv_relayvoice 1;sv_cheats 0;mp_ct_default_melee weapon_knife;mp_ct_default_secondary weapon_hkp2000;mp_ct_default_primary \"\";mp_t_default_melee weapon_knife;mp_t_default_secondary weapon_glock;mp_t_default_primary;mp_maxrounds 24;mp_warmup_pausetimer 1;mp_warmuptime 9999;cash_team_bonus_shorthanded 0;mp_warmup_start;mp_restartgame 1"
-                );
+                Server.ExecuteCommand("bot_kick;bot_quota 0;mp_autokick 0;mp_autoteambalance 0;mp_buy_anywhere 0;mp_buytime 15;mp_death_drop_gun 0;mp_free_armor 0;mp_ignore_round_win_conditions 0;mp_limitteams 0;mp_radar_showall 0;mp_respawn_on_death_ct 0;mp_respawn_on_death_t 0;mp_solid_teammates 0;mp_spectators_max 20;mp_maxmoney 16000;mp_startmoney 16000;mp_timelimit 0;sv_alltalk 0;sv_auto_full_alltalk_during_warmup_half_end 0;sv_deadtalk 1;sv_full_alltalk 0;sv_grenade_trajectory 0;sv_hibernate_when_empty 0;mp_weapons_allow_typecount -1;sv_infinite_ammo 0;sv_showimpacts 0;sv_voiceenable 1;sm_cvar sv_mute_players_with_social_penalties 0;sv_mute_players_with_social_penalties 0;tv_relayvoice 1;sv_cheats 0;mp_ct_default_melee weapon_knife;mp_ct_default_secondary weapon_hkp2000;mp_ct_default_primary \"\";mp_t_default_melee weapon_knife;mp_t_default_secondary weapon_glock;mp_t_default_primary;mp_maxrounds 24;mp_warmup_pausetimer 1;mp_warmuptime 9999;cash_team_bonus_shorthanded 0;mp_warmup_start;mp_restartgame 1");
             }
         }
 
@@ -399,9 +330,7 @@ namespace MatchZy
                     try
                     {
                         var rules = GetGameRules();
-                        var proxy = Utilities
-                            .FindAllEntitiesByDesignerName<CCSGameRulesProxy>("cs_gamerules")
-                            .FirstOrDefault();
+                        var proxy = Utilities.FindAllEntitiesByDesignerName<CCSGameRulesProxy>("cs_gamerules").FirstOrDefault();
                         if (rules != null && proxy != null)
                         {
                             rules.MatchStats_RoundResults.Clear();
@@ -410,8 +339,7 @@ namespace MatchZy
                             Utilities.SetStateChanged(proxy, "CCSGameRulesProxy", "m_pGameRules");
                         }
 
-                        int startMoney =
-                            ConVar.Find("mp_startmoney")?.GetPrimitiveValue<int>() ?? 800;
+                        int startMoney = ConVar.Find("mp_startmoney")?.GetPrimitiveValue<int>() ?? 800;
 
                         foreach (var p in Utilities.GetPlayers())
                         {
@@ -448,9 +376,7 @@ namespace MatchZy
                             }
                             catch (Exception pex)
                             {
-                                Log(
-                                    $"[StartWarmup per-player reset] slot={p.Slot} {pex.Message}"
-                                );
+                                Log($"[StartWarmup per-player reset] slot={p.Slot} {pex.Message}");
                             }
                         }
                     }
@@ -499,9 +425,7 @@ namespace MatchZy
             }
             else
             {
-                Server.ExecuteCommand(
-                    "mp_ct_default_secondary \"\";mp_free_armor 1;mp_freezetime 10;mp_give_player_c4 0;mp_maxmoney 0;mp_respawn_immunitytime 0;mp_respawn_on_death_ct 0;mp_respawn_on_death_t 0;mp_roundtime 1.92;mp_roundtime_defuse 1.92;mp_roundtime_hostage 1.92;mp_t_default_secondary \"\";mp_round_restart_delay 3;mp_team_intro_time 0;mp_restartgame 1;mp_warmup_end;"
-                );
+                Server.ExecuteCommand("mp_ct_default_secondary \"\";mp_free_armor 1;mp_freezetime 10;mp_give_player_c4 0;mp_maxmoney 0;mp_respawn_immunitytime 0;mp_respawn_on_death_ct 0;mp_respawn_on_death_t 0;mp_roundtime 1.92;mp_roundtime_defuse 1.92;mp_roundtime_hostage 1.92;mp_t_default_secondary \"\";mp_round_restart_delay 3;mp_team_intro_time 0;mp_restartgame 1;mp_warmup_end;");
             }
 
             PrintToAllChat($"{ChatColors.Olive}KNIFE!");
@@ -521,17 +445,10 @@ namespace MatchZy
             isWarmup = true;
             //DrawSideSelection();
             ExecWarmupCfg();
-            knifeWinnerName =
-                knifeWinner == 3
-                    ? reverseTeamSides["CT"].teamName
-                    : reverseTeamSides["TERRORIST"].teamName;
+            knifeWinnerName = knifeWinner == 3 ? reverseTeamSides["CT"].teamName : reverseTeamSides["TERRORIST"].teamName;
             ShowDamageInfo();
             PrintToAllChat(Localizer["matchzy.knife.sidedecisionpending", knifeWinnerName]);
-            sideSelectionMessageTimer ??= AddTimer(
-                chatTimerDelay,
-                SendSideSelectionMessage,
-                TimerFlags.REPEAT
-            );
+            sideSelectionMessageTimer ??= AddTimer(chatTimerDelay, SendSideSelectionMessage, TimerFlags.REPEAT);
 
             DrawSideSelection();
         }
@@ -549,12 +466,8 @@ namespace MatchZy
                 PrintToAllChat(Localizer["matchzy.utility.matchlive"]);
                 PrintToAllChat(Localizer["matchzy.utility.matchlive"]);
                 PrintToAllChat(Localizer["matchzy.utility.matchlive"]);
-                PrintToAllChat(
-                    $"{ChatColors.Green}.tac {ChatColors.Default} - Tactical pause (4 x 30 seconds per team)"
-                );
-                PrintToAllChat(
-                    $"{ChatColors.Green}.tech/.pause {ChatColors.Default} - Technical pause (indefinite)"
-                );
+                PrintToAllChat($"{ChatColors.Green}.tac {ChatColors.Default} - Tactical pause (4 x 30 seconds per team)");
+                PrintToAllChat($"{ChatColors.Green}.tech/.pause {ChatColors.Default} - Technical pause (indefinite)");
 
                 var tvEnableConVar = _cvTvEnable;
                 if (tvEnableConVar != null && tvEnableConVar.GetPrimitiveValue<bool>() == true)
@@ -565,9 +478,7 @@ namespace MatchZy
                 // Only show OT notice for match mode (scrim/hill have OT disabled)
                 if (!isPlayOutEnabled && !isPlayOutEnabled2)
                 {
-                    PrintToAllChat(
-                        $"{ChatColors.Green}Please be aware that this match has overtime enabled, there is no tie."
-                    );
+                    PrintToAllChat($"{ChatColors.Green}Please be aware that this match has overtime enabled, there is no tie.");
                 }
             }
         }
@@ -660,16 +571,10 @@ namespace MatchZy
                         1,
                         () =>
                         {
-                            var clinch = ConVar
-                                .Find("mp_match_can_clinch")
-                                ?.GetPrimitiveValue<bool>();
+                            var clinch = ConVar.Find("mp_match_can_clinch")?.GetPrimitiveValue<bool>();
                             var maxr = ConVar.Find("mp_maxrounds")?.GetPrimitiveValue<int>();
-                            var ot = ConVar
-                                .Find("mp_overtime_enable")
-                                ?.GetPrimitiveValue<bool>();
-                            Log(
-                                $"[MatchDebug] clinch={clinch} maxrounds={maxr} overtime={ot}"
-                            );
+                            var ot = ConVar.Find("mp_overtime_enable")?.GetPrimitiveValue<bool>();
+                            Log($"[MatchDebug] clinch={clinch} maxrounds={maxr} overtime={ot}");
                         }
                     );
                 }
@@ -701,16 +606,10 @@ namespace MatchZy
                         1,
                         () =>
                         {
-                            var clinch = ConVar
-                                .Find("mp_match_can_clinch")
-                                ?.GetPrimitiveValue<bool>();
+                            var clinch = ConVar.Find("mp_match_can_clinch")?.GetPrimitiveValue<bool>();
                             var maxr = ConVar.Find("mp_maxrounds")?.GetPrimitiveValue<int>();
-                            var ot = ConVar
-                                .Find("mp_overtime_enable")
-                                ?.GetPrimitiveValue<bool>();
-                            Log(
-                                $"[ScrimDebug] clinch={clinch} maxrounds={maxr} overtime={ot}"
-                            );
+                            var ot = ConVar.Find("mp_overtime_enable")?.GetPrimitiveValue<bool>();
+                            Log($"[ScrimDebug] clinch={clinch} maxrounds={maxr} overtime={ot}");
                         }
                     );
                 }
@@ -752,28 +651,20 @@ namespace MatchZy
             ClearClanTags();
 
             // Storing 0-0 score backup file as lastBackupFileName, so that .stop functions properly in first round.
-            lastBackupFileName =
-                $"matchzy_{liveMatchId}_{matchConfig.CurrentMapNumber}_round00.txt";
-            lastMatchZyBackupFileName =
-                $"matchzy_{liveMatchId}_{matchConfig.CurrentMapNumber}_round00.json";
+            lastBackupFileName = $"matchzy_{liveMatchId}_{matchConfig.CurrentMapNumber}_round00.txt";
+            lastMatchZyBackupFileName = $"matchzy_{liveMatchId}_{matchConfig.CurrentMapNumber}_round00.json";
 
             PrintToAllChat($"{ChatColors.Olive}LIVE!");
             PrintToAllChat($"{ChatColors.Lime}LIVE!");
             PrintToAllChat($"{ChatColors.Green}LIVE!");
 
-            PrintToAllChat(
-                $"{ChatColors.Green}.tac {ChatColors.Default} - Tactical pause (4 x 30 seconds per team)"
-            );
-            PrintToAllChat(
-                $"{ChatColors.Green}.tech/.pause {ChatColors.Default} - Technical pause (indefinite)"
-            );
+            PrintToAllChat($"{ChatColors.Green}.tac {ChatColors.Default} - Tactical pause (4 x 30 seconds per team)");
+            PrintToAllChat($"{ChatColors.Green}.tech/.pause {ChatColors.Default} - Technical pause (indefinite)");
 
             // Only show OT notice for match mode (scrim/hill have OT disabled)
             if (!isPlayOutEnabled && !isPlayOutEnabled2)
             {
-                PrintToAllChat(
-                    $"{ChatColors.Green}Please be aware that this match has overtime enabled, there is no tie."
-                );
+                PrintToAllChat($"{ChatColors.Green}Please be aware that this match has overtime enabled, there is no tie.");
             }
 
             var tvEnableConVar = _cvTvEnable;
@@ -782,11 +673,7 @@ namespace MatchZy
                 PrintToAllChat($"{ChatColors.Green}CSTV Recording...");
             }
 
-            var goingLiveEvent = new GoingLiveEvent
-            {
-                MatchId = liveMatchId,
-                MapNumber = matchConfig.CurrentMapNumber,
-            };
+            var goingLiveEvent = new GoingLiveEvent { MatchId = liveMatchId, MapNumber = matchConfig.CurrentMapNumber };
 
             Task.Run(async () =>
             {
@@ -811,21 +698,15 @@ namespace MatchZy
             ClearClanTags();
 
             // Storing 0-0 score backup file as lastBackupFileName, so that .stop functions properly in first round.
-            lastBackupFileName =
-                $"matchzy_{liveMatchId}_{matchConfig.CurrentMapNumber}_round00.txt";
-            lastMatchZyBackupFileName =
-                $"matchzy_data_backup_{liveMatchId}_{matchConfig.CurrentMapNumber}_round_00.json";
+            lastBackupFileName = $"matchzy_{liveMatchId}_{matchConfig.CurrentMapNumber}_round00.txt";
+            lastMatchZyBackupFileName = $"matchzy_data_backup_{liveMatchId}_{matchConfig.CurrentMapNumber}_round_00.json";
 
             PrintToAllChat($"{ChatColors.Olive}LIVE!");
             PrintToAllChat($"{ChatColors.Lime}LIVE!");
             PrintToAllChat($"{ChatColors.Green}LIVE!");
 
-            PrintToAllChat(
-                $"{ChatColors.Green}.tac {ChatColors.Default} - Tactical pause (4 x 30 seconds per team)"
-            );
-            PrintToAllChat(
-                $"{ChatColors.Green}.tech/.pause {ChatColors.Default} - Technical pause (indefinite)"
-            );
+            PrintToAllChat($"{ChatColors.Green}.tac {ChatColors.Default} - Tactical pause (4 x 30 seconds per team)");
+            PrintToAllChat($"{ChatColors.Green}.tech/.pause {ChatColors.Default} - Technical pause (indefinite)");
 
             var tvEnableConVar = _cvTvEnable;
             if (tvEnableConVar != null && tvEnableConVar.GetPrimitiveValue<bool>() == true)
@@ -833,11 +714,7 @@ namespace MatchZy
                 PrintToAllChat($"{ChatColors.Green}CSTV Recording...");
             }
 
-            var goingLiveEvent = new GoingLiveEvent
-            {
-                MatchId = liveMatchId,
-                MapNumber = matchConfig.CurrentMapNumber,
-            };
+            var goingLiveEvent = new GoingLiveEvent { MatchId = liveMatchId, MapNumber = matchConfig.CurrentMapNumber };
 
             Task.Run(async () =>
             {
@@ -861,21 +738,15 @@ namespace MatchZy
             ClearClanTags();
 
             // Storing 0-0 score backup file as lastBackupFileName, so that .stop functions properly in first round.
-            lastBackupFileName =
-                $"matchzy_{liveMatchId}_{matchConfig.CurrentMapNumber}_round00.txt";
-            lastMatchZyBackupFileName =
-                $"matchzy_data_backup_{liveMatchId}_{matchConfig.CurrentMapNumber}_round_00.json";
+            lastBackupFileName = $"matchzy_{liveMatchId}_{matchConfig.CurrentMapNumber}_round00.txt";
+            lastMatchZyBackupFileName = $"matchzy_data_backup_{liveMatchId}_{matchConfig.CurrentMapNumber}_round_00.json";
 
             PrintToAllChat($"{ChatColors.Olive}HILL LIVE!");
             PrintToAllChat($"{ChatColors.Lime}HILL LIVE!");
             PrintToAllChat($"{ChatColors.Green}HILL LIVE!");
 
-            PrintToAllChat(
-                $"{ChatColors.Green}.tac {ChatColors.Default} - Tactical pause (4 x 30 seconds per team)"
-            );
-            PrintToAllChat(
-                $"{ChatColors.Green}.tech/.pause {ChatColors.Default} - Technical pause (indefinite)"
-            );
+            PrintToAllChat($"{ChatColors.Green}.tac {ChatColors.Default} - Tactical pause (4 x 30 seconds per team)");
+            PrintToAllChat($"{ChatColors.Green}.tech/.pause {ChatColors.Default} - Technical pause (indefinite)");
 
             var tvEnableConVar = _cvTvEnable;
             if (tvEnableConVar != null && tvEnableConVar.GetPrimitiveValue<bool>() == true)
@@ -883,11 +754,7 @@ namespace MatchZy
                 PrintToAllChat($"{ChatColors.Green}CSTV Recording...");
             }
 
-            var goingLiveEvent = new GoingLiveEvent
-            {
-                MatchId = liveMatchId,
-                MapNumber = matchConfig.CurrentMapNumber,
-            };
+            var goingLiveEvent = new GoingLiveEvent { MatchId = liveMatchId, MapNumber = matchConfig.CurrentMapNumber };
 
             Task.Run(async () =>
             {
@@ -902,9 +769,7 @@ namespace MatchZy
         {
             try
             {
-                var proxy = Utilities
-                    .FindAllEntitiesByDesignerName<CCSGameRulesProxy>("cs_gamerules")
-                    .FirstOrDefault();
+                var proxy = Utilities.FindAllEntitiesByDesignerName<CCSGameRulesProxy>("cs_gamerules").FirstOrDefault();
                 var rules = GetGameRules();
                 if (proxy == null || rules == null)
                     return;
@@ -967,9 +832,7 @@ namespace MatchZy
                 if (matchStarted && isMatchLive && cancelReason != null)
                 {
                     (int t1score, int t2score) = GetTeamsScore();
-                    string? demoFilename = !string.IsNullOrEmpty(activeDemoFile)
-                        ? Path.GetFileName(activeDemoFile)
-                        : null;
+                    string? demoFilename = !string.IsNullOrEmpty(activeDemoFile) ? Path.GetFileName(activeDemoFile) : null;
 
                     var cancelledEvent = new MatchCancelledEvent
                     {
@@ -1110,9 +973,7 @@ namespace MatchZy
         {
             try
             {
-                var playerEntities = Utilities.FindAllEntitiesByDesignerName<CCSPlayerController>(
-                    "cs_player_controller"
-                );
+                var playerEntities = Utilities.FindAllEntitiesByDesignerName<CCSPlayerController>("cs_player_controller");
 
                 // Use HashSet for efficient lookups during cleanup
                 var validUserIds = new HashSet<int>();
@@ -1159,9 +1020,7 @@ namespace MatchZy
                 }
 
                 // Efficient cleanup using HashSet - O(n) instead of O(n²)
-                var keysToRemove = playerReadyStatus
-                    .Keys.Where(key => !validUserIds.Contains(key))
-                    .ToList();
+                var keysToRemove = playerReadyStatus.Keys.Where(key => !validUserIds.Contains(key)).ToList();
 
                 foreach (var key in keysToRemove)
                 {
@@ -1183,9 +1042,7 @@ namespace MatchZy
             // Knife Round code referred from Get5, thanks to the Get5 team for their amazing job!
             (int tAlive, int tHealth) = GetAlivePlayers(2);
             (int ctAlive, int ctHealth) = GetAlivePlayers(3);
-            Log(
-                $"[KNIFE OVER] CT Alive: {ctAlive} with Total Health: {ctHealth}, T Alive: {tAlive} with Total Health: {tHealth}"
-            );
+            Log($"[KNIFE OVER] CT Alive: {ctAlive} with Total Health: {ctHealth}, T Alive: {tAlive} with Total Health: {tHealth}");
             if (ctAlive > tAlive)
             {
                 knifeWinner = 3;
@@ -1294,49 +1151,22 @@ namespace MatchZy
 
             if (!string.IsNullOrWhiteSpace(commandArg))
             {
-                if (
-                    int.TryParse(commandArg, out int readyRequired)
-                    && readyRequired >= 0
-                    && readyRequired <= 32
-                )
+                if (int.TryParse(commandArg, out int readyRequired) && readyRequired >= 0 && readyRequired <= 32)
                 {
                     minimumReadyRequired = readyRequired;
-                    string minimumReadyRequiredFormatted =
-                        (player == null)
-                            ? $"{minimumReadyRequired}"
-                            : $"{ChatColors.Green}{minimumReadyRequired}{ChatColors.Default}";
-                    ReplyToUserCommand(
-                        player,
-                        Localizer.ForPlayer(
-                            player,
-                            "matchzy.utility.minreadyplayers",
-                            minimumReadyRequiredFormatted
-                        )
-                    );
+                    string minimumReadyRequiredFormatted = (player == null) ? $"{minimumReadyRequired}" : $"{ChatColors.Green}{minimumReadyRequired}{ChatColors.Default}";
+                    ReplyToUserCommand(player, Localizer.ForPlayer(player, "matchzy.utility.minreadyplayers", minimumReadyRequiredFormatted));
                     CheckLiveRequired();
                 }
                 else
                 {
-                    ReplyToUserCommand(
-                        player,
-                        Localizer.ForPlayer(player, "matchzy.utility.rrinvalidvalue")
-                    );
+                    ReplyToUserCommand(player, Localizer.ForPlayer(player, "matchzy.utility.rrinvalidvalue"));
                 }
             }
             else
             {
-                string minimumReadyRequiredFormatted =
-                    (player == null)
-                        ? $"{minimumReadyRequired}"
-                        : $"{ChatColors.Green}{minimumReadyRequired}{ChatColors.Default}";
-                ReplyToUserCommand(
-                    player,
-                    Localizer.ForPlayer(
-                        player,
-                        "matchzy.utility.currentreadyrequired",
-                        minimumReadyRequiredFormatted
-                    )
-                );
+                string minimumReadyRequiredFormatted = (player == null) ? $"{minimumReadyRequired}" : $"{ChatColors.Green}{minimumReadyRequired}{ChatColors.Default}";
+                ReplyToUserCommand(player, Localizer.ForPlayer(player, "matchzy.utility.currentreadyrequired", minimumReadyRequiredFormatted));
             }
         }
 
@@ -1407,12 +1237,7 @@ namespace MatchZy
                     {
                         if (playerData[key].TeamNum == 3)
                         {
-                            matchzyTeam1.teamName =
-                                "team_"
-                                + RemoveSpecialCharacters(
-                                        playerData[key].PlayerName.Replace(" ", "_")
-                                    )
-                                    .TrimStart('-', '_');
+                            matchzyTeam1.teamName = "team_" + RemoveSpecialCharacters(playerData[key].PlayerName.Replace(" ", "_")).TrimStart('-', '_');
                             break;
                         }
                     }
@@ -1443,12 +1268,7 @@ namespace MatchZy
                     {
                         if (playerData[key].TeamNum == 2)
                         {
-                            matchzyTeam2.teamName =
-                                "team_"
-                                + RemoveSpecialCharacters(
-                                        playerData[key].PlayerName.Replace(" ", "_")
-                                    )
-                                    .TrimStart('-', '_');
+                            matchzyTeam2.teamName = "team_" + RemoveSpecialCharacters(playerData[key].PlayerName.Replace(" ", "_")).TrimStart('-', '_');
                             break;
                         }
                     }
@@ -1488,22 +1308,10 @@ namespace MatchZy
                 {
                     if (backoffMs[attempt] > 0)
                         await Task.Delay(backoffMs[attempt]);
-                    newMatchId = await database.InitMatchAsync(
-                        team1Name,
-                        team2Name,
-                        "-",
-                        matchSetup,
-                        currentMatchId,
-                        currentMapNum,
-                        seriesType,
-                        mapName,
-                        serverIp
-                    );
+                    newMatchId = await database.InitMatchAsync(team1Name, team2Name, "-", matchSetup, currentMatchId, currentMapNum, seriesType, mapName, serverIp);
                     if (newMatchId > 0)
                         break;
-                    Log(
-                        $"[HandleMatchStart] InitMatchAsync attempt {attempt + 1}/{backoffMs.Length} returned {newMatchId}, retrying..."
-                    );
+                    Log($"[HandleMatchStart] InitMatchAsync attempt {attempt + 1}/{backoffMs.Length} returned {newMatchId}, retrying...");
                 }
 
                 // Continue match start on game thread
@@ -1513,15 +1321,11 @@ namespace MatchZy
 
                     if (liveMatchId == -1)
                     {
-                        Log(
-                            "[HandleMatchStart] CRITICAL: Database initialization failed! Match stats will NOT be recorded."
-                        );
+                        Log("[HandleMatchStart] CRITICAL: Database initialization failed! Match stats will NOT be recorded.");
                     }
                     else
                     {
-                        Log(
-                            $"[HandleMatchStart] Match initialized successfully with matchId: {liveMatchId}"
-                        );
+                        Log($"[HandleMatchStart] Match initialized successfully with matchId: {liveMatchId}");
                     }
 
                     SetupRoundBackupFile();
@@ -1547,10 +1351,7 @@ namespace MatchZy
                     {
                         StartLive();
                     }
-                    if (
-                        matchStartMessage.Value.Trim() != ""
-                        && matchStartMessage.Value.Trim() != "\"\""
-                    )
+                    if (matchStartMessage.Value.Trim() != "" && matchStartMessage.Value.Trim() != "\"\"")
                     {
                         List<string> matchStartMessages = [.. matchStartMessage.Value.Split("$$$")];
                         foreach (string message in matchStartMessages)
@@ -1618,9 +1419,7 @@ namespace MatchZy
         {
             if (readyAvailable && !matchStarted && !isPractice && !isDryRun)
             {
-                return playerReadyStatus.TryGetValue(userId, out bool isReady) && isReady
-                    ? "[READY]"
-                    : "[UNREADY]";
+                return playerReadyStatus.TryGetValue(userId, out bool isReady) && isReady ? "[READY]" : "[UNREADY]";
             }
 
             return string.Empty;
@@ -1636,9 +1435,7 @@ namespace MatchZy
             int restartDelay = _cvMatchRestartDelay?.GetPrimitiveValue<int>() ?? 25;
 
             int currentMapNumber = matchConfig.CurrentMapNumber;
-            Log(
-                $"[HandleMatchEnd] MAP ENDED, isMatchSetup: {isMatchSetup} matchid: {liveMatchId} currentMapNumber: {currentMapNumber} restartDelay: {restartDelay}"
-            );
+            Log($"[HandleMatchEnd] MAP ENDED, isMatchSetup: {isMatchSetup} matchid: {liveMatchId} currentMapNumber: {currentMapNumber} restartDelay: {restartDelay}");
 
             StopDemoRecording(activeDemoFile, liveMatchId, currentMapNumber);
 
@@ -1647,58 +1444,26 @@ namespace MatchZy
             int team1SeriesScore = matchzyTeam1.seriesScore;
             int team2SeriesScore = matchzyTeam2.seriesScore;
 
-            string statsPath =
-                Server.GameDirectory + "/csgo/MatchZy_Stats/" + liveMatchId.ToString();
+            string statsPath = Server.GameDirectory + "/csgo/MatchZy_Stats/" + liveMatchId.ToString();
 
             // Get player stats for the map_result event
-            (
-                Dictionary<ulong, Dictionary<string, object>> playerStatsDictionary,
-                List<StatsPlayer> playerStatsListTeam1,
-                List<StatsPlayer> playerStatsListTeam2
-            ) = GetPlayerStatsDict();
+            (Dictionary<ulong, Dictionary<string, object>> playerStatsDictionary, List<StatsPlayer> playerStatsListTeam1, List<StatsPlayer> playerStatsListTeam2) = GetPlayerStatsDict();
 
             // Get demo filename
-            string? demoFilename = !string.IsNullOrEmpty(activeDemoFile)
-                ? Path.GetFileName(activeDemoFile)
-                : null;
+            string? demoFilename = !string.IsNullOrEmpty(activeDemoFile) ? Path.GetFileName(activeDemoFile) : null;
 
             var mapResultEvent = new MapResultEvent
             {
                 MatchId = liveMatchId,
                 MapNumber = currentMapNumber,
-                Winner = new Winner(
-                    t1score > t2score && reverseTeamSides["CT"] == matchzyTeam1 ? "3" : "2",
-                    t1score > t2score ? "team1" : "team2"
-                ),
-                StatsTeam1 = new MatchZyStatsTeam(
-                    matchzyTeam1.id,
-                    matchzyTeam1.teamName,
-                    team1SeriesScore,
-                    t1score,
-                    0,
-                    0,
-                    playerStatsListTeam1
-                ),
-                StatsTeam2 = new MatchZyStatsTeam(
-                    matchzyTeam2.id,
-                    matchzyTeam2.teamName,
-                    team2SeriesScore,
-                    t2score,
-                    0,
-                    0,
-                    playerStatsListTeam2
-                ),
+                Winner = new Winner(t1score > t2score && reverseTeamSides["CT"] == matchzyTeam1 ? "3" : "2", t1score > t2score ? "team1" : "team2"),
+                StatsTeam1 = new MatchZyStatsTeam(matchzyTeam1.id, matchzyTeam1.teamName, team1SeriesScore, t1score, 0, 0, playerStatsListTeam1),
+                StatsTeam2 = new MatchZyStatsTeam(matchzyTeam2.id, matchzyTeam2.teamName, team2SeriesScore, t2score, 0, 0, playerStatsListTeam2),
                 DemoFilename = demoFilename,
             };
 
             // Collect match stats JSON on main thread (accesses native APIs like Server.MapName)
-            MatchStatsJson? matchStatsForExport = CollectMatchStatsForExport(
-                demoFilename ?? string.Empty,
-                t1score,
-                t2score,
-                playerStatsListTeam1,
-                playerStatsListTeam2
-            );
+            MatchStatsJson? matchStatsForExport = CollectMatchStatsForExport(demoFilename ?? string.Empty, t1score, t2score, playerStatsListTeam1, playerStatsListTeam2);
 
             ShowMatchSummaryPanel(matchStatsForExport, t1score, t2score, winnerName);
 
@@ -1708,16 +1473,7 @@ namespace MatchZy
             Task.Run(async () =>
             {
                 await SendEventAsync(mapResultEvent);
-                await database.SetMatchEndDataAsync(
-                    matchId,
-                    currentMapNumber,
-                    winnerName,
-                    t1score,
-                    t2score,
-                    winnerName,
-                    team1SeriesScore,
-                    team2SeriesScore
-                );
+                await database.SetMatchEndDataAsync(matchId, currentMapNumber, winnerName, t1score, t2score, winnerName, team1SeriesScore, team2SeriesScore);
                 await database.WritePlayerStatsToCsvAsync(statsPath, matchId, currentMapNumber);
 
                 // Write pre-collected HLTV-style JSON stats (file I/O only, no native calls)
@@ -1733,8 +1489,7 @@ namespace MatchZy
                 return;
             }
 
-            int remainingMaps =
-                matchConfig.NumMaps - matchzyTeam1.seriesScore - matchzyTeam2.seriesScore;
+            int remainingMaps = matchConfig.NumMaps - matchzyTeam1.seriesScore - matchzyTeam2.seriesScore;
 
             if (matchzyTeam1.seriesScore == matchzyTeam2.seriesScore && remainingMaps <= 0)
             {
@@ -1744,10 +1499,7 @@ namespace MatchZy
             else if (matchConfig.SeriesCanClinch)
             {
                 int mapsToWinSeries = (matchConfig.NumMaps / 2) + 1;
-                if (
-                    matchzyTeam1.seriesScore == mapsToWinSeries
-                    || matchzyTeam2.seriesScore == mapsToWinSeries
-                )
+                if (matchzyTeam1.seriesScore == mapsToWinSeries || matchzyTeam2.seriesScore == mapsToWinSeries)
                 {
                     EndSeries(null, restartDelay, t1score, t2score);
                     return;
@@ -1761,21 +1513,15 @@ namespace MatchZy
 
             if (matchzyTeam1.seriesScore > matchzyTeam2.seriesScore)
             {
-                Server.PrintToChatAll(
-                    $"{chatPrefix} {ChatColors.Green}{matchzyTeam1.teamName}{ChatColors.Default} is winning the series {ChatColors.Green}{matchzyTeam1.seriesScore}-{matchzyTeam2.seriesScore}{ChatColors.Default}"
-                );
+                Server.PrintToChatAll($"{chatPrefix} {ChatColors.Green}{matchzyTeam1.teamName}{ChatColors.Default} is winning the series {ChatColors.Green}{matchzyTeam1.seriesScore}-{matchzyTeam2.seriesScore}{ChatColors.Default}");
             }
             else if (matchzyTeam2.seriesScore > matchzyTeam1.seriesScore)
             {
-                Server.PrintToChatAll(
-                    $"{chatPrefix} {ChatColors.Green}{matchzyTeam2.teamName}{ChatColors.Default} is winning the series {ChatColors.Green}{matchzyTeam2.seriesScore}-{matchzyTeam1.seriesScore}{ChatColors.Default}"
-                );
+                Server.PrintToChatAll($"{chatPrefix} {ChatColors.Green}{matchzyTeam2.teamName}{ChatColors.Default} is winning the series {ChatColors.Green}{matchzyTeam2.seriesScore}-{matchzyTeam1.seriesScore}{ChatColors.Default}");
             }
             else
             {
-                Server.PrintToChatAll(
-                    $"{chatPrefix} The series is tied at {ChatColors.Green}{matchzyTeam1.seriesScore}-{matchzyTeam2.seriesScore}{ChatColors.Default}"
-                );
+                Server.PrintToChatAll($"{chatPrefix} The series is tied at {ChatColors.Green}{matchzyTeam1.seriesScore}-{matchzyTeam2.seriesScore}{ChatColors.Default}");
             }
 
             matchConfig.CurrentMapNumber += 1;
@@ -1862,9 +1608,7 @@ namespace MatchZy
                         }
                         else
                         {
-                            Log(
-                                $"[ChangeMap] WARNING: Map '{mapName}' is not valid, cannot change!"
-                            );
+                            Log($"[ChangeMap] WARNING: Map '{mapName}' is not valid, cannot change!");
                         }
                     });
                 }
@@ -1904,12 +1648,7 @@ namespace MatchZy
             string team2Side = teamSides[matchzyTeam2];
 
             // Map sides to cached entities
-            if (
-                _cachedCtTeam != null
-                && _cachedCtTeam.IsValid
-                && _cachedTTeam != null
-                && _cachedTTeam.IsValid
-            )
+            if (_cachedCtTeam != null && _cachedCtTeam.IsValid && _cachedTTeam != null && _cachedTTeam.IsValid)
             {
                 team1Entity = team1Side == "CT" ? _cachedCtTeam : _cachedTTeam;
                 team2Entity = team2Side == "CT" ? _cachedCtTeam : _cachedTTeam;
@@ -2011,9 +1750,7 @@ namespace MatchZy
                     coachKillTimer?.Kill();
                     coachKillTimer = null;
                     (int t1score, int t2score) = GetTeamsScore();
-                    Server.PrintToChatAll(
-                        $"{chatPrefix} {ChatColors.Green}{matchzyTeam1.teamName} [{t1score} - {t2score}] {matchzyTeam2.teamName}"
-                    );
+                    Server.PrintToChatAll($"{chatPrefix} {ChatColors.Green}{matchzyTeam1.teamName} [{t1score} - {t2score}] {matchzyTeam2.teamName}");
 
                     ShowDamageInfo();
 
@@ -2021,20 +1758,13 @@ namespace MatchZy
                     CsTeam winnerTeam = (CsTeam)@event.Winner;
                     OnAdvancedStatsRoundEnd(winnerTeam);
 
-                    (
-                        Dictionary<ulong, Dictionary<string, object>> playerStatsDictionary,
-                        List<StatsPlayer> playerStatsListTeam1,
-                        List<StatsPlayer> playerStatsListTeam2
-                    ) = GetPlayerStatsDict();
+                    (Dictionary<ulong, Dictionary<string, object>> playerStatsDictionary, List<StatsPlayer> playerStatsListTeam1, List<StatsPlayer> playerStatsListTeam2) = GetPlayerStatsDict();
 
                     int currentMapNumber = matchConfig.CurrentMapNumber;
                     long matchId = liveMatchId;
                     int ctTeamNum = reverseTeamSides["CT"] == matchzyTeam1 ? 1 : 2;
                     int tTeamNum = reverseTeamSides["TERRORIST"] == matchzyTeam1 ? 1 : 2;
-                    Winner winner = new(
-                        @event.Winner.ToString(),
-                        t1score > t2score ? "team1" : "team2"
-                    );
+                    Winner winner = new(@event.Winner.ToString(), t1score > t2score ? "team1" : "team2");
 
                     var roundEndEvent = new MatchZyRoundEndedEvent
                     {
@@ -2044,61 +1774,30 @@ namespace MatchZy
                         Reason = @event.Reason,
                         RoundTime = 0,
                         Winner = winner,
-                        StatsTeam1 = new MatchZyStatsTeam(
-                            matchzyTeam1.id,
-                            matchzyTeam1.teamName,
-                            0,
-                            t1score,
-                            0,
-                            0,
-                            playerStatsListTeam1
-                        ),
-                        StatsTeam2 = new MatchZyStatsTeam(
-                            matchzyTeam2.id,
-                            matchzyTeam2.teamName,
-                            0,
-                            t2score,
-                            0,
-                            0,
-                            playerStatsListTeam2
-                        ),
+                        StatsTeam1 = new MatchZyStatsTeam(matchzyTeam1.id, matchzyTeam1.teamName, 0, t1score, 0, 0, playerStatsListTeam1),
+                        StatsTeam2 = new MatchZyStatsTeam(matchzyTeam2.id, matchzyTeam2.teamName, 0, t2score, 0, 0, playerStatsListTeam2),
                     };
 
                     Task.Run(async () =>
                     {
                         await SendEventAsync(roundEndEvent);
-                        var playerStatsDictInt = playerStatsDictionary.ToDictionary(
-                            kvp => (long)kvp.Key,
-                            kvp => kvp.Value
-                        );
-                        await database.UpdatePlayerStatsAsync(
-                            matchId,
-                            currentMapNumber,
-                            playerStatsDictInt
-                        );
+                        var playerStatsDictInt = playerStatsDictionary.ToDictionary(kvp => (long)kvp.Key, kvp => kvp.Value);
+                        await database.UpdatePlayerStatsAsync(matchId, currentMapNumber, playerStatsDictInt);
                     });
 
                     string round = GetRoundNumer().ToString("D2");
-                    lastBackupFileName =
-                        $"matchzy_{liveMatchId}_{matchConfig.CurrentMapNumber}_round{round}.txt";
-                    lastMatchZyBackupFileName =
-                        $"matchzy_{liveMatchId}_{matchConfig.CurrentMapNumber}_round{round}.json";
-                    Log(
-                        $"[HandlePostRoundEndEvent] Setting lastBackupFileName to {lastBackupFileName} and lastMatchZyBackupFileName to {lastMatchZyBackupFileName}"
-                    );
+                    lastBackupFileName = $"matchzy_{liveMatchId}_{matchConfig.CurrentMapNumber}_round{round}.txt";
+                    lastMatchZyBackupFileName = $"matchzy_{liveMatchId}_{matchConfig.CurrentMapNumber}_round{round}.json";
+                    Log($"[HandlePostRoundEndEvent] Setting lastBackupFileName to {lastBackupFileName} and lastMatchZyBackupFileName to {lastMatchZyBackupFileName}");
 
                     // One of the team did not use .stop command hence display the proper message after the round has ended.
                     if (stopData["ct"] && !stopData["t"])
                     {
-                        Server.PrintToChatAll(
-                            $"{chatPrefix} The round restore request by {ChatColors.Green}{reverseTeamSides["CT"].teamName}{ChatColors.Default} was cancelled as the round ended"
-                        );
+                        Server.PrintToChatAll($"{chatPrefix} The round restore request by {ChatColors.Green}{reverseTeamSides["CT"].teamName}{ChatColors.Default} was cancelled as the round ended");
                     }
                     else if (!stopData["ct"] && stopData["t"])
                     {
-                        Server.PrintToChatAll(
-                            $"{chatPrefix} The round restore request by {ChatColors.Green}{reverseTeamSides["TERRORIST"].teamName}{ChatColors.Default} was cancelled as the round ended"
-                        );
+                        Server.PrintToChatAll($"{chatPrefix} The round restore request by {ChatColors.Green}{reverseTeamSides["TERRORIST"].teamName}{ChatColors.Default} was cancelled as the round ended");
                     }
 
                     // Invalidate .stop requests after a round is completed.
@@ -2106,9 +1805,7 @@ namespace MatchZy
                     stopData["t"] = false;
 
                     bool swapRequired = IsTeamSwapRequired();
-                    Log(
-                        $"[HandlePostRoundEndEvent] swapRequired={swapRequired}, isRoundRestoring={isRoundRestoring}"
-                    );
+                    Log($"[HandlePostRoundEndEvent] swapRequired={swapRequired}, isRoundRestoring={isRoundRestoring}");
 
                     // If isRoundRestoring is true, sides will be swapped from round restore if required!
                     if (swapRequired && !isRoundRestoring)
@@ -2134,8 +1831,7 @@ namespace MatchZy
             int roundsPlayed = gameRules.TotalRoundsPlayed;
 
             int roundsPerHalf = ConVar.Find("mp_maxrounds")!.GetPrimitiveValue<int>() / 2;
-            int roundsPerOTHalf =
-                ConVar.Find("mp_overtime_maxrounds")!.GetPrimitiveValue<int>() / 2;
+            int roundsPerOTHalf = ConVar.Find("mp_overtime_maxrounds")!.GetPrimitiveValue<int>() / 2;
 
             bool halftimeEnabled = ConVar.Find("mp_halftime")!.GetPrimitiveValue<bool>();
 
@@ -2170,28 +1866,19 @@ namespace MatchZy
 
             if (IsHalfTimePhase())
             {
-                ReplyToUserCommand(
-                    player,
-                    Localizer.ForPlayer(player, "matchzy.utility.duringhalftime")
-                );
+                ReplyToUserCommand(player, Localizer.ForPlayer(player, "matchzy.utility.duringhalftime"));
                 return;
             }
 
             if (IsPostGamePhase())
             {
-                ReplyToUserCommand(
-                    player,
-                    Localizer.ForPlayer(player, "matchzy.utility.matchended")
-                );
+                ReplyToUserCommand(player, Localizer.ForPlayer(player, "matchzy.utility.matchended"));
                 return;
             }
 
             if (IsTacticalTimeoutActive())
             {
-                ReplyToUserCommand(
-                    player,
-                    Localizer.ForPlayer(player, "matchzy.utility.tacticaltimeout")
-                );
+                ReplyToUserCommand(player, Localizer.ForPlayer(player, "matchzy.utility.tacticaltimeout"));
                 return;
             }
 
@@ -2246,30 +1933,21 @@ namespace MatchZy
             if (IsHalfTimePhase())
             {
                 // ReplyToUserCommand(player, "You cannot use this command during halftime.");
-                ReplyToUserCommand(
-                    player,
-                    Localizer.ForPlayer(player, "matchzy.utility.duringhalftime")
-                );
+                ReplyToUserCommand(player, Localizer.ForPlayer(player, "matchzy.utility.duringhalftime"));
                 return;
             }
 
             if (IsPostGamePhase())
             {
                 // ReplyToUserCommand(player, "You cannot use this command after the game has ended.");
-                ReplyToUserCommand(
-                    player,
-                    Localizer.ForPlayer(player, "matchzy.utility.matchended")
-                );
+                ReplyToUserCommand(player, Localizer.ForPlayer(player, "matchzy.utility.matchended"));
                 return;
             }
 
             if (IsTacticalTimeoutActive())
             {
                 // ReplyToUserCommand(player, "You cannot use this command when tactical timeout is active.");
-                ReplyToUserCommand(
-                    player,
-                    Localizer.ForPlayer(player, "matchzy.utility.tacticaltimeout")
-                );
+                ReplyToUserCommand(player, Localizer.ForPlayer(player, "matchzy.utility.tacticaltimeout"));
                 return;
             }
 
@@ -2278,9 +1956,7 @@ namespace MatchZy
             // Server.PrintToChatAll($"{chatPrefix} {ChatColors.Green}Admin{ChatColors.Default} has paused the match.");
             if (player == null)
             {
-                Server.PrintToConsole(
-                    $"[MatchZy] {Localizer["matchzy.pause.adminpausedthematch"]}"
-                );
+                Server.PrintToConsole($"[MatchZy] {Localizer["matchzy.pause.adminpausedthematch"]}");
             }
 
             SetMatchPausedFlags("admin");
@@ -2493,21 +2169,13 @@ namespace MatchZy
             {
                 if (gameMode == 2)
                 {
-                    Server.ExecuteCommand(
-                        "ammo_grenade_limit_default 1;ammo_grenade_limit_flashbang 2;ammo_grenade_limit_total 4;bot_quota 0;cash_player_bomb_defused 300;cash_player_bomb_planted 300;cash_player_damage_hostage -30;cash_player_interact_with_hostage 300;cash_player_killed_enemy_default 300;cash_player_killed_enemy_factor 1;cash_player_killed_hostage -1000;cash_player_killed_teammate -300;cash_player_rescued_hostage 1000;cash_team_bonus_shorthanded 1000;cash_team_elimination_bomb_map 2750;cash_team_elimination_hostage_map_ct 2500;cash_team_elimination_hostage_map_t 2500;cash_team_hostage_alive 0;cash_team_hostage_interaction 600;cash_team_loser_bonus 2000;cash_team_loser_bonus_consecutive_rounds 300;cash_team_planted_bomb_but_defused 600;cash_team_rescued_hostage 600;cash_team_terrorist_win_bomb 3000;cash_team_win_by_defusing_bomb 3000;cash_team_win_by_hostage_rescue 2900;cash_team_win_by_time_running_out_bomb 2750;cash_team_win_by_time_running_out_hostage 2750;ff_damage_reduction_bullets 0.33;ff_damage_reduction_grenade 0.85;ff_damage_reduction_grenade_self 1;ff_damage_reduction_other 0.4;mp_afterroundmoney 16000;mp_autokick 0;mp_autoteambalance 0;mp_backup_restore_load_autopause 0;mp_backup_round_auto 1;mp_buy_anywhere 0;mp_buy_during_immunity 0;mp_buytime 20;mp_c4timer 40;mp_ct_default_melee weapon_knife;mp_ct_default_primary \"\";mp_ct_default_secondary weapon_hkp2000;mp_death_drop_defuser 1;mp_death_drop_grenade 2;mp_death_drop_gun 1;mp_defuser_allocation 0;mp_display_kill_assists 1;mp_endmatch_votenextmap 0;mp_forcecamera 1;mp_free_armor 0;mp_freezetime 10;mp_friendlyfire 1;mp_give_player_c4 1;mp_halftime 1;mp_halftime_duration 15;mp_halftime_pausetimer 0;mp_ignore_round_win_conditions 0;mp_limitteams 0;mp_match_can_clinch 0;mp_match_end_restart 0;mp_maxmoney 8000;"
-                    );
-                    Server.ExecuteCommand(
-                        "mp_maxrounds 16;mp_overtime_enable 0;mp_overtime_halftime_pausetimer 0;mp_overtime_maxrounds 4;mp_overtime_startmoney 8000;mp_playercashawards 1;mp_randomspawn 0;mp_respawn_immunitytime 0;mp_respawn_on_death_ct 0;mp_respawn_on_death_t 0;mp_round_restart_delay 7;mp_roundtime 1.5;mp_roundtime_defuse 1.5;mp_roundtime_hostage 1.5;mp_solid_teammates 1;mp_starting_losses 1;mp_startmoney 16000;mp_t_default_melee weapon_knife;mp_t_default_primary \"\";mp_t_default_secondary weapon_glock;mp_teamcashawards 1;mp_timelimit 0;mp_weapons_allow_map_placed 1;mp_weapons_allow_zeus 1;mp_win_panel_display_time 3;spec_freeze_deathanim_time 0;spec_freeze_time 2;spec_freeze_time_lock 2;spec_replay_enable 0;sv_allow_votes 0;sv_auto_full_alltalk_during_warmup_half_end 0;sv_damage_print_enable 0;sv_deadtalk 1;sv_hibernate_postgame_delay 300;sv_ignoregrenaderadio 0;sv_infinite_ammo 0;sv_talk_enemy_dead 0;sv_talk_enemy_living 0;sv_voiceenable 1;tv_relayvoice 0"
-                    );
+                    Server.ExecuteCommand("ammo_grenade_limit_default 1;ammo_grenade_limit_flashbang 2;ammo_grenade_limit_total 4;bot_quota 0;cash_player_bomb_defused 300;cash_player_bomb_planted 300;cash_player_damage_hostage -30;cash_player_interact_with_hostage 300;cash_player_killed_enemy_default 300;cash_player_killed_enemy_factor 1;cash_player_killed_hostage -1000;cash_player_killed_teammate -300;cash_player_rescued_hostage 1000;cash_team_bonus_shorthanded 1000;cash_team_elimination_bomb_map 2750;cash_team_elimination_hostage_map_ct 2500;cash_team_elimination_hostage_map_t 2500;cash_team_hostage_alive 0;cash_team_hostage_interaction 600;cash_team_loser_bonus 2000;cash_team_loser_bonus_consecutive_rounds 300;cash_team_planted_bomb_but_defused 600;cash_team_rescued_hostage 600;cash_team_terrorist_win_bomb 3000;cash_team_win_by_defusing_bomb 3000;cash_team_win_by_hostage_rescue 2900;cash_team_win_by_time_running_out_bomb 2750;cash_team_win_by_time_running_out_hostage 2750;ff_damage_reduction_bullets 0.33;ff_damage_reduction_grenade 0.85;ff_damage_reduction_grenade_self 1;ff_damage_reduction_other 0.4;mp_afterroundmoney 16000;mp_autokick 0;mp_autoteambalance 0;mp_backup_restore_load_autopause 0;mp_backup_round_auto 1;mp_buy_anywhere 0;mp_buy_during_immunity 0;mp_buytime 20;mp_c4timer 40;mp_ct_default_melee weapon_knife;mp_ct_default_primary \"\";mp_ct_default_secondary weapon_hkp2000;mp_death_drop_defuser 1;mp_death_drop_grenade 2;mp_death_drop_gun 1;mp_defuser_allocation 0;mp_display_kill_assists 1;mp_endmatch_votenextmap 0;mp_forcecamera 1;mp_free_armor 0;mp_freezetime 10;mp_friendlyfire 1;mp_give_player_c4 1;mp_halftime 1;mp_halftime_duration 15;mp_halftime_pausetimer 0;mp_ignore_round_win_conditions 0;mp_limitteams 0;mp_match_can_clinch 0;mp_match_end_restart 0;mp_maxmoney 8000;");
+                    Server.ExecuteCommand("mp_maxrounds 16;mp_overtime_enable 0;mp_overtime_halftime_pausetimer 0;mp_overtime_maxrounds 4;mp_overtime_startmoney 8000;mp_playercashawards 1;mp_randomspawn 0;mp_respawn_immunitytime 0;mp_respawn_on_death_ct 0;mp_respawn_on_death_t 0;mp_round_restart_delay 7;mp_roundtime 1.5;mp_roundtime_defuse 1.5;mp_roundtime_hostage 1.5;mp_solid_teammates 1;mp_starting_losses 1;mp_startmoney 16000;mp_t_default_melee weapon_knife;mp_t_default_primary \"\";mp_t_default_secondary weapon_glock;mp_teamcashawards 1;mp_timelimit 0;mp_weapons_allow_map_placed 1;mp_weapons_allow_zeus 1;mp_win_panel_display_time 3;spec_freeze_deathanim_time 0;spec_freeze_time 2;spec_freeze_time_lock 2;spec_replay_enable 0;sv_allow_votes 0;sv_auto_full_alltalk_during_warmup_half_end 0;sv_damage_print_enable 0;sv_deadtalk 1;sv_hibernate_postgame_delay 300;sv_ignoregrenaderadio 0;sv_infinite_ammo 0;sv_talk_enemy_dead 0;sv_talk_enemy_living 0;sv_voiceenable 1;tv_relayvoice 0");
                 }
                 else
                 {
-                    Server.ExecuteCommand(
-                        "ammo_grenade_limit_default 1;ammo_grenade_limit_flashbang 2;ammo_grenade_limit_total 4;bot_quota 0;cash_player_bomb_defused 300;cash_player_bomb_planted 300;cash_player_damage_hostage -30;cash_player_interact_with_hostage 300;cash_player_killed_enemy_default 300;cash_player_killed_enemy_factor 1;cash_player_killed_hostage -1000;cash_player_killed_teammate -300;cash_player_rescued_hostage 1000;cash_team_elimination_bomb_map 3250;cash_team_elimination_hostage_map_ct 3000;cash_team_elimination_hostage_map_t 3000;cash_team_hostage_alive 0;cash_team_hostage_interaction 600;cash_team_loser_bonus 1400;cash_team_loser_bonus_consecutive_rounds 500;cash_team_planted_bomb_but_defused 600;cash_team_rescued_hostage 600;cash_team_terrorist_win_bomb 3500;cash_team_win_by_defusing_bomb 3500;"
-                    );
-                    Server.ExecuteCommand(
-                        "cash_team_win_by_hostage_rescue 2900;cash_team_win_by_time_running_out_bomb 3250;cash_team_win_by_time_running_out_hostage 3250;ff_damage_reduction_bullets 0.33;ff_damage_reduction_grenade 0.85;ff_damage_reduction_grenade_self 1;ff_damage_reduction_other 0.4;mp_afterroundmoney 16000;mp_autokick 0;mp_autoteambalance 0;mp_backup_restore_load_autopause 1;mp_backup_round_auto 1;mp_buy_anywhere 0;mp_buy_during_immunity 0;mp_buytime 20;mp_c4timer 40;mp_ct_default_melee weapon_knife;mp_ct_default_primary \"\";mp_ct_default_secondary weapon_hkp2000;mp_death_drop_defuser 1;mp_death_drop_grenade 2;mp_death_drop_gun 1;mp_defuser_allocation 0;mp_display_kill_assists 1;mp_endmatch_votenextmap 0;mp_forcecamera 1;mp_free_armor 0;mp_freezetime 18;mp_friendlyfire 1;mp_give_player_c4 1;mp_halftime 1;mp_halftime_duration 15;mp_halftime_pausetimer 0;mp_ignore_round_win_conditions 0;mp_limitteams 0;mp_match_can_clinch 0;mp_match_end_restart 0;mp_maxmoney 16000;mp_maxrounds 24;mp_overtime_enable 0;mp_overtime_halftime_pausetimer 0;mp_overtime_maxrounds 6;mp_overtime_startmoney 10000;mp_playercashawards 1;mp_randomspawn 0;mp_respawn_immunitytime 0;mp_respawn_on_death_ct 0;mp_respawn_on_death_t 0;mp_round_restart_delay 5;mp_roundtime 1.92;mp_roundtime_defuse 1.92;mp_roundtime_hostage 1.92;mp_solid_teammates 1;mp_starting_losses 1;mp_startmoney 16000;mp_t_default_melee weapon_knife;mp_t_default_primary \"\";mp_t_default_secondary weapon_glock;mp_teamcashawards 1;mp_timelimit 0;mp_weapons_allow_map_placed 1;mp_weapons_allow_zeus 1;mp_win_panel_display_time 3;spec_freeze_deathanim_time 0;spec_freeze_time 2;spec_freeze_time_lock 2;spec_replay_enable 0;sv_allow_votes 1;sv_auto_full_alltalk_during_warmup_half_end 0;sv_damage_print_enable 0;sv_deadtalk 1;sv_hibernate_postgame_delay 300;sv_ignoregrenaderadio 0;sv_infinite_ammo 0;sv_talk_enemy_dead 0;sv_talk_enemy_living 0;sv_voiceenable 1;tv_relayvoice 1;mp_team_timeout_max 4;mp_team_timeout_time 30;sv_vote_command_delay 0;cash_team_bonus_shorthanded 0;mp_spectators_max 20;mp_team_intro_time 0;mp_restartgame 3;mp_warmup_end;"
-                    );
+                    Server.ExecuteCommand("ammo_grenade_limit_default 1;ammo_grenade_limit_flashbang 2;ammo_grenade_limit_total 4;bot_quota 0;cash_player_bomb_defused 300;cash_player_bomb_planted 300;cash_player_damage_hostage -30;cash_player_interact_with_hostage 300;cash_player_killed_enemy_default 300;cash_player_killed_enemy_factor 1;cash_player_killed_hostage -1000;cash_player_killed_teammate -300;cash_player_rescued_hostage 1000;cash_team_elimination_bomb_map 3250;cash_team_elimination_hostage_map_ct 3000;cash_team_elimination_hostage_map_t 3000;cash_team_hostage_alive 0;cash_team_hostage_interaction 600;cash_team_loser_bonus 1400;cash_team_loser_bonus_consecutive_rounds 500;cash_team_planted_bomb_but_defused 600;cash_team_rescued_hostage 600;cash_team_terrorist_win_bomb 3500;cash_team_win_by_defusing_bomb 3500;");
+                    Server.ExecuteCommand("cash_team_win_by_hostage_rescue 2900;cash_team_win_by_time_running_out_bomb 3250;cash_team_win_by_time_running_out_hostage 3250;ff_damage_reduction_bullets 0.33;ff_damage_reduction_grenade 0.85;ff_damage_reduction_grenade_self 1;ff_damage_reduction_other 0.4;mp_afterroundmoney 16000;mp_autokick 0;mp_autoteambalance 0;mp_backup_restore_load_autopause 1;mp_backup_round_auto 1;mp_buy_anywhere 0;mp_buy_during_immunity 0;mp_buytime 20;mp_c4timer 40;mp_ct_default_melee weapon_knife;mp_ct_default_primary \"\";mp_ct_default_secondary weapon_hkp2000;mp_death_drop_defuser 1;mp_death_drop_grenade 2;mp_death_drop_gun 1;mp_defuser_allocation 0;mp_display_kill_assists 1;mp_endmatch_votenextmap 0;mp_forcecamera 1;mp_free_armor 0;mp_freezetime 18;mp_friendlyfire 1;mp_give_player_c4 1;mp_halftime 1;mp_halftime_duration 15;mp_halftime_pausetimer 0;mp_ignore_round_win_conditions 0;mp_limitteams 0;mp_match_can_clinch 0;mp_match_end_restart 0;mp_maxmoney 16000;mp_maxrounds 24;mp_overtime_enable 0;mp_overtime_halftime_pausetimer 0;mp_overtime_maxrounds 6;mp_overtime_startmoney 10000;mp_playercashawards 1;mp_randomspawn 0;mp_respawn_immunitytime 0;mp_respawn_on_death_ct 0;mp_respawn_on_death_t 0;mp_round_restart_delay 5;mp_roundtime 1.92;mp_roundtime_defuse 1.92;mp_roundtime_hostage 1.92;mp_solid_teammates 1;mp_starting_losses 1;mp_startmoney 16000;mp_t_default_melee weapon_knife;mp_t_default_primary \"\";mp_t_default_secondary weapon_glock;mp_teamcashawards 1;mp_timelimit 0;mp_weapons_allow_map_placed 1;mp_weapons_allow_zeus 1;mp_win_panel_display_time 3;spec_freeze_deathanim_time 0;spec_freeze_time 2;spec_freeze_time_lock 2;spec_replay_enable 0;sv_allow_votes 1;sv_auto_full_alltalk_during_warmup_half_end 0;sv_damage_print_enable 0;sv_deadtalk 1;sv_hibernate_postgame_delay 300;sv_ignoregrenaderadio 0;sv_infinite_ammo 0;sv_talk_enemy_dead 0;sv_talk_enemy_living 0;sv_voiceenable 1;tv_relayvoice 1;mp_team_timeout_max 4;mp_team_timeout_time 30;sv_vote_command_delay 0;cash_team_bonus_shorthanded 0;mp_spectators_max 20;mp_team_intro_time 0;mp_restartgame 3;mp_warmup_end;");
                 }
             }
         }
@@ -2536,21 +2204,13 @@ namespace MatchZy
             {
                 if (gameMode == 2)
                 {
-                    Server.ExecuteCommand(
-                        "ammo_grenade_limit_default 1;ammo_grenade_limit_flashbang 2;ammo_grenade_limit_total 4;bot_quota 0;cash_player_bomb_defused 300;cash_player_bomb_planted 300;cash_player_damage_hostage -30;cash_player_interact_with_hostage 300;cash_player_killed_enemy_default 300;cash_player_killed_enemy_factor 1;cash_player_killed_hostage -1000;cash_player_killed_teammate -300;cash_player_rescued_hostage 1000;cash_team_bonus_shorthanded 1000;cash_team_elimination_bomb_map 2750;cash_team_elimination_hostage_map_ct 2500;cash_team_elimination_hostage_map_t 2500;cash_team_hostage_alive 0;cash_team_hostage_interaction 600;cash_team_loser_bonus 2000;cash_team_loser_bonus_consecutive_rounds 300;cash_team_planted_bomb_but_defused 600;cash_team_rescued_hostage 600;cash_team_terrorist_win_bomb 3000;cash_team_win_by_defusing_bomb 3000;cash_team_win_by_hostage_rescue 2900;cash_team_win_by_time_running_out_bomb 2750;cash_team_win_by_time_running_out_hostage 2750;ff_damage_reduction_bullets 0.33;ff_damage_reduction_grenade 0.85;ff_damage_reduction_grenade_self 1;ff_damage_reduction_other 0.4;mp_afterroundmoney 0;mp_autokick 0;mp_autoteambalance 0;mp_backup_restore_load_autopause 0;mp_backup_round_auto 1;mp_buy_anywhere 0;mp_buy_during_immunity 0;mp_buytime 20;mp_c4timer 40;mp_ct_default_melee weapon_knife;mp_ct_default_primary \"\";mp_ct_default_secondary weapon_hkp2000;mp_death_drop_defuser 1;mp_death_drop_grenade 2;mp_death_drop_gun 1;mp_defuser_allocation 0;mp_display_kill_assists 1;mp_endmatch_votenextmap 0;mp_forcecamera 1;mp_free_armor 0;mp_freezetime 10;mp_friendlyfire 1;mp_give_player_c4 1;mp_halftime 1;mp_halftime_duration 15;mp_halftime_pausetimer 0;mp_ignore_round_win_conditions 0;mp_limitteams 0;mp_match_can_clinch 0;mp_match_end_restart 0;mp_maxmoney 8000;"
-                    );
-                    Server.ExecuteCommand(
-                        "mp_maxrounds 16;mp_overtime_enable 0;mp_overtime_halftime_pausetimer 0;mp_overtime_maxrounds 4;mp_overtime_startmoney 8000;mp_playercashawards 1;mp_randomspawn 0;mp_respawn_immunitytime 0;mp_respawn_on_death_ct 0;mp_respawn_on_death_t 0;mp_round_restart_delay 7;mp_roundtime 1.5;mp_roundtime_defuse 1.5;mp_roundtime_hostage 1.5;mp_solid_teammates 1;mp_starting_losses 1;mp_startmoney 800;mp_t_default_melee weapon_knife;mp_t_default_primary \"\";mp_t_default_secondary weapon_glock;mp_teamcashawards 1;mp_timelimit 0;mp_weapons_allow_map_placed 1;mp_weapons_allow_zeus 1;mp_win_panel_display_time 3;spec_freeze_deathanim_time 0;spec_freeze_time 2;spec_freeze_time_lock 2;spec_replay_enable 0;sv_allow_votes 0;sv_auto_full_alltalk_during_warmup_half_end 0;sv_damage_print_enable 0;sv_deadtalk 1;sv_hibernate_postgame_delay 300;sv_ignoregrenaderadio 0;sv_infinite_ammo 0;sv_talk_enemy_dead 0;sv_talk_enemy_living 0;sv_voiceenable 1;tv_relayvoice 0"
-                    );
+                    Server.ExecuteCommand("ammo_grenade_limit_default 1;ammo_grenade_limit_flashbang 2;ammo_grenade_limit_total 4;bot_quota 0;cash_player_bomb_defused 300;cash_player_bomb_planted 300;cash_player_damage_hostage -30;cash_player_interact_with_hostage 300;cash_player_killed_enemy_default 300;cash_player_killed_enemy_factor 1;cash_player_killed_hostage -1000;cash_player_killed_teammate -300;cash_player_rescued_hostage 1000;cash_team_bonus_shorthanded 1000;cash_team_elimination_bomb_map 2750;cash_team_elimination_hostage_map_ct 2500;cash_team_elimination_hostage_map_t 2500;cash_team_hostage_alive 0;cash_team_hostage_interaction 600;cash_team_loser_bonus 2000;cash_team_loser_bonus_consecutive_rounds 300;cash_team_planted_bomb_but_defused 600;cash_team_rescued_hostage 600;cash_team_terrorist_win_bomb 3000;cash_team_win_by_defusing_bomb 3000;cash_team_win_by_hostage_rescue 2900;cash_team_win_by_time_running_out_bomb 2750;cash_team_win_by_time_running_out_hostage 2750;ff_damage_reduction_bullets 0.33;ff_damage_reduction_grenade 0.85;ff_damage_reduction_grenade_self 1;ff_damage_reduction_other 0.4;mp_afterroundmoney 0;mp_autokick 0;mp_autoteambalance 0;mp_backup_restore_load_autopause 0;mp_backup_round_auto 1;mp_buy_anywhere 0;mp_buy_during_immunity 0;mp_buytime 20;mp_c4timer 40;mp_ct_default_melee weapon_knife;mp_ct_default_primary \"\";mp_ct_default_secondary weapon_hkp2000;mp_death_drop_defuser 1;mp_death_drop_grenade 2;mp_death_drop_gun 1;mp_defuser_allocation 0;mp_display_kill_assists 1;mp_endmatch_votenextmap 0;mp_forcecamera 1;mp_free_armor 0;mp_freezetime 10;mp_friendlyfire 1;mp_give_player_c4 1;mp_halftime 1;mp_halftime_duration 15;mp_halftime_pausetimer 0;mp_ignore_round_win_conditions 0;mp_limitteams 0;mp_match_can_clinch 0;mp_match_end_restart 0;mp_maxmoney 8000;");
+                    Server.ExecuteCommand("mp_maxrounds 16;mp_overtime_enable 0;mp_overtime_halftime_pausetimer 0;mp_overtime_maxrounds 4;mp_overtime_startmoney 8000;mp_playercashawards 1;mp_randomspawn 0;mp_respawn_immunitytime 0;mp_respawn_on_death_ct 0;mp_respawn_on_death_t 0;mp_round_restart_delay 7;mp_roundtime 1.5;mp_roundtime_defuse 1.5;mp_roundtime_hostage 1.5;mp_solid_teammates 1;mp_starting_losses 1;mp_startmoney 800;mp_t_default_melee weapon_knife;mp_t_default_primary \"\";mp_t_default_secondary weapon_glock;mp_teamcashawards 1;mp_timelimit 0;mp_weapons_allow_map_placed 1;mp_weapons_allow_zeus 1;mp_win_panel_display_time 3;spec_freeze_deathanim_time 0;spec_freeze_time 2;spec_freeze_time_lock 2;spec_replay_enable 0;sv_allow_votes 0;sv_auto_full_alltalk_during_warmup_half_end 0;sv_damage_print_enable 0;sv_deadtalk 1;sv_hibernate_postgame_delay 300;sv_ignoregrenaderadio 0;sv_infinite_ammo 0;sv_talk_enemy_dead 0;sv_talk_enemy_living 0;sv_voiceenable 1;tv_relayvoice 0");
                 }
                 else
                 {
-                    Server.ExecuteCommand(
-                        "ammo_grenade_limit_default 1;ammo_grenade_limit_flashbang 2;ammo_grenade_limit_total 4;bot_quota 0;cash_player_bomb_defused 300;cash_player_bomb_planted 300;cash_player_damage_hostage -30;cash_player_interact_with_hostage 300;cash_player_killed_enemy_default 300;cash_player_killed_enemy_factor 1;cash_player_killed_hostage -1000;cash_player_killed_teammate -300;cash_player_rescued_hostage 1000;cash_team_elimination_bomb_map 3250;cash_team_elimination_hostage_map_ct 3000;cash_team_elimination_hostage_map_t 3000;cash_team_hostage_alive 0;cash_team_hostage_interaction 600;cash_team_loser_bonus 1400;cash_team_loser_bonus_consecutive_rounds 500;cash_team_planted_bomb_but_defused 600;cash_team_rescued_hostage 600;cash_team_terrorist_win_bomb 3500;cash_team_win_by_defusing_bomb 3500;"
-                    );
-                    Server.ExecuteCommand(
-                        "cash_team_win_by_hostage_rescue 2900;cash_team_win_by_time_running_out_bomb 3250;cash_team_win_by_time_running_out_hostage 3250;ff_damage_reduction_bullets 0.33;ff_damage_reduction_grenade 0.85;ff_damage_reduction_grenade_self 1;ff_damage_reduction_other 0.4;mp_afterroundmoney 0;mp_autokick 0;mp_autoteambalance 0;mp_backup_restore_load_autopause 1;mp_backup_round_auto 1;mp_buy_anywhere 0;mp_buy_during_immunity 0;mp_buytime 20;mp_c4timer 40;mp_ct_default_melee weapon_knife;mp_ct_default_primary \"\";mp_ct_default_secondary weapon_hkp2000;mp_death_drop_defuser 1;mp_death_drop_grenade 2;mp_death_drop_gun 1;mp_defuser_allocation 0;mp_display_kill_assists 1;mp_endmatch_votenextmap 0;mp_forcecamera 1;mp_free_armor 0;mp_freezetime 18;mp_friendlyfire 1;mp_give_player_c4 1;mp_halftime 1;mp_halftime_duration 15;mp_halftime_pausetimer 0;mp_ignore_round_win_conditions 0;mp_limitteams 0;mp_match_can_clinch 0;mp_match_end_restart 0;mp_maxmoney 16000;mp_maxrounds 24;mp_overtime_enable 0;mp_overtime_halftime_pausetimer 0;mp_overtime_maxrounds 6;mp_overtime_startmoney 10000;mp_playercashawards 1;mp_randomspawn 0;mp_respawn_immunitytime 0;mp_respawn_on_death_ct 0;mp_respawn_on_death_t 0;mp_round_restart_delay 5;mp_roundtime 1.92;mp_roundtime_defuse 1.92;mp_roundtime_hostage 1.92;mp_solid_teammates 1;mp_starting_losses 1;mp_startmoney 800;mp_t_default_melee weapon_knife;mp_t_default_primary \"\";mp_t_default_secondary weapon_glock;mp_teamcashawards 1;mp_timelimit 0;mp_weapons_allow_map_placed 1;mp_weapons_allow_zeus 1;mp_win_panel_display_time 3;spec_freeze_deathanim_time 0;spec_freeze_time 2;spec_freeze_time_lock 2;spec_replay_enable 0;sv_allow_votes 1;sv_auto_full_alltalk_during_warmup_half_end 0;sv_damage_print_enable 0;sv_deadtalk 1;sv_hibernate_postgame_delay 300;sv_ignoregrenaderadio 0;sv_infinite_ammo 0;sv_talk_enemy_dead 0;sv_talk_enemy_living 0;sv_voiceenable 1;tv_relayvoice 1;mp_team_timeout_max 4;mp_team_timeout_time 30;sv_vote_command_delay 0;cash_team_bonus_shorthanded 0;mp_spectators_max 20;mp_team_intro_time 0;mp_restartgame 3;mp_warmup_end;"
-                    );
+                    Server.ExecuteCommand("ammo_grenade_limit_default 1;ammo_grenade_limit_flashbang 2;ammo_grenade_limit_total 4;bot_quota 0;cash_player_bomb_defused 300;cash_player_bomb_planted 300;cash_player_damage_hostage -30;cash_player_interact_with_hostage 300;cash_player_killed_enemy_default 300;cash_player_killed_enemy_factor 1;cash_player_killed_hostage -1000;cash_player_killed_teammate -300;cash_player_rescued_hostage 1000;cash_team_elimination_bomb_map 3250;cash_team_elimination_hostage_map_ct 3000;cash_team_elimination_hostage_map_t 3000;cash_team_hostage_alive 0;cash_team_hostage_interaction 600;cash_team_loser_bonus 1400;cash_team_loser_bonus_consecutive_rounds 500;cash_team_planted_bomb_but_defused 600;cash_team_rescued_hostage 600;cash_team_terrorist_win_bomb 3500;cash_team_win_by_defusing_bomb 3500;");
+                    Server.ExecuteCommand("cash_team_win_by_hostage_rescue 2900;cash_team_win_by_time_running_out_bomb 3250;cash_team_win_by_time_running_out_hostage 3250;ff_damage_reduction_bullets 0.33;ff_damage_reduction_grenade 0.85;ff_damage_reduction_grenade_self 1;ff_damage_reduction_other 0.4;mp_afterroundmoney 0;mp_autokick 0;mp_autoteambalance 0;mp_backup_restore_load_autopause 1;mp_backup_round_auto 1;mp_buy_anywhere 0;mp_buy_during_immunity 0;mp_buytime 20;mp_c4timer 40;mp_ct_default_melee weapon_knife;mp_ct_default_primary \"\";mp_ct_default_secondary weapon_hkp2000;mp_death_drop_defuser 1;mp_death_drop_grenade 2;mp_death_drop_gun 1;mp_defuser_allocation 0;mp_display_kill_assists 1;mp_endmatch_votenextmap 0;mp_forcecamera 1;mp_free_armor 0;mp_freezetime 18;mp_friendlyfire 1;mp_give_player_c4 1;mp_halftime 1;mp_halftime_duration 15;mp_halftime_pausetimer 0;mp_ignore_round_win_conditions 0;mp_limitteams 0;mp_match_can_clinch 0;mp_match_end_restart 0;mp_maxmoney 16000;mp_maxrounds 24;mp_overtime_enable 0;mp_overtime_halftime_pausetimer 0;mp_overtime_maxrounds 6;mp_overtime_startmoney 10000;mp_playercashawards 1;mp_randomspawn 0;mp_respawn_immunitytime 0;mp_respawn_on_death_ct 0;mp_respawn_on_death_t 0;mp_round_restart_delay 5;mp_roundtime 1.92;mp_roundtime_defuse 1.92;mp_roundtime_hostage 1.92;mp_solid_teammates 1;mp_starting_losses 1;mp_startmoney 800;mp_t_default_melee weapon_knife;mp_t_default_primary \"\";mp_t_default_secondary weapon_glock;mp_teamcashawards 1;mp_timelimit 0;mp_weapons_allow_map_placed 1;mp_weapons_allow_zeus 1;mp_win_panel_display_time 3;spec_freeze_deathanim_time 0;spec_freeze_time 2;spec_freeze_time_lock 2;spec_replay_enable 0;sv_allow_votes 1;sv_auto_full_alltalk_during_warmup_half_end 0;sv_damage_print_enable 0;sv_deadtalk 1;sv_hibernate_postgame_delay 300;sv_ignoregrenaderadio 0;sv_infinite_ammo 0;sv_talk_enemy_dead 0;sv_talk_enemy_living 0;sv_voiceenable 1;tv_relayvoice 1;mp_team_timeout_max 4;mp_team_timeout_time 30;sv_vote_command_delay 0;cash_team_bonus_shorthanded 0;mp_spectators_max 20;mp_team_intro_time 0;mp_restartgame 3;mp_warmup_end;");
                 }
             }
         }
@@ -2579,21 +2239,13 @@ namespace MatchZy
             {
                 if (gameMode == 2)
                 {
-                    Server.ExecuteCommand(
-                        "ammo_grenade_limit_default 1;ammo_grenade_limit_flashbang 2;ammo_grenade_limit_total 4;bot_quota 0;cash_player_bomb_defused 300;cash_player_bomb_planted 300;cash_player_damage_hostage -30;cash_player_interact_with_hostage 300;cash_player_killed_enemy_default 300;cash_player_killed_enemy_factor 1;cash_player_killed_hostage -1000;cash_player_killed_teammate -300;cash_player_rescued_hostage 1000;cash_team_bonus_shorthanded 1000;cash_team_elimination_bomb_map 2750;cash_team_elimination_hostage_map_ct 2500;cash_team_elimination_hostage_map_t 2500;cash_team_hostage_alive 0;cash_team_hostage_interaction 600;cash_team_loser_bonus 2000;cash_team_loser_bonus_consecutive_rounds 300;cash_team_planted_bomb_but_defused 600;cash_team_rescued_hostage 600;cash_team_terrorist_win_bomb 3000;cash_team_win_by_defusing_bomb 3000;cash_team_win_by_hostage_rescue 2900;cash_team_win_by_time_running_out_bomb 2750;cash_team_win_by_time_running_out_hostage 2750;ff_damage_reduction_bullets 0.33;ff_damage_reduction_grenade 0.85;ff_damage_reduction_grenade_self 1;ff_damage_reduction_other 0.4;mp_afterroundmoney 0;mp_autokick 0;mp_autoteambalance 0;mp_backup_restore_load_autopause 0;mp_backup_round_auto 1;mp_buy_anywhere 0;mp_buy_during_immunity 0;mp_buytime 20;mp_c4timer 40;mp_ct_default_melee weapon_knife;mp_ct_default_primary \"\";mp_ct_default_secondary weapon_hkp2000;mp_death_drop_defuser 1;mp_death_drop_grenade 2;mp_death_drop_gun 1;mp_defuser_allocation 0;mp_display_kill_assists 1;mp_endmatch_votenextmap 0;mp_forcecamera 1;mp_free_armor 0;mp_freezetime 10;mp_friendlyfire 1;mp_give_player_c4 1;mp_halftime 1;mp_halftime_duration 15;mp_halftime_pausetimer 0;mp_ignore_round_win_conditions 0;mp_limitteams 0;mp_match_can_clinch 1;mp_match_end_restart 0;mp_maxmoney 8000;"
-                    );
-                    Server.ExecuteCommand(
-                        "mp_maxrounds 16;mp_overtime_enable 1;mp_overtime_halftime_pausetimer 0;mp_overtime_maxrounds 4;mp_overtime_startmoney 8000;mp_playercashawards 1;mp_randomspawn 0;mp_respawn_immunitytime 0;mp_respawn_on_death_ct 0;mp_respawn_on_death_t 0;mp_round_restart_delay 7;mp_roundtime 1.5;mp_roundtime_defuse 1.5;mp_roundtime_hostage 1.5;mp_solid_teammates 1;mp_starting_losses 1;mp_startmoney 800;mp_t_default_melee weapon_knife;mp_t_default_primary \"\";mp_t_default_secondary weapon_glock;mp_teamcashawards 1;mp_timelimit 0;mp_weapons_allow_map_placed 1;mp_weapons_allow_zeus 1;mp_win_panel_display_time 3;spec_freeze_deathanim_time 0;spec_freeze_time 2;spec_freeze_time_lock 2;spec_replay_enable 0;sv_allow_votes 0;sv_auto_full_alltalk_during_warmup_half_end 0;sv_damage_print_enable 0;sv_deadtalk 1;sv_hibernate_postgame_delay 300;sv_ignoregrenaderadio 0;sv_infinite_ammo 0;sv_talk_enemy_dead 0;sv_talk_enemy_living 0;sv_voiceenable 1;tv_relayvoice 0"
-                    );
+                    Server.ExecuteCommand("ammo_grenade_limit_default 1;ammo_grenade_limit_flashbang 2;ammo_grenade_limit_total 4;bot_quota 0;cash_player_bomb_defused 300;cash_player_bomb_planted 300;cash_player_damage_hostage -30;cash_player_interact_with_hostage 300;cash_player_killed_enemy_default 300;cash_player_killed_enemy_factor 1;cash_player_killed_hostage -1000;cash_player_killed_teammate -300;cash_player_rescued_hostage 1000;cash_team_bonus_shorthanded 1000;cash_team_elimination_bomb_map 2750;cash_team_elimination_hostage_map_ct 2500;cash_team_elimination_hostage_map_t 2500;cash_team_hostage_alive 0;cash_team_hostage_interaction 600;cash_team_loser_bonus 2000;cash_team_loser_bonus_consecutive_rounds 300;cash_team_planted_bomb_but_defused 600;cash_team_rescued_hostage 600;cash_team_terrorist_win_bomb 3000;cash_team_win_by_defusing_bomb 3000;cash_team_win_by_hostage_rescue 2900;cash_team_win_by_time_running_out_bomb 2750;cash_team_win_by_time_running_out_hostage 2750;ff_damage_reduction_bullets 0.33;ff_damage_reduction_grenade 0.85;ff_damage_reduction_grenade_self 1;ff_damage_reduction_other 0.4;mp_afterroundmoney 0;mp_autokick 0;mp_autoteambalance 0;mp_backup_restore_load_autopause 0;mp_backup_round_auto 1;mp_buy_anywhere 0;mp_buy_during_immunity 0;mp_buytime 20;mp_c4timer 40;mp_ct_default_melee weapon_knife;mp_ct_default_primary \"\";mp_ct_default_secondary weapon_hkp2000;mp_death_drop_defuser 1;mp_death_drop_grenade 2;mp_death_drop_gun 1;mp_defuser_allocation 0;mp_display_kill_assists 1;mp_endmatch_votenextmap 0;mp_forcecamera 1;mp_free_armor 0;mp_freezetime 10;mp_friendlyfire 1;mp_give_player_c4 1;mp_halftime 1;mp_halftime_duration 15;mp_halftime_pausetimer 0;mp_ignore_round_win_conditions 0;mp_limitteams 0;mp_match_can_clinch 1;mp_match_end_restart 0;mp_maxmoney 8000;");
+                    Server.ExecuteCommand("mp_maxrounds 16;mp_overtime_enable 1;mp_overtime_halftime_pausetimer 0;mp_overtime_maxrounds 4;mp_overtime_startmoney 8000;mp_playercashawards 1;mp_randomspawn 0;mp_respawn_immunitytime 0;mp_respawn_on_death_ct 0;mp_respawn_on_death_t 0;mp_round_restart_delay 7;mp_roundtime 1.5;mp_roundtime_defuse 1.5;mp_roundtime_hostage 1.5;mp_solid_teammates 1;mp_starting_losses 1;mp_startmoney 800;mp_t_default_melee weapon_knife;mp_t_default_primary \"\";mp_t_default_secondary weapon_glock;mp_teamcashawards 1;mp_timelimit 0;mp_weapons_allow_map_placed 1;mp_weapons_allow_zeus 1;mp_win_panel_display_time 3;spec_freeze_deathanim_time 0;spec_freeze_time 2;spec_freeze_time_lock 2;spec_replay_enable 0;sv_allow_votes 0;sv_auto_full_alltalk_during_warmup_half_end 0;sv_damage_print_enable 0;sv_deadtalk 1;sv_hibernate_postgame_delay 300;sv_ignoregrenaderadio 0;sv_infinite_ammo 0;sv_talk_enemy_dead 0;sv_talk_enemy_living 0;sv_voiceenable 1;tv_relayvoice 0");
                 }
                 else
                 {
-                    Server.ExecuteCommand(
-                        "ammo_grenade_limit_default 1;ammo_grenade_limit_flashbang 2;ammo_grenade_limit_total 4;bot_quota 0;cash_player_bomb_defused 300;cash_player_bomb_planted 300;cash_player_damage_hostage -30;cash_player_interact_with_hostage 300;cash_player_killed_enemy_default 300;cash_player_killed_enemy_factor 1;cash_player_killed_hostage -1000;cash_player_killed_teammate -300;cash_player_rescued_hostage 1000;cash_team_elimination_bomb_map 3250;cash_team_elimination_hostage_map_ct 3000;cash_team_elimination_hostage_map_t 3000;cash_team_hostage_alive 0;cash_team_hostage_interaction 600;cash_team_loser_bonus 1400;cash_team_loser_bonus_consecutive_rounds 500;cash_team_planted_bomb_but_defused 600;cash_team_rescued_hostage 600;cash_team_terrorist_win_bomb 3500;cash_team_win_by_defusing_bomb 3500;"
-                    );
-                    Server.ExecuteCommand(
-                        "cash_team_win_by_hostage_rescue 2900;cash_team_win_by_time_running_out_bomb 3250;cash_team_win_by_time_running_out_hostage 3250;ff_damage_reduction_bullets 0.33;ff_damage_reduction_grenade 0.85;ff_damage_reduction_grenade_self 1;ff_damage_reduction_other 0.4;mp_afterroundmoney 0;mp_autokick 0;mp_autoteambalance 0;mp_backup_restore_load_autopause 1;mp_backup_round_auto 1;mp_buy_anywhere 0;mp_buy_during_immunity 0;mp_buytime 20;mp_c4timer 40;mp_ct_default_melee weapon_knife;mp_ct_default_primary \"\";mp_ct_default_secondary weapon_hkp2000;mp_death_drop_defuser 1;mp_death_drop_grenade 2;mp_death_drop_gun 1;mp_defuser_allocation 0;mp_display_kill_assists 1;mp_endmatch_votenextmap 0;mp_forcecamera 1;mp_free_armor 0;mp_freezetime 18;mp_friendlyfire 1;mp_give_player_c4 1;mp_halftime 1;mp_halftime_duration 15;mp_halftime_pausetimer 0;mp_ignore_round_win_conditions 0;mp_limitteams 0;mp_match_can_clinch 1;mp_match_end_restart 0;mp_maxmoney 16000;mp_maxrounds 24;mp_overtime_enable 1;mp_overtime_halftime_pausetimer 0;mp_overtime_maxrounds 6;mp_overtime_startmoney 10000;mp_playercashawards 1;mp_randomspawn 0;mp_respawn_immunitytime 0;mp_respawn_on_death_ct 0;mp_respawn_on_death_t 0;mp_round_restart_delay 5;mp_roundtime 1.92;mp_roundtime_defuse 1.92;mp_roundtime_hostage 1.92;mp_solid_teammates 1;mp_starting_losses 1;mp_startmoney 800;mp_t_default_melee weapon_knife;mp_t_default_primary \"\";mp_t_default_secondary weapon_glock;mp_teamcashawards 1;mp_timelimit 0;mp_weapons_allow_map_placed 1;mp_weapons_allow_zeus 1;mp_win_panel_display_time 3;spec_freeze_deathanim_time 0;spec_freeze_time 2;spec_freeze_time_lock 2;spec_replay_enable 0;sv_allow_votes 1;sv_auto_full_alltalk_during_warmup_half_end 0;sv_damage_print_enable 0;sv_deadtalk 1;sv_hibernate_postgame_delay 300;sv_ignoregrenaderadio 0;sv_infinite_ammo 0;sv_talk_enemy_dead 0;sv_talk_enemy_living 0;sv_voiceenable 1;tv_relayvoice 1;mp_team_timeout_max 4;mp_team_timeout_time 30;sv_vote_command_delay 0;cash_team_bonus_shorthanded 0;mp_spectators_max 20;mp_team_intro_time 0;mp_restartgame 3;mp_warmup_end;"
-                    );
+                    Server.ExecuteCommand("ammo_grenade_limit_default 1;ammo_grenade_limit_flashbang 2;ammo_grenade_limit_total 4;bot_quota 0;cash_player_bomb_defused 300;cash_player_bomb_planted 300;cash_player_damage_hostage -30;cash_player_interact_with_hostage 300;cash_player_killed_enemy_default 300;cash_player_killed_enemy_factor 1;cash_player_killed_hostage -1000;cash_player_killed_teammate -300;cash_player_rescued_hostage 1000;cash_team_elimination_bomb_map 3250;cash_team_elimination_hostage_map_ct 3000;cash_team_elimination_hostage_map_t 3000;cash_team_hostage_alive 0;cash_team_hostage_interaction 600;cash_team_loser_bonus 1400;cash_team_loser_bonus_consecutive_rounds 500;cash_team_planted_bomb_but_defused 600;cash_team_rescued_hostage 600;cash_team_terrorist_win_bomb 3500;cash_team_win_by_defusing_bomb 3500;");
+                    Server.ExecuteCommand("cash_team_win_by_hostage_rescue 2900;cash_team_win_by_time_running_out_bomb 3250;cash_team_win_by_time_running_out_hostage 3250;ff_damage_reduction_bullets 0.33;ff_damage_reduction_grenade 0.85;ff_damage_reduction_grenade_self 1;ff_damage_reduction_other 0.4;mp_afterroundmoney 0;mp_autokick 0;mp_autoteambalance 0;mp_backup_restore_load_autopause 1;mp_backup_round_auto 1;mp_buy_anywhere 0;mp_buy_during_immunity 0;mp_buytime 20;mp_c4timer 40;mp_ct_default_melee weapon_knife;mp_ct_default_primary \"\";mp_ct_default_secondary weapon_hkp2000;mp_death_drop_defuser 1;mp_death_drop_grenade 2;mp_death_drop_gun 1;mp_defuser_allocation 0;mp_display_kill_assists 1;mp_endmatch_votenextmap 0;mp_forcecamera 1;mp_free_armor 0;mp_freezetime 18;mp_friendlyfire 1;mp_give_player_c4 1;mp_halftime 1;mp_halftime_duration 15;mp_halftime_pausetimer 0;mp_ignore_round_win_conditions 0;mp_limitteams 0;mp_match_can_clinch 1;mp_match_end_restart 0;mp_maxmoney 16000;mp_maxrounds 24;mp_overtime_enable 1;mp_overtime_halftime_pausetimer 0;mp_overtime_maxrounds 6;mp_overtime_startmoney 10000;mp_playercashawards 1;mp_randomspawn 0;mp_respawn_immunitytime 0;mp_respawn_on_death_ct 0;mp_respawn_on_death_t 0;mp_round_restart_delay 5;mp_roundtime 1.92;mp_roundtime_defuse 1.92;mp_roundtime_hostage 1.92;mp_solid_teammates 1;mp_starting_losses 1;mp_startmoney 800;mp_t_default_melee weapon_knife;mp_t_default_primary \"\";mp_t_default_secondary weapon_glock;mp_teamcashawards 1;mp_timelimit 0;mp_weapons_allow_map_placed 1;mp_weapons_allow_zeus 1;mp_win_panel_display_time 3;spec_freeze_deathanim_time 0;spec_freeze_time 2;spec_freeze_time_lock 2;spec_replay_enable 0;sv_allow_votes 1;sv_auto_full_alltalk_during_warmup_half_end 0;sv_damage_print_enable 0;sv_deadtalk 1;sv_hibernate_postgame_delay 300;sv_ignoregrenaderadio 0;sv_infinite_ammo 0;sv_talk_enemy_dead 0;sv_talk_enemy_living 0;sv_voiceenable 1;tv_relayvoice 1;mp_team_timeout_max 4;mp_team_timeout_time 30;sv_vote_command_delay 0;cash_team_bonus_shorthanded 0;mp_spectators_max 20;mp_team_intro_time 0;mp_restartgame 3;mp_warmup_end;");
                 }
             }
         }
@@ -2601,14 +2253,8 @@ namespace MatchZy
         private void SendPlayerNotAdminMessage(CCSPlayerController? player)
         {
             // ReplyToUserCommand(player, "You do not have permission to use this command!");
-            ReplyToUserCommand(
-                player,
-                Localizer.ForPlayer(player, "matchzy.utility.dontpermission")
-            );
-            ReplyToUserCommand(
-                player,
-                "You are not an admin. Make sure you has been added as Admin!"
-            );
+            ReplyToUserCommand(player, Localizer.ForPlayer(player, "matchzy.utility.dontpermission"));
+            ReplyToUserCommand(player, "You are not an admin. Make sure you has been added as Admin!");
         }
 
         private string GetColorTreatedString(string message)
@@ -2628,12 +2274,7 @@ namespace MatchZy
 
                 // Create a case-insensitive regular expression pattern for the color name
                 string patternIgnoreCase = Regex.Escape(pattern);
-                message = Regex.Replace(
-                    message,
-                    patternIgnoreCase,
-                    replacement,
-                    RegexOptions.IgnoreCase
-                );
+                message = Regex.Replace(message, patternIgnoreCase, replacement, RegexOptions.IgnoreCase);
             }
 
             return message;
@@ -2650,106 +2291,26 @@ namespace MatchZy
             if (isPractice)
             {
                 player!.PrintToChat($"{chatPrefix} {ChatColors.Gold}Practice Mode Commands:");
-                player.PrintToChat(
-                    $" {ChatColors.Green}Spawns:{ChatColors.Default} .spawn .ctspawn .tspawn .bestspawn .worstspawn"
-                );
-                player.PrintToChat(
-                    $" {ChatColors.Green}Bots:{ChatColors.Default} .bot .cbot .boost .nobot .clearbots"
-                );
-                player.PrintToChat(
-                    $" {ChatColors.Green}Nades:{ChatColors.Default} .savenade .loadnade .listnades .rethrow .throwindex"
-                );
-                player.PrintToChat(
-                    $" {ChatColors.Green}Utility:{ChatColors.Default} .clear .ff .god .traj .impacts .break .cam .timer"
-                );
-                player.PrintToChat(
-                    $" {ChatColors.Green}Teams:{ChatColors.Default} .ct .t .spec .fas"
-                );
+                player.PrintToChat($" {ChatColors.Green}Spawns:{ChatColors.Default} .spawn .ctspawn .tspawn .bestspawn .worstspawn");
+                player.PrintToChat($" {ChatColors.Green}Bots:{ChatColors.Default} .bot .cbot .boost .nobot .clearbots");
+                player.PrintToChat($" {ChatColors.Green}Nades:{ChatColors.Default} .savenade .loadnade .listnades .rethrow .throwindex");
+                player.PrintToChat($" {ChatColors.Green}Utility:{ChatColors.Default} .clear .ff .god .traj .impacts .break .cam .timer");
+                player.PrintToChat($" {ChatColors.Green}Teams:{ChatColors.Default} .ct .t .spec .fas");
                 if (isAdmin)
                 {
-                    player.PrintToChat(
-                        $" {ChatColors.Red}Admin:{ChatColors.Default} .exitprac .match .scrim .dryrun"
-                    );
+                    player.PrintToChat($" {ChatColors.Red}Admin:{ChatColors.Default} .exitprac .match .scrim .dryrun");
                 }
                 player.PrintToChat($" {ChatColors.Grey}Full list in console → .mhelp");
 
                 // Console output (unchanged — detailed practice docs)
                 player.PrintToConsole("=== Practice Mode Command List ===\n");
-                player.PrintToConsole(
-                    "\n【Spawn Point Operations】\n"
-                        + ".spawn <number>  Teleport to the specified competitive spawn point of your team\n"
-                        + ".ctspawn <number>  Teleport to the specified CT competitive spawn point (alias: .cts)\n"
-                        + ".tspawn <number>  Teleport to the specified T competitive spawn point (alias: .ts)\n"
-                        + ".bestspawn  Teleport to the nearest team spawn point\n"
-                        + ".worstspawn  Teleport to the farthest team spawn point\n"
-                        + ".bestctspawn  Teleport to the nearest CT spawn point\n"
-                        + ".worstctspawn  Teleport to the farthest CT spawn point\n"
-                        + ".besttspawn  Teleport to the nearest T spawn point\n"
-                        + ".worsttspawn  Teleport to the farthest T spawn point\n"
-                        + ".showspawns  Highlight all competitive spawn points\n"
-                        + ".hidespawns  Hide highlighted spawn points\n"
-                );
-                player.PrintToConsole(
-                    "\n【Bot Control】\n"
-                        + ".bot  Add a bot at the player's current position\n"
-                        + ".crouchbot  Add a crouching bot at the player's current position (alias: .cbot)\n"
-                        + ".boost  Add a bot at the current position and boost the player on top of it\n"
-                        + ".crouchboost  Add a crouching bot and boost the player on top of it\n"
-                        + ".nobot  Remove the bot under the crosshair\n"
-                        + ".clearbots  Remove all bots\n"
-                );
-                player.PrintToConsole(
-                    "\n【Teams & Modes】\n"
-                        + ".ct, .t, .spec  Switch the player to the requested team\n"
-                        + ".fas /.watchme  Force all players into spectator mode except the one issuing the command\n"
-                        + ".dryrun  Enable Dryrun Mode (alias: .dry)\n"
-                        + ".god  Enable God Mode\n"
-                );
-                player.PrintToConsole(
-                    "\n【Grenade Management】\n"
-                        + ".savenade <n> <optional description>  Save a grenade crosshair (alias: .sn)\n"
-                        + ".loadnade <n>  Load a grenade crosshair (alias: .ln)\n"
-                        + ".deletenade <n>  Delete a saved grenade crosshair from file (alias: .dn)\n"
-                        + ".importnade <code>  Save a crosshair using a code printed in chat or from savednades.cfg (alias: .in)\n"
-                        + ".listnades <optional filter>  List all saved crosshairs, filter optional (alias: .lin)\n"
-                );
-                player.PrintToConsole(
-                    "\n【Grenade Throwing】\n"
-                        + ".rethrow  Re-throw your last thrown grenade (alias: .rt)\n"
-                        + ".last  Teleport to where you threw your last grenade\n"
-                        + ".back <number>  Teleport to a specific grenade history position\n"
-                        + ".delay <delay_in_seconds>  Set delay on last grenade (used with .rethrow or .throwindex)\n"
-                        + ".throwindex <index> <optional index> <optional index>  Throw grenade(s) from specific history index(es)\n"
-                        + ".lastindex  Print the index of your last thrown grenade\n"
-                        + ".rethrowsmoke  Throw your last smoke grenade\n"
-                        + ".rethrownade  Throw your last HE grenade\n"
-                        + ".rethrowflash  Throw your last flashbang\n"
-                        + ".rethrowmolotov  Throw your last molotov/incendiary\n"
-                        + ".rethrowdecoy  Throw your last decoy\n"
-                );
-                player.PrintToConsole(
-                    "\n【Utilities】\n"
-                        + ".clear  Clear all active smokes, molotovs, and incendiaries\n"
-                        + ".fastforward  Fast forward server time to 20 seconds (alias: .ff)\n"
-                        + ".noflash  Toggle flash immunity (players without noflash still get blinded, alias: .noblind)\n"
-                        + ".timer  Start a timer immediately; use .timer again to stop and show duration\n"
-                        + ".break  Break all breakable entities (windows, wooden doors, vents, etc.)\n"
-                        + ".nobreak  Restore all breakable entities "
-                );
-                player.PrintToConsole(
-                    "\n【Display & Toggles】\n"
-                        + ".solid  Toggle mp_solid_teammates (teammate collision) - Current: "
-                        + ConVar.Find("mp_solid_teammates")!.GetPrimitiveValue<int>()
-                        + "\n"
-                        + ".impacts  Toggle sv_showimpacts (show bullet impacts) - Current: "
-                        + ConVar.Find("sv_showimpacts")!.GetPrimitiveValue<int>()
-                        + "\n"
-                        + ".traj  Toggle sv_grenade_trajectory_prac_pipreview (grenade trajectory preview) - Current: "
-                        + ConVar
-                            .Find("sv_grenade_trajectory_prac_pipreview")!
-                            .GetPrimitiveValue<bool>()
-                        + "\n"
-                );
+                player.PrintToConsole("\n【Spawn Point Operations】\n" + ".spawn <number>  Teleport to the specified competitive spawn point of your team\n" + ".ctspawn <number>  Teleport to the specified CT competitive spawn point (alias: .cts)\n" + ".tspawn <number>  Teleport to the specified T competitive spawn point (alias: .ts)\n" + ".bestspawn  Teleport to the nearest team spawn point\n" + ".worstspawn  Teleport to the farthest team spawn point\n" + ".bestctspawn  Teleport to the nearest CT spawn point\n" + ".worstctspawn  Teleport to the farthest CT spawn point\n" + ".besttspawn  Teleport to the nearest T spawn point\n" + ".worsttspawn  Teleport to the farthest T spawn point\n" + ".showspawns  Highlight all competitive spawn points\n" + ".hidespawns  Hide highlighted spawn points\n");
+                player.PrintToConsole("\n【Bot Control】\n" + ".bot  Add a bot at the player's current position\n" + ".crouchbot  Add a crouching bot at the player's current position (alias: .cbot)\n" + ".boost  Add a bot at the current position and boost the player on top of it\n" + ".crouchboost  Add a crouching bot and boost the player on top of it\n" + ".nobot  Remove the bot under the crosshair\n" + ".clearbots  Remove all bots\n");
+                player.PrintToConsole("\n【Teams & Modes】\n" + ".ct, .t, .spec  Switch the player to the requested team\n" + ".fas /.watchme  Force all players into spectator mode except the one issuing the command\n" + ".dryrun  Enable Dryrun Mode (alias: .dry)\n" + ".god  Enable God Mode\n");
+                player.PrintToConsole("\n【Grenade Management】\n" + ".savenade <n> <optional description>  Save a grenade crosshair (alias: .sn)\n" + ".loadnade <n>  Load a grenade crosshair (alias: .ln)\n" + ".deletenade <n>  Delete a saved grenade crosshair from file (alias: .dn)\n" + ".importnade <code>  Save a crosshair using a code printed in chat or from savednades.cfg (alias: .in)\n" + ".listnades <optional filter>  List all saved crosshairs, filter optional (alias: .lin)\n");
+                player.PrintToConsole("\n【Grenade Throwing】\n" + ".rethrow  Re-throw your last thrown grenade (alias: .rt)\n" + ".last  Teleport to where you threw your last grenade\n" + ".back <number>  Teleport to a specific grenade history position\n" + ".delay <delay_in_seconds>  Set delay on last grenade (used with .rethrow or .throwindex)\n" + ".throwindex <index> <optional index> <optional index>  Throw grenade(s) from specific history index(es)\n" + ".lastindex  Print the index of your last thrown grenade\n" + ".rethrowsmoke  Throw your last smoke grenade\n" + ".rethrownade  Throw your last HE grenade\n" + ".rethrowflash  Throw your last flashbang\n" + ".rethrowmolotov  Throw your last molotov/incendiary\n" + ".rethrowdecoy  Throw your last decoy\n");
+                player.PrintToConsole("\n【Utilities】\n" + ".clear  Clear all active smokes, molotovs, and incendiaries\n" + ".fastforward  Fast forward server time to 20 seconds (alias: .ff)\n" + ".noflash  Toggle flash immunity (players without noflash still get blinded, alias: .noblind)\n" + ".timer  Start a timer immediately; use .timer again to stop and show duration\n" + ".break  Break all breakable entities (windows, wooden doors, vents, etc.)\n" + ".nobreak  Restore all breakable entities ");
+                player.PrintToConsole("\n【Display & Toggles】\n" + ".solid  Toggle mp_solid_teammates (teammate collision) - Current: " + ConVar.Find("mp_solid_teammates")!.GetPrimitiveValue<int>() + "\n" + ".impacts  Toggle sv_showimpacts (show bullet impacts) - Current: " + ConVar.Find("sv_showimpacts")!.GetPrimitiveValue<int>() + "\n" + ".traj  Toggle sv_grenade_trajectory_prac_pipreview (grenade trajectory preview) - Current: " + ConVar.Find("sv_grenade_trajectory_prac_pipreview")!.GetPrimitiveValue<bool>() + "\n");
                 return;
             }
 
@@ -2757,9 +2318,7 @@ namespace MatchZy
             if (isDryRun)
             {
                 player!.PrintToChat($"{chatPrefix} {ChatColors.Gold}Dryrun Mode:");
-                player.PrintToChat(
-                    $" {ChatColors.Green}Exit:{ChatColors.Default} .exitdry .stopdry .enddry"
-                );
+                player.PrintToChat($" {ChatColors.Green}Exit:{ChatColors.Default} .exitdry .stopdry .enddry");
                 if (isAdmin)
                 {
                     player.PrintToChat($" {ChatColors.Red}Admin:{ChatColors.Default} .match .prac");
@@ -2771,9 +2330,7 @@ namespace MatchZy
             if (isVeto)
             {
                 player!.PrintToChat($"{chatPrefix} {ChatColors.Gold}Map Veto in progress:");
-                player.PrintToChat(
-                    $" {ChatColors.Green}Ban/Pick:{ChatColors.Default} .ban <map> .pick <map>"
-                );
+                player.PrintToChat($" {ChatColors.Green}Ban/Pick:{ChatColors.Default} .ban <map> .pick <map>");
                 player.PrintToChat($" {ChatColors.Default}Only team captains can ban/pick.");
                 return;
             }
@@ -2783,9 +2340,7 @@ namespace MatchZy
             {
                 player!.PrintToChat($"{chatPrefix} {ChatColors.Gold}Warmup:");
                 player.PrintToChat($" {ChatColors.Default}.match {ChatColors.Green}Match Mode");
-                player.PrintToChat(
-                    $" {ChatColors.Default}.scrim {ChatColors.Green}Playout/Scrim Mode"
-                );
+                player.PrintToChat($" {ChatColors.Default}.scrim {ChatColors.Green}Playout/Scrim Mode");
                 player.PrintToChat($" {ChatColors.Default}.prac {ChatColors.Green}Practice Mode");
                 player.PrintToChat($" {ChatColors.Default}.dry {ChatColors.Green}Dryrun Mode");
                 return;
@@ -2797,23 +2352,15 @@ namespace MatchZy
                 (int ctCount, int ctReady) = GetTeamPlayerCount((int)CsTeam.CounterTerrorist);
                 (int tCount, int tReady) = GetTeamPlayerCount((int)CsTeam.Terrorist);
 
-                string knifeStatus = isKnifeRequired
-                    ? $"{ChatColors.Green}ON"
-                    : $"{ChatColors.Red}OFF";
+                string knifeStatus = isKnifeRequired ? $"{ChatColors.Green}ON" : $"{ChatColors.Red}OFF";
 
                 player!.PrintToChat($"{chatPrefix} {ChatColors.Gold}Waiting for players:");
-                player.PrintToChat(
-                    $" {ChatColors.Green}Ready:{ChatColors.Default} .ready .unready .forceready"
-                );
-                player.PrintToChat(
-                    $" {ChatColors.Default}Status: CT {ChatColors.Green}{ctReady}/{ctCount}{ChatColors.Default} | T {ChatColors.Green}{tReady}/{tCount}"
-                );
+                player.PrintToChat($" {ChatColors.Green}Ready:{ChatColors.Default} .ready .unready .forceready");
+                player.PrintToChat($" {ChatColors.Default}Status: CT {ChatColors.Green}{ctReady}/{ctCount}{ChatColors.Default} | T {ChatColors.Green}{tReady}/{tCount}");
                 player.PrintToChat($" {ChatColors.Default}Knife: {knifeStatus}");
                 if (isAdmin)
                 {
-                    player.PrintToChat(
-                        $" {ChatColors.Red}Admin:{ChatColors.Default} .match .scrim .prac .knife .force"
-                    );
+                    player.PrintToChat($" {ChatColors.Red}Admin:{ChatColors.Default} .match .scrim .prac .knife .force");
                 }
                 return;
             }
@@ -2821,16 +2368,10 @@ namespace MatchZy
             // ── KNIFE ROUND — SIDE SELECTION ──
             if (isSideSelectionPhase)
             {
-                player!.PrintToChat(
-                    $"{chatPrefix} {ChatColors.Gold}Knife Winner — Pick your side:"
-                );
-                player.PrintToChat(
-                    $" {ChatColors.Green}.stay{ChatColors.Default} — Keep current side"
-                );
+                player!.PrintToChat($"{chatPrefix} {ChatColors.Gold}Knife Winner — Pick your side:");
+                player.PrintToChat($" {ChatColors.Green}.stay{ChatColors.Default} — Keep current side");
                 player.PrintToChat($" {ChatColors.Green}.switch{ChatColors.Default} — Swap sides");
-                player.PrintToChat(
-                    $" {ChatColors.Green}.ct{ChatColors.Default} / {ChatColors.Green}.t{ChatColors.Default} — Choose specific side"
-                );
+                player.PrintToChat($" {ChatColors.Green}.ct{ChatColors.Default} / {ChatColors.Green}.t{ChatColors.Default} — Choose specific side");
                 return;
             }
 
@@ -2838,14 +2379,10 @@ namespace MatchZy
             if (matchStarted && isMatchLive && isPaused)
             {
                 player!.PrintToChat($"{chatPrefix} {ChatColors.Gold}Match Paused:");
-                player.PrintToChat(
-                    $" {ChatColors.Green}.unpause{ChatColors.Default} — Request unpause (both teams must agree)"
-                );
+                player.PrintToChat($" {ChatColors.Green}.unpause{ChatColors.Default} — Request unpause (both teams must agree)");
                 if (isAdmin)
                 {
-                    player.PrintToChat(
-                        $" {ChatColors.Red}Admin:{ChatColors.Default} .fup (force unpause) .restore <round> .backupmenu"
-                    );
+                    player.PrintToChat($" {ChatColors.Red}Admin:{ChatColors.Default} .fup (force unpause) .restore <round> .backupmenu");
                 }
                 return;
             }
@@ -2854,20 +2391,14 @@ namespace MatchZy
             if (matchStarted && isMatchLive)
             {
                 player!.PrintToChat($"{chatPrefix} {ChatColors.Gold}Match Live:");
-                player.PrintToChat(
-                    $" {ChatColors.Green}Pause:{ChatColors.Default} .pause .tac .tech"
-                );
+                player.PrintToChat($" {ChatColors.Green}Pause:{ChatColors.Default} .pause .tac .tech");
                 if (isStopCommandAvailable)
                 {
-                    player.PrintToChat(
-                        $" {ChatColors.Green}Round:{ChatColors.Default} .stop (restore round — both teams agree)"
-                    );
+                    player.PrintToChat($" {ChatColors.Green}Round:{ChatColors.Default} .stop (restore round — both teams agree)");
                 }
                 if (isAdmin)
                 {
-                    player.PrintToChat(
-                        $" {ChatColors.Red}Admin:{ChatColors.Default} .fp (force pause) .restore <round> .backupmenu"
-                    );
+                    player.PrintToChat($" {ChatColors.Red}Admin:{ChatColors.Default} .fp (force pause) .restore <round> .backupmenu");
                 }
                 return;
             }
@@ -2890,49 +2421,27 @@ namespace MatchZy
             player.PrintToConsole(new string('=', 50) + "\n");
 
             // GENERAL/CONFIG COMMANDS
-            player.PrintToConsole(
-                $"\n{ChatColors.Green}【GENERAL/CONFIG COMMANDS】{ChatColors.Default}"
-            );
-            player.PrintToConsole(
-                "css_roundknife / css_rk / css_kr / css_kniferound - Toggle knife round requirement"
-            );
-            player.PrintToConsole(
-                "css_teamsize - Set number of players required to ready (default: 10)"
-            );
-            player.PrintToConsole(
-                "css_options / css_settings / css_configs - Show current match configuration"
-            );
-            player.PrintToConsole(
-                "css_autopause / css_autopause_minplayers / css_autopause_delay - Configure auto-pause"
-            );
-            player.PrintToConsole(
-                "css_autopause_status / css_autopause_check - Check auto-pause settings"
-            );
+            player.PrintToConsole($"\n{ChatColors.Green}【GENERAL/CONFIG COMMANDS】{ChatColors.Default}");
+            player.PrintToConsole("css_roundknife / css_rk / css_kr / css_kniferound - Toggle knife round requirement");
+            player.PrintToConsole("css_teamsize - Set number of players required to ready (default: 10)");
+            player.PrintToConsole("css_options / css_settings / css_configs - Show current match configuration");
+            player.PrintToConsole("css_autopause / css_autopause_minplayers / css_autopause_delay - Configure auto-pause");
+            player.PrintToConsole("css_autopause_status / css_autopause_check - Check auto-pause settings");
             player.PrintToConsole("css_version / css_matchzy_version - Display MatchZy version");
 
             // MATCH MODE COMMANDS
-            player.PrintToConsole(
-                $"\n{ChatColors.Green}【MATCH MODE COMMANDS】{ChatColors.Default}"
-            );
+            player.PrintToConsole($"\n{ChatColors.Green}【MATCH MODE COMMANDS】{ChatColors.Default}");
             player.PrintToConsole("css_match - Start match mode");
-            player.PrintToConsole(
-                "css_scrim / css_playout / css_po - Start scrim/playout mode (all rounds)"
-            );
+            player.PrintToConsole("css_scrim / css_playout / css_po - Start scrim/playout mode (all rounds)");
             player.PrintToConsole("css_warmup - Start warmup mode");
             player.PrintToConsole("css_prac / css_tactics - Start practice mode");
             player.PrintToConsole("css_dry / css_dryrun - Start dryrun mode");
             player.PrintToConsole("css_exitprac / css_noprac - Exit practice mode to warmup");
-            player.PrintToConsole(
-                "css_exitdry / css_exitdryrun / css_stopdry / css_enddry - Exit dryrun mode"
-            );
+            player.PrintToConsole("css_exitdry / css_exitdryrun / css_stopdry / css_enddry - Exit dryrun mode");
 
             // READY & SIDE SELECTION
-            player.PrintToConsole(
-                $"\n{ChatColors.Green}【READY & SIDE SELECTION】{ChatColors.Default}"
-            );
-            player.PrintToConsole(
-                "css_rc / css_rcheck / css_readycheck - Check ready player count"
-            );
+            player.PrintToConsole($"\n{ChatColors.Green}【READY & SIDE SELECTION】{ChatColors.Default}");
+            player.PrintToConsole("css_rc / css_rcheck / css_readycheck - Check ready player count");
             player.PrintToConsole("css_forceready - Force a team to be ready");
             player.PrintToConsole("css_ready / css_gaben / .ready - Mark yourself ready");
             player.PrintToConsole("css_unready / css_ur / css_notready - Mark yourself unready");
@@ -2942,9 +2451,7 @@ namespace MatchZy
             player.PrintToConsole("css_switch / css_swap - Switch sides after knife round");
 
             // PAUSE & UNPAUSE
-            player.PrintToConsole(
-                $"\n{ChatColors.Green}【PAUSE/UNPAUSE COMMANDS】{ChatColors.Default}"
-            );
+            player.PrintToConsole($"\n{ChatColors.Green}【PAUSE/UNPAUSE COMMANDS】{ChatColors.Default}");
             player.PrintToConsole("css_pause / css_p - Team pause (both teams must unpause)");
             player.PrintToConsole("css_tech - Technical pause (consumes technical pause timeout)");
             player.PrintToConsole("css_unpause / css_up / css_r - Request unpause");
@@ -2957,23 +2464,15 @@ namespace MatchZy
             player.PrintToConsole("css_start / css_force / css_forcestart - Force start the match");
             player.PrintToConsole("css_r - Ready up before match or unpause during match");
             player.PrintToConsole("css_restart / css_abort - Restart the match");
-            player.PrintToConsole(
-                "css_stop - Request round restore (restores to beginning of round)"
-            );
-            player.PrintToConsole(
-                "css_stopgame / css_stopmatch / css_endgame / css_forcestop / css_endmatch / css_forceend / css_end / css_exitscrim - End and reset match"
-            );
+            player.PrintToConsole("css_stop - Request round restore (restores to beginning of round)");
+            player.PrintToConsole("css_stopgame / css_stopmatch / css_endgame / css_forcestop / css_endmatch / css_forceend / css_end / css_exitscrim - End and reset match");
             player.PrintToConsole("css_asay - Say message as admin");
 
             // PRACTICE MODE SPECIFIC
-            player.PrintToConsole(
-                $"\n{ChatColors.Green}【PRACTICE MODE COMMANDS】{ChatColors.Default}"
-            );
+            player.PrintToConsole($"\n{ChatColors.Green}【PRACTICE MODE COMMANDS】{ChatColors.Default}");
             player.PrintToConsole("📍 SPAWN OPERATIONS:");
             player.PrintToConsole("   .spawn <#> / .ctspawn <#> / .tspawn <#> - Teleport to spawn");
-            player.PrintToConsole(
-                "   .bestspawn / .worstspawn - Teleport to nearest/farthest spawn"
-            );
+            player.PrintToConsole("   .bestspawn / .worstspawn - Teleport to nearest/farthest spawn");
             player.PrintToConsole("   .bestctspawn / .worstctspawn / .besttspawn / .worsttspawn");
             player.PrintToConsole("   .showspawns / .hidespawns - Show/hide spawn highlights");
             player.PrintToConsole("🤖 BOT CONTROL:");
@@ -2991,9 +2490,7 @@ namespace MatchZy
             player.PrintToConsole("   .last / .back <#> - Teleport to grenade location");
             player.PrintToConsole("   .throwindex <#> / .lastindex - Throw specific grenade");
             player.PrintToConsole("   .delay <seconds> - Set grenade throw delay");
-            player.PrintToConsole(
-                "   .rethrowsmoke / .rethrownade / .rethrowflash / .rethrowmolotov / .rethrowdecoy"
-            );
+            player.PrintToConsole("   .rethrowsmoke / .rethrownade / .rethrowflash / .rethrowmolotov / .rethrowdecoy");
             player.PrintToConsole("🔧 UTILITIES:");
             player.PrintToConsole("   .clear - Clear all smokes/molotovs");
             player.PrintToConsole("   .fastforward / .ff - Jump to 20 seconds");
@@ -3012,9 +2509,7 @@ namespace MatchZy
 
             // MODE-SPECIFIC AVAILABILITY
             player.PrintToConsole($"\n{ChatColors.Green}【MODE AVAILABILITY】{ChatColors.Default}");
-            player.PrintToConsole(
-                "Practice Mode: Full command access including spawns, bots, nades, etc."
-            );
+            player.PrintToConsole("Practice Mode: Full command access including spawns, bots, nades, etc.");
             player.PrintToConsole("Warmup Mode: .match, .scrim, .prac, .dry, knife round toggle");
             player.PrintToConsole("Ready Phase: .ready, .unready");
             player.PrintToConsole("Knife Round: .stay, .switch, .ct, .t (side selection)");
@@ -3027,8 +2522,7 @@ namespace MatchZy
         public void LoadClientNames()
         {
             string namesFileName = "Match_" + liveMatchId.ToString() + ".ini";
-            string namesFilePath =
-                Server.GameDirectory + "/csgo/MatchZyPlayerNames/" + namesFileName;
+            string namesFilePath = Server.GameDirectory + "/csgo/MatchZyPlayerNames/" + namesFileName;
             string? directoryPath = Path.GetDirectoryName(namesFilePath);
             if (directoryPath != null)
             {
@@ -3048,9 +2542,7 @@ namespace MatchZy
 
             sb.AppendLine("}");
             File.WriteAllText(namesFilePath, sb.ToString());
-            Server.ExecuteCommand(
-                $"sv_load_forced_client_names_file MatchZyPlayerNames/" + namesFileName
-            );
+            Server.ExecuteCommand($"sv_load_forced_client_names_file MatchZyPlayerNames/" + namesFileName);
         }
 
         public void WriteClientNamesInFile(StringBuilder sb, JToken? players)
@@ -3073,8 +2565,7 @@ namespace MatchZy
         {
             if (Uri.TryCreate(url, UriKind.Absolute, out Uri? result))
             {
-                return result != null
-                    && (result.Scheme == Uri.UriSchemeHttp || result.Scheme == Uri.UriSchemeHttps);
+                return result != null && (result.Scheme == Uri.UriSchemeHttp || result.Scheme == Uri.UriSchemeHttps);
             }
 
             return false;
@@ -3089,8 +2580,7 @@ namespace MatchZy
                 string convarValue = cvar.Type switch
                 {
                     ConVarType.Bool => cvar.GetPrimitiveValue<bool>().ToString(),
-                    ConVarType.Float32 or ConVarType.Float64 => cvar.GetPrimitiveValue<float>()
-                        .ToString(),
+                    ConVarType.Float32 or ConVarType.Float64 => cvar.GetPrimitiveValue<float>().ToString(),
                     ConVarType.UInt16 => cvar.GetPrimitiveValue<ushort>().ToString(),
                     ConVarType.Int16 => cvar.GetPrimitiveValue<short>().ToString(),
                     ConVarType.UInt32 => cvar.GetPrimitiveValue<uint>().ToString(),
@@ -3120,10 +2610,7 @@ namespace MatchZy
                     // Accept both numeric ("0"/"1") and textual ("true"/"false") forms.
                     // The old expression fell through to Convert.ToBoolean("0"), which throws
                     // "String '0' was not recognized as a valid Boolean".
-                    v =>
-                        cvar.SetValue(
-                            int.TryParse(v, out int intValue) ? intValue >= 1 : Convert.ToBoolean(v)
-                        )
+                    v => cvar.SetValue(int.TryParse(v, out int intValue) ? intValue >= 1 : Convert.ToBoolean(v))
                 },
                 { ConVarType.Float32, v => cvar.SetValue(Convert.ToSingle(v)) },
                 { ConVarType.Float64, v => cvar.SetValue(Convert.ToSingle(v)) },
@@ -3172,15 +2659,7 @@ namespace MatchZy
             string formattedTime = DateTime.Now.ToString("yyyy-MM-dd HH-mm-ss");
             (int team1Score, int team2Score) = GetTeamsScore();
 
-            var formattedValue = value
-                .Replace("{TIME}", formattedTime.Replace(" ", "_"))
-                .Replace("{MATCH_ID}", $"{liveMatchId}")
-                .Replace("{MAP}", Server.MapName)
-                .Replace("{MAPNUMBER}", matchConfig.CurrentMapNumber.ToString())
-                .Replace("{TEAM1}", matchzyTeam1.teamName.Replace(" ", "_"))
-                .Replace("{TEAM2}", matchzyTeam2.teamName.Replace(" ", "_"))
-                .Replace("{TEAM1_SCORE}", team1Score.ToString())
-                .Replace("{TEAM2_SCORE}", team2Score.ToString());
+            var formattedValue = value.Replace("{TIME}", formattedTime.Replace(" ", "_")).Replace("{MATCH_ID}", $"{liveMatchId}").Replace("{MAP}", Server.MapName).Replace("{MAPNUMBER}", matchConfig.CurrentMapNumber.ToString()).Replace("{TEAM1}", matchzyTeam1.teamName.Replace(" ", "_")).Replace("{TEAM2}", matchzyTeam2.teamName.Replace(" ", "_")).Replace("{TEAM1_SCORE}", team1Score.ToString()).Replace("{TEAM2_SCORE}", team2Score.ToString());
             return formattedValue;
         }
 
@@ -3198,10 +2677,7 @@ namespace MatchZy
         // there, crashing the server mid-match. Callers MUST null-check.
         public CCSGameRules? GetGameRules()
         {
-            return Utilities
-                .FindAllEntitiesByDesignerName<CCSGameRulesProxy>("cs_gamerules")
-                .FirstOrDefault()
-                ?.GameRules;
+            return Utilities.FindAllEntitiesByDesignerName<CCSGameRulesProxy>("cs_gamerules").FirstOrDefault()?.GameRules;
         }
 
         // -1 when gamerules absent (no real phase is negative), so callers comparing
@@ -3243,18 +2719,12 @@ namespace MatchZy
             if (gameRules == null)
                 return false;
 
-            return (gameRules.CTTimeOutActive || gameRules.TerroristTimeOutActive)
-                && gameRules.FreezePeriod;
+            return (gameRules.CTTimeOutActive || gameRules.TerroristTimeOutActive) && gameRules.FreezePeriod;
         }
 
-        public (
-            Dictionary<ulong, Dictionary<string, object>>,
-            List<StatsPlayer>,
-            List<StatsPlayer>
-        ) GetPlayerStatsDict()
+        public (Dictionary<ulong, Dictionary<string, object>>, List<StatsPlayer>, List<StatsPlayer>) GetPlayerStatsDict()
         {
-            Dictionary<ulong, Dictionary<string, object>> playerStatsDictionary =
-                new Dictionary<ulong, Dictionary<string, object>>();
+            Dictionary<ulong, Dictionary<string, object>> playerStatsDictionary = new Dictionary<ulong, Dictionary<string, object>>();
             List<StatsPlayer> playerStatsListTeam1 = new();
             List<StatsPlayer> playerStatsListTeam2 = new();
             var gameRules = GetGameRules();
@@ -3490,12 +2960,7 @@ namespace MatchZy
 
         public bool IsPlayerValid(CCSPlayerController? player)
         {
-            return player != null
-                && player.IsValid
-                && player.Connected == PlayerConnectedState.Connected
-                && player.PlayerPawn.IsValid
-                && player.PlayerPawn.Value != null
-                && player.PlayerPawn.Value.IsValid;
+            return player != null && player.IsValid && player.Connected == PlayerConnectedState.Connected && player.PlayerPawn.IsValid && player.PlayerPawn.Value != null && player.PlayerPawn.Value.IsValid;
         }
 
         public bool IsHumanPlayerValid(CCSPlayerController? player)
@@ -3541,14 +3006,7 @@ namespace MatchZy
         // afterRestore runs after the teleport (used by callers to put the
         // correct grenade in hand). switchSlot, if given, is the inventory slot
         // command ("slot8" etc.) to re-deploy onto.
-        public static void TeleportAndClearPose(
-            CCSPlayerController? player,
-            Vector position,
-            QAngle angle,
-            bool wantDucked = false,
-            string? switchSlot = null,
-            Action? afterRestore = null
-        )
+        public static void TeleportAndClearPose(CCSPlayerController? player, Vector position, QAngle angle, bool wantDucked = false, string? switchSlot = null, Action? afterRestore = null)
         {
             if (player == null || !player.IsValid || player.PlayerPawn.Value == null)
                 return;
@@ -3597,29 +3055,17 @@ namespace MatchZy
             return value;
         }
 
-        public async Task UploadFileAsync(
-            string? filePath,
-            string fileUploadURL,
-            string headerKey,
-            string headerValue,
-            long matchId,
-            int mapNumber,
-            int roundNumber
-        )
+        public async Task UploadFileAsync(string? filePath, string fileUploadURL, string headerKey, string headerValue, long matchId, int mapNumber, int roundNumber)
         {
             if (filePath == null || fileUploadURL == "")
             {
-                Log(
-                    $"[UploadFileAsync] Not able to upload the file, either filePath or fileUploadURL is not set. filePath: {filePath} fileUploadURL: {fileUploadURL}"
-                );
+                Log($"[UploadFileAsync] Not able to upload the file, either filePath or fileUploadURL is not set. filePath: {filePath} fileUploadURL: {fileUploadURL}");
                 return;
             }
 
             try
             {
-                Log(
-                    $"[UploadFileAsync] Going to upload the file on {fileUploadURL}. Complete path: {filePath}"
-                );
+                Log($"[UploadFileAsync] Going to upload the file on {fileUploadURL}. Complete path: {filePath}");
 
                 if (!File.Exists(filePath))
                 {
@@ -3654,15 +3100,11 @@ namespace MatchZy
 
                 if (response.IsSuccessStatusCode)
                 {
-                    Log(
-                        $"[UploadFileAsync] File upload successful for matchId: {matchId} mapNumber: {mapNumber} fileName: {Path.GetFileName(filePath)}."
-                    );
+                    Log($"[UploadFileAsync] File upload successful for matchId: {matchId} mapNumber: {mapNumber} fileName: {Path.GetFileName(filePath)}.");
                 }
                 else
                 {
-                    Log(
-                        $"[UploadFileAsync ERROR] Failed to upload file. Status code: {response.StatusCode} Response: {await response.Content.ReadAsStringAsync()}"
-                    );
+                    Log($"[UploadFileAsync ERROR] Failed to upload file. Status code: {response.StatusCode} Response: {await response.Content.ReadAsStringAsync()}");
                 }
             }
             catch (Exception e)
@@ -3692,9 +3134,7 @@ namespace MatchZy
             {
                 if (!whiteList.Contains(steamId.ToString()))
                 {
-                    Log(
-                        $"[EventPlayerConnectFull] KICKING PLAYER STEAMID: {steamId}, Name: {player.PlayerName} (Not whitelisted!)"
-                    );
+                    Log($"[EventPlayerConnectFull] KICKING PLAYER STEAMID: {steamId}, Name: {player.PlayerName} (Not whitelisted!)");
                     PrintToAllChat($"Kicking player {player.PlayerName} - Not whitelisted.");
                     return true;
                 }
@@ -3778,19 +3218,11 @@ namespace MatchZy
             Utilities.SetStateChanged(playerPawnValue, "CBaseModelEntity", "m_clrRender");
         }
 
-        public void DropWeaponByDesignerName(
-            CCSPlayerController player,
-            string weaponName,
-            bool remove = false
-        )
+        public void DropWeaponByDesignerName(CCSPlayerController player, string weaponName, bool remove = false)
         {
             if (!IsPlayerValid(player) || player.PlayerPawn.Value!.WeaponServices is null)
                 return;
-            var matchedWeapon = player
-                .PlayerPawn.Value!.WeaponServices!.MyWeapons.Where(x =>
-                    x.Value?.DesignerName == weaponName
-                )
-                .FirstOrDefault();
+            var matchedWeapon = player.PlayerPawn.Value!.WeaponServices!.MyWeapons.Where(x => x.Value?.DesignerName == weaponName).FirstOrDefault();
 
             if (matchedWeapon != null && matchedWeapon.IsValid)
             {
@@ -3802,21 +3234,7 @@ namespace MatchZy
         public void RandomizeSpawns()
         {
             List<CCSPlayerController> players = Utilities.GetPlayers();
-            Dictionary<byte, List<Position>> teamSpawns = new()
-            {
-                {
-                    (byte)CsTeam.CounterTerrorist,
-                    spawnsData[(byte)CsTeam.CounterTerrorist]
-                        .Select(position => new Position(position))
-                        .ToList()
-                },
-                {
-                    (byte)CsTeam.Terrorist,
-                    spawnsData[(byte)CsTeam.Terrorist]
-                        .Select(position => new Position(position))
-                        .ToList()
-                },
-            };
+            Dictionary<byte, List<Position>> teamSpawns = new() { { (byte)CsTeam.CounterTerrorist, spawnsData[(byte)CsTeam.CounterTerrorist].Select(position => new Position(position)).ToList() }, { (byte)CsTeam.Terrorist, spawnsData[(byte)CsTeam.Terrorist].Select(position => new Position(position)).ToList() } };
             Random random = new();
             foreach (var player in players)
             {

@@ -19,22 +19,14 @@ namespace MatchZy
             if (IsPlayerAdmin(player, "css_whitelist", "@css/config"))
             {
                 isWhitelistRequired = !isWhitelistRequired;
-                string WLStatus = isWhitelistRequired
-                    ? Localizer.ForPlayer(player, "matchzy.cc.enabled")
-                    : Localizer.ForPlayer(player, "matchzy.cc.disabled");
+                string WLStatus = isWhitelistRequired ? Localizer.ForPlayer(player, "matchzy.cc.enabled") : Localizer.ForPlayer(player, "matchzy.cc.disabled");
                 if (player == null)
                 {
-                    ReplyToUserCommand(
-                        player,
-                        Localizer.ForPlayer(player, "matchzy.cc.wl", WLStatus)
-                    );
+                    ReplyToUserCommand(player, Localizer.ForPlayer(player, "matchzy.cc.wl", WLStatus));
                 }
                 else
                 {
-                    PrintToPlayerChat(
-                        player,
-                        Localizer.ForPlayer(player, "matchzy.cc.wl", WLStatus)
-                    );
+                    PrintToPlayerChat(player, Localizer.ForPlayer(player, "matchzy.cc.wl", WLStatus));
                 }
             }
             else
@@ -50,22 +42,14 @@ namespace MatchZy
             if (IsPlayerAdmin(player, "css_save_nades_as_global", "@css/config"))
             {
                 isSaveNadesAsGlobalEnabled = !isSaveNadesAsGlobalEnabled;
-                string GlobalNadesStatus = isSaveNadesAsGlobalEnabled
-                    ? Localizer.ForPlayer(player, "matchzy.cc.enabled")
-                    : Localizer.ForPlayer(player, "matchzy.cc.disabled");
+                string GlobalNadesStatus = isSaveNadesAsGlobalEnabled ? Localizer.ForPlayer(player, "matchzy.cc.enabled") : Localizer.ForPlayer(player, "matchzy.cc.disabled");
                 if (player == null)
                 {
-                    ReplyToUserCommand(
-                        player,
-                        Localizer.ForPlayer(player, "matchzy.cc.globalnades", GlobalNadesStatus)
-                    );
+                    ReplyToUserCommand(player, Localizer.ForPlayer(player, "matchzy.cc.globalnades", GlobalNadesStatus));
                 }
                 else
                 {
-                    PrintToPlayerChat(
-                        player,
-                        Localizer.ForPlayer(player, "matchzy.cc.globalnades", GlobalNadesStatus)
-                    );
+                    PrintToPlayerChat(player, Localizer.ForPlayer(player, "matchzy.cc.globalnades", GlobalNadesStatus));
                 }
             }
             else
@@ -89,12 +73,8 @@ namespace MatchZy
                 if (notReadyPlayers < 0)
                     notReadyPlayers = 0; // safety check
 
-                player?.PrintToChat(
-                    $" {ChatColors.Default}Ready Players: {ChatColors.Green}{readyPlayers}/{totalPlayers}"
-                );
-                player?.PrintToChat(
-                    $" {ChatColors.Default}Waiting For: {ChatColors.Red}{notReadyPlayers} Players"
-                );
+                player?.PrintToChat($" {ChatColors.Default}Ready Players: {ChatColors.Green}{readyPlayers}/{totalPlayers}");
+                player?.PrintToChat($" {ChatColors.Default}Waiting For: {ChatColors.Red}{notReadyPlayers} Players");
             }
             else
             {
@@ -121,18 +101,12 @@ namespace MatchZy
 
                     if (playerReadyStatus[userId])
                     {
-                        PrintToPlayerChat(
-                            player,
-                            Localizer.ForPlayer(player, "matchzy.ready.markedready")
-                        );
+                        PrintToPlayerChat(player, Localizer.ForPlayer(player, "matchzy.ready.markedready"));
                     }
                     else
                     {
                         playerReadyStatus[userId] = true;
-                        PrintToPlayerChat(
-                            player,
-                            Localizer.ForPlayer(player, "matchzy.ready.markedready")
-                        );
+                        PrintToPlayerChat(player, Localizer.ForPlayer(player, "matchzy.ready.markedready"));
 
                         // NEW: Check if this team is now ready
                         bool isTeamReady = IsTeamReady(team);
@@ -171,18 +145,12 @@ namespace MatchZy
 
                     if (!playerReadyStatus[player.UserId.Value])
                     {
-                        PrintToPlayerChat(
-                            player,
-                            Localizer.ForPlayer(player, "matchzy.ready.markedunready")
-                        );
+                        PrintToPlayerChat(player, Localizer.ForPlayer(player, "matchzy.ready.markedunready"));
                     }
                     else
                     {
                         playerReadyStatus[player.UserId.Value] = false;
-                        PrintToPlayerChat(
-                            player,
-                            Localizer.ForPlayer(player, "matchzy.ready.markedunready")
-                        );
+                        PrintToPlayerChat(player, Localizer.ForPlayer(player, "matchzy.ready.markedunready"));
                     }
 
                     // Force update clan tag for this specific player
@@ -371,21 +339,11 @@ namespace MatchZy
         {
             try
             {
-                var grenadeNames = new[]
-                {
-                    "weapon_flashbang",
-                    "weapon_hegrenade",
-                    "weapon_smokegrenade",
-                    "weapon_molotov",
-                    "weapon_incgrenade",
-                    "weapon_decoy",
-                };
+                var grenadeNames = new[] { "weapon_flashbang", "weapon_hegrenade", "weapon_smokegrenade", "weapon_molotov", "weapon_incgrenade", "weapon_decoy" };
 
                 foreach (var grenadeName in grenadeNames)
                 {
-                    var entities = Utilities.FindAllEntitiesByDesignerName<CBasePlayerWeapon>(
-                        grenadeName
-                    );
+                    var entities = Utilities.FindAllEntitiesByDesignerName<CBasePlayerWeapon>(grenadeName);
 
                     foreach (var entity in entities)
                     {
@@ -396,11 +354,7 @@ namespace MatchZy
 
                             // Tjek om entityen har en owner (ikke droppet)
                             var ownerEntity = entity.OwnerEntity;
-                            if (
-                                ownerEntity != null
-                                && ownerEntity.IsValid
-                                && ownerEntity.Value != null
-                            )
+                            if (ownerEntity != null && ownerEntity.IsValid && ownerEntity.Value != null)
                                 continue;
 
                             entity.Remove();
@@ -481,9 +435,7 @@ namespace MatchZy
             // If none of the above conditions are met, provide helpful feedback
             if (matchStarted && isMatchLive && !isPaused)
             {
-                player.PrintToChat(
-                    $"{chatPrefix} Match is live and not paused. Use {ChatColors.Green}!pause{ChatColors.Default} to pause or {ChatColors.Green}!unready{ChatColors.Default} if you need to go unready."
-                );
+                player.PrintToChat($"{chatPrefix} Match is live and not paused. Use {ChatColors.Green}!pause{ChatColors.Default} to pause or {ChatColors.Green}!unready{ChatColors.Default} if you need to go unready.");
             }
             else if (!readyAvailable)
             {
@@ -491,9 +443,7 @@ namespace MatchZy
             }
             else
             {
-                player.PrintToChat(
-                    $"{chatPrefix} {ChatColors.Red}!r{ChatColors.Default} command is not available in the current match state."
-                );
+                player.PrintToChat($"{chatPrefix} {ChatColors.Red}!r{ChatColors.Default} command is not available in the current match state.");
             }
         }
 
@@ -583,13 +533,7 @@ namespace MatchZy
                 }
                 else
                 {
-                    PrintToAllChat(
-                        Localizer[
-                            "matchzy.pause.teamwantstounpause",
-                            unpauseTeamName,
-                            remainingUnpauseTeam
-                        ]
-                    );
+                    PrintToAllChat(Localizer["matchzy.pause.teamwantstounpause", unpauseTeamName, remainingUnpauseTeam]);
                 }
 
                 if (!isPaused && pausedStateTimer != null)
@@ -610,10 +554,7 @@ namespace MatchZy
             {
                 if (isPaused)
                 {
-                    ReplyToUserCommand(
-                        player,
-                        "Match is already paused, cannot start a tactical timeout!"
-                    );
+                    ReplyToUserCommand(player, "Match is already paused, cannot start a tactical timeout!");
                     return;
                 }
 
@@ -659,18 +600,12 @@ namespace MatchZy
                     if (player == null)
                     {
                         // ReplyToUserCommand(player, $"Skip veto command cannot be used if match has already started!");
-                        ReplyToUserCommand(
-                            player,
-                            Localizer.ForPlayer(player, "matchzy.cc.skipvetomatchstarted")
-                        );
+                        ReplyToUserCommand(player, Localizer.ForPlayer(player, "matchzy.cc.skipvetomatchstarted"));
                     }
                     else
                     {
                         // player.PrintToChat($"{chatPrefix} Skip veto command cannot be used if match has already started!");
-                        PrintToPlayerChat(
-                            player,
-                            Localizer.ForPlayer(player, "matchzy.cc.skipvetomatchstarted")
-                        );
+                        PrintToPlayerChat(player, Localizer.ForPlayer(player, "matchzy.cc.skipvetomatchstarted"));
                     }
                 }
                 else
@@ -679,18 +614,12 @@ namespace MatchZy
                     if (player == null)
                     {
                         // ReplyToUserCommand(player, $"Veto phase has been cancelled!");
-                        ReplyToUserCommand(
-                            player,
-                            Localizer.ForPlayer(player, "matchzy.cc.skipveto")
-                        );
+                        ReplyToUserCommand(player, Localizer.ForPlayer(player, "matchzy.cc.skipveto"));
                     }
                     else
                     {
                         // player.PrintToChat($"{chatPrefix} Veto phase has been cancelled!");
-                        PrintToPlayerChat(
-                            player,
-                            Localizer.ForPlayer(player, "matchzy.cc.skipveto")
-                        );
+                        PrintToPlayerChat(player, Localizer.ForPlayer(player, "matchzy.cc.skipveto"));
                     }
                 }
             }
@@ -712,24 +641,16 @@ namespace MatchZy
             if (IsPlayerAdmin(player, "css_roundknife", "@css/config"))
             {
                 isKnifeRequired = !isKnifeRequired;
-                string knifeStatus = isKnifeRequired
-                    ? Localizer.ForPlayer(player, "matchzy.cc.enabled")
-                    : Localizer.ForPlayer(player, "matchzy.cc.disabled");
+                string knifeStatus = isKnifeRequired ? Localizer.ForPlayer(player, "matchzy.cc.enabled") : Localizer.ForPlayer(player, "matchzy.cc.disabled");
                 if (player == null)
                 {
                     // ReplyToUserCommand(player, $"Knife round is now {knifeStatus}!");
-                    ReplyToUserCommand(
-                        player,
-                        Localizer.ForPlayer(player, "matchzy.cc.roundknife", knifeStatus)
-                    );
+                    ReplyToUserCommand(player, Localizer.ForPlayer(player, "matchzy.cc.roundknife", knifeStatus));
                 }
                 else
                 {
                     // player.PrintToChat($"{chatPrefix} Knife round is now {ChatColors.Green}{knifeStatus}{ChatColors.Default}!");
-                    PrintToPlayerChat(
-                        player,
-                        Localizer.ForPlayer(player, "matchzy.cc.roundknife", knifeStatus)
-                    );
+                    PrintToPlayerChat(player, Localizer.ForPlayer(player, "matchzy.cc.roundknife", knifeStatus));
                 }
             }
             else
@@ -739,10 +660,7 @@ namespace MatchZy
         }
 
         [ConsoleCommand("css_teamsize", "Sets number of ready players required to start the match")]
-        [ConsoleCommand(
-            "css_readyrequired",
-            "Sets number of ready players required to start the match"
-        )]
+        [ConsoleCommand("css_readyrequired", "Sets number of ready players required to start the match")]
         public void OnReadyRequiredCommand(CCSPlayerController? player, CommandInfo command)
         {
             if (IsPlayerAdmin(player, "css_readyrequired", "@css/config"))
@@ -754,14 +672,8 @@ namespace MatchZy
                 }
                 else
                 {
-                    string minimumReadyRequiredFormatted =
-                        (player == null)
-                            ? $"{minimumReadyRequired}"
-                            : $"{ChatColors.Green}{minimumReadyRequired}{ChatColors.Default}";
-                    ReplyToUserCommand(
-                        player,
-                        $"Current Ready Required: {minimumReadyRequiredFormatted} .Usage: !readyrequired <number_of_ready_players_required>"
-                    );
+                    string minimumReadyRequiredFormatted = (player == null) ? $"{minimumReadyRequired}" : $"{ChatColors.Green}{minimumReadyRequired}{ChatColors.Default}";
+                    ReplyToUserCommand(player, $"Current Ready Required: {minimumReadyRequiredFormatted} .Usage: !readyrequired <number_of_ready_players_required>");
                 }
             }
             else
@@ -780,26 +692,14 @@ namespace MatchZy
 
             if (IsPlayerAdmin(player, "css_settings", "@css/config"))
             {
-                string knifeStatus = isKnifeRequired
-                    ? Localizer.ForPlayer(player, "matchzy.cc.enabled")
-                    : Localizer.ForPlayer(player, "matchzy.cc.disabled");
-                string playoutStatus = isPlayOutEnabled
-                    ? Localizer.ForPlayer(player, "matchzy.cc.enabled")
-                    : Localizer.ForPlayer(player, "matchzy.cc.disabled");
-                string matchModeStatus = isMatchModeEnabled
-                    ? Localizer.ForPlayer(player, "matchzy.cc.enabled")
-                    : Localizer.ForPlayer(player, "matchzy.cc.disabled");
+                string knifeStatus = isKnifeRequired ? Localizer.ForPlayer(player, "matchzy.cc.enabled") : Localizer.ForPlayer(player, "matchzy.cc.disabled");
+                string playoutStatus = isPlayOutEnabled ? Localizer.ForPlayer(player, "matchzy.cc.enabled") : Localizer.ForPlayer(player, "matchzy.cc.disabled");
+                string matchModeStatus = isMatchModeEnabled ? Localizer.ForPlayer(player, "matchzy.cc.enabled") : Localizer.ForPlayer(player, "matchzy.cc.disabled");
 
                 player.PrintToChat($"{chatPrefix} Current Settings:");
-                player.PrintToChat(
-                    $"{chatPrefix} Knife Round: {ChatColors.Green}{knifeStatus}{ChatColors.Default}"
-                );
-                player.PrintToChat(
-                    $"{chatPrefix} Match Mode: {ChatColors.Green}{matchModeStatus}{ChatColors.Default}"
-                );
-                player.PrintToChat(
-                    $"{chatPrefix} Scrim/Full30 Mode (All Rounds): {ChatColors.Green}{playoutStatus}{ChatColors.Default}"
-                );
+                player.PrintToChat($"{chatPrefix} Knife Round: {ChatColors.Green}{knifeStatus}{ChatColors.Default}");
+                player.PrintToChat($"{chatPrefix} Match Mode: {ChatColors.Green}{matchModeStatus}{ChatColors.Default}");
+                player.PrintToChat($"{chatPrefix} Scrim/Full30 Mode (All Rounds): {ChatColors.Green}{playoutStatus}{ChatColors.Default}");
             }
             else
             {
@@ -819,10 +719,7 @@ namespace MatchZy
                 }
                 else
                 {
-                    ReplyToUserCommand(
-                        player,
-                        $"{ChatColors.Green}Practice mode is active, cannot end the match. Make sure to use !exitprac OR !match to load match mode."
-                    );
+                    ReplyToUserCommand(player, $"{ChatColors.Green}Practice mode is active, cannot end the match. Make sure to use !exitprac OR !match to load match mode.");
                 }
             }
             else
@@ -846,10 +743,7 @@ namespace MatchZy
                 // Block end/reset during endscreen/post-game to avoid instability
                 if (IsPostGamePhase())
                 {
-                    ReplyToUserCommand(
-                        player,
-                        Localizer.ForPlayer(player, "matchzy.utility.matchended")
-                    );
+                    ReplyToUserCommand(player, Localizer.ForPlayer(player, "matchzy.utility.matchended"));
                     return;
                 }
 
@@ -874,10 +768,7 @@ namespace MatchZy
                 // Block during endscreen/post-game
                 if (IsPostGamePhase())
                 {
-                    ReplyToUserCommand(
-                        player,
-                        Localizer.ForPlayer(player, "matchzy.utility.matchended")
-                    );
+                    ReplyToUserCommand(player, Localizer.ForPlayer(player, "matchzy.utility.matchended"));
                     return;
                 }
 
@@ -902,10 +793,7 @@ namespace MatchZy
                 // Block restart during endscreen/post-game to avoid CSTV/server issues
                 if (IsPostGamePhase())
                 {
-                    ReplyToUserCommand(
-                        player,
-                        Localizer.ForPlayer(player, "matchzy.utility.matchended")
-                    );
+                    ReplyToUserCommand(player, Localizer.ForPlayer(player, "matchzy.utility.matchended"));
                     return;
                 }
 
@@ -934,10 +822,7 @@ namespace MatchZy
             // Block map reload during endscreen/post-game to avoid CSTV/player issues
             if (IsPostGamePhase())
             {
-                ReplyToUserCommand(
-                    player,
-                    Localizer.ForPlayer(player, "matchzy.utility.matchended")
-                );
+                ReplyToUserCommand(player, Localizer.ForPlayer(player, "matchzy.utility.matchended"));
                 return;
             }
             string currentMapName = Server.MapName;
@@ -962,10 +847,7 @@ namespace MatchZy
                 }
                 else
                 {
-                    ReplyToUserCommand(
-                        player,
-                        Localizer.ForPlayer(player, "matchzy.cc.invalidmap")
-                    );
+                    ReplyToUserCommand(player, Localizer.ForPlayer(player, "matchzy.cc.invalidmap"));
                 }
             });
         }
@@ -977,10 +859,7 @@ namespace MatchZy
 
             // Localized message if you have it, otherwise plain text:
             // ReplyToUserCommand(player, Localizer.ForPlayer(player, "matchzy.pm.nostartindry"));
-            ReplyToUserCommand(
-                player,
-                "You can’t start a match while Dry Run is active. Type .exitdry first."
-            );
+            ReplyToUserCommand(player, "You can’t start a match while Dry Run is active. Type .exitdry first.");
             return true; // means: blocked
         }
 
@@ -993,14 +872,8 @@ namespace MatchZy
             {
                 if (isPractice)
                 {
-                    ReplyToUserCommand(
-                        player,
-                        $"{ChatColors.Green}You cannot start a match while we are in practice mode."
-                    );
-                    ReplyToUserCommand(
-                        player,
-                        $"{ChatColors.Green}Please use the .exitprac or .match commands to enter match mode."
-                    );
+                    ReplyToUserCommand(player, $"{ChatColors.Green}You cannot start a match while we are in practice mode.");
+                    ReplyToUserCommand(player, $"{ChatColors.Green}Please use the .exitprac or .match commands to enter match mode.");
                     return;
                 }
 
@@ -1009,16 +882,11 @@ namespace MatchZy
 
                 if (matchStarted)
                 {
-                    ReplyToUserCommand(
-                        player,
-                        "The Start command cannot be used if the match has already started! If you want to unpause, please use .unpause"
-                    );
+                    ReplyToUserCommand(player, "The Start command cannot be used if the match has already started! If you want to unpause, please use .unpause");
                 }
                 else
                 {
-                    Server.PrintToChatAll(
-                        $"{chatPrefix} {ChatColors.Green}Admin{ChatColors.Default} has started the game!"
-                    );
+                    Server.PrintToChatAll($"{chatPrefix} {ChatColors.Green}Admin{ChatColors.Default} has started the game!");
                     HandleMatchStart();
                 }
             }
@@ -1037,26 +905,18 @@ namespace MatchZy
                     return;
                 if (matchStarted)
                 {
-                    ReplyToUserCommand(
-                        player,
-                        "Warmup command cannot be used if match is already started! If you want to stop match, please use .endmatch"
-                    );
+                    ReplyToUserCommand(player, "Warmup command cannot be used if match is already started! If you want to stop match, please use .endmatch");
                 }
                 else if (!warmupEnabled.Value)
                 {
-                    ReplyToUserCommand(
-                        player,
-                        "Warmup mode is disabled via matchzy_warmup_enabled. Set it to true to use this command."
-                    );
+                    ReplyToUserCommand(player, "Warmup mode is disabled via matchzy_warmup_enabled. Set it to true to use this command.");
                 }
                 else
                 {
                     var absolutePath = Path.Join(Server.GameDirectory + "/csgo/cfg" + "/matchzy");
                     ExecUnpracCommands();
                     CleanupAllCollisionTimers();
-                    Server.PrintToChatAll(
-                        $"{chatPrefix} {ChatColors.Green}Admin{ChatColors.Default} has started the warmup round!"
-                    );
+                    Server.PrintToChatAll($"{chatPrefix} {ChatColors.Green}Admin{ChatColors.Default} has started the warmup round!");
                     Server.ExecuteCommand($"exec matchzy/warmup.cfg;mp_freezetime 0");
                 }
             }
@@ -1121,10 +981,7 @@ namespace MatchZy
             HandlePlayoutConfig();
             ReplyToUserCommand(player, "Scrim/Full30 Mode has been loaded.");
             ReplyToUserCommand(player, "Knife Round is disabled for this mode.");
-            ReplyToUserCommand(
-                player,
-                "Wait until all players have !ready OR an Admin can !forcestart."
-            );
+            ReplyToUserCommand(player, "Wait until all players have !ready OR an Admin can !forcestart.");
         }
 
         [ConsoleCommand("css_hill", "Starts scrim mode")]
@@ -1171,14 +1028,9 @@ namespace MatchZy
                 return;
 
             isKnifeRequired = true;
-            string knifeStatus = isKnifeRequired
-                ? Localizer.ForPlayer(player, "matchzy.cc.enabled")
-                : Localizer.ForPlayer(player, "matchzy.cc.disabled");
+            string knifeStatus = isKnifeRequired ? Localizer.ForPlayer(player, "matchzy.cc.enabled") : Localizer.ForPlayer(player, "matchzy.cc.disabled");
             ReplyToUserCommand(player, Localizer.ForPlayer(player, "matchzy.match.mode.loaded"));
-            ReplyToUserCommand(
-                player,
-                Localizer.ForPlayer(player, "matchzy.cc.knifestatus", knifeStatus)
-            );
+            ReplyToUserCommand(player, Localizer.ForPlayer(player, "matchzy.cc.knifestatus", knifeStatus));
             ReplyToUserCommand(player, Localizer.ForPlayer(player, "matchzy.cc.knifecmd"));
             isMatchModeEnabled = true;
 
@@ -1316,12 +1168,7 @@ namespace MatchZy
         // Overrides noclip console command. Perform the changes on server side.
         public HookResult OnConsoleNoClip(CCSPlayerController? player, CommandInfo cmd)
         {
-            if (
-                player == null
-                || !player.PawnIsAlive
-                || player.Team == CsTeam.Spectator
-                || player.Team == CsTeam.None
-            )
+            if (player == null || !player.PawnIsAlive || player.Team == CsTeam.Spectator || player.Team == CsTeam.None)
                 return HookResult.Stop;
 
             // Additional safety check for PlayerPawn

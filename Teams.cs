@@ -88,9 +88,7 @@ namespace MatchZy
             }
             if (IsHalfTimePhase())
             {
-                command.ReplyToCommand(
-                    "Cannot add players during halftime. Please wait until the next round starts."
-                );
+                command.ReplyToCommand("Cannot add players during halftime. Please wait until the next round starts.");
                 return;
             }
             if (command.ArgCount < 3)
@@ -122,9 +120,7 @@ namespace MatchZy
             }
             if (!success)
             {
-                command.ReplyToCommand(
-                    $"Failed to add player {playerName} to {playerTeam}. They may already be on a team or you provided an invalid Steam ID."
-                );
+                command.ReplyToCommand($"Failed to add player {playerName} to {playerTeam}. They may already be on a team or you provided an invalid Steam ID.");
                 return;
             }
             command.ReplyToCommand($"Player {playerName} added to {playerTeam} successfully!");
@@ -144,9 +140,7 @@ namespace MatchZy
             }
             if (IsHalfTimePhase())
             {
-                command.ReplyToCommand(
-                    "Cannot remove players during halftime. Please wait until the next round starts."
-                );
+                command.ReplyToCommand("Cannot remove players during halftime. Please wait until the next round starts.");
                 return;
             }
 
@@ -170,9 +164,7 @@ namespace MatchZy
             }
             else
             {
-                command.ReplyToCommand(
-                    $"Player {steamId} not found in any team or the Steam ID was invalid."
-                );
+                command.ReplyToCommand($"Player {steamId} not found in any team or the Steam ID was invalid.");
             }
         }
 
@@ -202,12 +194,7 @@ namespace MatchZy
 
         public bool RemovePlayerFromTeam(string steamId)
         {
-            List<JToken?> teams =
-            [
-                matchzyTeam1.teamPlayers,
-                matchzyTeam2.teamPlayers,
-                matchConfig.Spectators,
-            ];
+            List<JToken?> teams = [matchzyTeam1.teamPlayers, matchzyTeam2.teamPlayers, matchConfig.Spectators];
 
             foreach (var team in teams)
             {

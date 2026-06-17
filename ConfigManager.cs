@@ -12,8 +12,7 @@ namespace MatchZy
     {
         // Lazy: avoids calling native Server.GameDirectory in the ctor, which CSS
         // may construct before the engine pointer is ready (would throw → load abort).
-        private string ServerPath =>
-            Path.Combine(Server.GameDirectory, "csgo", "cfg", "matchzy");
+        private string ServerPath => Path.Combine(Server.GameDirectory, "csgo", "cfg", "matchzy");
 
         private void CreateConfigFile(string fileName, string content)
         {
@@ -1117,9 +1116,7 @@ mp_warmup_start
                     sb.Append("\n\n");
                 }
                 File.AppendAllText(filePath, sb.ToString());
-                Console.WriteLine(
-                    $"[MatchZy] Appended {missingBlocks.Count} missing cvar(s) to {ConfigFiles.Paths.Config}."
-                );
+                Console.WriteLine($"[MatchZy] Appended {missingBlocks.Count} missing cvar(s) to {ConfigFiles.Paths.Config}.");
             }
             catch (Exception ex)
             {

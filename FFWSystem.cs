@@ -74,9 +74,7 @@ namespace MatchZy
 
             string missingTeamName = ffwMissingMatchTeam!.teamName;
 
-            PrintToAllChat(
-                $"FFW timer started! {ChatColors.Green}{missingTeamName}{ChatColors.Default} has {ChatColors.Green}4{ChatColors.Default} minutes to return!"
-            );
+            PrintToAllChat($"FFW timer started! {ChatColors.Green}{missingTeamName}{ChatColors.Default} has {ChatColors.Green}4{ChatColors.Default} minutes to return!");
 
             ffwTimer = AddTimer(
                 240.0f,
@@ -97,9 +95,7 @@ namespace MatchZy
                     {
                         if (ffwActive && ffwMissingMatchTeam != null)
                         {
-                            PrintToAllChat(
-                                $"{ChatColors.Green}{ffwMissingMatchTeam.teamName}{ChatColors.Default} has {ChatColors.Green}3{ChatColors.Default} minutes left to return!"
-                            );
+                            PrintToAllChat($"{ChatColors.Green}{ffwMissingMatchTeam.teamName}{ChatColors.Default} has {ChatColors.Green}3{ChatColors.Default} minutes left to return!");
                         }
                     }
                 )
@@ -112,9 +108,7 @@ namespace MatchZy
                     {
                         if (ffwActive && ffwMissingMatchTeam != null)
                         {
-                            PrintToAllChat(
-                                $"{ChatColors.Green}{ffwMissingMatchTeam.teamName}{ChatColors.Default} has {ChatColors.Green}2{ChatColors.Default} minutes left to return!"
-                            );
+                            PrintToAllChat($"{ChatColors.Green}{ffwMissingMatchTeam.teamName}{ChatColors.Default} has {ChatColors.Green}2{ChatColors.Default} minutes left to return!");
                         }
                     }
                 )
@@ -127,9 +121,7 @@ namespace MatchZy
                     {
                         if (ffwActive && ffwMissingMatchTeam != null)
                         {
-                            PrintToAllChat(
-                                $"{ChatColors.Green}{ffwMissingMatchTeam.teamName}{ChatColors.Default} has {ChatColors.Green}1{ChatColors.Default} minute left to return!"
-                            );
+                            PrintToAllChat($"{ChatColors.Green}{ffwMissingMatchTeam.teamName}{ChatColors.Default} has {ChatColors.Green}1{ChatColors.Default} minute left to return!");
                         }
                     }
                 )
@@ -142,9 +134,7 @@ namespace MatchZy
                     {
                         if (ffwActive && ffwMissingMatchTeam != null)
                         {
-                            PrintToAllChat(
-                                $"{ChatColors.Green}{ffwMissingMatchTeam.teamName}{ChatColors.Default} has {ChatColors.Green}30{ChatColors.Default} seconds left to return!"
-                            );
+                            PrintToAllChat($"{ChatColors.Green}{ffwMissingMatchTeam.teamName}{ChatColors.Default} has {ChatColors.Green}30{ChatColors.Default} seconds left to return!");
                         }
                     }
                 )
@@ -192,9 +182,7 @@ namespace MatchZy
 
                 if (!missingTeamStillEmpty)
                 {
-                    PrintToAllChat(
-                        $"{ChatColors.Green}{ffwMissingMatchTeam.teamName}{ChatColors.Default} has returned at the last moment! FFW cancelled."
-                    );
+                    PrintToAllChat($"{ChatColors.Green}{ffwMissingMatchTeam.teamName}{ChatColors.Default} has returned at the last moment! FFW cancelled.");
                     ffwRequestingTeam = CsTeam.None;
                     ffwMissingTeam = CsTeam.None;
                     ffwRequestingMatchTeam = null;
@@ -205,9 +193,7 @@ namespace MatchZy
                 string winnerName = ffwRequestingMatchTeam.teamName;
                 string loserName = ffwMissingMatchTeam.teamName;
 
-                PrintToAllChat(
-                    $"{ChatColors.Green}{loserName}{ChatColors.Default} failed to return! {ChatColors.Green}{winnerName}{ChatColors.Default} wins by forfeit!"
-                );
+                PrintToAllChat($"{ChatColors.Green}{loserName}{ChatColors.Default} failed to return! {ChatColors.Green}{winnerName}{ChatColors.Default} wins by forfeit!");
 
                 StopFFWMonitoring();
 
@@ -235,9 +221,7 @@ namespace MatchZy
             {
                 if (ffwMissingMatchTeam != null)
                 {
-                    PrintToAllChat(
-                        $"{ChatColors.Green}{ffwMissingMatchTeam.teamName}{ChatColors.Default} has returned! FFW cancelled."
-                    );
+                    PrintToAllChat($"{ChatColors.Green}{ffwMissingMatchTeam.teamName}{ChatColors.Default} has returned! FFW cancelled.");
                 }
             }
 

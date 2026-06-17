@@ -14,7 +14,7 @@ MatchZy is a CounterStrikeSharp plugin for CS2 match management — warmup, knif
 
 ## Tech Stack
 
-- **Framework**: CounterStrikeSharp API 1.0.367 (.NET 8.0, C# 12)
+- **Framework**: CounterStrikeSharp API 1.0.369 (.NET 10.0, C# 14)
 - **Database**: SQLite (default) or MySQL via Dapper
 - **Serialization**: Newtonsoft.Json (match configs), System.Text.Json (events/stats)
 - **In-game menus**: CS2MenuManager 1.0.42 (`WasdMenu`)
@@ -28,7 +28,7 @@ This is a **single partial class** (`MatchZy : BasePlugin`) split across ~40 fil
 ```
 matchzy/                       # Repo root (== project root, no src/ subfolder)
 ├── MatchZy.cs                 # Entry point: Load(), event registrations, commandActions map, inline event handlers
-├── MatchZy.csproj             # .NET 8.0 project file
+├── MatchZy.csproj             # .NET 10.0 project file
 ├── EventHandlers.cs           # Named event handler methods (connect, disconnect, round start/end, entity spawn, etc.)
 ├── MatchManagement.cs         # Match setup: LoadMatch JSON/URL, team management, series end, map change
 ├── MatchSetupWizard.cs        # In-game .matchsetup wizard — WasdMenu flow that builds match JSON, calls LoadMatchFromJSON
@@ -190,7 +190,7 @@ When opening a menu from a **chat-command dispatch** (a `.command` routed via `c
 
 | Package | Version | Purpose |
 |---------|---------|---------|
-| CounterStrikeSharp.API | 1.0.367 | Core CSS framework |
+| CounterStrikeSharp.API | 1.0.369 | Core CSS framework |
 | Newtonsoft.Json | 13.0.3 | Match config JSON parsing (JObject/JToken) |
 | Dapper | 2.1.72 | Lightweight DB ORM |
 | Microsoft.Data.Sqlite | 8.0.0 | SQLite provider |
@@ -203,7 +203,7 @@ When opening a menu from a **chat-command dispatch** (a `.command` routed via `c
 
 ```bash
 dotnet build -c Release
-# Output: bin/Release/net8.0/MatchZy.dll + dependencies
+# Output: bin/Release/net10.0/MatchZy.dll + dependencies
 # Deploy to: /game/csgo/addons/counterstrikesharp/plugins/MatchZy/
 ```
 
@@ -222,7 +222,9 @@ This is a **CounterStrikeSharp** plugin. Skills useful here, and when to reach f
 | `caveman-commit` | Generate a compressed Conventional-Commits message when committing. |
 | `init` | (Re)generate this CLAUDE.md. |
 
-**Do NOT use the `swiftlys2` skill for this repo.** SwiftlyS2 is a *different* CS2 server-mod framework (.NET 10). This project targets CounterStrikeSharp 1.0.367 on .NET 8.0 — the two APIs are not interchangeable. The `swiftlys2` skill only applies under `/home/mikkel/Hentet/swiftlys2-cs2-plugins/` or when explicitly porting to SwiftlyS2.
+**Do NOT use the `swiftlys2` skill for this repo.** SwiftlyS2 is a *different* CS2 server-mod framework. This project targets **CounterStrikeSharp** (API 1.0.369, .NET 10.0) — both frameworks now run on .NET 10, so do not distinguish them by runtime version; distinguish by API surface (`CounterStrikeSharp.API.*` here vs `SwiftlyS2.CS2.*`). The two APIs are not interchangeable. The `swiftlys2` skill only applies under `/home/mikkel/Hentet/swiftlys2-cs2-plugins/` or when explicitly porting to SwiftlyS2.
+
+> **Runtime note:** the server runs a **forked CounterStrikeSharp built for .NET 10** at `~/CounterStrikeSharp` (stock CSS 1.0.x is .NET 8). MatchZy references NuGet `CounterStrikeSharp.API 1.0.369`; if a *consistent* `MissingMethod`/`TypeLoad` load failure appears, the NuGet API has drifted from the fork's runtime ABI — rebuild against the fork's own API DLLs rather than NuGet.
 
 For CounterStrikeSharp API questions, consult the docs link below rather than guessing — the API surface (especially enum names like `PlayerConnectedState`) has churned between minor versions.
 

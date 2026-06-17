@@ -74,10 +74,7 @@ public partial class MatchZy
             return;
         }
 
-        Team playerTeam =
-            (player!.Team == CsTeam.CounterTerrorist)
-                ? reverseTeamSides["CT"]
-                : reverseTeamSides["TERRORIST"];
+        Team playerTeam = (player!.Team == CsTeam.CounterTerrorist) ? reverseTeamSides["CT"] : reverseTeamSides["TERRORIST"];
 
         // Ensure this team is in our tracking dictionary
         if (!technicalPauseUsed.ContainsKey(playerTeam))
@@ -183,9 +180,7 @@ public partial class MatchZy
             string teamWithIssue = ctPlayerCount < minPlayers ? "CT" : "T";
             int playerCount = ctPlayerCount < minPlayers ? ctPlayerCount : tPlayerCount;
 
-            Log(
-                $"[AutoPause] Triggering auto-pause - {teamWithIssue} team has {playerCount}/{minPlayers} players"
-            );
+            Log($"[AutoPause] Triggering auto-pause - {teamWithIssue} team has {playerCount}/{minPlayers} players");
 
             Server.ExecuteCommand("mp_pause_match");
             isPaused = true;
@@ -197,12 +192,8 @@ public partial class MatchZy
             unpauseData["t"] = false;
             unpauseData["pauseTeam"] = "AUTO";
 
-            PrintToAllChat(
-                $"{ChatColors.Gold}[AUTO-PAUSE]{ChatColors.Default} Match paused - {autoPauseReason}"
-            );
-            PrintToAllChat(
-                $"{ChatColors.Grey}Match will auto-resume when both teams have {minPlayers} players, or use {ChatColors.Green}.unpause{ChatColors.Default}"
-            );
+            PrintToAllChat($"{ChatColors.Gold}[AUTO-PAUSE]{ChatColors.Default} Match paused - {autoPauseReason}");
+            PrintToAllChat($"{ChatColors.Grey}Match will auto-resume when both teams have {minPlayers} players, or use {ChatColors.Green}.unpause{ChatColors.Default}");
 
             // Send webhook for live scorebot
             if (!string.IsNullOrEmpty(matchConfig.RemoteLogURL))
@@ -223,21 +214,12 @@ public partial class MatchZy
             }
         }
         // Check if we can auto-resume (both teams back to min players)
-        else if (
-            isPaused
-            && isAutoPaused
-            && ctPlayerCount >= minPlayers
-            && tPlayerCount >= minPlayers
-        )
+        else if (isPaused && isAutoPaused && ctPlayerCount >= minPlayers && tPlayerCount >= minPlayers)
         {
-            Log(
-                $"[AutoPause] Auto-resuming - both teams now have {minPlayers} players (CT: {ctPlayerCount}, T: {tPlayerCount})"
-            );
+            Log($"[AutoPause] Auto-resuming - both teams now have {minPlayers} players (CT: {ctPlayerCount}, T: {tPlayerCount})");
 
             int resumeDelay = autoResumeDelay.Value;
-            PrintToAllChat(
-                $"{ChatColors.Green}[AUTO-RESUME]{ChatColors.Default} Both teams now have {minPlayers} players. Match resuming in {resumeDelay} seconds..."
-            );
+            PrintToAllChat($"{ChatColors.Green}[AUTO-RESUME]{ChatColors.Default} Both teams now have {minPlayers} players. Match resuming in {resumeDelay} seconds...");
 
             AddTimer(
                 (float)resumeDelay,
@@ -320,10 +302,7 @@ public partial class MatchZy
 
             if (ctCount < minPlayers || tCount < minPlayers)
             {
-                ReplyToUserCommand(
-                    player,
-                    $"Cannot unpause - teams still unbalanced (CT: {ctCount}/{minPlayers}, T: {tCount}/{minPlayers})"
-                );
+                ReplyToUserCommand(player, $"Cannot unpause - teams still unbalanced (CT: {ctCount}/{minPlayers}, T: {tCount}/{minPlayers})");
                 return false;
             }
         }
@@ -331,17 +310,11 @@ public partial class MatchZy
         else if (isAutoPaused && !IsAutoPauseActive())
         {
             // Autopause inactive for small player counts - allow unpause
-            ReplyToUserCommand(
-                player,
-                $"Match paused. You may now use .unpause to continue (players may be unbalanced)."
-            );
+            ReplyToUserCommand(player, $"Match paused. You may now use .unpause to continue (players may be unbalanced).");
         }
 
         string teamKey = player.Team == CsTeam.CounterTerrorist ? "ct" : "t";
-        string teamName =
-            player.Team == CsTeam.CounterTerrorist
-                ? ConVar.Find("mp_teamname_1")!.StringValue
-                : ConVar.Find("mp_teamname_2")!.StringValue;
+        string teamName = player.Team == CsTeam.CounterTerrorist ? ConVar.Find("mp_teamname_1")!.StringValue : ConVar.Find("mp_teamname_2")!.StringValue;
 
         if (string.IsNullOrEmpty(teamName))
         {
@@ -363,9 +336,7 @@ public partial class MatchZy
             isAutoPaused = false;
             autoPauseReason = null;
 
-            PrintToAllChat(
-                $"{ChatColors.Green}Match unpaused!{ChatColors.Default} Both teams ready."
-            );
+            PrintToAllChat($"{ChatColors.Green}Match unpaused!{ChatColors.Default} Both teams ready.");
 
             // Reset unpause data
             unpauseData["ct"] = false;

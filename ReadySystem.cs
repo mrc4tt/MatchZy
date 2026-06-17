@@ -113,10 +113,7 @@ public partial class MatchZy
 
         if (playerCount < minReady)
         {
-            ReplyToUserCommand(
-                player,
-                Localizer.ForPlayer(player, "matchzy.rs.minreadyplayers", minReady)
-            );
+            ReplyToUserCommand(player, Localizer.ForPlayer(player, "matchzy.rs.minreadyplayers", minReady));
             return;
         }
 
@@ -127,10 +124,7 @@ public partial class MatchZy
             if (playerData[key].TeamNum == player.TeamNum)
             {
                 playerReadyStatus[key] = true;
-                ReplyToUserCommand(
-                    playerData[key],
-                    Localizer.ForPlayer(player, "matchzy.rs.forcereadiedby", player.PlayerName)
-                );
+                ReplyToUserCommand(playerData[key], Localizer.ForPlayer(player, "matchzy.rs.forcereadiedby", player.PlayerName));
             }
         }
 

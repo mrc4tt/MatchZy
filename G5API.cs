@@ -172,9 +172,7 @@ namespace MatchZy
         [ConsoleCommand("get5_web_available", "Returns get5 web available")]
         public void Get5WebAvailable(CCSPlayerController? player, CommandInfo command)
         {
-            command.ReplyToCommand(
-                JsonSerializer.Serialize(new G5WebAvailable { GameState = (int)getGet5Gamestate() })
-            );
+            command.ReplyToCommand(JsonSerializer.Serialize(new G5WebAvailable { GameState = (int)getGet5Gamestate() }));
         }
 
         private Get5GameState getGet5Gamestate()

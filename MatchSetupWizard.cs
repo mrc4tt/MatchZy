@@ -42,26 +42,17 @@ namespace MatchZy
             }
             if (isMatchSetup)
             {
-                ReplyToUserCommand(
-                    player,
-                    $"A match is already configured (id {liveMatchId}). Use .stopmatch first."
-                );
+                ReplyToUserCommand(player, $"A match is already configured (id {liveMatchId}). Use .stopmatch first.");
                 return;
             }
             if (mapRotationList.Count == 0)
             {
-                ReplyToUserCommand(
-                    player,
-                    "matchzymaps.cfg has no maps — add some before running .matchsetup."
-                );
+                ReplyToUserCommand(player, "matchzymaps.cfg has no maps — add some before running .matchsetup.");
                 return;
             }
             if (activeSetup != null && activeSetup.AdminSteamId != player.SteamID)
             {
-                ReplyToUserCommand(
-                    player,
-                    "Another admin is already in the setup wizard. Wait for them to finish or cancel."
-                );
+                ReplyToUserCommand(player, "Another admin is already in the setup wizard. Wait for them to finish or cancel.");
                 return;
             }
 
@@ -210,29 +201,18 @@ namespace MatchZy
 
             var menu = new WasdMenu($"{chatPrefix} Confirm Match", this);
             menu.AddItem($"BO{s.NumMaps} — change", (p, _) => OpenSeriesMenu(p));
-            string mapSummary = s.SkipVeto
-                ? $"Maps ({s.SelectedMaps.Count}/{s.NumMaps}): {string.Join(" → ", s.SelectedMaps)}"
-                : $"Veto pool: {s.SelectedMaps.Count} maps";
+            string mapSummary = s.SkipVeto ? $"Maps ({s.SelectedMaps.Count}/{s.NumMaps}): {string.Join(" → ", s.SelectedMaps)}" : $"Veto pool: {s.SelectedMaps.Count} maps";
             menu.AddItem(mapSummary, (p, _) => OpenMapModeMenu(p));
-            menu.AddItem(
-                $"Sides: {(s.KnifeRound ? "Knife" : "Team1 CT")} — change",
-                (p, _) => OpenSidesMenu(p)
-            );
+            menu.AddItem($"Sides: {(s.KnifeRound ? "Knife" : "Team1 CT")} — change", (p, _) => OpenSidesMenu(p));
             menu.AddItem(
                 $"Teams: {team1} vs {team2}",
                 (p, o) =>
                 {
-                    ReplyToUserCommand(
-                        p,
-                        "Type .team1 <name> / .team2 <name> in chat — menu refreshes automatically."
-                    );
+                    ReplyToUserCommand(p, "Type .team1 <name> / .team2 <name> in chat — menu refreshes automatically.");
                     o.PostSelectAction = CS2MenuManager.API.Enum.PostSelectAction.Nothing;
                 }
             );
-            menu.AddItem(
-                $"{ChatColors.Green}>> START MATCH",
-                (p, _) => FinalizeMatchSetup(p)
-            );
+            menu.AddItem($"{ChatColors.Green}>> START MATCH", (p, _) => FinalizeMatchSetup(p));
             menu.AddItem("Cancel Setup", (p, _) => CancelSetup(p));
             menu.Display(player, 0);
         }
@@ -286,16 +266,11 @@ namespace MatchZy
 
             if (ok)
             {
-                PrintToAllChat(
-                    $"{ChatColors.Green}Match configured by admin: BO{s.NumMaps} ({(s.SkipVeto ? "no veto" : "veto")})"
-                );
+                PrintToAllChat($"{ChatColors.Green}Match configured by admin: BO{s.NumMaps} ({(s.SkipVeto ? "no veto" : "veto")})");
             }
             else
             {
-                ReplyToUserCommand(
-                    player,
-                    "LoadMatchFromJSON returned false — check server log for validation errors."
-                );
+                ReplyToUserCommand(player, "LoadMatchFromJSON returned false — check server log for validation errors.");
             }
         }
 
@@ -325,10 +300,7 @@ namespace MatchZy
             string fromConvar = teamNameCt.Value?.Trim() ?? "";
             if (!string.IsNullOrEmpty(fromConvar))
                 return fromConvar;
-            if (
-                !string.IsNullOrEmpty(matchzyTeam1.teamName)
-                && matchzyTeam1.teamName != "COUNTER-TERRORISTS"
-            )
+            if (!string.IsNullOrEmpty(matchzyTeam1.teamName) && matchzyTeam1.teamName != "COUNTER-TERRORISTS")
                 return matchzyTeam1.teamName;
             return "Team1";
         }
@@ -338,10 +310,7 @@ namespace MatchZy
             string fromConvar = teamNameT.Value?.Trim() ?? "";
             if (!string.IsNullOrEmpty(fromConvar))
                 return fromConvar;
-            if (
-                !string.IsNullOrEmpty(matchzyTeam2.teamName)
-                && matchzyTeam2.teamName != "TERRORISTS"
-            )
+            if (!string.IsNullOrEmpty(matchzyTeam2.teamName) && matchzyTeam2.teamName != "TERRORISTS")
                 return matchzyTeam2.teamName;
             return "Team2";
         }

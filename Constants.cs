@@ -2,9 +2,7 @@ namespace MatchZy;
 
 class Constants
 {
-    public static readonly Dictionary<string, string> ProjectileTypeMap = new(
-        StringComparer.OrdinalIgnoreCase
-    )
+    public static readonly Dictionary<string, string> ProjectileTypeMap = new(StringComparer.OrdinalIgnoreCase)
     {
         { "smokegrenade_projectile", "smoke" },
         { "flashbang_projectile", "flash" },
@@ -14,9 +12,7 @@ class Constants
         { "incendiary_projectile", "incendiary" },
     };
 
-    public static readonly Dictionary<string, string> NadeProjectileMap = new(
-        StringComparer.OrdinalIgnoreCase
-    )
+    public static readonly Dictionary<string, string> NadeProjectileMap = new(StringComparer.OrdinalIgnoreCase)
     {
         { "smoke", "smokegrenade_projectile" },
         { "flash", "flashbang_projectile" },

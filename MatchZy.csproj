@@ -28,4 +28,3 @@
     <None Update="spawns\**\*.*" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 </Project>
-

@@ -18,8 +18,7 @@ namespace MatchZy
         public override string ModuleName => "MatchZy";
         public override string ModuleVersion => "0.8.33";
         public override string ModuleAuthor => "WD- Edited by Miksen";
-        public override string ModuleDescription =>
-            "A plugin for running and managing CS2 practice/pugs/scrims/matches!";
+        public override string ModuleDescription => "A plugin for running and managing CS2 practice/pugs/scrims/matches!";
         public string chatPrefix = $"{ChatColors.Green}[MatchZy]{ChatColors.Default}";
         public string adminChatPrefix = $"[{ChatColors.Red}ADMIN{ChatColors.Default}]";
 
@@ -58,8 +57,7 @@ namespace MatchZy
         // Players Data (including admins)
         public int connectedPlayers = 0;
         private Dictionary<int, bool> playerReadyStatus = new Dictionary<int, bool>();
-        private Dictionary<int, CCSPlayerController> playerData =
-            new Dictionary<int, CCSPlayerController>();
+        private Dictionary<int, CCSPlayerController> playerData = new Dictionary<int, CCSPlayerController>();
 
         private void SetupRestartConfirmationCleanup()
         {
@@ -68,12 +66,7 @@ namespace MatchZy
                 () =>
                 {
                     var now = DateTime.Now;
-                    var expired = pendingRestartConfirmations
-                        .Where(kvp =>
-                            (now - kvp.Value).TotalSeconds > RESTART_CONFIRMATION_TIMEOUT_SECONDS
-                        )
-                        .Select(kvp => kvp.Key)
-                        .ToList();
+                    var expired = pendingRestartConfirmations.Where(kvp => (now - kvp.Value).TotalSeconds > RESTART_CONFIRMATION_TIMEOUT_SECONDS).Select(kvp => kvp.Key).ToList();
 
                     foreach (var steamId in expired)
                     {
@@ -106,9 +99,7 @@ namespace MatchZy
             _cachedTTeam = null;
             try
             {
-                var teamEntities = Utilities.FindAllEntitiesByDesignerName<CCSTeam>(
-                    "cs_team_manager"
-                );
+                var teamEntities = Utilities.FindAllEntitiesByDesignerName<CCSTeam>("cs_team_manager");
                 foreach (var team in teamEntities)
                 {
                     if (team.Teamname == "CT")
@@ -222,9 +213,7 @@ namespace MatchZy
                     {
                         Server.NextFrame(() =>
                         {
-                            PrintToAllChat(
-                                $"{ChatColors.Green}{knifeWinnerName}{ChatColors.Default} has 40 seconds left to choose side!"
-                            );
+                            PrintToAllChat($"{ChatColors.Green}{knifeWinnerName}{ChatColors.Default} has 40 seconds left to choose side!");
                         });
                     }
                 }
@@ -238,9 +227,7 @@ namespace MatchZy
                     {
                         Server.NextFrame(() =>
                         {
-                            PrintToAllChat(
-                                $"{ChatColors.Green}{knifeWinnerName}{ChatColors.Default} has 20 seconds left to choose side!"
-                            );
+                            PrintToAllChat($"{ChatColors.Green}{knifeWinnerName}{ChatColors.Default} has 20 seconds left to choose side!");
                         });
                     }
                 }
@@ -254,9 +241,7 @@ namespace MatchZy
                     {
                         Server.NextFrame(() =>
                         {
-                            PrintToAllChat(
-                                $"{ChatColors.Green}{knifeWinnerName}{ChatColors.Default} has 10 seconds left to choose side!"
-                            );
+                            PrintToAllChat($"{ChatColors.Green}{knifeWinnerName}{ChatColors.Default} has 10 seconds left to choose side!");
                         });
                     }
                 }
@@ -299,13 +284,7 @@ namespace MatchZy
                 configManager.InitializeConfigs();
                 mapRotationList = configManager.LoadMapRotation();
 
-                var configPath = Path.Combine(
-                    Server.GameDirectory,
-                    "csgo",
-                    "cfg",
-                    "matchzy",
-                    ConfigFiles.Paths.Config
-                );
+                var configPath = Path.Combine(Server.GameDirectory, "csgo", "cfg", "matchzy", ConfigFiles.Paths.Config);
                 if (File.Exists(configPath))
                 {
                     Server.ExecuteCommand($"execifexists matchzy/{ConfigFiles.Paths.Config}");
@@ -531,19 +510,13 @@ namespace MatchZy
 
             RegisterEventHandler<EventPlayerConnectFull>(EventPlayerConnectFullHandler);
             RegisterEventHandler<EventPlayerDisconnect>(EventPlayerDisconnectHandler);
-            RegisterEventHandler<EventCsWinPanelRound>(
-                EventCsWinPanelRoundHandler,
-                hookMode: HookMode.Pre
-            );
+            RegisterEventHandler<EventCsWinPanelRound>(EventCsWinPanelRoundHandler, hookMode: HookMode.Pre);
             RegisterEventHandler<EventCsWinPanelMatch>(EventCsWinPanelMatchHandler);
             RegisterEventHandler<EventRoundStart>(EventRoundStartHandler);
             RegisterEventHandler<EventRoundFreezeEnd>(EventRoundFreezeEndHandler);
             RegisterEventHandler<EventPlayerSpawn>(OnCoachPlayerSpawn, HookMode.Post);
             RegisterEventHandler<EventPlayerGivenC4>(EventPlayerGivenC4);
-            RegisterEventHandler<EventPlayerDeath>(
-                EventPlayerDeathPreHandler,
-                hookMode: HookMode.Pre
-            );
+            RegisterEventHandler<EventPlayerDeath>(EventPlayerDeathPreHandler, hookMode: HookMode.Pre);
             RegisterEventHandler<EventPlayerPing>(EventPlayerPingHandler);
             //RegisterEventHandler<EventCsIntermission>(OnEventCsIntermissionPost);
             RegisterListener<Listeners.OnMapEnd>(OnMapEndHandler);
@@ -562,9 +535,7 @@ namespace MatchZy
                     if (!IsPlayerValid(player))
                         return HookResult.Continue;
 
-                    if (
-                        matchzyTeam1.coach.Contains(player!) || matchzyTeam2.coach.Contains(player!)
-                    )
+                    if (matchzyTeam1.coach.Contains(player!) || matchzyTeam2.coach.Contains(player!))
                     {
                         @event.Silent = true;
                         return HookResult.Changed;
@@ -606,12 +577,7 @@ namespace MatchZy
                 "jointeam",
                 (player, info) =>
                 {
-                    if (
-                        (isMatchSetup || isVeto)
-                        && player != null
-                        && player.IsValid
-                        && IsTeamWhitelistConfigured()
-                    )
+                    if ((isMatchSetup || isVeto) && player != null && player.IsValid && IsTeamWhitelistConfigured())
                     {
                         if (int.TryParse(info.ArgByIndex(1), out int joiningTeam))
                         {
@@ -681,12 +647,8 @@ namespace MatchZy
                                 () =>
                                 {
                                     StartPracticeMode();
-                                    PrintToAllChat(
-                                        $"{ChatColors.Green}Practice Mode has been restored. You can run .dry again if you wish."
-                                    );
-                                    Server.ExecuteCommand(
-                                        "mp_warmup_start; mp_warmup_pausetimer 1; mp_restartgame 1"
-                                    );
+                                    PrintToAllChat($"{ChatColors.Green}Practice Mode has been restored. You can run .dry again if you wish.");
+                                    Server.ExecuteCommand("mp_warmup_start; mp_warmup_pausetimer 1; mp_restartgame 1");
                                 }
                             );
 
@@ -794,12 +756,8 @@ namespace MatchZy
                         VictimName = victim.PlayerName,
                         VictimSteamId = victim.SteamID.ToString(),
                         VictimTeam = GetTeamSide(victim),
-                        AssisterName =
-                            assister != null && assister.IsValid ? assister.PlayerName : null,
-                        AssisterSteamId =
-                            assister != null && assister.IsValid
-                                ? assister.SteamID.ToString()
-                                : null,
+                        AssisterName = assister != null && assister.IsValid ? assister.PlayerName : null,
+                        AssisterSteamId = assister != null && assister.IsValid ? assister.SteamID.ToString() : null,
                         Weapon = @event.Weapon ?? "unknown",
                         Headshot = @event.Headshot,
                         Penetrated = @event.Penetrated > 0,
@@ -938,16 +896,8 @@ namespace MatchZy
                                 Team = side,
                                 Hp = alive ? pawn.Health : 0,
                                 Armor = pawn.ArmorValue,
-                                HasHelmet =
-                                    p.PlayerPawn.Value.ItemServices != null
-                                    && (
-                                        p.PlayerPawn.Value.ItemServices as CCSPlayer_ItemServices
-                                    )?.HasHelmet == true,
-                                HasDefuser =
-                                    p.PlayerPawn.Value.ItemServices != null
-                                    && (
-                                        p.PlayerPawn.Value.ItemServices as CCSPlayer_ItemServices
-                                    )?.HasDefuser == true,
+                                HasHelmet = p.PlayerPawn.Value.ItemServices != null && (p.PlayerPawn.Value.ItemServices as CCSPlayer_ItemServices)?.HasHelmet == true,
+                                HasDefuser = p.PlayerPawn.Value.ItemServices != null && (p.PlayerPawn.Value.ItemServices as CCSPlayer_ItemServices)?.HasDefuser == true,
                                 Money = p.InGameMoneyServices?.Account ?? 0,
                             }
                         );
@@ -984,16 +934,7 @@ namespace MatchZy
                     {
                         int damage = @event.DmgHealth;
                         int postDamageHealth = @event.Health;
-                        PrintToPlayerChat(
-                            attacker!,
-                            Localizer.ForPlayer(
-                                attacker!,
-                                "matchzy.pracc.damage",
-                                damage,
-                                victim.PlayerName,
-                                postDamageHealth
-                            )
-                        );
+                        PrintToPlayerChat(attacker!, Localizer.ForPlayer(attacker!, "matchzy.pracc.damage", damage, victim.PlayerName, postDamageHealth));
                         return HookResult.Continue;
                     }
 
@@ -1038,14 +979,8 @@ namespace MatchZy
                         MatchId = liveMatchId,
                         MapNumber = matchConfig.CurrentMapNumber,
                         RoundNumber = GetRoundNumer(),
-                        AttackerName =
-                            attacker != null && attacker.IsValid && !attacker.IsBot
-                                ? attacker.PlayerName
-                                : null,
-                        AttackerSteamId =
-                            attacker != null && attacker.IsValid && !attacker.IsBot
-                                ? attacker.SteamID.ToString()
-                                : null,
+                        AttackerName = attacker != null && attacker.IsValid && !attacker.IsBot ? attacker.PlayerName : null,
+                        AttackerSteamId = attacker != null && attacker.IsValid && !attacker.IsBot ? attacker.SteamID.ToString() : null,
                         VictimName = victim.PlayerName,
                         VictimSteamId = victim.SteamID.ToString(),
                         VictimTeam = GetTeamSide(victim),
@@ -1085,8 +1020,7 @@ namespace MatchZy
 
                     var parts = originalMessage.Split(' ');
                     var messageCommand = parts.Length > 0 ? parts[0] : string.Empty;
-                    var messageCommandArg =
-                        parts.Length > 1 ? string.Join(' ', parts.Skip(1)) : string.Empty;
+                    var messageCommandArg = parts.Length > 1 ? string.Join(' ', parts.Skip(1)) : string.Empty;
 
                     CCSPlayerController? player = null;
                     if (playerData.TryGetValue(playerUserId, out CCSPlayerController? value))
@@ -1100,12 +1034,7 @@ namespace MatchZy
                         UpdatePlayersMap();
 
                         // Add validation before accessing the dictionary
-                        if (
-                            playerData.TryGetValue(
-                                playerUserId,
-                                out CCSPlayerController? playerValue
-                            )
-                        )
+                        if (playerData.TryGetValue(playerUserId, out CCSPlayerController? playerValue))
                         {
                             player = playerValue;
                         }
@@ -1187,22 +1116,12 @@ namespace MatchZy
 
                     if (message.StartsWith(".ctspawn") || message.StartsWith(".cts"))
                     {
-                        HandleSpawnCommand(
-                            player,
-                            messageCommandArg,
-                            (byte)CsTeam.CounterTerrorist,
-                            "ctspawn"
-                        );
+                        HandleSpawnCommand(player, messageCommandArg, (byte)CsTeam.CounterTerrorist, "ctspawn");
                     }
 
                     if (message.StartsWith(".tspawn") || message.StartsWith(".ts"))
                     {
-                        HandleSpawnCommand(
-                            player,
-                            messageCommandArg,
-                            (byte)CsTeam.Terrorist,
-                            "tspawn"
-                        );
+                        HandleSpawnCommand(player, messageCommandArg, (byte)CsTeam.Terrorist, "tspawn");
                     }
 
                     if (message.StartsWith(".team1") || message.StartsWith(".ctname"))
@@ -1268,15 +1187,7 @@ namespace MatchZy
                     if (attacker!.IsValid)
                     {
                         double roundedBlindDuration = Math.Round(@event.BlindDuration, 2);
-                        PrintToPlayerChat(
-                            attacker,
-                            Localizer.ForPlayer(
-                                attacker,
-                                "matchzy.pracc.blind",
-                                player!.PlayerName,
-                                roundedBlindDuration
-                            )
-                        );
+                        PrintToPlayerChat(attacker, Localizer.ForPlayer(attacker, "matchzy.pracc.blind", player!.PlayerName, roundedBlindDuration));
                     }
 
                     var userId = player!.UserId;
