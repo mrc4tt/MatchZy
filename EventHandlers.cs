@@ -393,7 +393,7 @@ public partial class MatchZy
         if (!isPractice || isDryRun)
             return HookResult.Continue;
         CCSPlayerController? player = @event.Userid;
-        if (!IsPlayerValid(player))
+        if (!IsHumanPlayerValid(player))
             return HookResult.Continue;
         if (lastGrenadeThrownTime.TryGetValue(@event.Entityid, out var thrownTime))
         {
@@ -409,7 +409,7 @@ public partial class MatchZy
         if (!isPractice || isDryRun)
             return HookResult.Continue;
         CCSPlayerController? player = @event.Userid;
-        if (!IsPlayerValid(player))
+        if (!IsHumanPlayerValid(player))
             return HookResult.Continue;
         if (lastGrenadeThrownTime.TryGetValue(@event.Entityid, out var thrownTime))
         {
@@ -425,7 +425,7 @@ public partial class MatchZy
         if (!isPractice || isDryRun)
             return HookResult.Continue;
         CCSPlayerController? player = @event.Userid;
-        if (!IsPlayerValid(player))
+        if (!IsHumanPlayerValid(player))
             return HookResult.Continue;
         if (lastGrenadeThrownTime.TryGetValue(@event.Get<int>("entityid"), out var thrownTime))
         {
@@ -440,7 +440,7 @@ public partial class MatchZy
         if (!isPractice || isDryRun)
             return HookResult.Continue;
         CCSPlayerController? player = @event.Userid;
-        if (!IsPlayerValid(player))
+        if (!IsHumanPlayerValid(player))
             return HookResult.Continue;
         if (lastGrenadeThrownTime.TryGetValue(@event.Entityid, out var thrownTime))
         {

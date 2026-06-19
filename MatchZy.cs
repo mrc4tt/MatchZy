@@ -930,7 +930,7 @@ namespace MatchZy
                     if (!IsPlayerValid(attacker) || !IsPlayerValid(victim))
                         return HookResult.Continue;
 
-                    if (isPractice && victim!.IsBot)
+                    if (isPractice && victim!.IsBot && !attacker!.IsBot)
                     {
                         int damage = @event.DmgHealth;
                         int postDamageHealth = @event.Health;
@@ -1184,7 +1184,7 @@ namespace MatchZy
                     if (!IsPlayerValid(player) || !IsPlayerValid(attacker))
                         return HookResult.Continue;
 
-                    if (attacker!.IsValid)
+                    if (attacker!.IsValid && !attacker.IsBot)
                     {
                         double roundedBlindDuration = Math.Round(@event.BlindDuration, 2);
                         PrintToPlayerChat(attacker, Localizer.ForPlayer(attacker, "matchzy.pracc.blind", player!.PlayerName, roundedBlindDuration));
