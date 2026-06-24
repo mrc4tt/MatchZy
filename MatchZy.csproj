@@ -48,15 +48,8 @@
     <PropertyGroup>
       <_PatchedSqlite>$(MSBuildProjectDirectory)/native/linux-x64/libe_sqlite3.so</_PatchedSqlite>
     </PropertyGroup>
-    <Error Condition="!Exists('$(_PatchedSqlite)')"
-           Text="Patched libe_sqlite3.so missing at $(_PatchedSqlite). Run ./tools/build-sqlite-native.sh." />
-    <Copy Condition="Exists('$(OutDir)runtimes/linux-x64/native/libe_sqlite3.so')"
-          SourceFiles="$(_PatchedSqlite)"
-          DestinationFiles="$(OutDir)runtimes/linux-x64/native/libe_sqlite3.so"
-          OverwriteReadOnlyFiles="true" SkipUnchangedFiles="false" />
-    <Copy Condition="'$(PublishDir)' != '' And Exists('$(PublishDir)runtimes/linux-x64/native/libe_sqlite3.so')"
-          SourceFiles="$(_PatchedSqlite)"
-          DestinationFiles="$(PublishDir)runtimes/linux-x64/native/libe_sqlite3.so"
-          OverwriteReadOnlyFiles="true" SkipUnchangedFiles="false" />
+    <Error Condition="!Exists('$(_PatchedSqlite)')" Text="Patched libe_sqlite3.so missing at $(_PatchedSqlite). Run ./tools/build-sqlite-native.sh." />
+    <Copy Condition="Exists('$(OutDir)runtimes/linux-x64/native/libe_sqlite3.so')" SourceFiles="$(_PatchedSqlite)" DestinationFiles="$(OutDir)runtimes/linux-x64/native/libe_sqlite3.so" OverwriteReadOnlyFiles="true" SkipUnchangedFiles="false" />
+    <Copy Condition="'$(PublishDir)' != '' And Exists('$(PublishDir)runtimes/linux-x64/native/libe_sqlite3.so')" SourceFiles="$(_PatchedSqlite)" DestinationFiles="$(PublishDir)runtimes/linux-x64/native/libe_sqlite3.so" OverwriteReadOnlyFiles="true" SkipUnchangedFiles="false" />
   </Target>
 </Project>

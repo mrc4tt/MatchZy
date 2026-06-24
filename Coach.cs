@@ -261,7 +261,8 @@ public partial class MatchZy
             List<Position> remainingSpawns = new(spawns);
             while (remainingPlayers.Count > 0 && remainingSpawns.Count > 0)
             {
-                int bestP = -1, bestS = -1;
+                int bestP = -1,
+                    bestS = -1;
                 float bestDist = float.MaxValue;
                 for (int pi = 0; pi < remainingPlayers.Count; pi++)
                 {
@@ -306,9 +307,7 @@ public partial class MatchZy
     /// </summary>
     private bool HasCoachSpawns()
     {
-        return coachSpawns.Count > 0
-            && coachSpawns.TryGetValue((byte)CsTeam.CounterTerrorist, out List<Position>? ct) && ct.Count > 0
-            && coachSpawns.TryGetValue((byte)CsTeam.Terrorist, out List<Position>? t) && t.Count > 0;
+        return coachSpawns.Count > 0 && coachSpawns.TryGetValue((byte)CsTeam.CounterTerrorist, out List<Position>? ct) && ct.Count > 0 && coachSpawns.TryGetValue((byte)CsTeam.Terrorist, out List<Position>? t) && t.Count > 0;
     }
 
     /// <summary>
@@ -319,12 +318,7 @@ public partial class MatchZy
     private List<Position> GetTopCompetitiveSpawns(byte side, int count)
     {
         string designerName = side == (byte)CsTeam.CounterTerrorist ? "info_player_counterterrorist" : "info_player_terrorist";
-        return Utilities.FindAllEntitiesByDesignerName<SpawnPoint>(designerName)
-            .Where(s => s.IsValid && s.Enabled && s.CBodyComponent?.SceneNode != null)
-            .OrderBy(s => s.Priority)
-            .Take(count)
-            .Select(s => new Position(s.CBodyComponent!.SceneNode!.AbsOrigin, s.CBodyComponent.SceneNode.AbsRotation))
-            .ToList();
+        return Utilities.FindAllEntitiesByDesignerName<SpawnPoint>(designerName).Where(s => s.IsValid && s.Enabled && s.CBodyComponent?.SceneNode != null).OrderBy(s => s.Priority).Take(count).Select(s => new Position(s.CBodyComponent!.SceneNode!.AbsOrigin, s.CBodyComponent.SceneNode.AbsRotation)).ToList();
     }
 
     private void MoveCoachToPosition(CCSPlayerController coach, Position position, string timing)
