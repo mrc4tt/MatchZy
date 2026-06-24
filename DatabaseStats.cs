@@ -50,19 +50,48 @@ namespace MatchZy
         // the native bootstrap can segfault. Pre-initialize once, eagerly.
         private static int _sqliteInitDone;
 
-        private static void EnsureSqliteProviderInitialized()
+        // Returns null on success/already-initialized, or a flattened error string when the
+        // native bootstrap failed (so the instance caller can Log it — this is static).
+        private static string? EnsureSqliteProviderInitialized()
         {
             if (Interlocked.CompareExchange(ref _sqliteInitDone, 1, 0) != 0)
-                return;
+                return null;
             try
             {
                 SQLitePCL.Batteries_V2.Init();
+                return null;
             }
-            catch
+            catch (Exception ex)
             {
                 // Another loader (Microsoft.Data.Sqlite static ctor or another
-                // plugin) may have already initialized. Safe to ignore.
+                // plugin) may have already initialized — that case is harmless.
+                // But a genuine native-load failure (missing/incompatible
+                // e_sqlite3 .so under the .NET 10 fork runtime) also lands here
+                // and otherwise surfaces later as an opaque TypeInitializationException
+                // on SqliteConnection. Return the full chain so the root cause is visible.
+                return DescribeException(ex);
             }
+        }
+
+        /// <summary>
+        /// Flattens an exception and its InnerException chain into a single line —
+        /// TypeInitializationException et al. hide the real cause (e.g. a native
+        /// DllNotFoundException) in InnerException, which the bare ex.Message drops.
+        /// </summary>
+        private static string DescribeException(Exception ex)
+        {
+            System.Text.StringBuilder sb = new();
+            Exception? cur = ex;
+            int depth = 0;
+            while (cur != null)
+            {
+                if (depth > 0)
+                    sb.Append(" -> INNER ");
+                sb.Append('[').Append(cur.GetType().Name).Append("] ").Append(cur.Message);
+                cur = cur.InnerException;
+                depth++;
+            }
+            return sb.ToString();
         }
 
         DatabaseConfig? config;
@@ -70,7 +99,9 @@ namespace MatchZy
 
         public async Task InitializeDatabaseAsync(string directory, string gameDirectory)
         {
-            EnsureSqliteProviderInitialized();
+            string? sqliteInitError = EnsureSqliteProviderInitialized();
+            if (sqliteInitError != null)
+                Log($"[EnsureSqliteProviderInitialized] Batteries_V2.Init() failed: {sqliteInitError}");
             ConnectDatabase(directory, gameDirectory);
             try
             {
@@ -94,7 +125,7 @@ namespace MatchZy
             }
             catch (Exception ex)
             {
-                Log($"[InitializeDatabase - FATAL] Database connection or table creation error: {ex.Message}");
+                Log($"[InitializeDatabase - FATAL] Database connection or table creation error: {DescribeException(ex)}");
                 Log($"[InitializeDatabase - FATAL] Stack trace: {ex.StackTrace}");
             }
         }
@@ -463,7 +494,8 @@ namespace MatchZy
             }
             catch (Exception ex)
             {
-                Log($"[InitMatch - FATAL] Error: {ex.Message}");
+                Log($"[InitMatch - FATAL] Error: {DescribeException(ex)}");
+                Log($"[InitMatch - FATAL] Stack: {ex.StackTrace}");
                 return -1;
             }
         }
