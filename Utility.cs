@@ -315,13 +315,6 @@ namespace MatchZy
             _readyStatusDirty = true; // Force recompute on warmup start
             ExecWarmupCfg();
 
-            // Force full reset of round history (W/L dots, death skulls, player stats).
-            // Plain mp_restartgame 1 may not clear per-round client-side trackers when
-            // chained after mp_warmup_start. Cycle: end → restart → start.
-            Server.ExecuteCommand("mp_warmup_end; mp_restartgame 1; mp_warmup_start;");
-
-            // Delay memory wipe until AFTER mp_restartgame 1 fires (~T+1s) so the
-            // restart doesn't re-populate cached state on top of our zeroed memory.
             // Also resets player money to mp_startmoney via InGameMoneyServices.
             AddTimer(
                 2.0f,
@@ -1811,7 +1804,6 @@ namespace MatchZy
                     stopData["t"] = false;
 
                     bool swapRequired = IsTeamSwapRequired();
-                    Log($"[HandlePostRoundEndEvent] swapRequired={swapRequired}, isRoundRestoring={isRoundRestoring}");
 
                     // If isRoundRestoring is true, sides will be swapped from round restore if required!
                     if (swapRequired && !isRoundRestoring)
