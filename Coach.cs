@@ -21,7 +21,8 @@ public partial class MatchZy
 
     public HookResult OnCoachPlayerSpawn(EventPlayerSpawn @event, GameEventInfo info)
     {
-        if (!matchStarted)
+        // Debug mode runs the coach flow during warmup too (bot testing without a full match).
+        if (!matchStarted && !coachDebugEnabled.Value)
             return HookResult.Continue;
 
         CCSPlayerController? player = @event.Userid;
@@ -173,28 +174,43 @@ public partial class MatchZy
             return;
         if (spawnsData.Values.Any(list => list.Count == 0))
             GetSpawns();
-        if (coachSpawns.Count == 0 || coachSpawns[(byte)CsTeam.CounterTerrorist].Count == 0 || coachSpawns[(byte)CsTeam.Terrorist].Count == 0)
+
+        // Coach viewing-position file is OPTIONAL now. If present we relocate coaches to a
+        // clean viewing spot; if absent, coaches just stay at their engine spawn until killed.
+        // Either way the real-player reseat below still runs — that is what actually fixes
+        // "one player doesn't get their normal spawn", and it needs only engine spawns.
+        bool haveCoachSpawns = HasCoachSpawns();
+        if (!haveCoachSpawns)
         {
-            Log($"[HandleCoaches] No coach spawns found, player positions will not be swapped!");
-            return;
+            GetCoachSpawns();
+            haveCoachSpawns = HasCoachSpawns();
         }
 
         int freezeTime = ConVar.Find("mp_freezetime")!.GetPrimitiveValue<int>();
         freezeTime = freezeTime > 2 ? freezeTime : 2;
-        coachKillTimer ??= AddTimer(freezeTime - 1f, KillCoaches);
+        // Skip coach cleanup while debugging so coaches stay alive/visible for screenshots.
+        if (!coachDebugEnabled.Value)
+            coachKillTimer ??= AddTimer(freezeTime - 1f, KillCoaches);
 
-        foreach (CCSPlayerController coach in coaches)
+        if (haveCoachSpawns)
         {
-            if (!IsPlayerValid(coach))
-                continue;
-            AddTimer(0.5f, () => HandleCoachTeam(coach));
+            foreach (CCSPlayerController coach in coaches)
+            {
+                if (!IsPlayerValid(coach))
+                    continue;
+                AddTimer(0.5f, () => HandleCoachTeam(coach));
+            }
+        }
+        else
+        {
+            Log($"[HandleCoaches] No coach viewing spawns for map {Server.MapName}; coaches stay at engine spawn, but real players are still re-seated onto competitive spawns.");
         }
 
-        // After coaches are relocated to their viewing spots, force the real (non-coach)
-        // players onto the canonical competitive spawns. The game allocates spawn points to
-        // ALL bodies on a team, coaches included, so coaches can grab the good min-priority
-        // spawns and bump real players to far/wrong ones. Relocating coaches alone does not
-        // fix the already-bumped players — this does, making coach count (1-5+) irrelevant.
+        // Always force the real (non-coach) players onto the canonical competitive spawns.
+        // The game allocates spawn points to ALL bodies on a team, coaches included, so a
+        // coach can grab a good spawn and bump a real player to a far/wrong one. Relocating
+        // coaches alone does not fix the already-bumped player — this does, regardless of
+        // coach count (1-5+) and regardless of whether a coach-spawn file exists.
         AddTimer(0.6f, EnforceCompetitiveSpawns);
 
         Log($"[HandleCoaches] Handled {coaches.Count} coach(es)");
@@ -211,6 +227,7 @@ public partial class MatchZy
     private void EnforceCompetitiveSpawns()
     {
         HashSet<CCSPlayerController> coaches = GetAllCoaches();
+        bool debug = coachDebugEnabled.Value;
 
         foreach (byte side in new[] { (byte)CsTeam.CounterTerrorist, (byte)CsTeam.Terrorist })
         {
@@ -218,7 +235,17 @@ public partial class MatchZy
             if (realPlayers.Count == 0)
                 continue;
 
-            List<Position> spawns = spawnsData[side];
+            // Pull the canonical first-N competitive spawns straight from the live map entities,
+            // ordered by Priority — the exact set the engine would hand to N coachless players.
+            // This does NOT depend on the min-priority `spawnsData` filter, which can come up
+            // short on maps where the lowest-priority set is smaller than the team size and
+            // leave a player stranded. Fall back to spawnsData only if the entity scan fails.
+            List<Position> spawns = GetTopCompetitiveSpawns(side, realPlayers.Count);
+            if (spawns.Count == 0)
+                spawns = spawnsData.TryGetValue(side, out List<Position>? fallback) ? fallback : new List<Position>();
+            if (spawns.Count == 0)
+                continue;
+
             if (spawns.Count < realPlayers.Count)
             {
                 // Overflow (more players than competitive spawns). We still seat as many as we
@@ -226,35 +253,78 @@ public partial class MatchZy
                 Log($"[EnforceCompetitiveSpawns] Team {side}: {realPlayers.Count} players > {spawns.Count} spawns, seating nearest {spawns.Count}");
             }
 
-            // Each competitive spawn pulls in its nearest remaining player.
-            foreach (Position spawn in spawns)
+            // Optimal one-to-one assignment: repeatedly bind the globally-closest remaining
+            // (player, spawn) pair. Beats the old spawn-centric greedy because the coach-bumped
+            // player snaps back to the freed competitive slot instead of staying at the far
+            // overflow spawn. N<=5 per side so the O(N^3) loop is trivial.
+            List<CCSPlayerController> remainingPlayers = new(realPlayers);
+            List<Position> remainingSpawns = new(spawns);
+            while (remainingPlayers.Count > 0 && remainingSpawns.Count > 0)
             {
-                if (realPlayers.Count == 0)
-                    break;
-
-                Vector sp = spawn.PlayerPosition;
-                int best = -1;
+                int bestP = -1, bestS = -1;
                 float bestDist = float.MaxValue;
-                for (int i = 0; i < realPlayers.Count; i++)
+                for (int pi = 0; pi < remainingPlayers.Count; pi++)
                 {
-                    Vector pos = realPlayers[i].PlayerPawn.Value!.CBodyComponent!.SceneNode!.AbsOrigin;
-                    float dx = sp.X - pos.X;
-                    float dy = sp.Y - pos.Y;
-                    float dz = sp.Z - pos.Z;
-                    float dist = dx * dx + dy * dy + dz * dz;
-                    if (dist < bestDist)
+                    Vector pos = remainingPlayers[pi].PlayerPawn.Value!.CBodyComponent!.SceneNode!.AbsOrigin;
+                    for (int si = 0; si < remainingSpawns.Count; si++)
                     {
-                        bestDist = dist;
-                        best = i;
+                        Vector sp = remainingSpawns[si].PlayerPosition;
+                        float dx = sp.X - pos.X;
+                        float dy = sp.Y - pos.Y;
+                        float dz = sp.Z - pos.Z;
+                        float dist = dx * dx + dy * dy + dz * dz;
+                        if (dist < bestDist)
+                        {
+                            bestDist = dist;
+                            bestP = pi;
+                            bestS = si;
+                        }
                     }
                 }
-                if (best < 0)
+                if (bestP < 0 || bestS < 0)
                     break;
 
-                new Position(spawn).Teleport(realPlayers[best]);
-                realPlayers.RemoveAt(best); // claim the player so no spawn reuses it
+                CCSPlayerController player = remainingPlayers[bestP];
+                Position spawn = remainingSpawns[bestS];
+
+                if (debug)
+                {
+                    Vector old = player.PlayerPawn.Value!.CBodyComponent!.SceneNode!.AbsOrigin;
+                    Log($"[CoachDebug] team {side}: {player.PlayerName} ({old.X:F0},{old.Y:F0},{old.Z:F0}) -> ({spawn.PlayerPosition.X:F0},{spawn.PlayerPosition.Y:F0},{spawn.PlayerPosition.Z:F0})");
+                    PrintToAllChat($"{ChatColors.Yellow}[CoachDebug]{ChatColors.Default} reseated {ChatColors.Green}{player.PlayerName}{ChatColors.Default} (team {side})");
+                }
+
+                new Position(spawn).Teleport(player);
+                remainingPlayers.RemoveAt(bestP);
+                remainingSpawns.RemoveAt(bestS); // claim both so nothing is reused
             }
         }
+    }
+
+    /// <summary>
+    /// True when a coach viewing-position file is currently loaded for both sides.
+    /// </summary>
+    private bool HasCoachSpawns()
+    {
+        return coachSpawns.Count > 0
+            && coachSpawns.TryGetValue((byte)CsTeam.CounterTerrorist, out List<Position>? ct) && ct.Count > 0
+            && coachSpawns.TryGetValue((byte)CsTeam.Terrorist, out List<Position>? t) && t.Count > 0;
+    }
+
+    /// <summary>
+    /// Returns up to <paramref name="count"/> competitive spawns for a side, taken from the live
+    /// map entities ordered by <c>Priority</c> ascending — i.e. the spawns the engine would assign
+    /// to that many coachless players. Independent of the cached min-priority <c>spawnsData</c>.
+    /// </summary>
+    private List<Position> GetTopCompetitiveSpawns(byte side, int count)
+    {
+        string designerName = side == (byte)CsTeam.CounterTerrorist ? "info_player_counterterrorist" : "info_player_terrorist";
+        return Utilities.FindAllEntitiesByDesignerName<SpawnPoint>(designerName)
+            .Where(s => s.IsValid && s.Enabled && s.CBodyComponent?.SceneNode != null)
+            .OrderBy(s => s.Priority)
+            .Take(count)
+            .Select(s => new Position(s.CBodyComponent!.SceneNode!.AbsOrigin, s.CBodyComponent.SceneNode.AbsRotation))
+            .ToList();
     }
 
     private void MoveCoachToPosition(CCSPlayerController coach, Position position, string timing)
@@ -372,6 +442,9 @@ public partial class MatchZy
 
     private void KillCoaches()
     {
+        // Debug mode keeps coaches alive for inspection — never suicide them.
+        if (coachDebugEnabled.Value)
+            return;
         if (isPaused || IsTacticalTimeoutActive())
             return;
         HashSet<CCSPlayerController> coaches = GetAllCoaches();

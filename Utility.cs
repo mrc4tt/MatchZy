@@ -1684,7 +1684,13 @@ namespace MatchZy
             if (isDryRun)
                 RandomizeSpawns();
             if (!matchStarted)
+            {
+                // Debug: exercise the coach-spawn flow during warmup so it can be tested with
+                // bots without starting a full match. Only the coach handling runs here.
+                if (coachDebugEnabled.Value && GetAllCoaches().Count > 0)
+                    HandleCoaches();
                 return;
+            }
 
             // Re-apply clinch/overtime convars on round 1 so trophy/clinch UI refreshes
             // immediately rather than waiting for round 2. Runs for ALL match types

@@ -52,6 +52,8 @@ namespace MatchZy
 
         public FakeConVar<bool> matchEndAutoChangelevel = new("matchzy_match_end_auto_changelevel", "Whether to automatically change map after match end. Disable this for G5API/tournament matches. Default: true", true);
 
+        public FakeConVar<bool> coachDebugEnabled = new("matchzy_coach_debug", "Coach-spawn debug: logs/announces each real-player spawn reassignment, keeps coaches alive (no suicide) for inspection, and runs spawn enforcement during warmup so it can be tested with bots without starting a full match. Default: false", false);
+
         [ConsoleCommand("matchzy_whitelist_enabled_default", "Whether Whitelist is enabled by default or not. Default value: false")]
         public void MatchZyWLConvar(CCSPlayerController? player, CommandInfo command)
         {
