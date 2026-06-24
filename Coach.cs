@@ -459,16 +459,26 @@ public partial class MatchZy
         ConVar? specFreezeTimeCvar = ConVar.Find("spec_freeze_time");
         ConVar? specFreezeTimeLockCvar = ConVar.Find("spec_freeze_time_lock");
         ConVar? specFreezeDeathanimCvar = ConVar.Find("spec_freeze_deathanim_time");
+        // Coach suicide makes the side momentarily shorthanded, so the engine hands the
+        // opposing team "compensation" money ("An enemy player was awarded compensation for
+        // the suicide of <coach>"). Zero the shorthanded bonuses across the suicides so the
+        // coach removal never gifts the enemy economy, then restore them in finally.
+        ConVar? shorthandedBonusCvar = ConVar.Find("cash_team_bonus_shorthanded");
+        ConVar? shorthandedLoserBonusCvar = ConVar.Find("cash_team_loser_bonus_shorthanded");
 
         string suicidePenalty = GetConvarStringValue(suicidePenaltyCvar);
         string specFreezeTime = GetConvarStringValue(specFreezeTimeCvar);
         string specFreezeTimeLock = GetConvarStringValue(specFreezeTimeLockCvar);
         string specFreezeDeathanim = GetConvarStringValue(specFreezeDeathanimCvar);
+        string shorthandedBonus = GetConvarStringValue(shorthandedBonusCvar);
+        string shorthandedLoserBonus = GetConvarStringValue(shorthandedLoserBonusCvar);
 
         SetConvarValue(suicidePenaltyCvar, "0");
         SetConvarValue(specFreezeTimeCvar, "0");
         SetConvarValue(specFreezeTimeLockCvar, "0");
         SetConvarValue(specFreezeDeathanimCvar, "0");
+        SetConvarValue(shorthandedBonusCvar, "0");
+        SetConvarValue(shorthandedLoserBonusCvar, "0");
 
         try
         {
@@ -495,6 +505,8 @@ public partial class MatchZy
             SetConvarValue(specFreezeTimeCvar, specFreezeTime);
             SetConvarValue(specFreezeTimeLockCvar, specFreezeTimeLock);
             SetConvarValue(specFreezeDeathanimCvar, specFreezeDeathanim);
+            SetConvarValue(shorthandedBonusCvar, shorthandedBonus);
+            SetConvarValue(shorthandedLoserBonusCvar, shorthandedLoserBonus);
         }
     }
 
