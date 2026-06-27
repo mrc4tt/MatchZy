@@ -2995,36 +2995,185 @@ namespace MatchZy
             ms.LastDuckTime = 0.0f;
         }
 
-        // Issues #391/#393 (AG2): teleport to the target position and clear any
-        // stuck throw/lean pose WITHOUT respawning (respawn wipes the inventory,
-        // which loses the thrown grenade and forces a fragile re-give/re-equip
-        // dance). Instead, after teleporting we force the held weapon to
-        // holster + re-deploy by cycling the inventory slot: a deploy retriggers
-        // the weapon's anim graph, which overrides the frozen throw pose.
-        // afterRestore runs after the teleport (used by callers to put the
-        // correct grenade in hand). switchSlot, if given, is the inventory slot
-        // command ("slot8" etc.) to re-deploy onto.
-        public static void TeleportAndClearPose(CCSPlayerController? player, Vector position, QAngle angle, bool wantDucked = false, string? switchSlot = null, Action? afterRestore = null)
+        // Issues #391/#393 + MatchZy-Enhanced#10: teleport to the target position,
+        // keep the body flat, and put the thrown grenade back in hand at the lineup
+        // WITHOUT respawning (respawn wipes the inventory). deployWeapon, if given,
+        // is the weapon CLASSNAME ("weapon_smokegrenade" etc.) to end up holding.
+        // giveDeploy = true for grenade restores (.last/.back/.ln) where the nade
+        // may have been consumed; false for loadpos (switch-only, never dup a rifle).
+        // afterRestore is a legacy caller hook run right after the teleport.
+        public static void TeleportAndClearPose(CCSPlayerController? player, Vector position, QAngle angle, bool wantDucked = false, string? deployWeapon = null, bool giveDeploy = false, Action? afterRestore = null)
         {
             if (player == null || !player.IsValid || player.PlayerPawn.Value == null)
                 return;
             var pawn = player.PlayerPawn.Value;
 
             pawn.Teleport(position, angle, new Vector(0, 0, 0));
+            // Issue MatchZy-Enhanced#10: pawn.Teleport writes the full QAngle
+            // (incl. pitch/roll) into the model's entity transform, tilting the
+            // WHOLE body instead of just the head. A live player's body transform
+            // must stay flat (yaw only) — pitch is driven by the head/aim bones via
+            // eye angles. The view keeps the full angle (set by Teleport above, so
+            // lineup aim is preserved); we only re-flatten the body transform. The
+            // engine re-syncs AbsRotation from the anim system after Teleport, so a
+            // single write here gets clobbered — re-apply next frame too.
+            FlattenBodyRotation(pawn, angle.Y);
             ResetPlayerCrouch(player, wantDucked);
 
             afterRestore?.Invoke();
 
-            // Pose kick: holster (knife) this frame, re-deploy the target slot
-            // next frame. The deploy animation overrides the stuck throw pose.
-            player.ExecuteClientCommand("slot3");
+            float bodyYaw = angle.Y;
             Server.NextFrame(() =>
             {
                 if (player == null || !player.IsValid || player.PlayerPawn.Value == null)
                     return;
-                if (!string.IsNullOrEmpty(switchSlot))
-                    player.ExecuteClientCommand(switchSlot);
+                FlattenBodyRotation(player.PlayerPawn.Value, bodyYaw);
+
+                if (string.IsNullOrEmpty(deployWeapon))
+                    return;
+
+                // The frozen THROW pose (issue #391) only clears on a REAL weapon
+                // deploy (draw anim). Deploy priority:
+                //  1. Engine SelectItem (native) — holsters the current weapon and
+                //     deploys the target OWNED weapon (redraws viewmodel + deploy
+                //     anim that clears the throw pose). Needs the gamedata sig.
+                //  2. GiveNamedItem — only when the nade is NOT owned (the give then
+                //     deploys). No-op when owned, so guarded.
+                //  3. Pointer switch (EquipWeaponByName) — never crashes but does not
+                //     redraw the viewmodel. Last-resort fallback if the sig is unset.
+                // NOT used: Remove()/Kill the owned nade then re-give — deleting a
+                // live networked weapon mid-tick crashes (WriteEnterPVS).
+                bool owns = player.PlayerPawn.Value.WeaponServices?.MyWeapons
+                    .Any(h => h.Value != null && h.Value.IsValid && h.Value.DesignerName == deployWeapon) ?? false;
+                if (SwitchWeaponNative(player, deployWeapon!))
+                {
+                    // Molotov/incendiary leave a lower-body throw anim layer that a
+                    // direct molotov deploy doesn't clear (other nades' deploy does)
+                    // — leg sticks out. Bounce through the knife (full-body idle
+                    // resets the legs) this frame, then reselect the molotov next
+                    // frame so it ends up in hand. Molotov-only to avoid a knife
+                    // flash on the nades that are already clean.
+                    if (deployWeapon == "weapon_molotov" || deployWeapon == "weapon_incgrenade")
+                    {
+                        string nade = deployWeapon!;
+                        SwitchWeaponNative(player, "weapon_knife");
+                        Server.NextFrame(() =>
+                        {
+                            if (player != null && player.IsValid && player.PlayerPawn.Value != null)
+                                SwitchWeaponNative(player, nade);
+                        });
+                    }
+                }
+                else if (giveDeploy && !owns)
+                    player.GiveNamedItem(deployWeapon!);
+                else
+                    EquipWeaponByName(player, deployWeapon!);
             });
+        }
+
+        // Server-side weapon switch by classname. CS2's `use weapon_x` / `slotN`
+        // console commands do NOT switch when issued via ExecuteClientCommand on
+        // this build, so we set the active-weapon handle directly (same mechanism
+        // as DropWeaponByDesignerName) and flag it networked-dirty so the client
+        // re-deploys the viewmodel. Returns true if the weapon was found+equipped.
+        public static bool EquipWeaponByName(CCSPlayerController? player, string classname)
+        {
+            if (player == null || !player.IsValid || player.PlayerPawn.Value == null)
+                return false;
+            var pawn = player.PlayerPawn.Value;
+            var ws = pawn.WeaponServices;
+            if (ws == null)
+                return false;
+            var matched = ws.MyWeapons.FirstOrDefault(x => x.Value != null && x.Value.IsValid && x.Value.DesignerName == classname);
+            if (matched == null || !matched.IsValid)
+                return false;
+            ws.ActiveWeapon.Raw = matched.Raw;
+            Utilities.SetStateChanged(pawn, "CCSPlayer_WeaponServices", "m_hActiveWeapon");
+            return true;
+        }
+
+        // Engine weapon-select (CCSPlayer_WeaponServices::SelectItem(this, weapon,
+        // subType) — vtable slot 28/linux, 27/windows). This is the ONLY way to
+        // deploy an already-owned weapon: it holsters the current weapon and
+        // deploys the target (redraws viewmodel + plays the deploy anim, which
+        // clears the frozen throw pose), with no GiveNamedItem (no-op when owned)
+        // and no entity deletion (crashes). The vtable index comes from the forked
+        // CounterStrikeSharp's gamedata.json key "CCSPlayer_WeaponServices_SelectItem"
+        // (offset entry). Cached lazily; -1 = unavailable -> caller falls back to a
+        // pointer switch (e.g. on stock CSS without the entry).
+        private const int SelectItemOffsetUntried = -2;
+        private const int SelectItemOffsetUnavailable = -1;
+        private static int _selectItemOffset = SelectItemOffsetUntried;
+        private static int SelectItemOffset()
+        {
+            if (_selectItemOffset != SelectItemOffsetUntried)
+                return _selectItemOffset;
+            try
+            {
+                _selectItemOffset = GameData.GetOffset("CCSPlayer_WeaponServices_SelectItem");
+            }
+            catch (Exception e)
+            {
+                _selectItemOffset = SelectItemOffsetUnavailable;
+                Console.WriteLine("[MatchZy] CCSPlayer_WeaponServices_SelectItem offset missing from gamedata.json — falling back to pointer switch. " + e.Message);
+            }
+            return _selectItemOffset;
+        }
+
+        // Deploy an owned weapon by classname via the engine SelectItem vfunc.
+        // Returns false if the offset is unavailable or the weapon isn't owned
+        // (caller falls back).
+        public static bool SwitchWeaponNative(CCSPlayerController? player, string classname)
+        {
+            if (player == null || !player.IsValid || player.PlayerPawn.Value?.WeaponServices == null)
+                return false;
+            int offset = SelectItemOffset();
+            if (offset < 0)
+                return false;
+            var ws = player.PlayerPawn.Value.WeaponServices;
+            var matched = ws.MyWeapons.FirstOrDefault(x => x.Value != null && x.Value.IsValid && x.Value.DesignerName == classname);
+            if (matched?.Value == null || !matched.Value.IsValid)
+                return false;
+            // SelectItem(this, weapon, subType=0): 0 = normal select for a different
+            // weapon (subType 4 is the holster-only/reselect path).
+            var wsHandle = ws.Handle;
+            VirtualFunction.CreateVoid<IntPtr, IntPtr, int>(wsHandle, offset)(wsHandle, matched.Value.Handle, 0);
+            return true;
+        }
+
+        // Remove every weapon of the given classname from the player's inventory.
+        // Uses entity-IO "Kill" (the engine queues a clean delete) instead of
+        // CBaseEntity.Remove() — Remove() frees a still-networked weapon mid-frame
+        // and crashes the server (WriteEnterPVS: GetEntServerClass failed). Returns
+        // true if at least one matching weapon was scheduled for removal.
+        public static bool RemoveWeaponByName(CCSPlayerController? player, string classname)
+        {
+            if (player == null || !player.IsValid || player.PlayerPawn.Value?.WeaponServices == null)
+                return false;
+            bool any = false;
+            foreach (var h in player.PlayerPawn.Value.WeaponServices.MyWeapons)
+            {
+                var w = h.Value;
+                if (w != null && w.IsValid && w.DesignerName == classname)
+                {
+                    w.AcceptInput("Kill");
+                    any = true;
+                }
+            }
+            return any;
+        }
+
+        // Re-flatten a live player's body/entity transform to yaw-only after a
+        // Teleport, so a saved pitch (look up/down) doesn't tilt the whole model.
+        // See TeleportAndClearPose / issue MatchZy-Enhanced#10.
+        private static void FlattenBodyRotation(CCSPlayerPawn pawn, float yaw)
+        {
+            var node = pawn.CBodyComponent?.SceneNode;
+            if (node == null)
+                return;
+            node.AbsRotation.X = 0f;
+            node.AbsRotation.Y = yaw;
+            node.AbsRotation.Z = 0f;
         }
 
         public static Color GetPlayerTeammateColor(CCSPlayerController playerController)

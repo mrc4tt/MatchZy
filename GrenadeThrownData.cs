@@ -59,37 +59,19 @@ public class GrenadeThrownData
             "molotov" => isCT ? "weapon_incgrenade" : "weapon_molotov",
             _ => null,
         };
-        // Inventory slot for the thrown grenade type, used to re-deploy it after
-        // the teleport so it's in hand at the lineup position.
-        string? nadeSlot = Type switch
-        {
-            "hegrenade" => "slot6",
-            "flash" => "slot7",
-            "smoke" => "slot8",
-            "decoy" => "slot9",
-            "molotov" => "slot10",
-            _ => null,
-        };
-
         // Issues #391/#393 (AG2): teleport back to the throw position and clear
-        // the stuck throw pose via a weapon re-deploy (no respawn, so the rest
-        // of the inventory is untouched). The thrown grenade itself was consumed,
-        // so re-give it in afterRestore before the re-deploy kicks in.
+        // the stuck throw pose. The pose only resets on a REAL weapon deploy, and
+        // the only managed call that triggers one is GiveNamedItem — so giveDeploy
+        // re-gives the (consumed) grenade by classname, which both restores it AND
+        // plays the deploy that clears the pose, leaving the nade in hand at the
+        // lineup. No respawn, so the rest of the inventory is untouched.
         MatchZy.TeleportAndClearPose(
             player,
             PlayerPosition,
             PlayerAngle,
             wantDucked: DuckAmount >= 0.5f,
-            switchSlot: nadeSlot,
-            afterRestore: nadeWeapon == null
-                ? null
-                : () =>
-                {
-                    var pawn = player.PlayerPawn.Value;
-                    bool alreadyHas = pawn?.WeaponServices?.MyWeapons.Any(h => h.Value != null && h.Value.IsValid && h.Value.DesignerName == nadeWeapon) ?? false;
-                    if (!alreadyHas)
-                        player.GiveNamedItem(nadeWeapon);
-                }
+            deployWeapon: nadeWeapon,
+            giveDeploy: nadeWeapon != null
         );
     }
 

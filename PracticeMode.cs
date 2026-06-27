@@ -724,19 +724,20 @@ namespace MatchZy
                                     // Issues #391/#393 (AG2): teleport to the
                                     // lineup position and clear any stuck throw
                                     // pose via a weapon re-deploy (no respawn).
-                                    // The grenade slot for this lineup type is
-                                    // re-deployed by TeleportAndClearPose.
+                                    // The grenade is re-deployed by classname
+                                    // (CS2 `slotN` grenade commands are dead).
                                     string nadeType = lineupInfo["Type"];
-                                    string nadeSlot = nadeType switch
+                                    bool isCT = player.TeamNum == (byte)CsTeam.CounterTerrorist;
+                                    string nadeWeapon = nadeType switch
                                     {
-                                        "Flash" => "slot7",
-                                        "Smoke" => "slot8",
-                                        "HE" => "slot6",
-                                        "Decoy" => "slot9",
-                                        "Molly" => "slot10",
-                                        _ => "slot8",
+                                        "Flash" => "weapon_flashbang",
+                                        "Smoke" => "weapon_smokegrenade",
+                                        "HE" => "weapon_hegrenade",
+                                        "Decoy" => "weapon_decoy",
+                                        "Molly" => isCT ? "weapon_incgrenade" : "weapon_molotov",
+                                        _ => "weapon_smokegrenade",
                                     };
-                                    TeleportAndClearPose(player, loadedPlayerPos, loadedPlayerAngle, wantDucked: false, switchSlot: nadeSlot);
+                                    TeleportAndClearPose(player, loadedPlayerPos, loadedPlayerAngle, wantDucked: false, deployWeapon: nadeWeapon, giveDeploy: true);
 
                                     // Extract description, if available
                                     string? lineupDesc = lineupInfo.ContainsKey("Desc") ? lineupInfo["Desc"] : null;
@@ -1188,22 +1189,10 @@ namespace MatchZy
             if (!CanSpawnAnotherBot(player))
                 return;
 
-            AddBot(
-                player, /*crouch*/
-                false
-            );
-
-            var target = player; // capture for timer safety
-            AddTimer(
-                0.2f,
-                () =>
-                {
-                    if (target != null && target.IsValid && target.Connected == PlayerConnectedState.Connected && target.PlayerPawn?.IsValid == true && target.PlayerPawn.Value != null)
-                    {
-                        ElevatePlayer(target);
-                    }
-                }
-            );
+            // boost: lift handled inside SpawnBot (same tick the bot lands) with
+            // collisions kept solid, so the player rests on the bot instead of
+            // sinking through it.
+            AddBot(player, /*crouch*/ false, boost: true);
         }
 
         [ConsoleCommand("css_cboost", "Spawns a crouched bot at the player's position and boost the player on it")]
@@ -1221,11 +1210,10 @@ namespace MatchZy
                 return;
             }
 
-            AddBot(player, true);
-            AddTimer(0.2f, () => ElevatePlayer(player));
+            AddBot(player, true, boost: true);
         }
 
-        private void AddBot(CCSPlayerController? player, bool crouch, CsTeam? forceTeam = null)
+        private void AddBot(CCSPlayerController? player, bool crouch, CsTeam? forceTeam = null, bool boost = false)
         {
             try
             {
@@ -1282,7 +1270,7 @@ namespace MatchZy
                     {
                         if (targetPlayer != null && targetPlayer.IsValid && targetPlayer.Connected == PlayerConnectedState.Connected)
                         {
-                            SpawnBot(targetPlayer, crouch);
+                            SpawnBot(targetPlayer, crouch, boost);
                         }
                         else
                         {
@@ -1755,7 +1743,7 @@ namespace MatchZy
             }
         }
 
-        private void SpawnBot(CCSPlayerController botOwner, bool crouch)
+        private void SpawnBot(CCSPlayerController botOwner, bool crouch, bool boost = false)
         {
             try
             {
@@ -1842,10 +1830,28 @@ namespace MatchZy
                         // Now safe - we validated PlayerPawn.Value above
                         tempPlayer.PlayerPawn.Value.Teleport(botOwnerPosition.PlayerPosition, botOwnerPosition.PlayerAngle, new Vector(0, 0, 0));
 
-                        // Your existing collision validation (already good!)
-                        if (IsPlayerValid(botOwner) && IsPlayerValid(tempPlayer) && botOwner.PlayerPawn != null && botOwner.PlayerPawn.IsValid && tempPlayer.PlayerPawn != null && tempPlayer.PlayerPawn.IsValid)
+                        if (boost)
                         {
-                            TemporarilyDisableCollisions(botOwner, tempPlayer);
+                            // Boost: keep BOTH solid (no DEBRIS) and lift the owner
+                            // onto the bot's crown in the same tick the bot lands, so
+                            // the player rests on top instead of clipping through.
+                            // Disabling collisions here is what made the player sink
+                            // back through the bot (gravity re-overlaps the bot before
+                            // the 0.5s re-solidify timer fires).
+                            float ownerYaw = botOwnerPawn.EyeAngles.Y; // yaw only — keep body flat (issue #10)
+                            botOwnerPawn.Teleport(
+                                new Vector(botOwnerPosition.PlayerPosition.X, botOwnerPosition.PlayerPosition.Y, botOwnerPosition.PlayerPosition.Z + 80.0f),
+                                new QAngle(0, ownerYaw, 0),
+                                new Vector(0, 0, 0)
+                            );
+                        }
+                        else
+                        {
+                            // Your existing collision validation (already good!)
+                            if (IsPlayerValid(botOwner) && IsPlayerValid(tempPlayer) && botOwner.PlayerPawn != null && botOwner.PlayerPawn.IsValid && tempPlayer.PlayerPawn != null && tempPlayer.PlayerPawn.IsValid)
+                            {
+                                TemporarilyDisableCollisions(botOwner, tempPlayer);
+                            }
                         }
                         unusedBotFound = true;
                     }
@@ -1981,17 +1987,6 @@ namespace MatchZy
                 timer?.Kill();
             }
             collisionGroupTimers.Clear();
-        }
-
-        private static void ElevatePlayer(CCSPlayerController? player)
-        {
-            if (player == null || !player.IsValid || !player.PlayerPawn.IsValid || player.PlayerPawn.Value == null)
-                return;
-            if (player.PlayerPawn.Value.CBodyComponent?.SceneNode == null)
-                return;
-
-            var origin = player.PlayerPawn.Value.CBodyComponent.SceneNode.AbsOrigin;
-            player.PlayerPawn.Value.Teleport(new Vector(origin.X, origin.Y, origin.Z + 80.0f), player.PlayerPawn.Value.EyeAngles, new Vector(0, 0, 0));
         }
 
         [ConsoleCommand("css_rs", "Removes bots from the practice session")]
