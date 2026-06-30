@@ -363,7 +363,7 @@ mp_halftime_duration 10
 mp_logdetail 3
 mp_match_can_clinch 0		
 mp_match_end_restart false
-mp_match_end_changelevel false
+mp_match_end_changelevel true
 mp_match_restart_delay 25
 mp_maxmoney 16000			
 mp_maxrounds 24                  
@@ -372,7 +372,7 @@ mp_playerid 0
 mp_playerid_delay 0.5			
 mp_playerid_hold 0.25				
 mp_round_restart_delay 5
-mp_roundtime 1.92                       	
+mp_roundtime 1.92
 mp_roundtime_defuse 1.92                
 mp_solid_teammates 1
 mp_startmoney 16000                 
@@ -498,7 +498,7 @@ mp_ignore_round_win_conditions 0
 mp_limitteams 0
 mp_match_can_clinch 1
 mp_match_end_restart false
-mp_match_end_changelevel false
+mp_match_end_changelevel true
 mp_match_restart_delay 25
 mp_maxmoney 16000
 mp_maxrounds 24
@@ -616,7 +616,7 @@ mp_ignore_round_win_conditions 0
 mp_limitteams 0
 mp_match_can_clinch 1
 mp_match_end_restart false
-mp_match_end_changelevel false
+mp_match_end_changelevel true
 mp_maxmoney 8000
 mp_maxrounds 16
 mp_overtime_enable 1
@@ -780,10 +780,10 @@ mp_limitteams 0                         	// Max # of players 1 team can have ove
 mp_logdetail 3                          	// Logs attacks.  Values are: 0=off, 1=enemy, 2=teammate, 3=both)
 mp_match_can_clinch 0				// Can a team clinch and end the match by being so far ahead that the other team has no way to catching up
 mp_match_end_restart false
-mp_match_end_changelevel false
+mp_match_end_changelevel true
 mp_match_restart_delay 25
 mp_maxmoney 16000				// maximum amount of money allowed in a player's account
-mp_maxrounds 24                         	// max number of rounds to play before server changes maps
+mp_maxrounds 24					// max number of rounds to play before server changes maps
 mp_playercashawards 1				// Players can earn money by performing in-game actions
 mp_playerid 0					// Controls what information player see in the status bar: 0 all names; 1 team names; 2 no names 
 mp_playerid_delay 0.5				// Number of seconds to delay showing information in the status bar

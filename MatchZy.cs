@@ -1134,6 +1134,21 @@ namespace MatchZy
                         HandleTeamNameChangeCommand(player, messageCommandArg, 2);
                     }
 
+                    if (message.StartsWith(".savecoachspawn"))
+                    {
+                        HandleSaveCoachSpawnCommand(player, messageCommandArg);
+                    }
+
+                    if (message.StartsWith(".clearcoachspawns"))
+                    {
+                        HandleClearCoachSpawnsCommand(player);
+                    }
+
+                    if (message.StartsWith(".listcoachspawns"))
+                    {
+                        HandleListCoachSpawnsCommand(player);
+                    }
+
                     if (message.StartsWith(".coach"))
                     {
                         HandleCoachCommand(player, messageCommandArg);

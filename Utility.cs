@@ -1535,7 +1535,6 @@ namespace MatchZy
             var matchEndRestartConVar = _cvMatchEndRestart;
             if (matchEndRestartConVar?.GetPrimitiveValue<bool>() == true)
             {
-                Log("[HandleMatchEnd] Disabling mp_match_end_restart to avoid early restart");
                 Server.ExecuteCommand("mp_match_end_restart 0");
             }
 

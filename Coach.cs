@@ -2,6 +2,8 @@ using System.Globalization;
 using System.Text.Json;
 using CounterStrikeSharp.API;
 using CounterStrikeSharp.API.Core;
+using CounterStrikeSharp.API.Core.Attributes.Registration;
+using CounterStrikeSharp.API.Modules.Commands;
 using CounterStrikeSharp.API.Modules.Cvars;
 using CounterStrikeSharp.API.Modules.Utils;
 
@@ -501,6 +503,176 @@ public partial class MatchZy
             SetConvarValue(specFreezeDeathanimCvar, specFreezeDeathanim);
             SetConvarValue(shorthandedBonusCvar, shorthandedBonus);
             SetConvarValue(shorthandedLoserBonusCvar, shorthandedLoserBonus);
+        }
+    }
+
+    /// <summary>
+    /// Admin tool: capture the caller's current position + view angle and append it as a coach
+    /// viewing spot for the current map/side, then persist to spawns/coach/{map}.json. Lets server
+    /// owners build the coach-spawn file in-game instead of editing JSON by hand. Side defaults to
+    /// the caller's team; pass "t"/"ct" to override.
+    /// </summary>
+    [ConsoleCommand("css_savecoachspawn", "Save your current position as a coach viewing spawn for this map")]
+    [CommandHelper(minArgs: 0, usage: "[t|ct]", whoCanExecute: CommandUsage.CLIENT_ONLY)]
+    public void OnSaveCoachSpawnCommand(CCSPlayerController? player, CommandInfo command)
+    {
+        HandleSaveCoachSpawnCommand(player, command.ArgCount > 1 ? command.GetArg(1) : "");
+    }
+
+    public void HandleSaveCoachSpawnCommand(CCSPlayerController? player, string sideArg)
+    {
+        if (!IsPlayerAdmin(player, "css_savecoachspawn", "@css/config"))
+        {
+            ReplyToUserCommand(player, "You do not have permission to use this command!");
+            return;
+        }
+        if (!IsPlayerValid(player) || !player!.PlayerPawn.IsValid || player.PlayerPawn.Value?.CBodyComponent?.SceneNode == null)
+        {
+            ReplyToUserCommand(player, "You must be alive and in-game to save a coach spawn.");
+            return;
+        }
+
+        // Resolve side: explicit arg wins, else caller's current team.
+        string side = sideArg.Trim().ToLower();
+        byte team;
+        if (side == "t")
+            team = (byte)CsTeam.Terrorist;
+        else if (side == "ct")
+            team = (byte)CsTeam.CounterTerrorist;
+        else if (player.TeamNum == (byte)CsTeam.Terrorist || player.TeamNum == (byte)CsTeam.CounterTerrorist)
+            team = player.TeamNum;
+        else
+        {
+            ReplyToUserCommand(player, "Usage: .savecoachspawn t|ct (or join a team first)");
+            return;
+        }
+
+        // Make sure the in-memory set reflects what's currently on disk before we append.
+        if (!HasCoachSpawns())
+            GetCoachSpawns();
+
+        Vector origin = player.PlayerPawn.Value.CBodyComponent.SceneNode.AbsOrigin;
+        QAngle angle = player.PlayerPawn.Value.CBodyComponent.SceneNode.AbsRotation;
+
+        if (!coachSpawns.TryGetValue(team, out List<Position>? list) || list == null)
+        {
+            list = new List<Position>();
+            coachSpawns[team] = list;
+        }
+        list.Add(new Position(origin, angle));
+
+        if (SaveCoachSpawnsFile())
+        {
+            string sideName = team == (byte)CsTeam.Terrorist ? "T" : "CT";
+            ReplyToUserCommand(player, $"Saved coach spawn #{list.Count} for {sideName} on {Server.MapName}.");
+        }
+        else
+        {
+            ReplyToUserCommand(player, "Failed to write coach spawn file — check server logs.");
+        }
+    }
+
+    /// <summary>
+    /// Admin tool: delete every saved coach viewing spawn for the current map (both sides) and
+    /// remove the on-disk file so you can rebuild from scratch.
+    /// </summary>
+    [ConsoleCommand("css_clearcoachspawns", "Clear all coach viewing spawns for this map")]
+    [CommandHelper(minArgs: 0, usage: "", whoCanExecute: CommandUsage.CLIENT_ONLY)]
+    public void OnClearCoachSpawnsCommand(CCSPlayerController? player, CommandInfo command)
+    {
+        HandleClearCoachSpawnsCommand(player);
+    }
+
+    public void HandleClearCoachSpawnsCommand(CCSPlayerController? player)
+    {
+        if (!IsPlayerAdmin(player, "css_clearcoachspawns", "@css/config"))
+        {
+            ReplyToUserCommand(player, "You do not have permission to use this command!");
+            return;
+        }
+
+        coachSpawns = GetEmptySpawnsData();
+        try
+        {
+            string path = Path.Combine(ModuleDirectory, "spawns", "coach", $"{Server.MapName}.json");
+            if (File.Exists(path))
+                File.Delete(path);
+            ReplyToUserCommand(player, $"Cleared all coach spawns for {Server.MapName}.");
+        }
+        catch (Exception ex)
+        {
+            Log($"[OnClearCoachSpawnsCommand] Error deleting coach spawn file: {ex.Message}");
+            ReplyToUserCommand(player, "Failed to delete coach spawn file — check server logs.");
+        }
+    }
+
+    /// <summary>
+    /// Admin tool: report how many coach viewing spawns are currently loaded for each side.
+    /// </summary>
+    [ConsoleCommand("css_listcoachspawns", "List loaded coach viewing spawns for this map")]
+    [CommandHelper(minArgs: 0, usage: "", whoCanExecute: CommandUsage.CLIENT_ONLY)]
+    public void OnListCoachSpawnsCommand(CCSPlayerController? player, CommandInfo command)
+    {
+        HandleListCoachSpawnsCommand(player);
+    }
+
+    public void HandleListCoachSpawnsCommand(CCSPlayerController? player)
+    {
+        if (!IsPlayerAdmin(player, "css_listcoachspawns", "@css/config"))
+        {
+            ReplyToUserCommand(player, "You do not have permission to use this command!");
+            return;
+        }
+
+        if (!HasCoachSpawns())
+            GetCoachSpawns();
+
+        int ct = coachSpawns.TryGetValue((byte)CsTeam.CounterTerrorist, out List<Position>? ctList) ? ctList.Count : 0;
+        int t = coachSpawns.TryGetValue((byte)CsTeam.Terrorist, out List<Position>? tList) ? tList.Count : 0;
+        ReplyToUserCommand(player, $"Coach spawns for {Server.MapName}: {ct} CT, {t} T.");
+    }
+
+    /// <summary>
+    /// Serializes the in-memory <see cref="coachSpawns"/> set to spawns/coach/{map}.json in the
+    /// same shape <see cref="GetCoachSpawns"/> reads back ({ teamNum: [ { Vector, QAngle } ] }).
+    /// Returns true on success.
+    /// </summary>
+    private bool SaveCoachSpawnsFile()
+    {
+        try
+        {
+            string dir = Path.Combine(ModuleDirectory, "spawns", "coach");
+            Directory.CreateDirectory(dir);
+            string path = Path.Combine(dir, $"{Server.MapName}.json");
+
+            var outData = new Dictionary<string, List<Dictionary<string, string>>>();
+            foreach (var entry in coachSpawns)
+            {
+                if (entry.Value == null || entry.Value.Count == 0)
+                    continue;
+                var positions = new List<Dictionary<string, string>>();
+                foreach (Position pos in entry.Value)
+                {
+                    positions.Add(
+                        new Dictionary<string, string>
+                        {
+                            ["Vector"] = string.Format(CultureInfo.InvariantCulture, "{0:F2} {1:F2} {2:F2}", pos.PlayerPosition.X, pos.PlayerPosition.Y, pos.PlayerPosition.Z),
+                            ["QAngle"] = string.Format(CultureInfo.InvariantCulture, "{0:F2} {1:F2} {2:F2}", pos.PlayerAngle.X, pos.PlayerAngle.Y, pos.PlayerAngle.Z),
+                        }
+                    );
+                }
+                outData[entry.Key.ToString()] = positions;
+            }
+
+            string json = JsonSerializer.Serialize(outData, new JsonSerializerOptions { WriteIndented = true });
+            File.WriteAllText(path, json);
+            Log($"[SaveCoachSpawnsFile] Wrote coach spawns for {Server.MapName} to {path}");
+            return true;
+        }
+        catch (Exception ex)
+        {
+            Log($"[SaveCoachSpawnsFile] Error: {ex.Message}");
+            return false;
         }
     }
 
