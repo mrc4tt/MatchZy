@@ -941,6 +941,11 @@ namespace MatchZy
             if (shouldDisableAutoChangelevel)
             {
                 Log($"[EndSeries] Auto changelevel is disabled (ConVar: {matchEndAutoChangelevel.Value}, G5API: {isG5ApiMatch})");
+                // Stay on map → keep GOTV/CSTV relay alive so spectators can watch to the end.
+                // live.cfg sets sv_hibernate_postgame_delay 5; with only spectators left the
+                // server counts as empty and hibernates → CSTV disconnects. Disable empty
+                // hibernation here so the broadcast survives past match end.
+                Server.ExecuteCommand("sv_hibernate_when_empty 0");
                 AddTimer(
                     restartDelay,
                     () =>
