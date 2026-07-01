@@ -11,6 +11,9 @@ jobs:
   build:
     name: Build and Release
     runs-on: ubuntu-latest
+    # Auth for the "forgejo" NuGet source (CS2MenuManager) in nuget.config.
+    env:
+      NuGetPackageSourceCredentials_forgejo: "Username=${{ secrets.FORGEJO_USER || 'mikkel' }};Password=${{ secrets.RELEASE_TOKEN || secrets.GITHUB_TOKEN }}"
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
