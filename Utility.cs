@@ -3011,6 +3011,20 @@ namespace MatchZy
         // giveDeploy = true for grenade restores (.last/.back/.ln) where the nade
         // may have been consumed; false for loadpos (switch-only, never dup a rifle).
         // afterRestore is a legacy caller hook run right after the teleport.
+        // All thrown-grenade weapon classnames. molotov maps to weapon_incgrenade
+        // on CT / weapon_molotov on T; both variants of every nade are listed.
+        private static readonly HashSet<string> _grenadeClassnames = new()
+        {
+            "weapon_molotov",
+            "weapon_incgrenade",
+            "weapon_smokegrenade",
+            "weapon_hegrenade",
+            "weapon_decoy",
+            "weapon_flashbang",
+        };
+
+        private static bool IsGrenadeClassname(string classname) => _grenadeClassnames.Contains(classname);
+
         public static void TeleportAndClearPose(CCSPlayerController? player, Vector position, QAngle angle, bool wantDucked = false, string? deployWeapon = null, bool giveDeploy = false, Action? afterRestore = null)
         {
             if (player == null || !player.IsValid || player.PlayerPawn.Value == null)
@@ -3056,13 +3070,13 @@ namespace MatchZy
                     .Any(h => h.Value != null && h.Value.IsValid && h.Value.DesignerName == deployWeapon) ?? false;
                 if (SwitchWeaponNative(player, deployWeapon!))
                 {
-                    // Molotov/incendiary leave a lower-body throw anim layer that a
-                    // direct molotov deploy doesn't clear (other nades' deploy does)
-                    // — leg sticks out. Bounce through the knife (full-body idle
-                    // resets the legs) this frame, then reselect the molotov next
-                    // frame so it ends up in hand. Molotov-only to avoid a knife
-                    // flash on the nades that are already clean.
-                    if (deployWeapon == "weapon_molotov" || deployWeapon == "weapon_incgrenade")
+                    // Grenades leave a lower-body throw anim layer that a direct
+                    // nade deploy doesn't clear — leg/body sticks out (the sprawled
+                    // throw pose). Bounce through the knife (full-body idle resets
+                    // the body) this frame, then reselect the nade next frame so it
+                    // ends up in hand. Applied to ALL grenade types (originally
+                    // molotov-only, but every nade shows the stuck pose).
+                    if (IsGrenadeClassname(deployWeapon!))
                     {
                         string nade = deployWeapon!;
                         SwitchWeaponNative(player, "weapon_knife");
