@@ -1035,6 +1035,7 @@ mp_t_default_secondary weapon_glock
 mp_t_default_primary """"
 mp_maxrounds 24
 mp_warmuptime 9999
+mp_warmup_online_enabled 0
 mp_warmup_start
 mp_warmup_pausetimer 1
 cash_team_bonus_shorthanded 0
