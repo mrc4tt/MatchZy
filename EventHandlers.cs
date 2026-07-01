@@ -51,6 +51,10 @@ public partial class MatchZy
                     ExecUnpracCommands();
                     if (!isMatchSetup)
                     {
+                        // OnMapStart's AutoStart may have run while the server was empty/
+                        // hibernating, so the warmup exec never stuck. Re-arm the latch so
+                        // AutoStart actually runs now that the first real player is in.
+                        autoStartLatched = false;
                         AutoStart();
                     }
 
