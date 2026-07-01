@@ -68,7 +68,10 @@ jobs:
 
           # Build MatchZy-only package
           dotnet publish -c Release -o package/addons/counterstrikesharp/plugins/MatchZy
-          cp -r cfg package/
+          # Ship cfgs under cfg/MatchZy/ so they extract to csgo/cfg/MatchZy/ — the dir the
+          # plugin execs (exec matchzy/live.cfg etc). A flat cfg/ landed them in csgo/cfg/.
+          mkdir -p package/cfg/MatchZy
+          cp cfg/*.cfg package/cfg/MatchZy/
           cd package && 7z a -tzip ../MatchZy-${{ env.MATCHZY_VERSION }}.zip . && cd ..
 
           # Build with CSSharp Linux runtime
