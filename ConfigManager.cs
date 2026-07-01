@@ -1032,11 +1032,11 @@ mp_ct_default_grenades """";
 mp_t_default_grenades """";
 mp_t_default_melee weapon_knife
 mp_t_default_secondary weapon_glock
-mp_t_default_primary
+mp_t_default_primary """"
 mp_maxrounds 24
+mp_warmuptime 9999
 mp_warmup_start
 mp_warmup_pausetimer 1
-mp_warmuptime 9999
 cash_team_bonus_shorthanded 0
 sv_hide_roundtime_until_seconds 0
 ammo_grenade_limit_default 1
