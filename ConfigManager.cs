@@ -12,7 +12,26 @@ namespace MatchZy
     {
         // Lazy: avoids calling native Server.GameDirectory in the ctor, which CSS
         // may construct before the engine pointer is ready (would throw → load abort).
-        private string ServerPath => Path.Combine(Server.GameDirectory, "csgo", "cfg", "matchzy");
+        // Resolves to an existing case-variant dir (e.g. "MatchZy") if one is present,
+        // so we don't create a duplicate lowercase "matchzy" on case-sensitive Linux fs.
+        private string ServerPath => ResolveConfigDir(Path.Combine(Server.GameDirectory, "csgo", "cfg"), "matchzy");
+
+        private static string ResolveConfigDir(string parent, string name)
+        {
+            try
+            {
+                if (Directory.Exists(parent))
+                {
+                    foreach (var dir in Directory.GetDirectories(parent))
+                    {
+                        if (string.Equals(Path.GetFileName(dir), name, StringComparison.OrdinalIgnoreCase))
+                            return dir;
+                    }
+                }
+            }
+            catch { /* fall through to default path */ }
+            return Path.Combine(parent, name);
+        }
 
         private void CreateConfigFile(string fileName, string content)
         {
@@ -1009,15 +1028,14 @@ mp_t_default_melee weapon_knife
 mp_t_default_secondary weapon_glock
 mp_t_default_primary
 mp_maxrounds 24
-mp_warmup_pausetimer 0
+mp_warmup_start
+mp_warmup_pausetimer 1
 mp_warmuptime 9999
-mp_warmup_online_enabled 1
 cash_team_bonus_shorthanded 0
 sv_hide_roundtime_until_seconds 0
 ammo_grenade_limit_default 1
 ammo_grenade_limit_flashbang 2
 ammo_grenade_limit_total 4
-mp_warmup_start
 ",
             };
             foreach (var config in configs)
