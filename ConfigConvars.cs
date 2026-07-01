@@ -161,6 +161,18 @@ namespace MatchZy
             }
         }
 
+        [ConsoleCommand("matchzy_nade_pose_flicker_free", "Experimental: after a .last/.back/.ln nade restore, reselect the grenade same-frame (no knife flash) instead of the 1-frame knife bounce. May leave the throw pose stuck on some builds. Default: false")]
+        public void MatchZyNadePoseFlickerFree(CCSPlayerController? player, CommandInfo command)
+        {
+            if (player != null)
+                return;
+            if (command.ArgCount == 2)
+            {
+                string v = command.ArgByIndex(1).Trim();
+                nadePoseFlickerFree = v == "1" || v.Equals("true", StringComparison.OrdinalIgnoreCase);
+            }
+        }
+
         [ConsoleCommand("get5_demo_upload_url", "If defined, recorded demos will be uploaded to this URL once the map ends.")]
         [ConsoleCommand("matchzy_demo_upload_url", "If defined, recorded demos will be uploaded to this URL once the map ends.")]
         public void MatchZyDemoUploadURL(CCSPlayerController? player, CommandInfo command)

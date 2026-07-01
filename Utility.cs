@@ -3025,6 +3025,13 @@ namespace MatchZy
 
         private static bool IsGrenadeClassname(string classname) => _grenadeClassnames.Contains(classname);
 
+        // Experimental flicker-free nade-restore mode (matchzy_nade_pose_flicker_free).
+        // false (default) = proven 1-frame knife bounce (tiny knife flash, always clears
+        // the pose). true = same-frame reselect (no knife flash, but only clears the pose
+        // if the SelectItem holster cancels the throw gesture synchronously — untested per
+        // build, toggle live to compare).
+        public static bool nadePoseFlickerFree = false;
+
         public static void TeleportAndClearPose(CCSPlayerController? player, Vector position, QAngle angle, bool wantDucked = false, string? deployWeapon = null, bool giveDeploy = false, Action? afterRestore = null)
         {
             if (player == null || !player.IsValid || player.PlayerPawn.Value == null)
@@ -3080,11 +3087,23 @@ namespace MatchZy
                     {
                         string nade = deployWeapon!;
                         SwitchWeaponNative(player, "weapon_knife");
-                        Server.NextFrame(() =>
+                        if (nadePoseFlickerFree)
                         {
-                            if (player != null && player.IsValid && player.PlayerPawn.Value != null)
-                                SwitchWeaponNative(player, nade);
-                        });
+                            // Reselect the nade in the SAME frame → the client never
+                            // networks the intermediate knife (no flash). Works only if
+                            // the SelectItem holster cancels the throw gesture right away.
+                            SwitchWeaponNative(player, nade);
+                        }
+                        else
+                        {
+                            // Proven path: let the knife's full-body anim tick one frame
+                            // to reset the legs, then reselect the nade (1-frame flash).
+                            Server.NextFrame(() =>
+                            {
+                                if (player != null && player.IsValid && player.PlayerPawn.Value != null)
+                                    SwitchWeaponNative(player, nade);
+                            });
+                        }
                     }
                 }
                 else if (giveDeploy && !owns)
