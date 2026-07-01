@@ -1697,6 +1697,14 @@ namespace MatchZy
                 RandomizeSpawns();
             if (!matchStarted)
             {
+                // (Re)assert the warmup timer pause here: mp_warmup_start defers the warmup
+                // (re)init to a later frame that resets mp_warmup_pausetimer back to 0, and
+                // the warmup RoundStart is the first reliable point *after* that settles
+                // (can be many seconds in, once players spawn). A fixed delay loses the race;
+                // this doesn't. Keeps the HUD on plain "WARMUP" with no running countdown.
+                if (isWarmup)
+                    Server.ExecuteCommand("mp_warmup_pausetimer 1");
+
                 // Debug: exercise the coach-spawn flow during warmup so it can be tested with
                 // bots without starting a full match. Only the coach handling runs here.
                 if (coachDebugEnabled.Value && GetAllCoaches().Count > 0)
