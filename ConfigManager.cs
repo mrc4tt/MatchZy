@@ -293,8 +293,7 @@ spec_replay_enable 0
 sv_allow_votes 0
 sv_auto_full_alltalk_during_warmup_half_end 1
 sv_deadtalk 1
-sv_hibernate_postgame_delay 5
-sv_hibernate_when_empty 0
+sv_hibernate_postgame_delay 300
 sv_ignoregrenaderadio 0
 sv_infinite_ammo 0
 sv_talk_enemy_dead 0
@@ -559,8 +558,7 @@ spec_replay_enable 0
 sv_allow_votes 0
 sv_auto_full_alltalk_during_warmup_half_end 0
 sv_deadtalk 1
-sv_hibernate_postgame_delay 15
-sv_hibernate_when_empty 0
+sv_hibernate_postgame_delay 300
 sv_ignoregrenaderadio 0
 sv_infinite_ammo 0
 sv_talk_enemy_dead 0
@@ -677,8 +675,7 @@ spec_replay_enable 0
 sv_allow_votes 0
 sv_auto_full_alltalk_during_warmup_half_end 0
 sv_deadtalk 1
-sv_hibernate_postgame_delay 5
-sv_hibernate_when_empty 0
+sv_hibernate_postgame_delay 300
 sv_ignoregrenaderadio 0
 sv_infinite_ammo 0
 sv_talk_enemy_dead 0
@@ -976,8 +973,7 @@ spec_replay_enable 0
 sv_allow_votes 1
 sv_auto_full_alltalk_during_warmup_half_end 0
 sv_deadtalk 1
-sv_hibernate_postgame_delay 5
-sv_hibernate_when_empty 0
+sv_hibernate_postgame_delay 300
 sv_ignoregrenaderadio 0
 sv_infinite_ammo 0
 sv_talk_enemy_dead 0
