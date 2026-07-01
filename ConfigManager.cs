@@ -16,6 +16,12 @@ namespace MatchZy
         // so we don't create a duplicate lowercase "matchzy" on case-sensitive Linux fs.
         private string ServerPath => ResolveConfigDir(Path.Combine(Server.GameDirectory, "csgo", "cfg"), "matchzy");
 
+        // Public accessor so the exec path in MatchZy.Load() uses the SAME case-resolved
+        // dir the config files were created in. Hardcoding lowercase "matchzy" for the
+        // File.Exists/execifexists broke on case-sensitive Linux when the on-disk dir was
+        // e.g. "MatchZy" → config.cfg was never exec'd → user cvars (demo_path, etc.) ignored.
+        public string GetMatchZyCfgDir() => ServerPath;
+
         private static string ResolveConfigDir(string parent, string name)
         {
             try

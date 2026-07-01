@@ -25,6 +25,7 @@ namespace MatchZy
             isWarmup = false;
             readyAvailable = false;
             matchStarted = false;
+            matchStartInProgress = false;
             isSideSelectionPhase = false;
             isMatchLive = false;
 

@@ -851,6 +851,7 @@ namespace MatchZy
                 }
                 // Reset match data
                 matchStarted = false;
+                matchStartInProgress = false;
                 readyAvailable = true;
                 isPaused = false;
                 isMatchSetup = false;
@@ -1198,6 +1199,13 @@ namespace MatchZy
 
         private void HandleMatchStart()
         {
+            // Re-entry guard: knife/live start is deferred (Task.Run → NextFrame), so matchStarted
+            // isn't set yet when a second CheckLiveRequired fires. Without this the match starts
+            // twice (e.g. "KNIFE!" announced 6x). Restore path re-arms below via early return.
+            if (matchStartInProgress || matchStarted)
+                return;
+            matchStartInProgress = true;
+
             isPractice = false;
             isDryRun = false;
             if (isRoundRestorePending)
@@ -1205,6 +1213,7 @@ namespace MatchZy
                 RestoreRoundBackup(null, pendingRestoreFileName);
                 isRoundRestorePending = false;
                 pendingRestoreFileName = "";
+                matchStartInProgress = false;
                 return;
             }
 
@@ -1550,6 +1559,7 @@ namespace MatchZy
                     Server.ExecuteCommand("mp_match_end_restart false");
                     ChangeMap(nextMap, 0.0f);
                     matchStarted = false;
+                    matchStartInProgress = false;
                     readyAvailable = true;
                     isPaused = false;
                     isWarmup = true;

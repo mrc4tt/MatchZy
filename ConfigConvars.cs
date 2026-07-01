@@ -30,9 +30,12 @@ namespace MatchZy
 
         public FakeConVar<int> autoResumeDelay = new("matchzy_autopause_resume_delay", "Delay in seconds before auto-resuming when teams are balanced. Default: 3", 3);
 
-        public FakeConVar<string> teamNameCt = new("matchzy_ct_name", "Set teamname for CT. Set to \"\" to disable/use default.", "CT");
+        // Default MUST be "" so the auto "team_<playername>" naming in HandleMatchStart runs.
+        // Non-empty default ("CT"/"T") always won the custom-name branch → demos/hostname
+        // showed "CT" & "T" instead of team_<playername>.
+        public FakeConVar<string> teamNameCt = new("matchzy_ct_name", "Set teamname for CT. Set to \"\" to disable/use default.", "");
 
-        public FakeConVar<string> teamNameT = new("matchzy_t_name", "Set teamname for Terrorist. Set to \"\" to disable/use default.", "T");
+        public FakeConVar<string> teamNameT = new("matchzy_t_name", "Set teamname for Terrorist. Set to \"\" to disable/use default.", "");
 
         public FakeConVar<bool> enableDamageReport = new("matchzy_enable_damage_report", "Whether to show damage report after each round or not. Default: true", true);
 

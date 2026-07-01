@@ -27,6 +27,10 @@ namespace MatchZy
         public bool isSleep = false;
         public bool readyAvailable = false;
         public bool matchStarted = false;
+        // Synchronous guard: HandleMatchStart defers StartKnifeRound to Task.Run→Server.NextFrame,
+        // so matchStarted flips late. Two rapid CheckLiveRequired calls both passed → knife started
+        // twice → "KNIFE!" printed 6x. Set true synchronously at entry, cleared on match reset.
+        public bool matchStartInProgress = false;
         public bool isWarmup = false;
         public bool isKnifeRound = false;
         public bool isSideSelectionPhase = false;
@@ -284,10 +288,15 @@ namespace MatchZy
                 configManager.InitializeConfigs();
                 mapRotationList = configManager.LoadMapRotation();
 
-                var configPath = Path.Combine(Server.GameDirectory, "csgo", "cfg", "matchzy", ConfigFiles.Paths.Config);
+                // Use the SAME case-resolved dir the configs were created in. Hardcoding
+                // lowercase "matchzy" here failed on case-sensitive Linux when the on-disk
+                // dir was e.g. "MatchZy" → execifexists skipped → config.cfg (demo_path etc.) ignored.
+                var matchzyCfgDir = configManager.GetMatchZyCfgDir();
+                var cfgFolderName = Path.GetFileName(matchzyCfgDir.TrimEnd('/'));
+                var configPath = Path.Combine(matchzyCfgDir, ConfigFiles.Paths.Config);
                 if (File.Exists(configPath))
                 {
-                    Server.ExecuteCommand($"execifexists matchzy/{ConfigFiles.Paths.Config}");
+                    Server.ExecuteCommand($"execifexists {cfgFolderName}/{ConfigFiles.Paths.Config}");
                 }
 
                 teamSides[matchzyTeam1] = "CT";

@@ -862,6 +862,7 @@ namespace MatchZy
             }
 
             matchStarted = false;
+            matchStartInProgress = false;
             isPlayOutEnabled = false;
             isPlayOutEnabled2 = false;
             isKnifeRound = false;
