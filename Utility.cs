@@ -297,7 +297,7 @@ namespace MatchZy
             }
             else
             {
-                Server.ExecuteCommand("bot_kick;bot_quota 0;mp_autokick 0;mp_autoteambalance 0;mp_buy_anywhere 0;mp_buytime 15;mp_death_drop_gun 0;mp_free_armor 0;mp_ignore_round_win_conditions 0;mp_limitteams 0;mp_radar_showall 0;mp_respawn_on_death_ct 0;mp_respawn_on_death_t 0;mp_solid_teammates 0;mp_spectators_max 20;mp_maxmoney 16000;mp_startmoney 16000;mp_timelimit 0;sv_alltalk 0;sv_auto_full_alltalk_during_warmup_half_end 0;sv_deadtalk 1;sv_full_alltalk 0;sv_grenade_trajectory 0;sv_hibernate_when_empty 0;mp_weapons_allow_typecount -1;sv_infinite_ammo 0;sv_showimpacts 0;sv_voiceenable 1;sm_cvar sv_mute_players_with_social_penalties 0;sv_mute_players_with_social_penalties 0;tv_relayvoice 1;sv_cheats 0;mp_ct_default_melee weapon_knife;mp_ct_default_secondary weapon_hkp2000;mp_ct_default_primary \"\";mp_t_default_melee weapon_knife;mp_t_default_secondary weapon_glock;mp_t_default_primary \"\";mp_maxrounds 24;mp_warmuptime 9999;cash_team_bonus_shorthanded 0;mp_restartgame 1;mp_warmup_online_enabled 0;mp_warmup_start;mp_warmup_pausetimer 1");
+                Server.ExecuteCommand("bot_kick;bot_quota 0;mp_autokick 0;mp_autoteambalance 0;mp_buy_anywhere 0;mp_buytime 15;mp_death_drop_gun 0;mp_free_armor 0;mp_ignore_round_win_conditions 0;mp_limitteams 0;mp_radar_showall 0;mp_respawn_on_death_ct 0;mp_respawn_on_death_t 0;mp_solid_teammates 0;mp_spectators_max 20;mp_maxmoney 16000;mp_startmoney 16000;mp_timelimit 0;sv_alltalk 0;sv_auto_full_alltalk_during_warmup_half_end 0;sv_deadtalk 1;sv_full_alltalk 0;sv_grenade_trajectory 0;sv_hibernate_when_empty 0;mp_weapons_allow_typecount -1;sv_infinite_ammo 0;sv_showimpacts 0;sv_voiceenable 1;sm_cvar sv_mute_players_with_social_penalties 0;sv_mute_players_with_social_penalties 0;tv_relayvoice 1;sv_cheats 0;mp_ct_default_melee weapon_knife;mp_ct_default_secondary weapon_hkp2000;mp_ct_default_primary \"\";mp_t_default_melee weapon_knife;mp_t_default_secondary weapon_glock;mp_t_default_primary \"\";mp_maxrounds 24;mp_warmuptime 9999;cash_team_bonus_shorthanded 0;mp_restartgame 1;mp_warmup_online_enabled 1;mp_warmup_start;mp_warmup_pausetimer 1");
             }
         }
 
@@ -322,7 +322,7 @@ namespace MatchZy
             AddTimer(3.0f, () =>
             {
                 if (isWarmup)
-                    Server.ExecuteCommand("mp_warmup_online_enabled 0;mp_warmup_pausetimer 1");
+                    Server.ExecuteCommand("mp_warmup_online_enabled 1;mp_warmup_pausetimer 1");
             });
 
             // Also resets player money to mp_startmoney via InGameMoneyServices.
@@ -1702,11 +1702,10 @@ namespace MatchZy
                 // the warmup RoundStart is the first reliable point *after* that settles
                 // (can be many seconds in, once players spawn). A fixed delay loses the race;
                 // this doesn't. Keeps the HUD on plain "WARMUP" with no running countdown.
-                // mp_warmup_online_enabled 1 (left on by practice mode) runs an "online"
-                // warmup that manages its own countdown and ignores mp_warmup_pausetimer,
-                // so force it off first, then pause.
+                // mp_warmup_pausetimer only holds under online warmup; offline warmup
+                // (mp_warmup_online_enabled 0) always counts down. Force it on, then pause.
                 if (isWarmup)
-                    Server.ExecuteCommand("mp_warmup_online_enabled 0;mp_warmup_pausetimer 1");
+                    Server.ExecuteCommand("mp_warmup_online_enabled 1;mp_warmup_pausetimer 1");
 
                 // Debug: exercise the coach-spawn flow during warmup so it can be tested with
                 // bots without starting a full match. Only the coach handling runs here.
