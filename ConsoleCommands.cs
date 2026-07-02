@@ -926,19 +926,19 @@ namespace MatchZy
             }
         }
 
-        [ConsoleCommand("css_asay", "Say as an admin")]
+        [ConsoleCommand("css_asay", "Say as an admin (all chat)")]
         public void OnAdminSay(CCSPlayerController? player, CommandInfo? command)
         {
             if (command == null)
                 return;
+            // Another plugin (e.g. CS2-SimpleAdmin, whose css_asay is team-only) may own css_asay.
+            // When disabled, MatchZy's console handler no-ops so !asay does not double-print.
+            // The .asay chat command stays available regardless (see HandleAdminSayCommand).
+            if (!asayConsoleEnabled.Value)
+                return;
             if (player == null)
             {
                 Server.PrintToChatAll($"{adminChatPrefix} {command.ArgString}");
-                return;
-            }
-            if (!IsPlayerAdmin(player, "css_asay", "@css/chat"))
-            {
-                SendPlayerNotAdminMessage(player);
                 return;
             }
             string message = "";
@@ -946,6 +946,20 @@ namespace MatchZy
             {
                 message += command.ArgByIndex(i) + " ";
             }
+            HandleAdminSayCommand(player, message);
+        }
+
+        // Shared by console css_asay and the .asay chat prefix command. Broadcasts to all chat.
+        public void HandleAdminSayCommand(CCSPlayerController? player, string message)
+        {
+            if (!IsPlayerAdmin(player, "css_asay", "@css/chat"))
+            {
+                SendPlayerNotAdminMessage(player);
+                return;
+            }
+            message = message.Trim();
+            if (string.IsNullOrEmpty(message))
+                return;
             Server.PrintToChatAll($"{adminChatPrefix} {message}");
         }
 
