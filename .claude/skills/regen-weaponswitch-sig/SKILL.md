@@ -15,7 +15,12 @@ It is a **virtual function**, called via its **vtable index**, read from the for
 CounterStrikeSharp gamedata key `CCSPlayer_WeaponServices_SelectItem`:
 
 ```json
-"CCSPlayer_WeaponServices_SelectItem": { "offsets": { "windows": 27, "linux": 28 } }
+  "CCSPlayer_WeaponServices_SelectItem": {
+    "offsets": {
+      "windows": 27,
+      "linux": 28
+    }
+  },
 ```
 
 File: `~/CounterStrikeSharp/configs/addons/counterstrikesharp/gamedata/gamedata.json`
