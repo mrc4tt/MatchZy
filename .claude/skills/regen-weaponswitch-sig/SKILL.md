@@ -15,27 +15,32 @@ It is a **virtual function**, called via its **vtable index**, read from the for
 CounterStrikeSharp gamedata key `CCSPlayer_WeaponServices_SelectItem`:
 
 ```json
-"CCSPlayer_WeaponServices_SelectItem": { "offsets": { "windows": 27, "linux": 28 } }
+  "CCSPlayer_WeaponServices_SelectItem": {
+    "offsets": {
+      "windows": 27,
+      "linux": 28
+    }
+  },
 ```
 
 File: `~/CounterStrikeSharp/configs/addons/counterstrikesharp/gamedata/gamedata.json`
 (source of truth; build/ and out/ are generated). The code calls
 `GameData.GetOffset("CCSPlayer_WeaponServices_SelectItem")`. If the key is missing
 or the index is wrong, the plugin logs `[MatchZy] CCSPlayer_WeaponServices_SelectItem
-offset missing ...` (or the nade equips in schema but viewmodel/legs are wrong) and
-falls back to a non-deploying pointer switch.
+offset missing ...` (or the nade equips in schema, but viewmodel/legs are wrong) and
+Falls back to a non-deploying pointer switch.
 
-A CS2 update can shift the **vtable index**. This skill re-confirms it. Vtable
+A CS2 update can shift the **vtable index**. This skill reconfirms it. Vtable
 indices move far less than byte signatures, so most updates need no change — but
 verify.
 
 ## Preconditions
 
 - IDA Pro open on the target binary with the **ida-pro-mcp** server running.
-  - Linux: `server.so` / `libserver.so`.
+  - Linux: `libserver.so`.
   - Windows: `server.dll`.
 - `mcp__ida-pro-mcp__server_health` → check the `module` field. The MCP talks to
-  ONE IDB at a time — do linux and windows in separate passes.
+  ONE IDB at a time — do Linux and Windows in separate passes.
 
 ## Procedure
 
