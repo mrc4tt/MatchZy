@@ -3,6 +3,7 @@ on:
   push:
     paths-ignore:
       - documentation/**
+      - '**/*.md'
     branches:
       - main
   workflow_dispatch:
