@@ -476,8 +476,9 @@ public partial class MatchZy
                 playerReadyStatus[userId] = !currentStatus;
                 _readyStatusDirty = true;
 
-                // Update the clan tag immediately
-                HandleClanTags(forceUpdateSlot: player.Slot);
+                // Update the clan tag next frame (same-tick m_szClan set lags scoreboard)
+                int slot = player.Slot;
+                Server.NextFrame(() => HandleClanTags(forceUpdateSlot: slot));
 
                 // Show feedback to the player
                 if (playerReadyStatus[userId])

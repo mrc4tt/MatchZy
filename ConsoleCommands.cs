@@ -118,9 +118,11 @@ namespace MatchZy
                     }
 
                     AddTimer(afterReadyDelay, CheckLiveRequired);
-                    // Force update clan tag for this specific player
-                    HandleClanTags(forceUpdateSlot: player.Slot);
                     _readyStatusDirty = true;
+                    // Defer tag update: setting m_szClan on the same tick as the chat
+                    // command dispatch loses a network race, so the scoreboard tag lags.
+                    int slot = player.Slot;
+                    Server.NextFrame(() => HandleClanTags(forceUpdateSlot: slot));
                     UnreadyHintMessageStart();
                 }
             }
@@ -153,9 +155,9 @@ namespace MatchZy
                         PrintToPlayerChat(player, Localizer.ForPlayer(player, "matchzy.ready.markedunready"));
                     }
 
-                    // Force update clan tag for this specific player
-                    HandleClanTags(forceUpdateSlot: player.Slot);
                     _readyStatusDirty = true;
+                    int slot = player.Slot;
+                    Server.NextFrame(() => HandleClanTags(forceUpdateSlot: slot));
                     UnreadyHintMessageStart();
                 }
             }

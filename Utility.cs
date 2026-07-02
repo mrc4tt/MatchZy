@@ -190,24 +190,38 @@ namespace MatchZy
                 {
                     int readyCount = 0;
                     int totalPlayers = 0;
+                    List<string> notReady = new();
 
                     foreach (var key in playerReadyStatus.Keys)
                     {
                         if (playerData.TryGetValue(key, out var player) && player != null && player.IsValid)
                         {
+                            // Only T/CT — spectators aren't part of the ready gate.
+                            if (player.TeamNum != 2 && player.TeamNum != 3)
+                                continue;
+
                             totalPlayers++;
                             if (playerReadyStatus[key])
-                            {
                                 readyCount++;
-                            }
+                            else
+                                notReady.Add(player.PlayerName);
                         }
                     }
 
                     string line1 = Localizer["matchzy.hint.waitingforplayers", readyCount, totalPlayers];
                     string line2 = Localizer["matchzy.hint.usereadycommand"];
-                    _cachedReadyHintMessage = $"{line1}\n{line2}";
+                    // Fold not-ready names into the repeating hint so the list persists
+                    // (a one-shot center print gets overwritten by this hint every 3s).
+                    _cachedReadyHintMessage = notReady.Count > 0
+                        ? $"{line1}\n{line2}\nNotReady: {string.Join(", ", notReady)}"
+                        : $"{line1}\n{line2}";
                     _readyStatusDirty = false;
                 }
+
+                // Re-assert clan tags every tick. A single SetStateChanged can be missed
+                // by a client holding the scoreboard open, so periodic re-assert converges.
+                // The `player.Clan != clanTag` guard inside makes this a no-op once synced.
+                HandleClanTags();
 
                 // Broadcast cached message (center HUD text expires after a few seconds, so repeat is still needed)
                 VirtualFunctions.ClientPrintAll(HudDestination.Center, _cachedReadyHintMessage, 0, 0, 0, 0, 0);
@@ -1387,10 +1401,23 @@ namespace MatchZy
             if (!readyAvailable)
                 return;
 
+            bool anyChanged = false;
+
             foreach (var player in Utilities.GetPlayers())
             {
                 if (player == null || !player.IsValid || player.IsBot || !player.UserId.HasValue)
                     continue;
+
+                // Only T/CT get ready tags. Spectators/unassigned → strip any stale tag.
+                if (player.TeamNum != 2 && player.TeamNum != 3)
+                {
+                    if (!string.IsNullOrEmpty(player.Clan))
+                    {
+                        ApplyClanTag(player, string.Empty);
+                        anyChanged = true;
+                    }
+                    continue;
+                }
 
                 int userId = player.UserId.Value;
                 string clanTag = GetPlayerClanTag(player, userId);
@@ -1398,16 +1425,20 @@ namespace MatchZy
                 bool isForced = forceUpdateSlot.HasValue && player.Slot == forceUpdateSlot.Value;
                 if (isForced || player.Clan != clanTag)
                 {
-                    player.Clan = clanTag;
-                    Utilities.SetStateChanged(player, "CCSPlayerController", "m_szClan");
+                    ApplyClanTag(player, clanTag);
+                    anyChanged = true;
                 }
             }
+
+            if (anyChanged)
+                PokeClanNameRefresh();
         }
 
         private void ClearClanTags()
         {
             try
             {
+                bool anyChanged = false;
                 foreach (var player in Utilities.GetPlayers())
                 {
                     if (player == null || !player.IsValid || player.IsBot)
@@ -1415,16 +1446,42 @@ namespace MatchZy
 
                     if (!string.IsNullOrEmpty(player.Clan))
                     {
-                        player.Clan = string.Empty;
-                        Utilities.SetStateChanged(player, "CCSPlayerController", "m_szClan");
+                        ApplyClanTag(player, string.Empty);
+                        anyChanged = true;
                     }
                 }
+                if (anyChanged)
+                    PokeClanNameRefresh();
             }
             catch (Exception)
             {
                 // Silently catch if server isn't ready yet (during plugin load)
                 // This is expected and will be retried when players connect
             }
+        }
+
+        // Set a player's clan tag and force the client scoreboard to re-read it.
+        // m_szClan alone often won't live-refresh a Tab-open scoreboard, so also
+        // dirty m_szClanName and fire a per-client event that triggers a name/clan redraw.
+        private void ApplyClanTag(CCSPlayerController player, string tag)
+        {
+            player.Clan = tag ?? "";
+            Utilities.SetStateChanged(player, "CCSPlayerController", "m_szClan");
+            Utilities.SetStateChanged(player, "CCSPlayerController", "m_szClanName");
+            new EventNextlevelChanged(false).FireEventToClient(player);
+        }
+
+        // Nudge the game to re-push team/clan names to all clients this tick.
+        private void PokeClanNameRefresh()
+        {
+            var gameRules = Utilities
+                .FindAllEntitiesByDesignerName<CCSGameRulesProxy>("cs_gamerules")
+                .FirstOrDefault();
+            if (gameRules?.GameRules == null)
+                return;
+
+            gameRules.GameRules.NextUpdateTeamClanNamesTime = Server.CurrentTime - 0.01f;
+            Utilities.SetStateChanged(gameRules, "CCSGameRules", "m_fNextUpdateTeamClanNamesTime");
         }
 
         private string GetPlayerClanTag(CCSPlayerController player, int userId)
