@@ -52,12 +52,4 @@
     <Copy Condition="Exists('$(OutDir)runtimes/linux-x64/native/libe_sqlite3.so')" SourceFiles="$(_PatchedSqlite)" DestinationFiles="$(OutDir)runtimes/linux-x64/native/libe_sqlite3.so" OverwriteReadOnlyFiles="true" SkipUnchangedFiles="false" />
     <Copy Condition="'$(PublishDir)' != '' And Exists('$(PublishDir)runtimes/linux-x64/native/libe_sqlite3.so')" SourceFiles="$(_PatchedSqlite)" DestinationFiles="$(PublishDir)runtimes/linux-x64/native/libe_sqlite3.so" OverwriteReadOnlyFiles="true" SkipUnchangedFiles="false" />
   </Target>
-
-  <!-- Manual CLI release cleanup: a `dotnet publish` drops a nested bin/Release/net10.0/publish/
-       folder, but deploy is from the build output (bin/Release/net10.0/). Delete the stale publish
-       dir so it never gets zipped/deployed by mistake. DependsOn the SQLite override so it runs
-       AFTER that target's publish copy (both hook Publish; this pins the order). -->
-  <Target Name="RemovePublishDir" AfterTargets="Publish" DependsOnTargets="OverridePatchedSqliteNative">
-    <RemoveDir Condition="'$(PublishDir)' != ''" Directories="$(PublishDir)" />
-  </Target>
 </Project>
