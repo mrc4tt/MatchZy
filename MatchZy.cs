@@ -717,6 +717,27 @@ namespace MatchZy
                 }
             );
 
+            // Practice side-switch (.t/.ct/.spec) suicide must not count as a death. This Post
+            // handler fires AFTER the engine has incremented the death stat, so decrementing here
+            // lands on the same tick — the scoreboard never settles on the +1.
+            RegisterEventHandler<EventPlayerDeath>(
+                (@event, info) =>
+                {
+                    var victim = @event.Userid;
+                    if (victim == null || !victim.IsValid || victim.UserId == null)
+                        return HookResult.Continue;
+                    if (!practiceSwitchNoDeath.Remove(victim.UserId.Value))
+                        return HookResult.Continue;
+
+                    var ms = victim.ActionTrackingServices?.MatchStats;
+                    if (ms != null)
+                        ms.Deaths = Math.Max(0, ms.Deaths - 1);
+                    // Suicide also docks a point — give it back so the switch is score-neutral.
+                    victim.Score += 1;
+                    return HookResult.Continue;
+                }
+            );
+
             // Advanced stats tracking for player deaths
             RegisterEventHandler<EventPlayerDeath>(
                 (@event, info) =>
