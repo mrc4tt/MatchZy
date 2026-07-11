@@ -16,7 +16,7 @@ namespace MatchZy
     public partial class MatchZy : BasePlugin
     {
         public override string ModuleName => "MatchZy";
-        public override string ModuleVersion => "0.8.49";
+        public override string ModuleVersion => "0.8.50";
         public override string ModuleAuthor => "WD- Edited by Miksen @ FSHOST.me";
         public override string ModuleDescription => "A plugin for running and managing CS2 practice/pugs/scrims/matches!";
         public string chatPrefix = $"{ChatColors.Green}[MatchZy]{ChatColors.Default}";
@@ -713,6 +713,27 @@ namespace MatchZy
                         return HookResult.Continue;
                     if (player!.InGameMoneyServices != null)
                         player.InGameMoneyServices.Account = 16000;
+                    return HookResult.Continue;
+                }
+            );
+
+            // Practice side-switch (.t/.ct/.spec) suicide must not count as a death. This Post
+            // handler fires AFTER the engine has incremented the death stat, so decrementing here
+            // lands on the same tick — the scoreboard never settles on the +1.
+            RegisterEventHandler<EventPlayerDeath>(
+                (@event, info) =>
+                {
+                    var victim = @event.Userid;
+                    if (victim == null || !victim.IsValid || victim.UserId == null)
+                        return HookResult.Continue;
+                    if (!practiceSwitchNoDeath.Remove(victim.UserId.Value))
+                        return HookResult.Continue;
+
+                    var ms = victim.ActionTrackingServices?.MatchStats;
+                    if (ms != null)
+                        ms.Deaths = Math.Max(0, ms.Deaths - 1);
+                    // Suicide also docks a point — give it back so the switch is score-neutral.
+                    victim.Score += 1;
                     return HookResult.Continue;
                 }
             );

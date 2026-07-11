@@ -165,6 +165,10 @@ namespace MatchZy
         public bool isDryRun = false;
         public List<int> noFlashList = new List<int>();
 
+        // UserIds whose next death is a practice side-switch suicide (.t/.ct/.spec) — zeroed in
+        // the Post EventPlayerDeath handler so it never counts on the scoreboard.
+        public readonly HashSet<int> practiceSwitchNoDeath = new();
+
         public static Dictionary<byte, List<Position>> GetEmptySpawnsData()
         {
             return new Dictionary<byte, List<Position>> { { (byte)CsTeam.CounterTerrorist, new List<Position>() }, { (byte)CsTeam.Terrorist, new List<Position>() } };
@@ -2280,35 +2284,70 @@ namespace MatchZy
         {
             if (team > CsTeam.None)
             {
-                if (player.TeamNum == (byte)CsTeam.Spectator)
+                // SideSwitchCommand runs inside a chat/console command handler (.t/.ct/.spec), i.e.
+                // on the engine's command-dispatch stack — so everything below is marshalled off it
+                // via Server.NextFrame first.
+                Server.NextFrame(() =>
                 {
+                    if (!IsPlayerValid(player))
+                        return;
                     try
                     {
-                        // Directly switch to the desired team
-                        player.ChangeTeam(team);
+                        // Flag this player so the side-switch suicide below does NOT count as a
+                        // death on the practice scoreboard. The engine increments the death stat
+                        // during EventPlayerDeath, AFTER any restore we could do here — so the
+                        // reset is done in the Post EventPlayerDeath handler (fires the exact death
+                        // tick → scoreboard never settles on the +1). See MatchZy.cs.
+                        if (player.UserId.HasValue)
+                            practiceSwitchNoDeath.Add(player.UserId.Value);
 
-                        // Add a small delay to ensure team switch is processed
-                        AddTimer(
-                            0.1f,
-                            () =>
+                        // Kill the live pawn BEFORE changing team. The engine's live-player
+                        // ChangeTeam strips/destroys the held weapons inline; weapon-lifecycle hooks
+                        // from other plugins (e.g. skin plugins) then re-enter on a half-destroyed
+                        // weapon and SIGSEGV *inside* ChangeTeam — the reproducible .t/.ct/.spec
+                        // practice crash. A normal death just DROPS the weapons, so a dead,
+                        // weaponless player never hits that strip path.
+                        CCSPlayerPawn? pawn = player.PlayerPawn.Value;
+                        if (pawn != null && pawn.IsValid && player.PawnIsAlive)
+                            pawn.CommitSuicide(explode: false, force: true);
+
+                        // Do the actual switch a frame later, once the death (and weapon drop) has
+                        // settled and the pawn is no longer holding anything to strip.
+                        Server.NextFrame(() =>
+                        {
+                            if (!IsPlayerValid(player))
+                                return;
+                            try
                             {
-                                // Re-validate player after timer - may have disconnected
-                                if (!IsPlayerValid(player))
-                                    return;
-                                player.Respawn();
+                                // SwitchTeam, not ChangeTeam. ChangeTeam is a vtable OFFSET in
+                                // gamedata (fragile across CS2 builds) and runs the engine's full
+                                // live team-change path (weapon strip → plugin hooks → SIGSEGV).
+                                // SwitchTeam is SIGNATURE-based (build-robust) and just sets the
+                                // team number; the Respawn below puts the player in on the new side.
+                                player.SwitchTeam(team);
+
+                                // Practice: respawn onto an actual playing side (T/CT) so you're
+                                // live instantly. NEVER respawn when the target is Spectator —
+                                // respawning a spectator crashes the server.
+                                // TEST: respawn immediately (no 0.1s delay) for instant switch.
+                                if (team == CsTeam.Terrorist || team == CsTeam.CounterTerrorist)
+                                {
+                                    player.Respawn();
+                                }
                             }
-                        );
-                        return;
+                            catch (Exception ex)
+                            {
+                                Console.WriteLine($"Error switching team: {ex.Message}");
+                                ReplyToUserCommand(player, Localizer.ForPlayer(player, "matchzy.pm.spectatorbroken"));
+                            }
+                        });
                     }
                     catch (Exception ex)
                     {
                         Console.WriteLine($"Error switching team: {ex.Message}");
                         ReplyToUserCommand(player, Localizer.ForPlayer(player, "matchzy.pm.spectatorbroken"));
-                        return;
                     }
-                }
-
-                player.ChangeTeam(team);
+                });
                 return;
             }
 
