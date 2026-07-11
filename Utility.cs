@@ -3115,16 +3115,17 @@ namespace MatchZy
                 return;
             var pawn = player.PlayerPawn.Value;
 
+            // Teleport with the FULL lineup angle: this snaps the LOCAL player's VIEW to the throw
+            // pitch/yaw (the client owns its own view, so only a teleport can force it) — required
+            // to actually reproduce the lineup aim.
             pawn.Teleport(position, angle, new Vector(0, 0, 0));
-            // Issue MatchZy-Enhanced#10: pawn.Teleport writes the full QAngle
-            // (incl. pitch/roll) into the model's entity transform, tilting the
-            // WHOLE body instead of just the head. A live player's body transform
-            // must stay flat (yaw only) — pitch is driven by the head/aim bones via
-            // eye angles. The view keeps the full angle (set by Teleport above, so
-            // lineup aim is preserved); we only re-flatten the body transform. The
-            // engine re-syncs AbsRotation from the anim system after Teleport, so a
-            // single write here gets clobbered — re-apply next frame too.
-            FlattenBodyRotation(pawn, angle.Y);
+            // Issue MatchZy-Enhanced#10: the same teleport also writes the pitch into the model's
+            // transform, tilting the WHOLE body sideways at steep angles (look up → .last/.back →
+            // you see your own sprawled body). Flatten the model back to yaw-only. Must flatten the
+            // SOURCE rotation (m_angRotation / node.Rotation), NOT the derived AbsRotation — the anim
+            // system recomputes AbsRotation from the source every tick, so flattening AbsRotation
+            // alone is clobbered. Re-apply over a few frames while the teleport rotation settles.
+            FlattenBodyRotationFrames(player, angle.Y, 6);
             ResetPlayerCrouch(player, wantDucked);
 
             afterRestore?.Invoke();
@@ -3290,9 +3291,25 @@ namespace MatchZy
             var node = pawn.CBodyComponent?.SceneNode;
             if (node == null)
                 return;
+            // Flatten the SOURCE rotation (m_angRotation) — the anim system derives AbsRotation
+            // from this each tick, so flattening the source is what actually holds the body flat.
+            node.Rotation.X = 0f;
+            node.Rotation.Y = yaw;
+            node.Rotation.Z = 0f;
+            // Also flatten the current derived value so this same frame renders flat.
             node.AbsRotation.X = 0f;
             node.AbsRotation.Y = yaw;
             node.AbsRotation.Z = 0f;
+        }
+
+        // Flatten the body transform across the next few frames. The teleport rotation re-syncs
+        // for a couple ticks, so a single write is clobbered; re-applying over ~6 frames holds it.
+        private static void FlattenBodyRotationFrames(CCSPlayerController player, float yaw, int frames)
+        {
+            if (frames <= 0 || player == null || !player.IsValid || player.PlayerPawn.Value == null)
+                return;
+            FlattenBodyRotation(player.PlayerPawn.Value, yaw);
+            Server.NextFrame(() => FlattenBodyRotationFrames(player, yaw, frames - 1));
         }
 
         public static Color GetPlayerTeammateColor(CCSPlayerController playerController)
