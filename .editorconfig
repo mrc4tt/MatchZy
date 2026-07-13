@@ -1,0 +1,8 @@
+root = true
+
+[*.cs]
+# Files are organized into folders for readability, but every file stays in the
+# single `namespace MatchZy` partial class — folder path must NOT drive namespace.
+# Silence "namespace does not match folder structure" (IDE0130).
+dotnet_style_namespace_match_folder = false
+dotnet_diagnostic.IDE0130.severity = none
