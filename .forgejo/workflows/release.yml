@@ -27,9 +27,9 @@ jobs:
       - name: Get MatchZy Version
         id: matchzy_version
         run: |
-          VERSION=$(grep -oP 'ModuleVersion\s*=>\s*"\K[^"]*' MatchZy.cs)
+          VERSION=$(grep -oP 'ModuleVersion\s*=>\s*"\K[^"]*' Core/MatchZy.cs)
           if [ -z "$VERSION" ]; then
-            echo "Error: Could not extract version from MatchZy.cs"
+            echo "Error: Could not extract version from Core/MatchZy.cs"
             exit 1
           fi
           echo "MATCHZY_VERSION=$VERSION" >> $GITHUB_ENV
