@@ -51,6 +51,12 @@ namespace MatchZy
 
         public FakeConVar<bool> pracDisableMagazineDrop = new("matchzy_prac_disable_magazine_drop", "Whether to disable magazine-based ammo discard on reload in practice mode (CS2 March 2026+ reload system). Default: true", true);
 
+        // Registered as a real FakeConVar (not a ConsoleCommand) so a value set from a cfg
+        // (e.g. `matchzy_autostart_mode 2` in a mapchange/exec script) is stored on the ConVar
+        // and read live at AutoStart time. A ConsoleCommand handler could not be resolved by
+        // ConVar.Find and lost the cfg value to a load-time snapshot race. 0=none, 1=match, 2=practice.
+        public FakeConVar<int> autoStartModeCvar = new("matchzy_autostart_mode", "Which mode the plugin loads on startup: 0 for neither, 1 for match mode, 2 for practice mode. Default: 1", 1);
+
         public FakeConVar<string> matchStartMessage = new("matchzy_match_start_message", "Message to show when the match starts. Use $$$ to break message into multiple lines. Set to \"\" to disable.", "");
 
         public FakeConVar<bool> matchEndAutoChangelevel = new("matchzy_match_end_auto_changelevel", "Whether to automatically change map after match end. Disable this for G5API/tournament matches. Default: true", true);
@@ -315,19 +321,6 @@ namespace MatchZy
             else if (command.ArgCount == 1)
             {
                 ReplyToUserCommand(player, $"matchzy_chat_messages_timer_delay = {chatTimerDelay}");
-            }
-        }
-
-        [ConsoleCommand("matchzy_autostart_mode", "Whether the plugin will load the match mode, the practice moder or neither by startup. 0 for neither, 1 for match mode, 2 for practice mode. Default: 1")]
-        public void MatchZyAutoStartConvar(CCSPlayerController? player, CommandInfo command)
-        {
-            if (player != null)
-                return;
-            string args = command.ArgString;
-
-            if (int.TryParse(args, out int autoStartModeValue))
-            {
-                autoStartMode = autoStartModeValue;
             }
         }
 

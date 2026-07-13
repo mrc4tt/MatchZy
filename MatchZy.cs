@@ -322,12 +322,8 @@ namespace MatchZy
                         1.0f,
                         () =>
                         {
-                            var autoStartConVar = ConVar.Find("matchzy_autostart_mode");
-                            if (autoStartConVar != null)
-                            {
-                                autoStartMode = autoStartConVar.GetPrimitiveValue<int>();
-                                Log($"[Load] Read autoStartMode from ConVar: {autoStartMode}");
-                            }
+                            // AutoStart reads matchzy_autostart_mode live from its ConVar, so any
+                            // cfg that set it (mapchange/exec scripts) is already reflected here.
                             RefreshTeamEntities();
                             AutoStart();
                         }
@@ -340,14 +336,7 @@ namespace MatchZy
                     UpdatePlayersMap();
                     RefreshTeamEntities();
 
-                    // Read the ConVar to preserve autoStartMode on hot-reload
-                    var autoStartConVar = ConVar.Find("matchzy_autostart_mode");
-                    if (autoStartConVar != null)
-                    {
-                        autoStartMode = autoStartConVar.GetPrimitiveValue<int>();
-                        Log($"[HotReload] Restored autoStartMode from ConVar: {autoStartMode}");
-                    }
-
+                    // AutoStart reads matchzy_autostart_mode live from its ConVar (preserved across hot-reload).
                     AutoStart();
                 }
             }

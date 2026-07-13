@@ -59,7 +59,7 @@ namespace MatchZy
             activeSetup = new MatchSetupState { AdminSteamId = player.SteamID };
             // Defer to next frame so menu render isn't clobbered when entered via .chat dispatch
             // (the originating chat line is still being broadcast on this tick).
-            Server.NextFrame(() => OpenSeriesMenu(player));
+            Server.NextFrame(() => OpenMenuGuarded(player, OpenSeriesMenu));
         }
 
         // ─── Wizard menus ──────────────────────────────────────────────────────────

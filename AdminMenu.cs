@@ -1,3 +1,5 @@
+using System;
+using System.IO;
 using CounterStrikeSharp.API;
 using CounterStrikeSharp.API.Core;
 using CounterStrikeSharp.API.Core.Attributes.Registration;
@@ -9,6 +11,27 @@ namespace MatchZy
 {
     public partial class MatchZy
     {
+        // CS2MenuManager is an OPTIONAL runtime dependency. Its assembly is only
+        // JIT-resolved on the first touch of a menu type (WasdMenu), which happens
+        // inside the OpenX menu-builder methods, never at Load(). If the shared
+        // plugin isn't installed, that first touch throws FileNotFound/TypeLoad on
+        // the NextFrame callback. Route every menu open through here so a missing
+        // optional dep degrades to a chat message instead of crashing the frame.
+        // `open` must be a method group whose body is the first WasdMenu reference —
+        // this wrapper itself references no menu type, so it always JIT-resolves.
+        private void OpenMenuGuarded(CCSPlayerController player, Action<CCSPlayerController> open)
+        {
+            try
+            {
+                open(player);
+            }
+            catch (Exception e) when (e is FileNotFoundException || e is TypeLoadException || e is FileLoadException)
+            {
+                ReplyToUserCommand(player, "In-game menus require the CS2MenuManager plugin, which is not installed on this server.");
+                Log($"[Menu] CS2MenuManager not available: {e.Message}");
+            }
+        }
+
         [ConsoleCommand("css_matchadmin", "Opens the MatchZy admin chat menu")]
         [ConsoleCommand("css_ma", "Opens the MatchZy admin chat menu")]
         public void OnMatchAdminCommand(CCSPlayerController? player, CommandInfo? command)
@@ -24,7 +47,7 @@ namespace MatchZy
                 return;
             }
             // Defer so menu render isn't clobbered when entered via .chat dispatch.
-            Server.NextFrame(() => OpenMatchAdminMenu(player));
+            Server.NextFrame(() => OpenMenuGuarded(player, OpenMatchAdminMenu));
         }
 
         private void OpenMatchAdminMenu(CCSPlayerController player)

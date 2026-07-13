@@ -2974,6 +2974,11 @@ namespace MatchZy
             }
             autoStartLatched = true;
 
+            // Read the ConVar live at consumption time. AutoStart fires ~1s after load / map start,
+            // by which point any cfg (e.g. a mapchange script doing `matchzy_autostart_mode 2`) has
+            // fully exec'd — so this always reflects the intended mode, with no load-time snapshot race.
+            autoStartMode = autoStartModeCvar.Value;
+
             Log($"[AutoStart] autoStartMode: {autoStartMode}");
             if (autoStartMode == 0)
             {
