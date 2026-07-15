@@ -3170,54 +3170,45 @@ namespace MatchZy
                 if (string.IsNullOrEmpty(deployWeapon))
                     return;
 
-                // The frozen THROW pose (issue #391) only clears on a REAL weapon
-                // deploy (draw anim). Deploy priority:
-                //  1. Engine SelectItem (native) — holsters the current weapon and
-                //     deploys the target OWNED weapon (redraws viewmodel + deploy
-                //     anim that clears the throw pose). Needs the gamedata sig.
-                //  2. GiveNamedItem — only when the nade is NOT owned (the give then
-                //     deploys). No-op when owned, so guarded.
-                //  3. Pointer switch (EquipWeaponByName) — never crashes but does not
-                //     redraw the viewmodel. Last-resort fallback if the sig is unset.
-                // NOT used: Remove()/Kill the owned nade then re-give — deleting a
-                // live networked weapon mid-tick crashes (WriteEnterPVS).
                 bool owns = player.PlayerPawn.Value.WeaponServices?.MyWeapons
                     .Any(h => h.Value != null && h.Value.IsValid && h.Value.DesignerName == deployWeapon) ?? false;
-                if (SwitchWeaponNative(player, deployWeapon!))
+
+                if (IsGrenadeClassname(deployWeapon!))
                 {
-                    // Grenades leave a lower-body throw anim layer that a direct
-                    // nade deploy doesn't clear — leg/body sticks out (the sprawled
-                    // throw pose). Bounce through the knife (full-body idle resets
-                    // the body) this frame, then reselect the nade next frame so it
-                    // ends up in hand. Applied to ALL grenade types (originally
-                    // molotov-only, but every nade shows the stuck pose).
-                    if (IsGrenadeClassname(deployWeapon!))
+                    // CRITICAL: do NOT deploy the grenade with SelectItem subType=0. On a
+                    // grenade that makes the engine THROW it — that was the .loadnade
+                    // auto-throw (the owned smoke was launched mid-restore, dead into the
+                    // wall at tight corners). Deploy the KNIFE first via SelectItem (a knife
+                    // never throws; its full-body idle clears the frozen throw pose, issue
+                    // #391), then next frame give the nade if it was consumed and draw it via
+                    // SelectItem subType=4 (reselect/redeploy — a real deploy animation with
+                    // NO throw), so a later manual throw fires from the proper deploy state.
+                    // Fall back to the EquipWeaponByName pointer switch if SelectItem is
+                    // unavailable.
+                    string nade = deployWeapon!;
+                    bool needGive = giveDeploy && !owns;
+                    if (!SwitchWeaponNative(player, "weapon_knife"))
+                        EquipWeaponByName(player, "weapon_knife");
+                    Server.NextFrame(() =>
                     {
-                        string nade = deployWeapon!;
-                        SwitchWeaponNative(player, "weapon_knife");
-                        if (nadePoseFlickerFree)
-                        {
-                            // Reselect the nade in the SAME frame → the client never
-                            // networks the intermediate knife (no flash). Works only if
-                            // the SelectItem holster cancels the throw gesture right away.
-                            SwitchWeaponNative(player, nade);
-                        }
-                        else
-                        {
-                            // Proven path: let the knife's full-body anim tick one frame
-                            // to reset the legs, then reselect the nade (1-frame flash).
-                            Server.NextFrame(() =>
-                            {
-                                if (player != null && player.IsValid && player.PlayerPawn.Value != null)
-                                    SwitchWeaponNative(player, nade);
-                            });
-                        }
-                    }
+                        if (player == null || !player.IsValid || player.PlayerPawn.Value == null)
+                            return;
+                        if (needGive)
+                            player.GiveNamedItem(nade);
+                        if (!SwitchWeaponNative(player, nade, 4))
+                            EquipWeaponByName(player, nade);
+                    });
                 }
-                else if (giveDeploy && !owns)
-                    player.GiveNamedItem(deployWeapon!);
                 else
-                    EquipWeaponByName(player, deployWeapon!);
+                {
+                    // Non-grenade (loadpos switch): no throw risk. SelectItem, else
+                    // give if missing, else pointer-switch.
+                    if (SwitchWeaponNative(player, deployWeapon!)) { }
+                    else if (giveDeploy && !owns)
+                        player.GiveNamedItem(deployWeapon!);
+                    else
+                        EquipWeaponByName(player, deployWeapon!);
+                }
             });
         }
 
@@ -3273,7 +3264,7 @@ namespace MatchZy
         // Deploy an owned weapon by classname via the engine SelectItem vfunc.
         // Returns false if the offset is unavailable or the weapon isn't owned
         // (caller falls back).
-        public static bool SwitchWeaponNative(CCSPlayerController? player, string classname)
+        public static bool SwitchWeaponNative(CCSPlayerController? player, string classname, int subType = 0)
         {
             if (player == null || !player.IsValid || player.PlayerPawn.Value?.WeaponServices == null)
                 return false;
@@ -3284,10 +3275,13 @@ namespace MatchZy
             var matched = ws.MyWeapons.FirstOrDefault(x => x.Value != null && x.Value.IsValid && x.Value.DesignerName == classname);
             if (matched?.Value == null || !matched.Value.IsValid)
                 return false;
-            // SelectItem(this, weapon, subType=0): 0 = normal select for a different
-            // weapon (subType 4 is the holster-only/reselect path).
+            // SelectItem(this, weapon, subType): 0 = normal select for a different weapon
+            // (on a grenade this triggers the THROW). 4 = the reselect/redeploy path,
+            // used to draw a weapon with its deploy animation WITHOUT throwing — needed
+            // to put a restored grenade in hand so a later manual throw animates from the
+            // proper deploy state (subType 0 / a pointer switch releases mid-windup).
             var wsHandle = ws.Handle;
-            VirtualFunction.CreateVoid<IntPtr, IntPtr, int>(wsHandle, offset)(wsHandle, matched.Value.Handle, 0);
+            VirtualFunction.CreateVoid<IntPtr, IntPtr, int>(wsHandle, offset)(wsHandle, matched.Value.Handle, subType);
             return true;
         }
 

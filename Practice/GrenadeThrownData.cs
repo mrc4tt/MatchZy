@@ -81,6 +81,13 @@ public class GrenadeThrownData
         if (player == null || !player.IsValid || player.Connected != PlayerConnectedState.Connected || !player.PlayerPawn.IsValid || player.PlayerPawn.Value == null)
             return;
 
+        // Never re-throw a zero-velocity entry: a real thrown grenade always carries
+        // launch velocity, so mag≈0 means a corrupt/garbage history record (e.g. a dead
+        // nade that a pre-fix build re-recorded). Replaying it would spawn a stationary
+        // grenade that drops into the floor/wall at the record's spawn point.
+        if (Velocity.X * Velocity.X + Velocity.Y * Velocity.Y + Velocity.Z * Velocity.Z < 1.0f)
+            return;
+
         CBaseCSGrenadeProjectile? grenadeEntity = null;
         switch (Type)
         {
@@ -117,7 +124,15 @@ public class GrenadeThrownData
                 break;
         }
 
-        if (grenadeEntity != null && grenadeEntity.DesignerName != "smokegrenade_projectile")
+        // Apply the recorded launch transform to EVERY grenade type — including smoke.
+        // Smokes were previously excluded (DesignerName != "smokegrenade_projectile"),
+        // relying on the native Create func to impart velocity; it does not, so a
+        // re-thrown smoke dropped dead at the spawn origin with zero velocity. The
+        // Teleport(pos, ang, vel) below is what actually launches the projectile.
+        // Setting Globalname="custom" also marks the projectile so OnEntitySpawned
+        // skips it — without it, dead re-thrown smokes were re-recorded into history
+        // with zero velocity, poisoning .last / .rt.
+        if (grenadeEntity != null)
         {
             grenadeEntity.InitialPosition.X = Position.X;
             grenadeEntity.InitialPosition.Y = Position.Y;

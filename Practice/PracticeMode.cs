@@ -425,7 +425,13 @@ namespace MatchZy
 
                     savedNadesDict[playerSteamID][lineupName] = new Dictionary<string, string>
                     {
-                        { "Position", $"{playerPos.X} {playerPos.Y} {playerPos.Z + 4}" },
+                        // Store the EXACT feet origin (AbsOrigin), matching getpos_exact.
+                        // A previous +4 lift wrote the position 4u above the real stance,
+                        // so .loadnade teleported you 4u high — throwing before you fell
+                        // those 4u released the nade from the wrong height (clipped tight
+                        // corners). Teleporting to the exact standing origin is safe (the
+                        // player stood there), same as setpos_exact.
+                        { "Position", $"{playerPos.X} {playerPos.Y} {playerPos.Z}" },
                         { "Angles", $"{playerAngle.X} {playerAngle.Y} {playerAngle.Z}" },
                         { "Desc", lineupDesc },
                         { "Map", currentMapName },
