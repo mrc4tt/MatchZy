@@ -47,7 +47,7 @@ namespace MatchZy
             }
             if (mapRotationList.Count == 0)
             {
-                ReplyToUserCommand(player, "matchzymaps.cfg has no maps — add some before running .matchsetup.");
+                ReplyToUserCommand(player, "matchzymaps.cfg has no maps - add some before running .matchsetup.");
                 return;
             }
             if (activeSetup != null && activeSetup.AdminSteamId != player.SteamID)
@@ -68,7 +68,7 @@ namespace MatchZy
         {
             if (!ValidateSetupOwner(player))
                 return;
-            var menu = new WasdMenu($"{chatPrefix} Match Setup — Series", this);
+            var menu = new WasdMenu($"{chatPrefix} Match Setup - Series", this);
             menu.AddItem(
                 "Best of 1 (BO1)",
                 (p, _) =>
@@ -109,7 +109,7 @@ namespace MatchZy
             var menu = new WasdMenu($"{chatPrefix} Map Selection (BO{s.NumMaps})", this);
             menu.AddItem("« Back", (p, _) => OpenSeriesMenu(p));
             menu.AddItem(
-                $"Pre-pick {s.NumMaps} map(s) — no veto",
+                $"Pre-pick {s.NumMaps} map(s) - no veto",
                 (p, _) =>
                 {
                     s.SkipVeto = true;
@@ -138,7 +138,7 @@ namespace MatchZy
             if (!ValidateSetupOwner(player))
                 return;
             var s = activeSetup!;
-            var menu = new WasdMenu($"{chatPrefix} Pick Maps — {s.SelectedMaps.Count}/{s.NumMaps}", this);
+            var menu = new WasdMenu($"{chatPrefix} Pick Maps - {s.SelectedMaps.Count}/{s.NumMaps}", this);
             foreach (var map in mapRotationList)
             {
                 int pickIdx = s.SelectedMaps.IndexOf(map);
@@ -200,15 +200,15 @@ namespace MatchZy
             string team2 = ResolveTeam2Name();
 
             var menu = new WasdMenu($"{chatPrefix} Confirm Match", this);
-            menu.AddItem($"BO{s.NumMaps} — change", (p, _) => OpenSeriesMenu(p));
+            menu.AddItem($"BO{s.NumMaps} - change", (p, _) => OpenSeriesMenu(p));
             string mapSummary = s.SkipVeto ? $"Maps ({s.SelectedMaps.Count}/{s.NumMaps}): {string.Join(" → ", s.SelectedMaps)}" : $"Veto pool: {s.SelectedMaps.Count} maps";
             menu.AddItem(mapSummary, (p, _) => OpenMapModeMenu(p));
-            menu.AddItem($"Sides: {(s.KnifeRound ? "Knife" : "Team1 CT")} — change", (p, _) => OpenSidesMenu(p));
+            menu.AddItem($"Sides: {(s.KnifeRound ? "Knife" : "Team1 CT")} - change", (p, _) => OpenSidesMenu(p));
             menu.AddItem(
                 $"Teams: {team1} vs {team2}",
                 (p, o) =>
                 {
-                    ReplyToUserCommand(p, "Type .team1 <name> / .team2 <name> in chat — menu refreshes automatically.");
+                    ReplyToUserCommand(p, "Type .team1 <name> / .team2 <name> in chat - menu refreshes automatically.");
                     o.PostSelectAction = CS2MenuManager.API.Enum.PostSelectAction.Nothing;
                 }
             );
@@ -229,7 +229,7 @@ namespace MatchZy
             string team1 = ResolveTeam1Name();
             string team2 = ResolveTeam2Name();
 
-            // Don't set "matchid" — InitMatchAsync allocates a fresh parent row when liveMatchId is -1.
+            // Don't set "matchid" - InitMatchAsync allocates a fresh parent row when liveMatchId is -1.
             // Passing a synthetic id makes the maps-table insert violate the FK to matchzy_stats_matches.
             var json = new JObject
             {
@@ -270,7 +270,7 @@ namespace MatchZy
             }
             else
             {
-                ReplyToUserCommand(player, "LoadMatchFromJSON returned false — check server log for validation errors.");
+                ReplyToUserCommand(player, "LoadMatchFromJSON returned false - check server log for validation errors.");
             }
         }
 

@@ -135,7 +135,7 @@ namespace MatchZy
                             string jsonData = await response.Content.ReadAsStringAsync();
                             Log($"[LoadMatchFromURL] Received following data: {jsonData}");
 
-                            // LoadMatchFromJSON uses native APIs — must run on game thread
+                            // LoadMatchFromJSON uses native APIs - must run on game thread
                             Server.NextFrame(() =>
                             {
                                 bool success = LoadMatchFromJSON(jsonData);
@@ -306,7 +306,7 @@ namespace MatchZy
             {
                 long parsedId = (long)jsonDataObject["matchid"]!;
                 // Only honor positive matchids. Zero/negative means "no existing
-                // match" — let InitMatchAsync allocate a fresh autoincrement row.
+                // match" - let InitMatchAsync allocate a fresh autoincrement row.
                 if (parsedId > 0)
                     liveMatchId = parsedId;
                 else
@@ -647,7 +647,7 @@ namespace MatchZy
             }
 
             // Also set directly on CCSTeam entities for reliability.
-            // Re-fetch fresh — cached refs can be stale right after a changelevel
+            // Re-fetch fresh - cached refs can be stale right after a changelevel
             // (SetTeamNames may run before the post-map RefreshTeamEntities timer fires),
             // and a stale CCSTeam handle NREs on the ClanTeamname setter.
             try
@@ -915,7 +915,7 @@ namespace MatchZy
                 await SendEventAsync(seriesResultEvent);
             });
 
-            // FIRST: Disable engine auto-change BEFORE restoring cvars — prevents race condition
+            // FIRST: Disable engine auto-change BEFORE restoring cvars - prevents race condition
             // where ResetChangedConvars re-enables them and engine races the plugin's map change.
             Server.ExecuteCommand("mp_match_end_changelevel 0");
             Server.ExecuteCommand("mp_match_end_restart 0");
@@ -963,7 +963,7 @@ namespace MatchZy
             if (mapRotationList.Count == 0)
             {
                 Log("[EndSeries] WARNING: Map rotation list is empty! Cannot auto-changelevel. Resetting match on current map.");
-                PrintToAllChat($"{ChatColors.Red}No maps in rotation — staying on current map.");
+                PrintToAllChat($"{ChatColors.Red}No maps in rotation - staying on current map.");
                 AddTimer(
                     restartDelay,
                     () =>
@@ -982,13 +982,13 @@ namespace MatchZy
             Log($"[EndSeries] Current map: {currentMap}, Next map: {nextMap}, Change in {mapChangeDelay}s");
 
             // Notify players
-            PrintToAllChat($"Next map: {ChatColors.Green}{nextMap}{ChatColors.Default} — changing in {(int)mapChangeDelay} seconds.");
+            PrintToAllChat($"Next map: {ChatColors.Green}{nextMap}{ChatColors.Default} - changing in {(int)mapChangeDelay} seconds.");
 
             matchEndMapChangeTimer = AddTimer(
                 mapChangeDelay,
                 () =>
                 {
-                    // Reset match state FIRST, then change map — serialized to avoid race condition
+                    // Reset match state FIRST, then change map - serialized to avoid race condition
                     ResetMatch(false);
 
                     // Use the appropriate command based on map type
@@ -1052,7 +1052,7 @@ namespace MatchZy
                 Server.ExecuteCommand("mp_match_end_changelevel 0");
                 Server.ExecuteCommand("mp_match_end_restart 0");
                 Server.ExecuteCommand("mp_endmatch_votenextmap 0");
-                Log("[HandlePlayoutConfig] Scrim/Hill playout — clinch=0, overtime=0");
+                Log("[HandlePlayoutConfig] Scrim/Hill playout - clinch=0, overtime=0");
                 return;
             }
 
@@ -1061,7 +1061,7 @@ namespace MatchZy
             string? overtimeEnabled = GetConvarValueFromCFGFile(absoluteCfgPath, "mp_overtime_enable");
             Server.ExecuteCommand($"mp_match_can_clinch {matchCanClinch ?? "1"}");
             Server.ExecuteCommand($"mp_overtime_enable {overtimeEnabled ?? "1"}");
-            Log($"[HandlePlayoutConfig] Match mode — cfg={absoluteCfgPath} clinch={matchCanClinch ?? "1(default)"} overtime={overtimeEnabled ?? "1(default)"}");
+            Log($"[HandlePlayoutConfig] Match mode - cfg={absoluteCfgPath} clinch={matchCanClinch ?? "1(default)"} overtime={overtimeEnabled ?? "1(default)"}");
         }
     }
 }

@@ -135,7 +135,7 @@ namespace MatchZy
                 )
             ).ToList();
 
-            string header = $"{ChatColors.Green}Last match #{matchId}{ChatColors.Default} on {ChatColors.Yellow}{mapName}{ChatColors.Default} — " + $"{ChatColors.Green}{team1} {t1}{ChatColors.Default}:{ChatColors.Green}{t2} {team2}";
+            string header = $"{ChatColors.Green}Last match #{matchId}{ChatColors.Default} on {ChatColors.Yellow}{mapName}{ChatColors.Default} - " + $"{ChatColors.Green}{team1} {t1}{ChatColors.Default}:{ChatColors.Green}{t2} {team2}";
 
             var rows = new List<string>();
             int i = 1;
@@ -174,7 +174,7 @@ namespace MatchZy
 
             List<dynamic> rows;
 
-            // SteamID64 path — exact 17-digit numeric input
+            // SteamID64 path - exact 17-digit numeric input
             string trimmed = nameQuery.Trim();
             if (trimmed.Length == 17 && trimmed.All(char.IsDigit))
             {

@@ -38,7 +38,7 @@ public class GrenadeThrownData
         ThrownTime = thrownTime;
         Delay = 0;
         ItemIndex = itemIndex;
-        // Snap to fully-standing or fully-ducked — anything in-between produces
+        // Snap to fully-standing or fully-ducked - anything in-between produces
         // the "MJ peak" half-crouch when restored (issue #391).
         DuckAmount = duckAmount >= 0.5f ? 1.0f : 0.0f;
     }
@@ -61,7 +61,7 @@ public class GrenadeThrownData
         };
         // Issues #391/#393 (AG2): teleport back to the throw position and clear
         // the stuck throw pose. The pose only resets on a REAL weapon deploy, and
-        // the only managed call that triggers one is GiveNamedItem — so giveDeploy
+        // the only managed call that triggers one is GiveNamedItem - so giveDeploy
         // re-gives the (consumed) grenade by classname, which both restores it AND
         // plays the deploy that clears the pose, leaving the nade in hand at the
         // lineup. No respawn, so the rest of the inventory is untouched.
@@ -124,13 +124,13 @@ public class GrenadeThrownData
                 break;
         }
 
-        // Apply the recorded launch transform to EVERY grenade type — including smoke.
+        // Apply the recorded launch transform to EVERY grenade type - including smoke.
         // Smokes were previously excluded (DesignerName != "smokegrenade_projectile"),
         // relying on the native Create func to impart velocity; it does not, so a
         // re-thrown smoke dropped dead at the spawn origin with zero velocity. The
         // Teleport(pos, ang, vel) below is what actually launches the projectile.
         // Setting Globalname="custom" also marks the projectile so OnEntitySpawned
-        // skips it — without it, dead re-thrown smokes were re-recorded into history
+        // skips it - without it, dead re-thrown smokes were re-recorded into history
         // with zero velocity, poisoning .last / .rt.
         if (grenadeEntity != null)
         {

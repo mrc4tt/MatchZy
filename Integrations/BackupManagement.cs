@@ -803,7 +803,7 @@ namespace MatchZy
             // Show current match context
             (int t1score, int t2score) = GetTeamsScore();
             int currentRound = t1score + t2score;
-            ReplyToUserCommand(player, $"Current: Round {currentRound} — {ChatColors.Green}{matchzyTeam1.teamName} {t1score}-{t2score} {matchzyTeam2.teamName}");
+            ReplyToUserCommand(player, $"Current: Round {currentRound} - {ChatColors.Green}{matchzyTeam1.teamName} {t1score}-{t2score} {matchzyTeam2.teamName}");
             ReplyToUserCommand(player, "───────────────────────────────────");
 
             int displayed = 0;

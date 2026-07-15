@@ -6,7 +6,7 @@ namespace MatchZy
 {
     public partial class MatchZy
     {
-        // Single HttpClient instance — avoids socket exhaustion from per-request allocation.
+        // Single HttpClient instance - avoids socket exhaustion from per-request allocation.
         // HttpClient is thread-safe and designed to be long-lived.
         private static readonly HttpClient _sharedHttpClient = new() { Timeout = TimeSpan.FromSeconds(10) };
 

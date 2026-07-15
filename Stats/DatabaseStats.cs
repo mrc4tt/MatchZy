@@ -20,7 +20,7 @@ namespace MatchZy
     {
         // Initialize the SQLite native provider eagerly, on the main thread, as soon
         // as the Database type is first touched (MatchZy's `database = new()` field
-        // initializer runs in the plugin ctor — before Load() and before the async
+        // initializer runs in the plugin ctor - before Load() and before the async
         // DB-init Task). Doing it here, synchronously, shrinks the window in which a
         // concurrent SqliteConnection open from another plugin (e.g. CS2_SimpleAdmin)
         // on a worker thread can race our open during the native bootstrap and segfault.
@@ -51,7 +51,7 @@ namespace MatchZy
         private static int _sqliteInitDone;
 
         // Returns null on success/already-initialized, or a flattened error string when the
-        // native bootstrap failed (so the instance caller can Log it — this is static).
+        // native bootstrap failed (so the instance caller can Log it - this is static).
         private static string? EnsureSqliteProviderInitialized()
         {
             if (Interlocked.CompareExchange(ref _sqliteInitDone, 1, 0) != 0)
@@ -64,7 +64,7 @@ namespace MatchZy
             catch (Exception ex)
             {
                 // Another loader (Microsoft.Data.Sqlite static ctor or another
-                // plugin) may have already initialized — that case is harmless.
+                // plugin) may have already initialized - that case is harmless.
                 // But a genuine native-load failure (missing/incompatible
                 // e_sqlite3 .so under the .NET 10 fork runtime) also lands here
                 // and otherwise surfaces later as an opaque TypeInitializationException
@@ -74,7 +74,7 @@ namespace MatchZy
         }
 
         /// <summary>
-        /// Flattens an exception and its InnerException chain into a single line —
+        /// Flattens an exception and its InnerException chain into a single line -
         /// TypeInitializationException et al. hide the real cause (e.g. a native
         /// DllNotFoundException) in InnerException, which the bare ex.Message drops.
         /// </summary>
@@ -235,7 +235,7 @@ namespace MatchZy
 
         // Creates a fresh, dedicated DB connection from the pool. Used by
         // operations that must not interleave with other DB work on the shared
-        // `connection` — notably matchid allocation, where LAST_INSERT_ID() /
+        // `connection` - notably matchid allocation, where LAST_INSERT_ID() /
         // last_insert_rowid() are connection-scoped and corrupt under concurrency.
         private IDbConnection CreateNewConnection()
         {

@@ -143,7 +143,7 @@ namespace MatchZy
         // NOT during MatchZy's static initialization. A throwing scan in a static
         // field initializer surfaces as a TypeInitializationException while CSS is
         // instantiating the plugin (before Load(), outside every try/catch) and makes
-        // CSS skip the whole plugin — the intermittent "MatchZy didn't auto-load,
+        // CSS skip the whole plugin - the intermittent "MatchZy didn't auto-load,
         // need css_plugins load MatchZy" boot failure. The scan can fail transiently
         // at boot (server modules not fully mapped yet) or permanently (game update
         // shifted the pattern); either way keep it off the load path and degrade
@@ -165,7 +165,7 @@ namespace MatchZy
         public bool isDryRun = false;
         public List<int> noFlashList = new List<int>();
 
-        // UserIds whose next death is a practice side-switch suicide (.t/.ct/.spec) — zeroed in
+        // UserIds whose next death is a practice side-switch suicide (.t/.ct/.spec) - zeroed in
         // the Post EventPlayerDeath handler so it never counts on the scoreboard.
         public readonly HashSet<int> practiceSwitchNoDeath = new();
 
@@ -427,7 +427,7 @@ namespace MatchZy
                     {
                         // Store the EXACT feet origin (AbsOrigin), matching getpos_exact.
                         // A previous +4 lift wrote the position 4u above the real stance,
-                        // so .loadnade teleported you 4u high — throwing before you fell
+                        // so .loadnade teleported you 4u high - throwing before you fell
                         // those 4u released the nade from the wrong height (clipped tight
                         // corners). Teleporting to the exact standing origin is safe (the
                         // player stood there), same as setpos_exact.
@@ -1849,7 +1849,7 @@ namespace MatchZy
                             // Disabling collisions here is what made the player sink
                             // back through the bot (gravity re-overlaps the bot before
                             // the 0.5s re-solidify timer fires).
-                            float ownerYaw = botOwnerPawn.EyeAngles.Y; // yaw only — keep body flat (issue #10)
+                            float ownerYaw = botOwnerPawn.EyeAngles.Y; // yaw only - keep body flat (issue #10)
                             botOwnerPawn.Teleport(
                                 new Vector(botOwnerPosition.PlayerPosition.X, botOwnerPosition.PlayerPosition.Y, botOwnerPosition.PlayerPosition.Z + 80.0f),
                                 new QAngle(0, ownerYaw, 0),
@@ -2248,7 +2248,7 @@ namespace MatchZy
                 else
                 {
                     ReplyToUserCommand(player, $" {ChatColors.Red}Breakable respawn unavailable (signature not resolved).");
-                    Log("[OnBreakRestoreCommand] CCSGameRules_PostCleanUp signature unresolved — breakrestore skipped.");
+                    Log("[OnBreakRestoreCommand] CCSGameRules_PostCleanUp signature unresolved - breakrestore skipped.");
                 }
             }
         }
@@ -2291,7 +2291,7 @@ namespace MatchZy
             if (team > CsTeam.None)
             {
                 // SideSwitchCommand runs inside a chat/console command handler (.t/.ct/.spec), i.e.
-                // on the engine's command-dispatch stack — so everything below is marshalled off it
+                // on the engine's command-dispatch stack - so everything below is marshalled off it
                 // via Server.NextFrame first.
                 Server.NextFrame(() =>
                 {
@@ -2301,7 +2301,7 @@ namespace MatchZy
                     {
                         // Flag this player so the side-switch suicide below does NOT count as a
                         // death on the practice scoreboard. The engine increments the death stat
-                        // during EventPlayerDeath, AFTER any restore we could do here — so the
+                        // during EventPlayerDeath, AFTER any restore we could do here - so the
                         // reset is done in the Post EventPlayerDeath handler (fires the exact death
                         // tick → scoreboard never settles on the +1). See MatchZy.cs.
                         if (player.UserId.HasValue)
@@ -2310,7 +2310,7 @@ namespace MatchZy
                         // Kill the live pawn BEFORE changing team. The engine's live-player
                         // ChangeTeam strips/destroys the held weapons inline; weapon-lifecycle hooks
                         // from other plugins (e.g. skin plugins) then re-enter on a half-destroyed
-                        // weapon and SIGSEGV *inside* ChangeTeam — the reproducible .t/.ct/.spec
+                        // weapon and SIGSEGV *inside* ChangeTeam - the reproducible .t/.ct/.spec
                         // practice crash. A normal death just DROPS the weapons, so a dead,
                         // weaponless player never hits that strip path.
                         CCSPlayerPawn? pawn = player.PlayerPawn.Value;
@@ -2333,7 +2333,7 @@ namespace MatchZy
                                 player.SwitchTeam(team);
 
                                 // Practice: respawn onto an actual playing side (T/CT) so you're
-                                // live instantly. NEVER respawn when the target is Spectator —
+                                // live instantly. NEVER respawn when the target is Spectator -
                                 // respawning a spectator crashes the server.
                                 // TEST: respawn immediately (no 0.1s delay) for instant switch.
                                 if (team == CsTeam.Terrorist || team == CsTeam.CounterTerrorist)

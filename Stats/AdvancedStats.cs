@@ -225,7 +225,7 @@ public partial class MatchZy
 
             // Check if this kill avenges a recent teammate death.
             // Perf: manual scan for the first match instead of .Where().ToList()
-            // + .Any() + .First() — this runs on every death (~10x/round) and the
+            // + .Any() + .First() - this runs on every death (~10x/round) and the
             // LINQ chain allocated a closure + List each call.
             var now = DateTime.UtcNow;
             RoundDeath? tradedDeath = null;
@@ -304,7 +304,7 @@ public partial class MatchZy
         aliveCT = 0;
 
         // Perf: iterate the cached playerData dict instead of Utilities.GetPlayers()
-        // — this runs on every player death during live matches (~10x/round), and
+        // - this runs on every player death during live matches (~10x/round), and
         // GetPlayers() allocates a List + crosses the native boundary each call.
         foreach (var player in playerData.Values)
         {

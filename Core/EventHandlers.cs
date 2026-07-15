@@ -13,7 +13,7 @@ public partial class MatchZy
         {
             CCSPlayerController? player = @event.Userid;
 
-            // Early validation — must be a connected human player with a UserId
+            // Early validation - must be a connected human player with a UserId
             if (!IsHumanPlayerValid(player) || !player!.UserId.HasValue)
                 return HookResult.Continue;
 
@@ -154,7 +154,7 @@ public partial class MatchZy
         try
         {
             HandleMatchEnd();
-            // isKnifeRequired is set explicitly by SetMapSides() / ResetMatch() — never toggle blindly
+            // isKnifeRequired is set explicitly by SetMapSides() / ResetMatch() - never toggle blindly
             return HookResult.Continue;
         }
         catch (Exception e)
@@ -169,7 +169,7 @@ public partial class MatchZy
         try
         {
             ResetMatch();
-            // isKnifeRequired is set explicitly by ResetMatch() — never toggle blindly
+            // isKnifeRequired is set explicitly by ResetMatch() - never toggle blindly
         }
         catch (Exception e)
         {

@@ -17,7 +17,7 @@ namespace MatchZy
         // plugin isn't installed, that first touch throws FileNotFound/TypeLoad on
         // the NextFrame callback. Route every menu open through here so a missing
         // optional dep degrades to a chat message instead of crashing the frame.
-        // `open` must be a method group whose body is the first WasdMenu reference —
+        // `open` must be a method group whose body is the first WasdMenu reference -
         // this wrapper itself references no menu type, so it always JIT-resolves.
         private void OpenMenuGuarded(CCSPlayerController player, Action<CCSPlayerController> open)
         {

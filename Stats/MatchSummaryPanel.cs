@@ -21,7 +21,7 @@ namespace MatchZy
 
             matchSummaryTimer?.Kill();
             matchSummaryTimer = AddTimer(1.0f, TickMatchSummaryPanel, TimerFlags.REPEAT | TimerFlags.STOP_ON_MAPCHANGE);
-            // Print immediately too — first tick is a second away.
+            // Print immediately too - first tick is a second away.
             BroadcastSummary();
         }
 

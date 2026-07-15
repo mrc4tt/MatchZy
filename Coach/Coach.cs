@@ -179,7 +179,7 @@ public partial class MatchZy
 
         // Coach viewing-position file is OPTIONAL now. If present we relocate coaches to a
         // clean viewing spot; if absent, coaches just stay at their engine spawn until killed.
-        // Either way the real-player reseat below still runs — that is what actually fixes
+        // Either way the real-player reseat below still runs - that is what actually fixes
         // "one player doesn't get their normal spawn", and it needs only engine spawns.
         bool haveCoachSpawns = HasCoachSpawns();
         if (!haveCoachSpawns)
@@ -211,7 +211,7 @@ public partial class MatchZy
         // Always force the real (non-coach) players onto the canonical competitive spawns.
         // The game allocates spawn points to ALL bodies on a team, coaches included, so a
         // coach can grab a good spawn and bump a real player to a far/wrong one. Relocating
-        // coaches alone does not fix the already-bumped player — this does, regardless of
+        // coaches alone does not fix the already-bumped player - this does, regardless of
         // coach count (1-5+) and regardless of whether a coach-spawn file exists.
         AddTimer(0.6f, EnforceCompetitiveSpawns);
 
@@ -238,7 +238,7 @@ public partial class MatchZy
                 continue;
 
             // Pull the canonical first-N competitive spawns straight from the live map entities,
-            // ordered by Priority — the exact set the engine would hand to N coachless players.
+            // ordered by Priority - the exact set the engine would hand to N coachless players.
             // This does NOT depend on the min-priority `spawnsData` filter, which can come up
             // short on maps where the lowest-priority set is smaller than the team size and
             // leave a player stranded. Fall back to spawnsData only if the entity scan fails.
@@ -314,7 +314,7 @@ public partial class MatchZy
 
     /// <summary>
     /// Returns up to <paramref name="count"/> competitive spawns for a side, taken from the live
-    /// map entities ordered by <c>Priority</c> ascending — i.e. the spawns the engine would assign
+    /// map entities ordered by <c>Priority</c> ascending - i.e. the spawns the engine would assign
     /// to that many coachless players. Independent of the cached min-priority <c>spawnsData</c>.
     /// </summary>
     private List<Position> GetTopCompetitiveSpawns(byte side, int count)
@@ -438,7 +438,7 @@ public partial class MatchZy
 
     private void KillCoaches()
     {
-        // Debug mode keeps coaches alive for inspection — never suicide them.
+        // Debug mode keeps coaches alive for inspection - never suicide them.
         if (coachDebugEnabled.Value)
             return;
         if (isPaused || IsTacticalTimeoutActive())
@@ -448,7 +448,7 @@ public partial class MatchZy
             return;
         // Capture the ConVar objects (not just their values) so we can mutate them
         // synchronously. Server.ExecuteCommand queues to the command buffer and runs at
-        // frame-end, AFTER the CommitSuicide() calls below execute inline — so the old
+        // frame-end, AFTER the CommitSuicide() calls below execute inline - so the old
         // ExecuteCommand("mp_suicide_penalty 0") never took effect before the suicides and
         // coaches still ate the suicide penalty. SetConvarValue writes the live cvar now.
         ConVar? suicidePenaltyCvar = ConVar.Find("mp_suicide_penalty");
@@ -568,7 +568,7 @@ public partial class MatchZy
         }
         else
         {
-            ReplyToUserCommand(player, "Failed to write coach spawn file — check server logs.");
+            ReplyToUserCommand(player, "Failed to write coach spawn file - check server logs.");
         }
     }
 
@@ -602,7 +602,7 @@ public partial class MatchZy
         catch (Exception ex)
         {
             Log($"[OnClearCoachSpawnsCommand] Error deleting coach spawn file: {ex.Message}");
-            ReplyToUserCommand(player, "Failed to delete coach spawn file — check server logs.");
+            ReplyToUserCommand(player, "Failed to delete coach spawn file - check server logs.");
         }
     }
 

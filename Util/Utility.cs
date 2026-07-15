@@ -21,7 +21,7 @@ namespace MatchZy
     public partial class MatchZy
     {
         // Case-resolved relative cfg paths (e.g. "matchzy/warmup.cfg" or "MatchZy/warmup.cfg")
-        // — see MatchZyCfgRel. Computed so they follow the on-disk folder casing.
+        // - see MatchZyCfgRel. Computed so they follow the on-disk folder casing.
         public string warmupCfgPath => MatchZyCfgRel("warmup.cfg");
         public string knifeCfgPath => MatchZyCfgRel("knife.cfg");
         public string liveCfgPath => MatchZyCfgRel("live.cfg");
@@ -86,11 +86,11 @@ namespace MatchZy
         // Single source of truth for the MatchZy config directory, resolved
         // case-insensitively (reuses an existing "MatchZy" OR "matchzy", else defaults to
         // lowercase "matchzy"). A server picks its casing simply by creating/naming that
-        // folder under csgo/cfg — every MatchZy file (cfgs, savednades, admins, whitelist)
+        // folder under csgo/cfg - every MatchZy file (cfgs, savednades, admins, whitelist)
         // then lives in it consistently. Cached: the resolved name is stable per session.
         private string? _matchZyCfgDirCache;
         private string MatchZyCfgDir => _matchZyCfgDirCache ??= new ConfigManager().GetMatchZyCfgDir();
-        // Folder name only (e.g. "matchzy") — for `exec <name>/x.cfg` paths, which are
+        // Folder name only (e.g. "matchzy") - for `exec <name>/x.cfg` paths, which are
         // relative to csgo/cfg.
         private string MatchZyCfgDirName => Path.GetFileName(MatchZyCfgDir.TrimEnd('/', '\\'));
         // Relative path for exec/execifexists and Path.Join(gamedir/csgo/cfg, ...): "<name>/<file>".
@@ -115,7 +115,7 @@ namespace MatchZy
                 {
                     Dictionary<string, string> template = new() { { "STEAM_ID_64_HERE", "" } };
                     File.WriteAllText(filePath, JsonSerializer.Serialize(template, new JsonSerializerOptions { WriteIndented = true }));
-                    Log($"[LoadAdmins] No admins.json found — created a template at '{filePath}'.");
+                    Log($"[LoadAdmins] No admins.json found - created a template at '{filePath}'.");
                 }
                 catch (Exception e)
                 {
@@ -273,7 +273,7 @@ namespace MatchZy
                     {
                         if (playerData.TryGetValue(key, out var player) && player != null && player.IsValid)
                         {
-                            // Only T/CT — spectators aren't part of the ready gate.
+                            // Only T/CT - spectators aren't part of the ready gate.
                             if (player.TeamNum != 2 && player.TeamNum != 3)
                                 continue;
 
@@ -398,7 +398,7 @@ namespace MatchZy
             unreadyPlayerMessageTimer = null;
             //unreadyPlayerMessageTimer ??= AddTimer(chatTimerDelay, SendUnreadyPlayersMessage, TimerFlags.REPEAT);
 
-            // Start the ready status hint message timer (3s — HUD text stays visible ~5s)
+            // Start the ready status hint message timer (3s - HUD text stays visible ~5s)
             readyStatusHintTimer?.Kill();
             readyStatusHintTimer = AddTimer(3, SendReadyStatusHintMessage, TimerFlags.REPEAT);
 
@@ -1221,7 +1221,7 @@ namespace MatchZy
                 // try the name as given, then a "de_" prefix so a bare "mirage" -> "de_mirage"
                 // (but "cs_office"/"ar_baggage"/workshop-mounted names validate as-is). Upstream
                 // stops the demo + kicks bots BEFORE validating, so a typo leaves the server torn
-                // down with no map change and the recording lost — validate first, act second.
+                // down with no map change and the recording lost - validate first, act second.
                 if (!Server.IsMapValid(targetMap))
                 {
                     string prefixed = "de_" + targetMap;
@@ -1237,7 +1237,7 @@ namespace MatchZy
                 }
             }
 
-            // Validated named map (or a workshop id) — safe to tear down and change now.
+            // Validated named map (or a workshop id) - safe to tear down and change now.
             // Stop demo recording before map change to prevent GOTV crash.
             if (isDemoRecording)
             {
@@ -1638,7 +1638,7 @@ namespace MatchZy
 
             ShowMatchSummaryPanel(matchStatsForExport, t1score, t2score, winnerName);
 
-            // Capture matchId before async context — liveMatchId may be reset to -1 by ResetMatch
+            // Capture matchId before async context - liveMatchId may be reset to -1 by ResetMatch
             long matchId = liveMatchId;
 
             Task.Run(async () =>
@@ -1810,7 +1810,7 @@ namespace MatchZy
             int t1score = 0;
             int t2score = 0;
 
-            // Use cached team entities (refreshed on map start) — avoids per-call entity scan
+            // Use cached team entities (refreshed on map start) - avoids per-call entity scan
             // Fall back to full scan if cache is stale
             CCSTeam? team1Entity = null;
             CCSTeam? team2Entity = null;
@@ -1826,7 +1826,7 @@ namespace MatchZy
             }
             else
             {
-                // Cache miss — refresh and retry
+                // Cache miss - refresh and retry
                 RefreshTeamEntities();
                 if (_cachedCtTeam != null && _cachedTTeam != null)
                 {
@@ -1875,7 +1875,7 @@ namespace MatchZy
 
             // Re-apply clinch/overtime convars on round 1 so trophy/clinch UI refreshes
             // immediately rather than waiting for round 2. Runs for ALL match types
-            // (scrim/hill/match) — match mode needs it so trophy reappears when
+            // (scrim/hill/match) - match mode needs it so trophy reappears when
             // transitioning back from scrim/hill where clinch was disabled.
             if (isMatchLive)
             {
@@ -2488,7 +2488,7 @@ namespace MatchZy
                 }
                 player.PrintToChat($" {ChatColors.Grey}Full list in console → .mhelp");
 
-                // Console output (unchanged — detailed practice docs)
+                // Console output (unchanged - detailed practice docs)
                 player.PrintToConsole("=== Practice Mode Command List ===\n");
                 player.PrintToConsole("\n【Spawn Point Operations】\n" + ".spawn <number>  Teleport to the specified competitive spawn point of your team\n" + ".ctspawn <number>  Teleport to the specified CT competitive spawn point (alias: .cts)\n" + ".tspawn <number>  Teleport to the specified T competitive spawn point (alias: .ts)\n" + ".bestspawn  Teleport to the nearest team spawn point\n" + ".worstspawn  Teleport to the farthest team spawn point\n" + ".bestctspawn  Teleport to the nearest CT spawn point\n" + ".worstctspawn  Teleport to the farthest CT spawn point\n" + ".besttspawn  Teleport to the nearest T spawn point\n" + ".worsttspawn  Teleport to the farthest T spawn point\n" + ".showspawns  Highlight all competitive spawn points\n" + ".hidespawns  Hide highlighted spawn points\n");
                 player.PrintToConsole("\n【Bot Control】\n" + ".bot  Add a bot at the player's current position\n" + ".crouchbot  Add a crouching bot at the player's current position (alias: .cbot)\n" + ".boost  Add a bot at the current position and boost the player on top of it\n" + ".crouchboost  Add a crouching bot and boost the player on top of it\n" + ".nobot  Remove the bot under the crosshair\n" + ".clearbots  Remove all bots\n");
@@ -2551,21 +2551,21 @@ namespace MatchZy
                 return;
             }
 
-            // ── KNIFE ROUND — SIDE SELECTION ──
+            // ── KNIFE ROUND - SIDE SELECTION ──
             if (isSideSelectionPhase)
             {
-                player!.PrintToChat($"{chatPrefix} {ChatColors.Gold}Knife Winner — Pick your side:");
-                player.PrintToChat($" {ChatColors.Green}.stay{ChatColors.Default} — Keep current side");
-                player.PrintToChat($" {ChatColors.Green}.switch{ChatColors.Default} — Swap sides");
-                player.PrintToChat($" {ChatColors.Green}.ct{ChatColors.Default} / {ChatColors.Green}.t{ChatColors.Default} — Choose specific side");
+                player!.PrintToChat($"{chatPrefix} {ChatColors.Gold}Knife Winner - Pick your side:");
+                player.PrintToChat($" {ChatColors.Green}.stay{ChatColors.Default} - Keep current side");
+                player.PrintToChat($" {ChatColors.Green}.switch{ChatColors.Default} - Swap sides");
+                player.PrintToChat($" {ChatColors.Green}.ct{ChatColors.Default} / {ChatColors.Green}.t{ChatColors.Default} - Choose specific side");
                 return;
             }
 
-            // ── MATCH LIVE — PAUSED ──
+            // ── MATCH LIVE - PAUSED ──
             if (matchStarted && isMatchLive && isPaused)
             {
                 player!.PrintToChat($"{chatPrefix} {ChatColors.Gold}Match Paused:");
-                player.PrintToChat($" {ChatColors.Green}.unpause{ChatColors.Default} — Request unpause (both teams must agree)");
+                player.PrintToChat($" {ChatColors.Green}.unpause{ChatColors.Default} - Request unpause (both teams must agree)");
                 if (isAdmin)
                 {
                     player.PrintToChat($" {ChatColors.Red}Admin:{ChatColors.Default} .fup (force unpause) .restore <round> .backupmenu");
@@ -2573,14 +2573,14 @@ namespace MatchZy
                 return;
             }
 
-            // ── MATCH LIVE — PLAYING ──
+            // ── MATCH LIVE - PLAYING ──
             if (matchStarted && isMatchLive)
             {
                 player!.PrintToChat($"{chatPrefix} {ChatColors.Gold}Match Live:");
                 player.PrintToChat($" {ChatColors.Green}Pause:{ChatColors.Default} .pause .tac .tech");
                 if (isStopCommandAvailable)
                 {
-                    player.PrintToChat($" {ChatColors.Green}Round:{ChatColors.Default} .stop (restore round — both teams agree)");
+                    player.PrintToChat($" {ChatColors.Green}Round:{ChatColors.Default} .stop (restore round - both teams agree)");
                 }
                 if (isAdmin)
                 {
@@ -3078,7 +3078,7 @@ namespace MatchZy
 
             // Read the ConVar live at consumption time. AutoStart fires ~1s after load / map start,
             // by which point any cfg (e.g. a mapchange script doing `matchzy_autostart_mode 2`) has
-            // fully exec'd — so this always reflects the intended mode, with no load-time snapshot race.
+            // fully exec'd - so this always reflects the intended mode, with no load-time snapshot race.
             autoStartMode = autoStartModeCvar.Value;
 
             Log($"[AutoStart] autoStartMode: {autoStartMode}");
@@ -3167,7 +3167,7 @@ namespace MatchZy
         // The full-body throw/lean pose (post-AG2 / Animation Graph 2.0) cannot
         // be cleared from here: it lives in m_pGraphInstanceAG2, which CSS does
         // not expose (no SetAnimGraphParameter, and bumping the serialized-recipe
-        // version + networked dirty flags has no visible effect — tested). The
+        // version + networked dirty flags has no visible effect - tested). The
         // reliable fix is to rebuild the pawn via Respawn(); see
         // RespawnAndTeleport, which the teleport commands now route through.
         public static void ResetPlayerCrouch(CCSPlayerController? player, bool wantDucked = false)
@@ -3212,7 +3212,7 @@ namespace MatchZy
         // Experimental flicker-free nade-restore mode (matchzy_nade_pose_flicker_free).
         // false (default) = proven 1-frame knife bounce (tiny knife flash, always clears
         // the pose). true = same-frame reselect (no knife flash, but only clears the pose
-        // if the SelectItem holster cancels the throw gesture synchronously — untested per
+        // if the SelectItem holster cancels the throw gesture synchronously - untested per
         // build, toggle live to compare).
         public static bool nadePoseFlickerFree = false;
 
@@ -3223,13 +3223,13 @@ namespace MatchZy
             var pawn = player.PlayerPawn.Value;
 
             // Teleport with the FULL lineup angle: this snaps the LOCAL player's VIEW to the throw
-            // pitch/yaw (the client owns its own view, so only a teleport can force it) — required
+            // pitch/yaw (the client owns its own view, so only a teleport can force it) - required
             // to actually reproduce the lineup aim.
             pawn.Teleport(position, angle, new Vector(0, 0, 0));
             // Issue MatchZy-Enhanced#10: the same teleport also writes the pitch into the model's
             // transform, tilting the WHOLE body sideways at steep angles (look up → .last/.back →
             // you see your own sprawled body). Flatten the model back to yaw-only. Must flatten the
-            // SOURCE rotation (m_angRotation / node.Rotation), NOT the derived AbsRotation — the anim
+            // SOURCE rotation (m_angRotation / node.Rotation), NOT the derived AbsRotation - the anim
             // system recomputes AbsRotation from the source every tick, so flattening AbsRotation
             // alone is clobbered. Re-apply over a few frames while the teleport rotation settles.
             FlattenBodyRotationFrames(player, angle.Y, 6);
@@ -3253,12 +3253,12 @@ namespace MatchZy
                 if (IsGrenadeClassname(deployWeapon!))
                 {
                     // CRITICAL: do NOT deploy the grenade with SelectItem subType=0. On a
-                    // grenade that makes the engine THROW it — that was the .loadnade
+                    // grenade that makes the engine THROW it - that was the .loadnade
                     // auto-throw (the owned smoke was launched mid-restore, dead into the
                     // wall at tight corners). Deploy the KNIFE first via SelectItem (a knife
                     // never throws; its full-body idle clears the frozen throw pose, issue
                     // #391), then next frame give the nade if it was consumed and draw it via
-                    // SelectItem subType=4 (reselect/redeploy — a real deploy animation with
+                    // SelectItem subType=4 (reselect/redeploy - a real deploy animation with
                     // NO throw), so a later manual throw fires from the proper deploy state.
                     // Fall back to the EquipWeaponByName pointer switch if SelectItem is
                     // unavailable.
@@ -3311,7 +3311,7 @@ namespace MatchZy
         }
 
         // Engine weapon-select (CCSPlayer_WeaponServices::SelectItem(this, weapon,
-        // subType) — vtable slot 28/linux, 27/windows). This is the ONLY way to
+        // subType) - vtable slot 28/linux, 27/windows). This is the ONLY way to
         // deploy an already-owned weapon: it holsters the current weapon and
         // deploys the target (redraws viewmodel + plays the deploy anim, which
         // clears the frozen throw pose), with no GiveNamedItem (no-op when owned)
@@ -3333,7 +3333,7 @@ namespace MatchZy
             catch (Exception e)
             {
                 _selectItemOffset = SelectItemOffsetUnavailable;
-                Console.WriteLine("[MatchZy] CCSPlayer_WeaponServices_SelectItem offset missing from gamedata.json — falling back to pointer switch. " + e.Message);
+                Console.WriteLine("[MatchZy] CCSPlayer_WeaponServices_SelectItem offset missing from gamedata.json - falling back to pointer switch. " + e.Message);
             }
             return _selectItemOffset;
         }
@@ -3354,7 +3354,7 @@ namespace MatchZy
                 return false;
             // SelectItem(this, weapon, subType): 0 = normal select for a different weapon
             // (on a grenade this triggers the THROW). 4 = the reselect/redeploy path,
-            // used to draw a weapon with its deploy animation WITHOUT throwing — needed
+            // used to draw a weapon with its deploy animation WITHOUT throwing - needed
             // to put a restored grenade in hand so a later manual throw animates from the
             // proper deploy state (subType 0 / a pointer switch releases mid-windup).
             var wsHandle = ws.Handle;
@@ -3364,7 +3364,7 @@ namespace MatchZy
 
         // Remove every weapon of the given classname from the player's inventory.
         // Uses entity-IO "Kill" (the engine queues a clean delete) instead of
-        // CBaseEntity.Remove() — Remove() frees a still-networked weapon mid-frame
+        // CBaseEntity.Remove() - Remove() frees a still-networked weapon mid-frame
         // and crashes the server (WriteEnterPVS: GetEntServerClass failed). Returns
         // true if at least one matching weapon was scheduled for removal.
         public static bool RemoveWeaponByName(CCSPlayerController? player, string classname)
@@ -3392,7 +3392,7 @@ namespace MatchZy
             var node = pawn.CBodyComponent?.SceneNode;
             if (node == null)
                 return;
-            // Flatten the SOURCE rotation (m_angRotation) — the anim system derives AbsRotation
+            // Flatten the SOURCE rotation (m_angRotation) - the anim system derives AbsRotation
             // from this each tick, so flattening the source is what actually holds the body flat.
             node.Rotation.X = 0f;
             node.Rotation.Y = yaw;
