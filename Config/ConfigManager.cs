@@ -195,6 +195,11 @@ matchzy_match_start_message """"
 // Set to 0 for G5API Tournament Servers (Get5 will handle map rotation)
 // Note: If using G5API, this is automatically detected and disabled, but you can override here if needed
 matchzy_match_end_auto_changelevel 1
+
+// Whether MatchZy responds to the css_map console command (!map). Default value: true
+// Disable (set to false) if another plugin such as CS2-SimpleAdmin owns css_map, to avoid a double map change / command conflict.
+// The .map chat command stays available regardless of this setting.
+matchzy_map_console_command_enabled true
 ",
 
                 [ConfigFiles.Paths.Dryrun] =
@@ -1072,8 +1077,22 @@ ammo_grenade_limit_total 4
                 foreach (var rawLine in existing.Split('\n'))
                 {
                     var line = rawLine.Trim();
-                    if (line.Length == 0 || line.StartsWith("//"))
+                    if (line.Length == 0)
                     {
+                        continue;
+                    }
+                    if (line.StartsWith("//"))
+                    {
+                        // Treat a commented-out cvar (e.g. "// matchzy_x true") as present so
+                        // we do not re-append something the admin deliberately disabled. Only
+                        // when the cvar name is the FIRST token after //, not a passing mention
+                        // in prose (e.g. "// Example matchzy_hostname_format ...").
+                        var commented = line.TrimStart('/').Trim();
+                        var commentedName = commented.Split(new[] { ' ', '\t' }, 2)[0];
+                        if (commentedName.StartsWith("matchzy_", StringComparison.OrdinalIgnoreCase))
+                        {
+                            existingCvars.Add(commentedName);
+                        }
                         continue;
                     }
                     var name = line.Split(new[] { ' ', '\t' }, 2)[0];
