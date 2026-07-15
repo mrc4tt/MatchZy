@@ -16,7 +16,7 @@ namespace MatchZy
     public partial class MatchZy : BasePlugin
     {
         public override string ModuleName => "MatchZy";
-        public override string ModuleVersion => "0.8.51";
+        public override string ModuleVersion => "0.8.52";
         public override string ModuleAuthor => "WD- Edited by Miksen @ FSHOST.me";
         public override string ModuleDescription => "A plugin for running and managing CS2 practice/pugs/scrims/matches!";
         public string chatPrefix = $"{ChatColors.Green}[MatchZy]{ChatColors.Default}";
@@ -84,13 +84,13 @@ namespace MatchZy
         // Admin Data
         private Dictionary<string, string> loadedAdmins = new Dictionary<string, string>();
 
-        // Cached ConVar references — looked up once, avoid per-frame string lookups
+        // Cached ConVar references - looked up once, avoid per-frame string lookups
         private ConVar? _cvTvEnable = null;
         private ConVar? _cvMatchRestartDelay = null;
         private ConVar? _cvMatchEndChangelevel = null;
         private ConVar? _cvMatchEndRestart = null;
 
-        // Cached CCSTeam entity references — refreshed on map start, avoids entity scan per event
+        // Cached CCSTeam entity references - refreshed on map start, avoids entity scan per event
         private CCSTeam? _cachedCtTeam = null;
         private CCSTeam? _cachedTTeam = null;
 
@@ -126,7 +126,7 @@ namespace MatchZy
         public CounterStrikeSharp.API.Modules.Timers.Timer? readyStatusHintTimer = null;
         public CounterStrikeSharp.API.Modules.Timers.Timer? matchEndMapChangeTimer = null;
 
-        // Ready status hint — event-driven with dirty flag to avoid per-second recomputation
+        // Ready status hint - event-driven with dirty flag to avoid per-second recomputation
         private bool _readyStatusDirty = true;
         private string _cachedReadyHintMessage = "";
 
@@ -260,7 +260,7 @@ namespace MatchZy
             // open from CS2_SimpleAdmin + MatchZy main-thread open during Load
             // segfaulted in EnsureConnectionOpen). The Database type now serializes
             // its own connection access, so DB-dependent calls elsewhere are safe
-            // to fire before this completes — they will block on the lock.
+            // to fire before this completes - they will block on the lock.
             string moduleDir = ModuleDirectory;
             string gameDir = Server.GameDirectory;
             _ = Task.Run(async () =>
@@ -276,7 +276,7 @@ namespace MatchZy
             });
             // Wrap startup config/ConVar/AutoStart init in try/catch. A throw anywhere
             // here (missing/locked cfg file, transient I/O error, null ConVar) would
-            // otherwise propagate out of Load() and make CSS abort the plugin load —
+            // otherwise propagate out of Load() and make CSS abort the plugin load -
             // the observed "sometimes the plugin doesn't load". Treat as non-fatal.
             try
             {
@@ -308,7 +308,7 @@ namespace MatchZy
                 reverseTeamSides["CT"] = matchzyTeam1;
                 reverseTeamSides["TERRORIST"] = matchzyTeam2;
 
-                // Cache ConVar references once — avoids per-frame string-based lookups
+                // Cache ConVar references once - avoids per-frame string-based lookups
                 _cvTvEnable = ConVar.Find("tv_enable");
                 _cvMatchRestartDelay = ConVar.Find("mp_match_restart_delay");
                 _cvMatchEndChangelevel = ConVar.Find("mp_match_end_changelevel");
@@ -319,7 +319,7 @@ namespace MatchZy
                     // Initial autostart for the already-running map. OnMapStart does not
                     // replay for the map that was loaded before the plugin, so this timer
                     // is the only initial trigger. Use the same 1.0s delay + entity refresh
-                    // as the OnMapStart path: 0.1s was too early — config.cfg exec hadn't
+                    // as the OnMapStart path: 0.1s was too early - config.cfg exec hadn't
                     // applied (stale autoStartMode) and team entities weren't ready yet
                     // (AutoStart → StartWarmup touches entities → intermittent NRE).
                     AddTimer(
@@ -642,7 +642,7 @@ namespace MatchZy
                             isDryRun = false;
 
                             // CRITICAL: Do NOT call StartPracticeMode() or mp_restartgame synchronously
-                            // inside EventRoundEnd — the engine is mid-round-transition and player/entity
+                            // inside EventRoundEnd - the engine is mid-round-transition and player/entity
                             // state is not stable. Defer to a short timer so the round end completes cleanly.
                             AddTimer(
                                 0.5f,
@@ -712,7 +712,7 @@ namespace MatchZy
 
             // Practice side-switch (.t/.ct/.spec) suicide must not count as a death. This Post
             // handler fires AFTER the engine has incremented the death stat, so decrementing here
-            // lands on the same tick — the scoreboard never settles on the +1.
+            // lands on the same tick - the scoreboard never settles on the +1.
             RegisterEventHandler<EventPlayerDeath>(
                 (@event, info) =>
                 {
@@ -725,7 +725,7 @@ namespace MatchZy
                     var ms = victim.ActionTrackingServices?.MatchStats;
                     if (ms != null)
                         ms.Deaths = Math.Max(0, ms.Deaths - 1);
-                    // Suicide also docks a point — give it back so the switch is score-neutral.
+                    // Suicide also docks a point - give it back so the switch is score-neutral.
                     victim.Score += 1;
                     return HookResult.Continue;
                 }
@@ -1074,11 +1074,11 @@ namespace MatchZy
                         return HookResult.Continue;
                     }
 
-                    // Handling player commands — exact match first, then prefix-based
+                    // Handling player commands - exact match first, then prefix-based
                     if (commandActions.TryGetValue(message, out var action))
                     {
                         action(player, null);
-                        // Exact match found — skip prefix checks (these commands take no args)
+                        // Exact match found - skip prefix checks (these commands take no args)
                         return HookResult.Continue;
                     }
 
