@@ -1636,8 +1636,6 @@ namespace MatchZy
             // Collect match stats JSON on main thread (accesses native APIs like Server.MapName)
             MatchStatsJson? matchStatsForExport = CollectMatchStatsForExport(demoFilename ?? string.Empty, t1score, t2score, playerStatsListTeam1, playerStatsListTeam2);
 
-            ShowMatchSummaryPanel(matchStatsForExport, t1score, t2score, winnerName);
-
             // Capture matchId before async context - liveMatchId may be reset to -1 by ResetMatch
             long matchId = liveMatchId;
 

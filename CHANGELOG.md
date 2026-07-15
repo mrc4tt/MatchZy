@@ -14,6 +14,7 @@ Fork version numbering is independent of upstream. Upstream changelog: <https://
 - Fixed practice smoke rethrow (`.rt` / `.throwsmoke`) dropping the smoke dead at the spawn origin. Smoke was excluded from the velocity-apply path.
 - Fixed `.loadnade` / `.back` / `.last` auto-throwing the restored grenade (dead into a wall at tight lineups); the pose-clear now redeploys the nade without triggering a throw.
 - Fixed `.savenade` storing the position 4 units above the real stance, which made loadnade lineups release from the wrong height.
+- Removed the end-of-match summary panel (the center-HTML MVP / clutch / top-frag panel) and its `matchzy_match_summary_panel` and `matchzy_match_summary_panel_duration` convars.
 
 # 0.8.51
 
