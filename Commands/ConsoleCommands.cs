@@ -965,6 +965,25 @@ namespace MatchZy
             Server.PrintToChatAll($"{adminChatPrefix} {message}");
         }
 
+        [ConsoleCommand("css_map", "Changes the map (map name or workshop id)")]
+        public void OnMapCommand(CCSPlayerController? player, CommandInfo? command)
+        {
+            if (command == null)
+                return;
+            // Another plugin (e.g. CS2-SimpleAdmin) may own css_map. When disabled,
+            // MatchZy's console handler no-ops so !map does not trigger a second map
+            // change / conflict. The .map chat command stays available regardless
+            // (see HandleMapChangeCommand dispatch in EventPlayerChat).
+            if (!mapConsoleCommandEnabled.Value)
+                return;
+            if (command.ArgCount < 2)
+            {
+                ReplyToUserCommand(player, Localizer.ForPlayer(player, "matchzy.cc.usage", "css_map <map name/id>"));
+                return;
+            }
+            HandleMapChangeCommand(player, command.GetArg(1));
+        }
+
         [ConsoleCommand("css_scrim", "Starts scrim mode")]
         [ConsoleCommand("css_playout", "Starts scrim mode")]
         [ConsoleCommand("css_po", "Starts scrim mode")]

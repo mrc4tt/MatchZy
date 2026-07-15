@@ -1127,12 +1127,41 @@ namespace MatchZy
                 return;
             }
 
-            if (!long.TryParse(mapName, out _) && !mapName.Contains('_'))
+            mapName = (mapName ?? string.Empty).Trim();
+            if (string.IsNullOrEmpty(mapName))
             {
-                mapName = "de_" + mapName;
+                ReplyToUserCommand(player, Localizer.ForPlayer(player, "matchzy.cc.usage", ".map <map name/id>"));
+                return;
             }
 
-            // Stop demo recording before map change to prevent GOTV crash
+            // A purely numeric argument is a Steam Workshop published-file id.
+            bool isWorkshopId = long.TryParse(mapName, out _);
+
+            string targetMap = mapName.ToLower();
+            if (!isWorkshopId)
+            {
+                // Resolve a NAMED map to one the server actually has BEFORE any teardown:
+                // try the name as given, then a "de_" prefix so a bare "mirage" -> "de_mirage"
+                // (but "cs_office"/"ar_baggage"/workshop-mounted names validate as-is). Upstream
+                // stops the demo + kicks bots BEFORE validating, so a typo leaves the server torn
+                // down with no map change and the recording lost — validate first, act second.
+                if (!Server.IsMapValid(targetMap))
+                {
+                    string prefixed = "de_" + targetMap;
+                    if (Server.IsMapValid(prefixed))
+                    {
+                        targetMap = prefixed;
+                    }
+                    else
+                    {
+                        ReplyToUserCommand(player, Localizer["matchzy.cc.invalidmap"]);
+                        return;
+                    }
+                }
+            }
+
+            // Validated named map (or a workshop id) — safe to tear down and change now.
+            // Stop demo recording before map change to prevent GOTV crash.
             if (isDemoRecording)
             {
                 Server.ExecuteCommand("tv_stoprecord");
@@ -1140,22 +1169,18 @@ namespace MatchZy
             }
             Server.ExecuteCommand("bot_kick");
 
+            Log($"[MapChange] Changing map to '{targetMap}' (workshop={isWorkshopId})");
+            PrintToAllChat(Localizer["matchzy.utility.changingmap", targetMap]);
+
             // Capture for lambda
-            string targetMap = mapName;
+            string finalMap = targetMap;
+            bool finalIsWorkshop = isWorkshopId;
             Server.NextFrame(() =>
             {
-                if (long.TryParse(targetMap, out _))
-                {
-                    Server.ExecuteCommand($"host_workshop_map \"{targetMap}\"");
-                }
-                else if (Server.IsMapValid(targetMap))
-                {
-                    Server.ExecuteCommand($"changelevel \"{targetMap}\"");
-                }
+                if (finalIsWorkshop)
+                    Server.ExecuteCommand($"host_workshop_map \"{finalMap}\"");
                 else
-                {
-                    ReplyToUserCommand(player, $"Invalid map name!");
-                }
+                    Server.ExecuteCommand($"changelevel \"{finalMap}\"");
             });
         }
 

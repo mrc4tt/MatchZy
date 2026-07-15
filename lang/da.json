@@ -119,6 +119,7 @@
     "matchzy.utility.readyplayers": "Nuværende klare spillere: {green}{0}{default}",
     "matchzy.utility.minimumreadyplayers": "Minimum antal klare spillere påkrævet {green}{0}{default}, nuværende klare spillere: {green}{1}{default}",
     "matchzy.utility.matchstarted": "Kortet kan ikke ændres, når kampen er startet!",
+    "matchzy.utility.changingmap": "Skifter bane til {green}{0}{default}...",
     "matchzy.utility.minreadyplayers": "Minimum antal klare spillere, der kræves for at starte kampen, er nu sat til: {0}",
     "matchzy.utility.rrinvalidvalue": "Ugyldig værdi for readyrequired. Angiv venligst et gyldigt ikke-negativt tal. Brug: !readyrequired <antal_krævede_spillere>",
     "matchzy.utility.currentreadyrequired": "Nuværende klar påkrævet: {0}. Brug: !readyrequired <antal_krævede_spillere>",

@@ -125,6 +125,7 @@
     "matchzy.utility.readyplayers": "Currently ready players: {green}{0}{silver}",
     "matchzy.utility.minimumreadyplayers": "Minimum ready players required {green}{0}{silver}, current: {green}{1}{silver}",
     "matchzy.utility.matchstarted": "Cannot change map once the match has started!",
+    "matchzy.utility.changingmap": "Changing map to {green}{0}{default}...",
     "matchzy.utility.minreadyplayers": "Minimum players required to start the match has been set to: {0}",
     "matchzy.utility.rrinvalidvalue": "Invalid value for readyrequired. Please enter a valid non-negative number. Syntax: !readyrequired <number>",
     "matchzy.utility.currentreadyrequired": "Current ready players: {0}. Syntax: !readyrequired <number>",

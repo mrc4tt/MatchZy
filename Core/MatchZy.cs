@@ -1098,6 +1098,14 @@ namespace MatchZy
                         HandleAdminSayCommand(player, messageCommandArg);
                     }
 
+                    // .map chat command is always available (dot-prefix, no clash with a
+                    // css_map from CS2-SimpleAdmin). The console css_map is separately
+                    // gated by matchzy_map_console_command_enabled.
+                    if (message.StartsWith(".map"))
+                    {
+                        HandleMapChangeCommand(player, messageCommandArg);
+                    }
+
                     if (message.StartsWith(".stats"))
                     {
                         HandleStatsCommand(player, messageCommandArg);

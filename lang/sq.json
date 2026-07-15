@@ -125,6 +125,7 @@
     "matchzy.utility.readyplayers": "Lojtarët aktualisht gati: {green}{0}{silver}",
     "matchzy.utility.minimumreadyplayers": "Kërkohet numri minimal i lojtarëve gati {green}{0}{silver}, aktual: {green}{1}{silver}",
     "matchzy.utility.matchstarted": "Nuk mund të ndryshohet harta pasi ndeshja të ketë filluar!",
+    "matchzy.utility.changingmap": "Duke ndryshuar hartën në {green}{0}{default}...",
     "matchzy.utility.minreadyplayers": "Numri minimal i lojtarëve të kërkuar për të filluar ndeshjen është vendosur në: {0}",
     "matchzy.utility.rrinvalidvalue": "Vlerë e pavlefshme për readyrequired. Ju lutem shkruani një numër të vlefshëm jo-negativ. Sintaksa: !readyrequired <numër>",
     "matchzy.utility.currentreadyrequired": "Lojtarët aktualë gati: {0}. Sintaksa: !readyrequired <numër>",
