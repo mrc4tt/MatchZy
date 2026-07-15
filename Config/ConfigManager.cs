@@ -184,6 +184,15 @@ matchzy_hostname_format """"
 // Whether to show damage report after each round or not. Default: true.
 matchzy_enable_damage_report true
 
+// Ready-status display style. 0 = classic center text, 1 = HTML READY-UP panel (progress bar, per-player status). Default: 1
+matchzy_ready_hint_style 1
+
+// In HTML style (1), hide the native CS2 'WARMUP' HUD banner during the ready phase so it does not compete with the panel. Set false if it disrupts warmup. Default: true
+matchzy_ready_hide_warmup_hud true
+
+// Whether the HTML 'READY UP' panel blinks the 'YOU ARE NOT READY' line to grab attention (style 1 only). Default: false
+matchzy_ready_hint_blink false
+
 // Message to show when the match starts. Use $$$ to break message into multiple lines. Set to """" to disable.
 // Available variables: {TIME}, {MATCH_ID}, {MAP}, {MAPNUMBER}, {TEAM1}, {TEAM2}, {TEAM1_SCORE}, {TEAM2_SCORE}
 // Available Colors: {Default}, {Darkred}, {Green}, {LightYellow}, {LightBlue}, {Olive}, {Lime}, {Red}, {Purple}, {Grey}, {Yellow}, {Gold}, {Silver}, {Blue}, {DarkBlue}

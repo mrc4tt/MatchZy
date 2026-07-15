@@ -16,7 +16,7 @@ namespace MatchZy
     public partial class MatchZy : BasePlugin
     {
         public override string ModuleName => "MatchZy";
-        public override string ModuleVersion => "0.8.52";
+        public override string ModuleVersion => "0.8.53";
         public override string ModuleAuthor => "WD- Edited by Miksen @ FSHOST.me";
         public override string ModuleDescription => "A plugin for running and managing CS2 practice/pugs/scrims/matches!";
         public string chatPrefix = $"{ChatColors.Green}[MatchZy]{ChatColors.Default}";
@@ -530,6 +530,15 @@ namespace MatchZy
             });
 
             RegisterListener<Listeners.OnEntitySpawned>(OnEntitySpawnedHandler);
+            // Ready-panel HTML render: runs every tick but early-outs cheaply unless the ready
+            // phase is active (matchzy_ready_hint_style = 1). Per-tick re-send keeps the panel
+            // solid. NOTE: a ClientPrint suppression hook to hide the native "WARMUP" HUD was
+            // tried and removed - the WARMUP banner is a client-side Panorama element driven by
+            // m_bWarmupPeriod, NOT a server ClientPrint (verified in libserver.so: the "WARMUP"
+            // string has no server xref), so no print hook can suppress it. The hook only spammed
+            // the DynoHook "could not allocate trampoline" error for zero benefit.
+            RegisterListener<Listeners.OnTick>(RenderReadyPanel);
+
             RegisterEventHandler<EventPlayerTeam>(
                 (@event, info) =>
                 {

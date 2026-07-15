@@ -75,6 +75,19 @@ public partial class MatchZy
                 AddTimer(1.0f, () => CheckAutoResumeOrAutoPause());
             }
 
+            // Discoverability: point admins at the help commands shortly after they join,
+            // so they don't have to already know a command exists (recurring support ticket).
+            // Admins only. Delayed so it lands after the join/connect chat spam; re-validate.
+            AddTimer(4.0f, () =>
+            {
+                if (!IsHumanPlayerValid(player))
+                    return;
+                if (IsPlayerAdmin(player, "", "@css/config", "@css/map", "@custom/prac"))
+                {
+                    PrintToPlayerChat(player, $"{ChatColors.Gold}Admin:{ChatColors.Default} type {ChatColors.Green}.help{ChatColors.Default} for the current mode's commands, {ChatColors.Green}.mhelp{ChatColors.Default} for the full admin guide, {ChatColors.Green}.ma{ChatColors.Default} for the admin menu.");
+                }
+            });
+
             return HookResult.Continue;
         }
         catch (Exception e)

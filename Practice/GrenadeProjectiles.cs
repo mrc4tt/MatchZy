@@ -6,29 +6,27 @@ namespace MatchZy;
 
 public static class GrenadeFunctions
 {
-    public static bool IsLinux => RuntimeInformation.IsOSPlatform(OSPlatform.Linux);
+    // Grenade projectile Create factories, resolved by key from the fork's gamedata.json (single
+    // source of truth - byte signatures live only in gamedata.json, never in this source, so they
+    // self-heal on a CS2 update by regenerating the entry with no MatchZy rebuild). Guard() keeps
+    // resolution off the crash path: a throw in a static field initializer surfaces as a
+    // TypeInitializationException before Load() and makes CSS skip the whole plugin, so a missing
+    // key degrades a factory to null (the caller skips the rethrow) instead of taking MatchZy down.
+    private static TFunc? Guard<TFunc>(Func<TFunc> make) where TFunc : class
+    {
+        try { return make(); }
+        catch { return null; }
+    }
 
-    // CSmokeGrenadeProjectile::Create
-    private const string CSmokeGrenadeProjectile_Create_Linux = @"55 4C 89 C1 48 89 E5 41 57 49 89 FF 41 56 45 89 CE";
-    private const string CSmokeGrenadeProjectile_Create_Windows = @"48 8B C4 48 89 58 ? 48 89 68 ? 48 89 70 ? 57 41 56 41 57 48 81 EC ? ? ? ? 48 8B B4 24 ? ? ? ? 4D 8B F8";
+    public static readonly MemoryFunctionWithReturn<IntPtr, IntPtr, IntPtr, IntPtr, IntPtr, int, int, CSmokeGrenadeProjectile>? CSmokeGrenadeProjectile_CreateFunc =
+        Guard(() => new MemoryFunctionWithReturn<IntPtr, IntPtr, IntPtr, IntPtr, IntPtr, int, int, CSmokeGrenadeProjectile>(GameData.GetSignature("CSmokeGrenadeProjectile_Create")));
 
-    // CHEGrenadeProjectile::Create
-    private const string CHEGrenadeProjectile_Create_Linux = "55 4C 89 C1 48 89 E5 41 57 49 89 FF 41 56 49 89 D6";
-    private const string CHEGrenadeProjectile_Create_Windows = "48 89 5C 24 08 48 89 6C 24 10 48 89 74 24 18 57 48 83 EC 50 48 8B AC 24 80 00 00 00 49 8B F8";
+    public static readonly MemoryFunctionWithReturn<IntPtr, IntPtr, IntPtr, IntPtr, IntPtr, int, CHEGrenadeProjectile>? CHEGrenadeProjectile_CreateFunc =
+        Guard(() => new MemoryFunctionWithReturn<IntPtr, IntPtr, IntPtr, IntPtr, IntPtr, int, CHEGrenadeProjectile>(GameData.GetSignature("CHEGrenadeProjectile_Create")));
 
-    // CMolotovProjectile::Create
-    private const string CMolotovProjectile_Create_Linux = "55 48 8D 05 ? ? ? ? 48 89 E5 41 57 41 56 41 55 41 54 49 89 FC 53 48 81 EC ? ? ? ? 4C 8D 35 ? ? ? ?";
-    private const string CMolotovProjectile_Create_Windows = "48 8B C4 48 89 58 10 4C 89 40 18 48 89 48 08";
+    public static readonly MemoryFunctionWithReturn<IntPtr, IntPtr, IntPtr, IntPtr, IntPtr, int, CMolotovProjectile>? CMolotovProjectile_CreateFunc =
+        Guard(() => new MemoryFunctionWithReturn<IntPtr, IntPtr, IntPtr, IntPtr, IntPtr, int, CMolotovProjectile>(GameData.GetSignature("CMolotovProjectile_Create")));
 
-    // CDecoyProjectile::Create
-    private const string CDecoyProjectile_Create_Linux = "55 4C 89 C1 48 89 E5 41 57 45 89 CF 41 56 49 89 FE 41 55 49 89 D5 48 89 F2 48 89 FE 41 54 48 8D 3D ? ? ? ? 4D 89 C4 53 48 83 EC ? E8 ? ? ? ? 45 31 C0";
-    private const string CDecoyProjectile_Create_Windows = "48 8B C4 55 56 48 81 EC 68 01 00 00";
-
-    public static MemoryFunctionWithReturn<IntPtr, IntPtr, IntPtr, IntPtr, IntPtr, int, int, CSmokeGrenadeProjectile> CSmokeGrenadeProjectile_CreateFunc = new(IsLinux ? CSmokeGrenadeProjectile_Create_Linux : CSmokeGrenadeProjectile_Create_Windows);
-
-    public static MemoryFunctionWithReturn<IntPtr, IntPtr, IntPtr, IntPtr, IntPtr, int, CHEGrenadeProjectile> CHEGrenadeProjectile_CreateFunc = new(IsLinux ? CHEGrenadeProjectile_Create_Linux : CHEGrenadeProjectile_Create_Windows);
-
-    public static MemoryFunctionWithReturn<IntPtr, IntPtr, IntPtr, IntPtr, IntPtr, int, CMolotovProjectile> CMolotovProjectile_CreateFunc = new(IsLinux ? CMolotovProjectile_Create_Linux : CMolotovProjectile_Create_Windows);
-
-    public static MemoryFunctionWithReturn<IntPtr, IntPtr, IntPtr, IntPtr, IntPtr, int, CDecoyProjectile> CDecoyProjectile_CreateFunc = new(IsLinux ? CDecoyProjectile_Create_Linux : CDecoyProjectile_Create_Windows);
+    public static readonly MemoryFunctionWithReturn<IntPtr, IntPtr, IntPtr, IntPtr, IntPtr, int, CDecoyProjectile>? CDecoyProjectile_CreateFunc =
+        Guard(() => new MemoryFunctionWithReturn<IntPtr, IntPtr, IntPtr, IntPtr, IntPtr, int, CDecoyProjectile>(GameData.GetSignature("CDecoyProjectile_Create")));
 }

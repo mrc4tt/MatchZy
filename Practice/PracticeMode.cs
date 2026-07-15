@@ -135,24 +135,24 @@ namespace MatchZy
         public string practiceCfgPath => MatchZyCfgRel("prac.cfg");
         public string dryrunCfgPath => MatchZyCfgRel("dryrun.cfg");
 
-        //		private readonly static Func<CCSGameRules, nint> CCSGameRules_PostCleanUp =
-        //			new MemoryFunctionWithReturn<CCSGameRules, nint>("55 48 89 E5 41 57 41 56 41 55 41 54 53 48 81 EC ? ? ? ? 48 89 BD ? ? ? ? E8 ? ? ? ? 66 83 F8").Invoke;
-        // 55 48 89 e5 41 57 41 56 ?? ?? 41 54 53 48 81 EC A8 10 00 00
-
-        // Lazy + guarded so the memory-signature scan runs on first practice use,
-        // NOT during MatchZy's static initialization. A throwing scan in a static
-        // field initializer surfaces as a TypeInitializationException while CSS is
-        // instantiating the plugin (before Load(), outside every try/catch) and makes
-        // CSS skip the whole plugin - the intermittent "MatchZy didn't auto-load,
-        // need css_plugins load MatchZy" boot failure. The scan can fail transiently
-        // at boot (server modules not fully mapped yet) or permanently (game update
-        // shifted the pattern); either way keep it off the load path and degrade
-        // gracefully to a no-op.
+        // Resolved by key from the fork's gamedata.json (single source of truth) - the byte
+        // signature lives ONLY in gamedata.json, never in this source, so it self-heals on a CS2
+        // update by regenerating the gamedata entry (no code change / rebuild of MatchZy). The
+        // fork ships its own gamedata.json, so every server running it carries the key.
+        //
+        // Lazy + guarded so the lookup runs on first practice use, NOT during MatchZy's static
+        // initialization. A throwing resolve in a static field initializer surfaces as a
+        // TypeInitializationException while CSS is instantiating the plugin (before Load(),
+        // outside every try/catch) and makes CSS skip the whole plugin - the intermittent
+        // "MatchZy didn't auto-load, need css_plugins load MatchZy" boot failure. If the key is
+        // somehow absent (server on an older fork build), GetSignature throws and we degrade to a
+        // no-op (breakrestore reports "unavailable" instead of crashing).
         private static readonly Lazy<Func<CCSGameRules, nint>?> CCSGameRules_PostCleanUp = new(() =>
         {
             try
             {
-                return new MemoryFunctionWithReturn<CCSGameRules, nint>("55 48 89 E5 41 57 49 89 FF 41 56 41 55 41 54 53 48 81 EC ? ? ? ? E8 ? ? ? ? 66 83 F8").Invoke;
+                return new MemoryFunctionWithReturn<CCSGameRules, nint>(
+                    GameData.GetSignature("CCSGameRules_PostCleanUp")).Invoke;
             }
             catch
             {
@@ -186,6 +186,13 @@ namespace MatchZy
             // Kill ready status hint timer
             readyStatusHintTimer?.Kill();
             readyStatusHintTimer = null;
+
+            // Undo the ready-phase HUD manipulation before loading prac.cfg. The panel forces
+            // m_bWarmupPeriod=false + m_bGameRestart (to hide WARMUP + stop flashing); left set,
+            // a stuck m_bGameRestart makes the game think a restart is already running, so
+            // prac.cfg's mp_restartgame/mp_warmup_start are ignored (round never restarts, warmup
+            // time wrong). Reset to a clean warmup baseline first.
+            RestoreReadyPhaseGameState();
 
             ClearClanTags();
 
@@ -2236,21 +2243,22 @@ namespace MatchZy
                 return;
 
             var gameRules = Utilities.FindAllEntitiesByDesignerName<CCSGameRulesProxy>("cs_gamerules").FirstOrDefault()?.GameRules;
-
-            if (gameRules != null)
+            if (gameRules == null)
             {
-                var postCleanUp = CCSGameRules_PostCleanUp.Value;
-                if (postCleanUp != null)
-                {
-                    postCleanUp(gameRules);
-                    ReplyToUserCommand(player, $" {ChatColors.Yellow}Breakable props respawned!");
-                }
-                else
-                {
-                    ReplyToUserCommand(player, $" {ChatColors.Red}Breakable respawn unavailable (signature not resolved).");
-                    Log("[OnBreakRestoreCommand] CCSGameRules_PostCleanUp signature unresolved - breakrestore skipped.");
-                }
+                ReplyToUserCommand(player, $" {ChatColors.Red}Breakable respawn unavailable (game rules not found).");
+                return;
             }
+
+            var postCleanUp = CCSGameRules_PostCleanUp.Value;
+            if (postCleanUp == null)
+            {
+                ReplyToUserCommand(player, $" {ChatColors.Red}Breakable respawn unavailable (signature not resolved).");
+                Log("[OnBreakRestoreCommand] CCSGameRules_PostCleanUp signature unresolved - breakrestore skipped.");
+                return;
+            }
+
+            postCleanUp(gameRules);
+            ReplyToUserCommand(player, $" {ChatColors.Yellow}Breakable props respawned!");
         }
 
         [ConsoleCommand("css_break", "Breaks the breakable entities")]

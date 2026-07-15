@@ -150,7 +150,7 @@ namespace MatchZy
                         loadedAdmins[sid] = kvp.Value;
                 }
 
-                Log($"[LoadAdmins] Loaded {loadedAdmins.Count} admin(s) from '{filePath}'.");
+                Log($"[LoadAdmins] Loaded {loadedAdmins.Count} admin(s).");
             }
             catch (Exception e)
             {
@@ -255,58 +255,226 @@ namespace MatchZy
             }
         }
 
+        // Cached ready-panel DATA (recomputed only on change). Localized HTML is built per
+        // player each tick so every player sees the panel in their own language.
+        private int _rpReady, _rpRequired, _rpTotal, _rpFilled, _rpCtCount, _rpCtReady, _rpTCount, _rpTReady;
+        private string _rpWaiting = "";
+        private uint _readyTickCounter;
+        // Last HTML sent to each player (by userid). The panel is only re-sent when its content
+        // changes (or on a slow keepalive) so PrintToCenterHtml does not re-trigger its show
+        // animation every tick - that per-tick re-fire is what makes the panel flash.
+        private readonly Dictionary<int, string> _lastPanelHtml = new();
+        // Cached gamerules proxy for the ready-phase HUD sync (re-fetched when invalid, e.g. after
+        // a map change). Avoids a FindAllEntitiesByDesignerName scan every tick.
+        private CCSGameRulesProxy? _readyProxy;
+        // True while the ready phase runs a "fake warmup" (real warmup is forced off to hide the
+        // banner, so warmup behaviour - no round end, respawn, no time expiry - is re-created via
+        // convars). Reset when leaving the ready phase so it never leaks into live play.
+        private bool _fakeWarmupActive;
+
+        // Recompute the shared ready numbers only when ready status changed.
+        private void ComputeReadyData()
+        {
+            if (!_readyStatusDirty)
+                return;
+
+            int readyCount = 0, totalPlayers = 0;
+            List<string> notReady = new();
+            foreach (var key in playerReadyStatus.Keys)
+            {
+                if (playerData.TryGetValue(key, out var p) && p != null && p.IsValid)
+                {
+                    // Only T/CT - spectators aren't part of the ready gate.
+                    if (p.TeamNum != 2 && p.TeamNum != 3)
+                        continue;
+                    totalPlayers++;
+                    if (playerReadyStatus[key])
+                        readyCount++;
+                    else
+                        notReady.Add(p.PlayerName);
+                }
+            }
+
+            _rpReady = readyCount;
+            _rpTotal = totalPlayers;
+            _rpRequired = minimumReadyRequired > 0 ? minimumReadyRequired : totalPlayers;
+            _rpFilled = Math.Clamp((int)Math.Round(12.0 * readyCount / Math.Max(1, _rpRequired)), 0, 12);
+            (_rpCtCount, _rpCtReady) = GetTeamPlayerCount((int)CsTeam.CounterTerrorist);
+            (_rpTCount, _rpTReady) = GetTeamPlayerCount((int)CsTeam.Terrorist);
+
+            string list = string.Join(", ", notReady.Take(6));
+            if (notReady.Count > 6)
+                list += $" +{notReady.Count - 6}";
+            _rpWaiting = notReady.Count > 0 ? System.Net.WebUtility.HtmlEncode(list) : "";
+
+            // Classic plain-center message (style 0) - built here so the 1s timer just broadcasts it.
+            string line1 = Localizer["matchzy.hint.waitingforplayers", _rpReady, _rpTotal];
+            string line2 = Localizer["matchzy.hint.usereadycommand"];
+            _cachedReadyHintMessage = _rpWaiting.Length > 0
+                ? $"{line1}\n{line2}\nNotReady: {list}"
+                : $"{line1}\n{line2}";
+
+            _readyStatusDirty = false;
+        }
+
+        // Undo the ready-phase HUD manipulation (forced m_bWarmupPeriod=false / m_bGameRestart)
+        // before switching to a non-ready mode. A leaked m_bGameRestart makes the engine think a
+        // restart is in progress, so the next mode's mp_restartgame/mp_warmup_start are ignored
+        // (e.g. practice: prac.cfg loads but the round never restarts and warmup time is wrong).
+        // The mode's own cfg (mp_warmup_start / mp_warmup_end) then takes over cleanly.
+        private void RestoreReadyPhaseGameState()
+        {
+            _readyProxy = null;
+            // Clear the fake-warmup flag without resetting its convars - the next mode's cfg
+            // (e.g. prac.cfg) sets round conditions / respawn itself, so it defines the final state.
+            _fakeWarmupActive = false;
+            var p = Utilities.FindAllEntitiesByDesignerName<CCSGameRulesProxy>("cs_gamerules").FirstOrDefault();
+            if (p?.GameRules == null)
+                return;
+            p.GameRules.GameRestart = false;
+            p.GameRules.WarmupPeriod = true;
+            Utilities.SetStateChanged(p, "CCSGameRulesProxy", "m_pGameRules");
+        }
+
+        // 1s timer: keep data fresh, re-assert clan tags ([READY]/[UNREADY] scoreboard), and
+        // - in classic style (matchzy_ready_hint_style 0) - broadcast the plain center text.
         private void SendReadyStatusHintMessage()
         {
             if (!readyAvailable || matchStarted)
                 return;
-
             try
             {
-                // Only recompute when ready status actually changed (connect/disconnect/ready/unready)
-                if (_readyStatusDirty)
-                {
-                    int readyCount = 0;
-                    int totalPlayers = 0;
-                    List<string> notReady = new();
-
-                    foreach (var key in playerReadyStatus.Keys)
-                    {
-                        if (playerData.TryGetValue(key, out var player) && player != null && player.IsValid)
-                        {
-                            // Only T/CT - spectators aren't part of the ready gate.
-                            if (player.TeamNum != 2 && player.TeamNum != 3)
-                                continue;
-
-                            totalPlayers++;
-                            if (playerReadyStatus[key])
-                                readyCount++;
-                            else
-                                notReady.Add(player.PlayerName);
-                        }
-                    }
-
-                    string line1 = Localizer["matchzy.hint.waitingforplayers", readyCount, totalPlayers];
-                    string line2 = Localizer["matchzy.hint.usereadycommand"];
-                    // Fold not-ready names into the repeating hint so the list persists
-                    // (a one-shot center print gets overwritten by this hint every 3s).
-                    _cachedReadyHintMessage = notReady.Count > 0
-                        ? $"{line1}\n{line2}\nNotReady: {string.Join(", ", notReady)}"
-                        : $"{line1}\n{line2}";
-                    _readyStatusDirty = false;
-                }
-
-                // Re-assert clan tags every tick. A single SetStateChanged can be missed
-                // by a client holding the scoreboard open, so periodic re-assert converges.
-                // The `player.Clan != clanTag` guard inside makes this a no-op once synced.
+                ComputeReadyData();
                 HandleClanTags();
 
-                // Broadcast cached message (center HUD text expires after a few seconds, so repeat is still needed)
-                VirtualFunctions.ClientPrintAll(HudDestination.Center, _cachedReadyHintMessage, 0, 0, 0, 0, 0);
+                if (readyHintStyle.Value == 0)
+                    VirtualFunctions.ClientPrintAll(HudDestination.Center, _cachedReadyHintMessage, 0, 0, 0, 0, 0);
             }
             catch (Exception)
             {
-                // Silently catch if server isn't ready yet
-                // Timer will retry on next tick
+                // Server not ready yet; retried on the next tick.
+            }
+        }
+
+        // OnTick: re-send the center HTML panel EVERY tick so the native "WARMUP" HUD (from
+        // mp_warmup_pausetimer) cannot flicker through it. Rendered per player and localized,
+        // so each sees the panel in their own language with their OWN ready state highlighted.
+        private void RenderReadyPanel()
+        {
+            if (!readyAvailable || matchStarted || readyHintStyle.Value != 1)
+            {
+                // Left the ready phase (or classic style) - drop the fake-warmup override so it
+                // never leaks into live play. Fires within a tick of matchStarted flipping, well
+                // inside the knife/live freezetime, so the round conditions are normal before play.
+                if (_fakeWarmupActive)
+                {
+                    Server.ExecuteCommand("mp_ignore_round_win_conditions 0; mp_respawn_on_death_ct 0; mp_respawn_on_death_t 0");
+                    _fakeWarmupActive = false;
+                }
+                return;
+            }
+            try
+            {
+                ComputeReadyData();
+                _readyTickCounter++;
+
+                // Ready-phase HUD sync (per tick):
+                //  - Hide the native "WARMUP" banner: m_bWarmupPeriod=false hides the client HUD
+                //    netvar while the plugin ready gate still holds players.
+                //  - Anti-flash: with warmup forced off, the center HTML panel becomes subject to
+                //    CS2's game-restart HUD flashing, so sync m_bGameRestart to (RestartRoundTime <
+                //    now). Technique from Ghost23161/FlashingHtmlHudFix. One SetStateChanged on
+                //    m_pGameRules (not a specific field - that fails offset resolution) covers both.
+                if (_readyProxy == null || !_readyProxy.IsValid)
+                    _readyProxy = Utilities.FindAllEntitiesByDesignerName<CCSGameRulesProxy>("cs_gamerules").FirstOrDefault();
+                var gr = _readyProxy?.GameRules;
+                if (gr != null)
+                {
+                    bool changed = false;
+                    if (readyHideWarmupHud.Value && gr.WarmupPeriod)
+                    {
+                        gr.WarmupPeriod = false;
+                        changed = true;
+                        if (!_fakeWarmupActive)
+                        {
+                            // Forcing real warmup off (to hide the banner) also disables warmup
+                            // behaviour - the round would start counting and could end. Re-create a
+                            // "fake warmup" so the ready phase still plays like warmup: round never
+                            // ends, no time expiry, respawn on death. Reset on leaving ready (above).
+                            Server.ExecuteCommand("mp_ignore_round_win_conditions 1; mp_respawn_on_death_ct 1; mp_respawn_on_death_t 1; mp_roundtime 60; mp_roundtime_defuse 60; mp_roundtime_hostage 60");
+                            _fakeWarmupActive = true;
+                        }
+                    }
+                    if (!gr.WarmupPeriod)
+                    {
+                        bool expectedRestart = gr.RestartRoundTime < Server.CurrentTime;
+                        if (gr.GameRestart != expectedRestart)
+                        {
+                            gr.GameRestart = expectedRestart;
+                            changed = true;
+                        }
+                    }
+                    if (changed)
+                        Utilities.SetStateChanged(_readyProxy!, "CCSGameRulesProxy", "m_pGameRules");
+                }
+
+                // Blink = alternate the NOT-READY line visible/hidden ~twice a second when
+                // matchzy_ready_hint_blink is on; always visible otherwise.
+                bool notReadyVisible = !readyHintBlinkEnabled.Value || (_readyTickCounter % 64 < 40);
+                // Keepalive: force a re-send about every 2s so the 5s panel never expires even if
+                // the content is unchanged. Between keepalives we only send on content change.
+                bool keepalive = (_readyTickCounter % 128 == 0);
+
+                // Computed fresh each render (not cached in ComputeReadyData): switching
+                // .match/.scrim/.hill during the ready phase flips these flags WITHOUT setting
+                // _readyStatusDirty (StartScrimMode early-returns in warmup), so a cached mode
+                // would go stale. It is only a few bool reads.
+                string mode = isMatchSetup ? "Match Setup"
+                    : isPlayOutEnabled2 ? "Hill"
+                    : isPlayOutEnabled ? "Scrim"
+                    : "Match";
+
+                string bar =
+                    $"<font class='fontSize-m' color='#37ff8b'>{new string('█', _rpFilled)}</font>" +
+                    $"<font class='fontSize-m' color='#3a3a3a'>{new string('█', 12 - _rpFilled)}</font>";
+
+                foreach (var target in Utilities.GetPlayers())
+                {
+                    if (target == null || !target.IsValid || target.IsBot || target.IsHLTV || !target.UserId.HasValue)
+                        continue;
+
+                    var sb = new StringBuilder();
+                    sb.Append($"<font class='fontSize-l' color='#ffcf3f'>{Localizer.ForPlayer(target, "matchzy.ready.title")}</font><br>");
+                    sb.Append($"<font class='fontSize-sm' color='#c8c8c8'>{Localizer.ForPlayer(target, "matchzy.ready.mode", mode)}</font><br>");
+                    sb.Append($"{bar} <font class='fontSize-m' color='#ffffff'>{_rpReady} / {_rpRequired}</font><br>");
+                    sb.Append($"<font class='fontSize-sm' color='#9ecbff'>CT {_rpCtReady}/{_rpCtCount}</font><font class='fontSize-sm' color='#ffffff'> &nbsp; </font><font class='fontSize-sm' color='#ffb36b'>T {_rpTReady}/{_rpTCount}</font>");
+                    if (_rpWaiting.Length > 0)
+                        sb.Append($"<br><font class='fontSize-sm' color='#9a9a9a'>{Localizer.ForPlayer(target, "matchzy.ready.waitingon", _rpWaiting)}</font>");
+
+                    bool isPlaying = target.TeamNum == 2 || target.TeamNum == 3;
+                    if (isPlaying)
+                    {
+                        if (playerReadyStatus.TryGetValue(target.UserId.Value, out bool isReady) && isReady)
+                            sb.Append($"<br><font class='fontSize-m' color='#37ff8b'>&#10004; {Localizer.ForPlayer(target, "matchzy.ready.youready")}</font>");
+                        else if (notReadyVisible)
+                            sb.Append($"<br><font class='fontSize-m' color='#ff3b3b'>&#10008; {Localizer.ForPlayer(target, "matchzy.ready.notready")}</font>");
+                        else
+                            sb.Append("<br><font class='fontSize-m' color='#ff3b3b'>&nbsp;</font>"); // blink off-frame: keep height
+                    }
+
+                    // Only re-send when the content changed (or on the keepalive tick). Re-sending
+                    // identical HTML every tick re-triggers the panel's show animation -> flashing.
+                    string html = sb.ToString();
+                    int uid = target.UserId.Value;
+                    if (!keepalive && _lastPanelHtml.TryGetValue(uid, out var prev) && prev == html)
+                        continue;
+                    _lastPanelHtml[uid] = html;
+                    target.PrintToCenterHtml(html, 5);
+                }
+            }
+            catch (Exception)
+            {
+                // Server not ready yet; retried on the next tick.
             }
         }
 
@@ -398,9 +566,10 @@ namespace MatchZy
             unreadyPlayerMessageTimer = null;
             //unreadyPlayerMessageTimer ??= AddTimer(chatTimerDelay, SendUnreadyPlayersMessage, TimerFlags.REPEAT);
 
-            // Start the ready status hint message timer (3s - HUD text stays visible ~5s)
+            // Ready-status HTML panel: re-send every 1s (each print lasts ~2s, so it stays
+            // solid with overlap) and drive the optional blink on the NOT-READY line.
             readyStatusHintTimer?.Kill();
-            readyStatusHintTimer = AddTimer(3, SendReadyStatusHintMessage, TimerFlags.REPEAT);
+            readyStatusHintTimer = AddTimer(1.0f, SendReadyStatusHintMessage, TimerFlags.REPEAT);
 
             isWarmup = true;
             _readyStatusDirty = true; // Force recompute on warmup start
@@ -2536,15 +2705,42 @@ namespace MatchZy
                 (int ctCount, int ctReady) = GetTeamPlayerCount((int)CsTeam.CounterTerrorist);
                 (int tCount, int tReady) = GetTeamPlayerCount((int)CsTeam.Terrorist);
 
-                string knifeStatus = isKnifeRequired ? $"{ChatColors.Green}ON" : $"{ChatColors.Red}OFF";
+                int totalReady = playerReadyStatus.Count(kv => kv.Value);
+                var unready = playerReadyStatus
+                    .Where(kv => !kv.Value && playerData.ContainsKey(kv.Key))
+                    .Select(kv => playerData[kv.Key].PlayerName)
+                    .ToList();
+                string knifeStatus = isKnifeRequired ? $"{ChatColors.Green}ON{ChatColors.Default}" : $"{ChatColors.Red}OFF{ChatColors.Default}";
 
-                player!.PrintToChat($"{chatPrefix} {ChatColors.Gold}Waiting for players:");
-                player.PrintToChat($" {ChatColors.Green}Ready:{ChatColors.Default} .ready .unready .forceready");
-                player.PrintToChat($" {ChatColors.Default}Status: CT {ChatColors.Green}{ctReady}/{ctCount}{ChatColors.Default} | T {ChatColors.Green}{tReady}/{tCount}");
-                player.PrintToChat($" {ChatColors.Default}Knife: {knifeStatus}");
+                player!.PrintToChat($"{chatPrefix} {ChatColors.Gold}Waiting for players to ready up");
+                player.PrintToChat($" {ChatColors.Green}.ready{ChatColors.Default} to ready up, {ChatColors.Green}.unready{ChatColors.Default} to cancel");
+
+                if (minimumReadyRequired > 0)
+                {
+                    int need = Math.Max(0, minimumReadyRequired - totalReady);
+                    string needTxt = need > 0
+                        ? $"{ChatColors.Red}need {need} more{ChatColors.Default}"
+                        : $"{ChatColors.Green}ready to start!{ChatColors.Default}";
+                    player.PrintToChat($" Ready: {ChatColors.Green}{totalReady}/{minimumReadyRequired}{ChatColors.Default} ({needTxt}) | CT {ctReady}/{ctCount} | T {tReady}/{tCount}");
+                }
+                else
+                {
+                    player.PrintToChat($" Ready: CT {ChatColors.Green}{ctReady}/{ctCount}{ChatColors.Default} | T {ChatColors.Green}{tReady}/{tCount}{ChatColors.Default} {ChatColors.Grey}(all players must ready)");
+                }
+
+                player.PrintToChat($" Knife: {knifeStatus}");
+
+                if (unready.Count > 0)
+                {
+                    string list = string.Join(", ", unready.Take(6));
+                    if (unready.Count > 6)
+                        list += $" +{unready.Count - 6}";
+                    player.PrintToChat($" {ChatColors.Grey}Not ready: {list}");
+                }
+
                 if (isAdmin)
                 {
-                    player.PrintToChat($" {ChatColors.Red}Admin:{ChatColors.Default} .match .scrim .prac .knife .force");
+                    player.PrintToChat($" {ChatColors.Red}Admin:{ChatColors.Default} .match .scrim .prac .knife .forceready .force");
                 }
                 return;
             }
@@ -2596,8 +2792,14 @@ namespace MatchZy
             if (!IsPlayerValid(player))
                 return;
 
-            ReplyToUserCommand(player, "=== MatchZy Admin Commands Guide ===");
-            player!.PrintToChat($"{chatPrefix} Check console for full command list");
+            // Concise categorized summary in CHAT (admins rarely open console). The full
+            // detailed reference still goes to console below.
+            player!.PrintToChat($"{chatPrefix} {ChatColors.Gold}Admin Commands");
+            player.PrintToChat($" {ChatColors.Green}Modes:{ChatColors.Default} .match  .scrim  .prac  .dry  .warmup");
+            player.PrintToChat($" {ChatColors.Green}Setup:{ChatColors.Default} .ma (menu)  .matchsetup  .map <name>  .teamsize <n>  .knife");
+            player.PrintToChat($" {ChatColors.Green}Control:{ChatColors.Default} .start  .restart  .stop  .end  .restore <round>  .backupmenu");
+            player.PrintToChat($" {ChatColors.Green}Pause:{ChatColors.Default} .fp (force pause)  .fup (force unpause)  .tac  .tech");
+            player.PrintToChat($" {ChatColors.Grey}Full detailed list in console (press ` and scroll up).");
 
             // Send to console for detailed view
             player.PrintToConsole("\n" + new string('=', 50));

@@ -93,22 +93,22 @@ public class GrenadeThrownData
         {
             case "smoke":
             {
-                grenadeEntity = GrenadeFunctions.CSmokeGrenadeProjectile_CreateFunc.Invoke(Position.Handle, Angle.Handle, Velocity.Handle, Velocity.Handle, IntPtr.Zero, ItemIndex, (int)player.Team);
+                grenadeEntity = GrenadeFunctions.CSmokeGrenadeProjectile_CreateFunc?.Invoke(Position.Handle, Angle.Handle, Velocity.Handle, Velocity.Handle, IntPtr.Zero, ItemIndex, (int)player.Team);
                 break;
             }
             case "molotov":
             {
-                grenadeEntity = GrenadeFunctions.CMolotovProjectile_CreateFunc.Invoke(Position.Handle, Angle.Handle, Velocity.Handle, Velocity.Handle, IntPtr.Zero, ItemIndex);
+                grenadeEntity = GrenadeFunctions.CMolotovProjectile_CreateFunc?.Invoke(Position.Handle, Angle.Handle, Velocity.Handle, Velocity.Handle, IntPtr.Zero, ItemIndex);
                 break;
             }
             case "hegrenade":
             {
-                grenadeEntity = GrenadeFunctions.CHEGrenadeProjectile_CreateFunc.Invoke(Position.Handle, Angle.Handle, Velocity.Handle, Velocity.Handle, IntPtr.Zero, ItemIndex);
+                grenadeEntity = GrenadeFunctions.CHEGrenadeProjectile_CreateFunc?.Invoke(Position.Handle, Angle.Handle, Velocity.Handle, Velocity.Handle, IntPtr.Zero, ItemIndex);
                 break;
             }
             case "decoy":
             {
-                grenadeEntity = GrenadeFunctions.CDecoyProjectile_CreateFunc.Invoke(Position.Handle, Angle.Handle, Velocity.Handle, Velocity.Handle, IntPtr.Zero, ItemIndex);
+                grenadeEntity = GrenadeFunctions.CDecoyProjectile_CreateFunc?.Invoke(Position.Handle, Angle.Handle, Velocity.Handle, Velocity.Handle, IntPtr.Zero, ItemIndex);
                 break;
             }
             case "flash":
