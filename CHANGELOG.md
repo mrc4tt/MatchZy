@@ -12,6 +12,7 @@ Fork version numbering is independent of upstream. Upstream changelog: <https://
 - The native "WARMUP" HUD banner is now hidden during the ready phase (convar `matchzy_ready_hide_warmup_hud`, default `true`) so it no longer overlaps the ready panel. A "fake warmup" keeps the pre-match ready phase playing like warmup (round never ends, respawn on death, no round-time expiry) while the banner is hidden, and the center panel no longer flashes.
 - Fixed the ready panel showing the wrong mode: switching `.scrim` / `.hill` during warmup now updates the panel immediately, and `.hill` -> `.match` no longer leaves the server stuck in hill mode.
 - Practice grenade spawns and `.breakrestore` now resolve their signatures from the fork's `gamedata.json` by key instead of hardcoded byte patterns, so they self-heal on a CS2 update without a plugin rebuild.
+- `css_map` is now registered only when `matchzy_map_console_command_enabled` is `true`. Set it to `false` when another plugin (CS2MapChange, CS2-SimpleAdmin) owns `css_map`: MatchZy no longer registers the command at all, avoiding a ConCommand conflict that could block players from connecting. The `.map` chat command is unaffected.
 
 # 0.8.52
 

@@ -65,7 +65,7 @@ namespace MatchZy
 
         public FakeConVar<bool> asayConsoleEnabled = new("matchzy_asay_console_enabled", "Whether MatchZy responds to the css_asay console command (!asay, all-chat). Disable if another plugin such as CS2-SimpleAdmin owns css_asay, to avoid duplicate chat output. The .asay chat command stays available regardless. Default: true", true);
 
-        public FakeConVar<bool> mapConsoleCommandEnabled = new("matchzy_map_console_command_enabled", "Whether MatchZy responds to the css_map console command (!map). Disable if another plugin such as CS2-SimpleAdmin owns css_map, to avoid a double map change / command conflict. The .map chat command stays available regardless. Default: true", true);
+        public FakeConVar<bool> mapConsoleCommandEnabled = new("matchzy_map_console_command_enabled", "Whether MatchZy registers the css_map console command (!map). Set to false if another plugin such as CS2MapChange or CS2-SimpleAdmin owns css_map: MatchZy then does NOT register it, avoiding a ConCommand conflict that can block players from connecting. The .map chat command stays available regardless. Default: true", true);
 
         public FakeConVar<bool> coachDebugEnabled = new("matchzy_coach_debug", "Coach-spawn debug: logs/announces each real-player spawn reassignment, keeps coaches alive (no suicide) for inspection, and runs spawn enforcement during warmup so it can be tested with bots without starting a full match. Default: false", false);
 

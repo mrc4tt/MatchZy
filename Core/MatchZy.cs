@@ -303,6 +303,18 @@ namespace MatchZy
                     Server.ExecuteCommand($"execifexists {cfgFolderName}/{ConfigFiles.Paths.Config}");
                 }
 
+                // Register css_map dynamically (NOT via a [ConsoleCommand] attribute) and only when
+                // matchzy_map_console_command_enabled is true, so an admin running a dedicated map
+                // plugin (CS2MapChange / CS2-SimpleAdmin) can set it to 0 and MatchZy will not
+                // register css_map at all. Two plugins registering the same ConCommand otherwise
+                // conflict and can block players from connecting. Deferred so the config.cfg value
+                // is applied first. The .map chat command stays available regardless.
+                AddTimer(3.0f, () =>
+                {
+                    if (mapConsoleCommandEnabled.Value)
+                        AddCommand("css_map", "Changes the map (map name or workshop id)", (p, c) => OnMapCommand(p, c));
+                });
+
                 teamSides[matchzyTeam1] = "CT";
                 teamSides[matchzyTeam2] = "TERRORIST";
                 reverseTeamSides["CT"] = matchzyTeam1;

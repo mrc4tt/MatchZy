@@ -965,15 +965,15 @@ namespace MatchZy
             Server.PrintToChatAll($"{adminChatPrefix} {message}");
         }
 
-        [ConsoleCommand("css_map", "Changes the map (map name or workshop id)")]
+        // NOT a [ConsoleCommand] - registered dynamically in Load() only when
+        // matchzy_map_console_command_enabled is true (see the AddCommand there). This avoids a
+        // ConCommand-registration conflict with a dedicated map plugin (CS2MapChange /
+        // CS2-SimpleAdmin) that would block connections. The convar check below is kept as a
+        // defence in case the command is ever registered while disabled.
         public void OnMapCommand(CCSPlayerController? player, CommandInfo? command)
         {
             if (command == null)
                 return;
-            // Another plugin (e.g. CS2-SimpleAdmin) may own css_map. When disabled,
-            // MatchZy's console handler no-ops so !map does not trigger a second map
-            // change / conflict. The .map chat command stays available regardless
-            // (see HandleMapChangeCommand dispatch in EventPlayerChat).
             if (!mapConsoleCommandEnabled.Value)
                 return;
             if (command.ArgCount < 2)

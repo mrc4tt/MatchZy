@@ -205,8 +205,9 @@ matchzy_match_start_message """"
 // Note: If using G5API, this is automatically detected and disabled, but you can override here if needed
 matchzy_match_end_auto_changelevel 1
 
-// Whether MatchZy responds to the css_map console command (!map). Default value: true
-// Disable (set to false) if another plugin such as CS2-SimpleAdmin owns css_map, to avoid a double map change / command conflict.
+// Whether MatchZy registers the css_map console command (!map). Default value: true
+// Set to false if another plugin such as CS2MapChange or CS2-SimpleAdmin owns css_map: MatchZy then
+// does NOT register it, avoiding a ConCommand conflict that can block players from connecting.
 // The .map chat command stays available regardless of this setting.
 matchzy_map_console_command_enabled true
 ",
