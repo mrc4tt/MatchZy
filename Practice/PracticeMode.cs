@@ -3115,19 +3115,38 @@ namespace MatchZy
             }
         }
 
-        // [ConsoleCommand("css_color", "Set cl_color of current player")]
-        // public void OnColorCommand(CCSPlayerController? player, CommandInfo? command)
-        // {
-        //     if (!IsPlayerValid(player)) return;
+        // Valid competitive teammate colors (see GetPlayerTeammateColor). Anything else
+        // falls back to red, so we clamp input to this range.
+        private static readonly string[] CompColorNames = { "blue", "green", "yellow", "orange", "purple" };
 
-        //     if(command.ArgCount < 2){
-        //         PrintToPlayerChat(player, $"add number of color, same as cl_color <number>");
-        //         return;
-        //     }
+        [ConsoleCommand("css_color", "Set your competitive teammate color (0-4)")]
+        public void OnColorCommand(CCSPlayerController? player, CommandInfo? command)
+        {
+            if (!IsPlayerValid(player) || command == null)
+                return;
 
-        //     PrintToPlayerChat(player, $"color was: {player.CompTeammateColor}, set to: {command.ArgByIndex(1)}");
-        //     player.CompTeammateColor = int.Parse(command.ArgByIndex(1));
-        // }
+            // Guard: a valid int in 0..4. int.Parse threw on non-numeric input before,
+            // and out-of-range values networked as the red fallback.
+            if (command.ArgCount < 2
+                || !int.TryParse(command.ArgByIndex(1), out int color)
+                || color < 0 || color >= CompColorNames.Length)
+            {
+                PrintToPlayerChat(player!, $"Usage: css_color <0-{CompColorNames.Length - 1}>  ({string.Join(", ", CompColorNames.Select((c, i) => $"{i}={c}"))})");
+                return;
+            }
+
+            int previous = player!.CompTeammateColor;
+            if (color == previous)
+            {
+                PrintToPlayerChat(player, $"Teammate color is already {color} ({CompColorNames[color]}).");
+                return;
+            }
+
+            player.CompTeammateColor = color;
+            // Mark networked-dirty so the change actually propagates to clients.
+            Utilities.SetStateChanged(player, "CCSPlayerController", "m_iCompTeammateColor");
+            PrintToPlayerChat(player, $"Teammate color set to {color} ({CompColorNames[color]}).");
+        }
 
         public void TeleportPlayerToBestSpawn(CCSPlayerController player, byte teamNum)
         {
