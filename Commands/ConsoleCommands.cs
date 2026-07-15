@@ -1076,6 +1076,7 @@ namespace MatchZy
             }
 
             isPlayOutEnabled = false;
+            isPlayOutEnabled2 = false; // clear hill flag too, else .hill -> .match leaks hill mode
             StartMatchMode();
             // Apply clinch=1/overtime=1 from live.cfg NOW during warmup so client
             // trophy UI slot is allocated at warmup→knife/live phase transition.
