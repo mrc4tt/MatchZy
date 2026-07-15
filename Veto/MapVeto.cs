@@ -189,7 +189,7 @@ namespace MatchZy
             HandeMapBanCommand(player, mapArg);
         }
 
-        public void HandeMapBanCommand(CCSPlayerController player, string map)
+        public void HandeMapBanCommand(CCSPlayerController? player, string map)
         {
             if (!isVeto || SidePickPending() || player == null || map == null)
                 return;
@@ -224,7 +224,7 @@ namespace MatchZy
             }
         }
 
-        public void HandeMapPickCommand(CCSPlayerController player, string map)
+        public void HandeMapPickCommand(CCSPlayerController? player, string map)
         {
             if (!isVeto || SidePickPending() || player == null || map == null)
                 return;

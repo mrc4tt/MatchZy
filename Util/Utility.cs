@@ -81,6 +81,76 @@ namespace MatchZy
             }
         }
 
+        private void LoadAdmins()
+        {
+            string fileName = "MatchZy/admins.json";
+            string filePath = Path.Join(Server.GameDirectory + "/csgo/cfg", fileName);
+
+            if (File.Exists(filePath))
+            {
+                try
+                {
+                    using (StreamReader fileReader = File.OpenText(filePath))
+                    {
+                        string jsonContent = fileReader.ReadToEnd();
+                        if (!string.IsNullOrEmpty(jsonContent))
+                        {
+                            JsonSerializerOptions options = new()
+                            {
+                                AllowTrailingCommas = true,
+                            };
+                            loadedAdmins = JsonSerializer.Deserialize<Dictionary<string, string>>(jsonContent, options) ?? new Dictionary<string, string>();
+                        }
+                        else
+                        {
+                            // Handle the case where the JSON content is empty or null
+                            loadedAdmins = new Dictionary<string, string>();
+                        }
+                    }
+                    foreach (var kvp in loadedAdmins)
+                    {
+                        Log($"[ADMIN] Username: {kvp.Key}, Role: {kvp.Value}");
+                    }
+                }
+                catch (Exception e)
+                {
+                    Log($"[LoadAdmins FATAL] An error occurred: {e.Message}");
+                }
+            }
+            else
+            {
+                Log("[LoadAdmins] The JSON file does not exist. Creating one with default content");
+                Dictionary<string, string> defaultAdmins = new()
+                {
+                    { "steamid", "" }
+                };
+
+                try
+                {
+                    JsonSerializerOptions options = new()
+                    {
+                        WriteIndented = true,
+                    };
+                    string defaultJson = JsonSerializer.Serialize(defaultAdmins, options);
+                    string? directoryPath = Path.GetDirectoryName(filePath);
+                    if (directoryPath != null)
+                    {
+                        if (!Directory.Exists(directoryPath))
+                        {
+                            Directory.CreateDirectory(directoryPath);
+                        }
+                    }
+                    File.WriteAllText(filePath, defaultJson);
+
+                    Log("[LoadAdmins] Created a new JSON file with default content.");
+                }
+                catch (Exception e)
+                {
+                    Log($"[LoadAdmins FATAL] Error creating the JSON file: {e.Message}");
+                }
+            }
+        }
+
         private bool IsPlayerAdmin(CCSPlayerController? player, string command = "", params string[] permissions)
         {
             if (everyoneIsAdmin.Value)
