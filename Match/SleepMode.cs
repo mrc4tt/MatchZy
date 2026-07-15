@@ -8,7 +8,7 @@ namespace MatchZy
 {
     public partial class MatchZy
     {
-        public const string sleepCfgPath = "matchzy/sleep.cfg";
+        public string sleepCfgPath => MatchZyCfgRel("sleep.cfg");
 
         public void StartSleepMode()
         {

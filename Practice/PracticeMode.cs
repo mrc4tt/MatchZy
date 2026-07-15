@@ -132,8 +132,8 @@ namespace MatchZy
         public Dictionary<int, Dictionary<string, object>> pracUsedBots = new Dictionary<int, Dictionary<string, object>>();
         private readonly HashSet<int> _botsBeingProcessed = new();
 
-        public const string practiceCfgPath = "matchzy/prac.cfg";
-        public const string dryrunCfgPath = "matchzy/dryrun.cfg";
+        public string practiceCfgPath => MatchZyCfgRel("prac.cfg");
+        public string dryrunCfgPath => MatchZyCfgRel("dryrun.cfg");
 
         //		private readonly static Func<CCSGameRules, nint> CCSGameRules_PostCleanUp =
         //			new MemoryFunctionWithReturn<CCSGameRules, nint>("55 48 89 E5 41 57 41 56 41 55 41 54 53 48 81 EC ? ? ? ? 48 89 BD ? ? ? ? E8 ? ? ? ? 66 83 F8").Invoke;
@@ -388,7 +388,7 @@ namespace MatchZy
                 string nadeType = GetNadeType(playerPawn.WeaponServices!.ActiveWeapon.Value!.DesignerName);
 
                 // Define the file path
-                string savednadesfileName = "matchzy/savednades.json";
+                string savednadesfileName = MatchZyCfgRel("savednades.json");
                 string savednadesPath = Path.Join(Server.GameDirectory + "/csgo/cfg", savednadesfileName);
 
                 // Check if the file exists, if not, create it with an empty JSON object
@@ -477,7 +477,7 @@ namespace MatchZy
                 }
 
                 // Define the file path
-                string savednadesfileName = "matchzy/savednades.json";
+                string savednadesfileName = MatchZyCfgRel("savednades.json");
                 string savednadesPath = Path.Join(Server.GameDirectory + "/csgo/cfg", savednadesfileName);
 
                 try
@@ -558,7 +558,7 @@ namespace MatchZy
                         string currentMapName = Server.MapName;
 
                         // Define the file path
-                        string savednadesfileName = "matchzy/savednades.json";
+                        string savednadesfileName = MatchZyCfgRel("savednades.json");
                         string savednadesPath = Path.Join(Server.GameDirectory + "/csgo/cfg", savednadesfileName);
 
                         // Read existing JSON content
@@ -629,7 +629,7 @@ namespace MatchZy
                 return;
 
             // Define the file path
-            string savednadesfileName = "matchzy/savednades.json";
+            string savednadesfileName = MatchZyCfgRel("savednades.json");
             string savednadesPath = Path.Join(Server.GameDirectory + "/csgo/cfg", savednadesfileName);
 
             try
@@ -689,7 +689,7 @@ namespace MatchZy
                 string playerSteamID = player.SteamID.ToString();
 
                 // Define the file path
-                string savednadesfileName = "matchzy/savednades.json";
+                string savednadesfileName = MatchZyCfgRel("savednades.json");
                 string savednadesPath = Path.Join(Server.GameDirectory + "/csgo/cfg", savednadesfileName);
 
                 try

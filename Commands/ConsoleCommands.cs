@@ -919,7 +919,7 @@ namespace MatchZy
                     ExecUnpracCommands();
                     CleanupAllCollisionTimers();
                     Server.PrintToChatAll($"{chatPrefix} {ChatColors.Green}Admin{ChatColors.Default} has started the warmup round!");
-                    Server.ExecuteCommand($"exec matchzy/warmup.cfg;mp_freezetime 0");
+                    Server.ExecuteCommand($"exec {warmupCfgPath};mp_freezetime 0");
                 }
             }
             else

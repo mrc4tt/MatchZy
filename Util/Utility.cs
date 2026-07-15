@@ -20,12 +20,14 @@ namespace MatchZy
 {
     public partial class MatchZy
     {
-        public const string warmupCfgPath = "matchzy/warmup.cfg";
-        public const string knifeCfgPath = "matchzy/knife.cfg";
-        public const string liveCfgPath = "matchzy/live.cfg";
-        public const string liveWingmanCfgPath = "matchzy/live_wingman.cfg";
-        public const string scrimCfgPath = "matchzy/scrim.cfg";
-        public const string hillCfgPath = "matchzy/hill.cfg";
+        // Case-resolved relative cfg paths (e.g. "matchzy/warmup.cfg" or "MatchZy/warmup.cfg")
+        // — see MatchZyCfgRel. Computed so they follow the on-disk folder casing.
+        public string warmupCfgPath => MatchZyCfgRel("warmup.cfg");
+        public string knifeCfgPath => MatchZyCfgRel("knife.cfg");
+        public string liveCfgPath => MatchZyCfgRel("live.cfg");
+        public string liveWingmanCfgPath => MatchZyCfgRel("live_wingman.cfg");
+        public string scrimCfgPath => MatchZyCfgRel("scrim.cfg");
+        public string hillCfgPath => MatchZyCfgRel("hill.cfg");
 
         private void PrintToAllChat(string message)
         {
@@ -81,73 +83,78 @@ namespace MatchZy
             }
         }
 
+        // Single source of truth for the MatchZy config directory, resolved
+        // case-insensitively (reuses an existing "MatchZy" OR "matchzy", else defaults to
+        // lowercase "matchzy"). A server picks its casing simply by creating/naming that
+        // folder under csgo/cfg — every MatchZy file (cfgs, savednades, admins, whitelist)
+        // then lives in it consistently. Cached: the resolved name is stable per session.
+        private string? _matchZyCfgDirCache;
+        private string MatchZyCfgDir => _matchZyCfgDirCache ??= new ConfigManager().GetMatchZyCfgDir();
+        // Folder name only (e.g. "matchzy") — for `exec <name>/x.cfg` paths, which are
+        // relative to csgo/cfg.
+        private string MatchZyCfgDirName => Path.GetFileName(MatchZyCfgDir.TrimEnd('/', '\\'));
+        // Relative path for exec/execifexists and Path.Join(gamedir/csgo/cfg, ...): "<name>/<file>".
+        private string MatchZyCfgRel(string file) => $"{MatchZyCfgDirName}/{file}";
+
         private void LoadAdmins()
         {
-            string fileName = "MatchZy/admins.json";
-            string filePath = Path.Join(Server.GameDirectory + "/csgo/cfg", fileName);
+            // Reset first so a reload actually drops admins removed from the file
+            // (upstream mutated the field in place, leaving stale entries on reload).
+            loadedAdmins = new Dictionary<string, string>();
 
-            if (File.Exists(filePath))
+            string configDir = MatchZyCfgDir;
+            if (!Directory.Exists(configDir))
+                Directory.CreateDirectory(configDir);
+            string filePath = Path.Join(configDir, "admins.json");
+
+            if (!File.Exists(filePath))
             {
+                // Write a template so the file is discoverable and self-documenting. The
+                // placeholder key is non-numeric, so it never matches a real SteamID64.
                 try
                 {
-                    using (StreamReader fileReader = File.OpenText(filePath))
-                    {
-                        string jsonContent = fileReader.ReadToEnd();
-                        if (!string.IsNullOrEmpty(jsonContent))
-                        {
-                            JsonSerializerOptions options = new()
-                            {
-                                AllowTrailingCommas = true,
-                            };
-                            loadedAdmins = JsonSerializer.Deserialize<Dictionary<string, string>>(jsonContent, options) ?? new Dictionary<string, string>();
-                        }
-                        else
-                        {
-                            // Handle the case where the JSON content is empty or null
-                            loadedAdmins = new Dictionary<string, string>();
-                        }
-                    }
-                    foreach (var kvp in loadedAdmins)
-                    {
-                        Log($"[ADMIN] Username: {kvp.Key}, Role: {kvp.Value}");
-                    }
+                    Dictionary<string, string> template = new() { { "STEAM_ID_64_HERE", "" } };
+                    File.WriteAllText(filePath, JsonSerializer.Serialize(template, new JsonSerializerOptions { WriteIndented = true }));
+                    Log($"[LoadAdmins] No admins.json found — created a template at '{filePath}'.");
                 }
                 catch (Exception e)
                 {
-                    Log($"[LoadAdmins FATAL] An error occurred: {e.Message}");
+                    Log($"[LoadAdmins] Failed to create admins.json at '{filePath}': {e.Message}");
                 }
+                return;
             }
-            else
+
+            try
             {
-                Log("[LoadAdmins] The JSON file does not exist. Creating one with default content");
-                Dictionary<string, string> defaultAdmins = new()
+                string jsonContent = File.ReadAllText(filePath);
+                if (string.IsNullOrWhiteSpace(jsonContent))
                 {
-                    { "steamid", "" }
+                    Log($"[LoadAdmins] admins.json is empty at '{filePath}'.");
+                    return;
+                }
+
+                JsonSerializerOptions options = new()
+                {
+                    AllowTrailingCommas = true,
+                    ReadCommentHandling = JsonCommentHandling.Skip,
                 };
+                Dictionary<string, string> parsed = JsonSerializer.Deserialize<Dictionary<string, string>>(jsonContent, options) ?? new Dictionary<string, string>();
 
-                try
+                // Keep only real SteamID64 keys (17-digit numeric). IsPlayerAdmin compares
+                // against player.SteamID.ToString() (a SteamID64), so template/placeholder
+                // rows like "STEAM_ID_64_HERE" or "steamid" are dropped and can't grant admin.
+                foreach (var kvp in parsed)
                 {
-                    JsonSerializerOptions options = new()
-                    {
-                        WriteIndented = true,
-                    };
-                    string defaultJson = JsonSerializer.Serialize(defaultAdmins, options);
-                    string? directoryPath = Path.GetDirectoryName(filePath);
-                    if (directoryPath != null)
-                    {
-                        if (!Directory.Exists(directoryPath))
-                        {
-                            Directory.CreateDirectory(directoryPath);
-                        }
-                    }
-                    File.WriteAllText(filePath, defaultJson);
+                    string sid = kvp.Key.Trim();
+                    if (sid.Length == 17 && ulong.TryParse(sid, out _))
+                        loadedAdmins[sid] = kvp.Value;
+                }
 
-                    Log("[LoadAdmins] Created a new JSON file with default content.");
-                }
-                catch (Exception e)
-                {
-                    Log($"[LoadAdmins FATAL] Error creating the JSON file: {e.Message}");
-                }
+                Log($"[LoadAdmins] Loaded {loadedAdmins.Count} admin(s) from '{filePath}'.");
+            }
+            catch (Exception e)
+            {
+                Log($"[LoadAdmins] Failed to parse admins.json at '{filePath}': {e.Message}");
             }
         }
 
@@ -3492,7 +3499,7 @@ namespace MatchZy
 
         public bool HandlePlayerWhitelist(CCSPlayerController player, string steamId)
         {
-            string whitelistfileName = "matchzy/whitelist.cfg";
+            string whitelistfileName = MatchZyCfgRel("whitelist.cfg");
             string whitelistPath = Path.Join(Server.GameDirectory + "/csgo/cfg", whitelistfileName);
             string? directoryPath = Path.GetDirectoryName(whitelistPath);
             if (directoryPath != null)

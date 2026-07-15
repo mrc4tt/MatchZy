@@ -288,6 +288,10 @@ namespace MatchZy
                 configManager.InitializeConfigs();
                 mapRotationList = configManager.LoadMapRotation();
 
+                // Load MatchZy admins (admins.json). Was never called before, so
+                // loadedAdmins stayed empty and IsPlayerAdmin ignored the file.
+                LoadAdmins();
+
                 // Use the SAME case-resolved dir the configs were created in. Hardcoding
                 // lowercase "matchzy" here failed on case-sensitive Linux when the on-disk
                 // dir was e.g. "MatchZy" → execifexists skipped → config.cfg (demo_path etc.) ignored.
