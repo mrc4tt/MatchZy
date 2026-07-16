@@ -13,6 +13,12 @@ public class GrenadeThrownData
 
     public Vector Velocity { get; private set; }
 
+    // Angular velocity (spin) captured from the projectile at spawn. Separate from
+    // linear Velocity: applying linear velocity to AngVelocity spins the model wrong
+    // (spin is rad/s, launch is ~600-1000 u/s). Cosmetic - trajectory is driven by
+    // linear velocity + gravity - but replaying the real spin matches the original throw.
+    public Vector AngularVelocity { get; private set; }
+
     public Vector PlayerPosition { get; private set; }
 
     public QAngle PlayerAngle { get; private set; }
@@ -27,11 +33,14 @@ public class GrenadeThrownData
 
     public float DuckAmount { get; private set; }
 
-    public GrenadeThrownData(Vector nadePosition, QAngle nadeAngle, Vector nadeVelocity, Vector playerPosition, QAngle playerAngle, string grenadeType, DateTime thrownTime, UInt16 itemIndex, float duckAmount = 0.0f)
+    public GrenadeThrownData(Vector nadePosition, QAngle nadeAngle, Vector nadeVelocity, Vector playerPosition, QAngle playerAngle, string grenadeType, DateTime thrownTime, UInt16 itemIndex, float duckAmount = 0.0f, Vector? nadeAngularVelocity = null)
     {
         Position = new Vector(nadePosition.X, nadePosition.Y, nadePosition.Z);
         Angle = new QAngle(nadeAngle.X, nadeAngle.Y, nadeAngle.Z);
         Velocity = new Vector(nadeVelocity.X, nadeVelocity.Y, nadeVelocity.Z);
+        AngularVelocity = nadeAngularVelocity != null
+            ? new Vector(nadeAngularVelocity.X, nadeAngularVelocity.Y, nadeAngularVelocity.Z)
+            : new Vector(0.0f, 0.0f, 0.0f);
         PlayerPosition = new Vector(playerPosition.X, playerPosition.Y, playerPosition.Z);
         PlayerAngle = new QAngle(playerAngle.X, playerAngle.Y, playerAngle.Z);
         Type = grenadeType;
@@ -142,9 +151,11 @@ public class GrenadeThrownData
             grenadeEntity.InitialVelocity.Y = Velocity.Y;
             grenadeEntity.InitialVelocity.Z = Velocity.Z;
 
-            grenadeEntity.AngVelocity.X = Velocity.X;
-            grenadeEntity.AngVelocity.Y = Velocity.Y;
-            grenadeEntity.AngVelocity.Z = Velocity.Z;
+            // Apply the recorded spin, NOT the linear velocity (old bug: AngVelocity was
+            // set to Velocity, producing a wildly wrong model spin on rethrow).
+            grenadeEntity.AngVelocity.X = AngularVelocity.X;
+            grenadeEntity.AngVelocity.Y = AngularVelocity.Y;
+            grenadeEntity.AngVelocity.Z = AngularVelocity.Z;
 
             grenadeEntity.Teleport(Position, Angle, Velocity);
             grenadeEntity.Globalname = "custom";

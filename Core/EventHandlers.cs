@@ -316,6 +316,7 @@ public partial class MatchZy
                     Vector position = new(projectile.AbsOrigin!.X, projectile.AbsOrigin.Y, projectile.AbsOrigin.Z);
                     QAngle angle = new(projectile.AbsRotation!.X, projectile.AbsRotation.Y, projectile.AbsRotation.Z);
                     Vector velocity = new(projectile.AbsVelocity.X, projectile.AbsVelocity.Y, projectile.AbsVelocity.Z);
+                    Vector angularVelocity = new(projectile.AngVelocity.X, projectile.AngVelocity.Y, projectile.AngVelocity.Z);
                     string nadeType = Constants.ProjectileTypeMap[entity.Entity.DesignerName];
 
                     if (!lastGrenadesData.ContainsKey(client))
@@ -334,7 +335,7 @@ public partial class MatchZy
                         duckAmount = new CCSPlayer_MovementServices(player.PlayerPawn.Value.MovementServices.Handle).DuckAmount;
                     }
 
-                    GrenadeThrownData lastGrenadeThrown = new(position, angle, velocity, throwerSceneNode.AbsOrigin, player.PlayerPawn.Value.EyeAngles, nadeType, DateTime.Now, projectile.ItemIndex, duckAmount);
+                    GrenadeThrownData lastGrenadeThrown = new(position, angle, velocity, throwerSceneNode.AbsOrigin, player.PlayerPawn.Value.EyeAngles, nadeType, DateTime.Now, projectile.ItemIndex, duckAmount, angularVelocity);
 
                     nadeSpecificLastGrenadeData[client][nadeType] = lastGrenadeThrown;
                     lastGrenadesData[client].Add(lastGrenadeThrown);
