@@ -118,6 +118,25 @@ namespace MatchZy
     {
         int maxLastGrenadesSavedLimit = 512;
         Dictionary<int, List<GrenadeThrownData>> lastGrenadesData = new();
+        // Per-player cursor into lastGrenadesData for no-arg .back stepping (issue
+        // MatchZy-Enhanced#7 / CS:GO prac parity). Absent = not stepping yet: the first
+        // no-arg .back jumps to the newest nade, each subsequent press steps one older,
+        // and it stops at the oldest instead of wrapping. `.last` and `.back N` prime the
+        // cursor so the next no-arg .back steps from there. Reset on a new throw and on
+        // disconnect (indices renumber when the history is trimmed).
+        Dictionary<int, int> lastGrenadeBackCursor = new();
+        // Interactive spawn markers (issue MatchZy-Enhanced#9): while .showspawns beams
+        // are drawn, pressing +use aimed at a marker teleports to that spawn. activeSpawnMarkers
+        // mirrors the drawn beams (CT then T); spawnMarkersActive gates the OnPlayerButtonsChanged
+        // listener so it's a no-op when hidden / outside practice. Per-player use timestamp
+        // debounces a rapid/held +use so one press = one teleport.
+        bool spawnMarkersActive = false;
+        readonly List<Position> activeSpawnMarkers = new();
+        readonly Dictionary<int, float> lastSpawnMarkerUseTime = new();
+        const float spawnMarkerUseCooldown = 0.3f;      // seconds between accepted +use teleports
+        const float spawnMarkerAimMinDot = 0.985f;      // ~10 degree aim cone onto a marker
+        const float spawnMarkerStandRadiusSq = 8.0f * 8.0f;  // issue #11: only the spawn you're exactly on is excluded
+        const float spawnMarkerStandHeight = 90.0f;     // vertical band for the standing-on check
         Dictionary<int, Dictionary<string, GrenadeThrownData>> nadeSpecificLastGrenadeData = new();
         Dictionary<int, DateTime> lastGrenadeThrownTime = new();
         Dictionary<int, PlayerPracticeTimer> playerTimers = new();
@@ -321,7 +340,9 @@ namespace MatchZy
                         return;
                     if (player?.PlayerPawn?.IsValid == true && player.PlayerPawn.Value != null)
                     {
-                        player.PlayerPawn.Value.Teleport(spawnsData[teamNum][spawnNumber].PlayerPosition, spawnsData[teamNum][spawnNumber].PlayerAngle, new Vector(0, 0, 0));
+                        // Route through TeleportUpright so a steep spawn angle doesn't tilt the
+                        // whole body (issue MatchZy-Enhanced#8).
+                        TeleportUpright(player, spawnsData[teamNum][spawnNumber].PlayerPosition, spawnsData[teamNum][spawnNumber].PlayerAngle);
                     }
                     ReplyToUserCommand(player, Localizer.ForPlayer(player, "matchzy.pm.movedtospawn", $"{spawnNumber + 1}/{spawnsData[teamNum].Count}"));
                 }
@@ -823,11 +844,15 @@ namespace MatchZy
             beam.Width = 5;
             beam.Render = color;
 
-            beam.EndPos.X = spawn.PlayerPosition.X;
-            beam.EndPos.Y = spawn.PlayerPosition.Y;
+            // Lift the beam base +8u off the floor (issue MatchZy-Enhanced#11): at +0 the
+            // marker sinks under shallow water (e.g. de_ancient) and is invisible.
+            Vector basePos = new Vector(spawn.PlayerPosition.X, spawn.PlayerPosition.Y, spawn.PlayerPosition.Z + 8.0f);
+
+            beam.EndPos.X = basePos.X;
+            beam.EndPos.Y = basePos.Y;
             beam.EndPos.Z = spawn.PlayerPosition.Z + 100.0f;
 
-            beam.Teleport(spawn.PlayerPosition, new QAngle(0, 0, 0), new Vector(0, 0, 0));
+            beam.Teleport(basePos, new QAngle(0, 0, 0), new Vector(0, 0, 0));
 
             beam.DispatchSpawn();
         }
@@ -841,6 +866,11 @@ namespace MatchZy
                     continue;
                 beam.Remove();
             }
+            // Full teardown: also disarm the +use interaction. Every mode-transition path
+            // (match start, prac restart, sleep, map change) already calls RemoveSpawnBeams,
+            // so folding the flag/list reset here disarms interaction on all of them.
+            spawnMarkersActive = false;
+            activeSpawnMarkers.Clear();
         }
 
         [ConsoleCommand("css_god", "Sets Infinite health for player")]
@@ -2527,6 +2557,8 @@ namespace MatchZy
                     {
                         positionNumber -= 1;
                         lastGrenadesData[userId][positionNumber].LoadPosition(player);
+                        // Prime the cursor so a following no-arg .back steps older from here.
+                        lastGrenadeBackCursor[userId] = positionNumber;
                         // PrintToPlayerChat(player, $"Teleported to grenade of history position: {positionNumber+1}/{lastGrenadesData[userId].Count}");
                         PrintToPlayerChat(player, Localizer["matchzy.pm.tptogrenade", $"{positionNumber + 1}/{lastGrenadesData[userId].Count}"]);
                     }
@@ -2540,9 +2572,40 @@ namespace MatchZy
             }
             else
             {
-                int thrownCount = lastGrenadesData.ContainsKey(userId) ? lastGrenadesData[userId].Count : 0;
-                // ReplyToUserCommand(player, $"Usage: !back <number> (You've thrown {thrownCount} grenades till now)");
-                ReplyToUserCommand(player, Localizer["matchzy.pm.backtonumber", thrownCount]);
+                // No-arg .back: step iteratively backward through nade history (CS:GO prac
+                // parity, issue MatchZy-Enhanced#7). First press jumps to the newest nade;
+                // each subsequent press steps one older; at the oldest it stops (no wrap).
+                if (!lastGrenadesData.ContainsKey(userId) || lastGrenadesData[userId].Count <= 0)
+                {
+                    PrintToPlayerChat(player, Localizer.ForPlayer(player, "matchzy.pm.nothrownnades"));
+                    return;
+                }
+                int count = lastGrenadesData[userId].Count;
+                int cursor;
+                if (!lastGrenadeBackCursor.TryGetValue(userId, out cursor))
+                {
+                    // First press with no active cursor: jump to the most recent nade.
+                    cursor = count - 1;
+                }
+                else if (cursor <= 0)
+                {
+                    // Already at the oldest nade in history - don't wrap around.
+                    lastGrenadeBackCursor[userId] = 0;
+                    PrintToPlayerChat(player, Localizer.ForPlayer(player, "matchzy.pm.backatoldest"));
+                    return;
+                }
+                else
+                {
+                    // Step one grenade older.
+                    cursor -= 1;
+                }
+                // Defensive clamp: the history can only shrink from the front on a new throw,
+                // and a throw resets the cursor, so this should already be in range.
+                if (cursor >= count)
+                    cursor = count - 1;
+                lastGrenadeBackCursor[userId] = cursor;
+                lastGrenadesData[userId][cursor].LoadPosition(player);
+                PrintToPlayerChat(player, Localizer["matchzy.pm.tptogrenade", $"{cursor + 1}/{count}"]);
             }
         }
 
@@ -2773,6 +2836,8 @@ namespace MatchZy
                 return;
             }
             lastGrenadesData[userId].Last().LoadPosition(player);
+            // Prime the cursor at the newest nade so a following no-arg .back steps older.
+            lastGrenadeBackCursor[userId] = lastGrenadesData[userId].Count - 1;
         }
 
         [ConsoleCommand("css_back", "Teleports to the provided position in grenade thrown history")]
@@ -3114,17 +3179,94 @@ namespace MatchZy
         {
             if (!isPractice || !IsPlayerValid(player))
                 return;
-            RemoveSpawnBeams();
+            RemoveSpawnBeams();   // clears the flag + list too
             if (spawnsData.Values.Any(list => list.Count == 0))
                 GetSpawns();
             foreach (Position spawn in spawnsData[(byte)CsTeam.CounterTerrorist])
             {
                 ShowSpawnBeam(spawn, Color.Blue);
+                activeSpawnMarkers.Add(spawn);
             }
             foreach (Position spawn in spawnsData[(byte)CsTeam.Terrorist])
             {
                 ShowSpawnBeam(spawn, Color.Orange);
+                activeSpawnMarkers.Add(spawn);
             }
+            // Arm the +use teleport now that markers are drawn.
+            spawnMarkersActive = activeSpawnMarkers.Count > 0;
+            PrintToPlayerChat(player!, Localizer.ForPlayer(player, "matchzy.pm.spawnmarkerson"));
+        }
+
+        // +use onto a drawn spawn marker teleports to that spawn (issue MatchZy-Enhanced#9).
+        // Registered as an OnPlayerButtonsChanged listener so it fires once on the rising edge
+        // of the Use button - no per-tick polling. Gated on spawnMarkersActive so it's a no-op
+        // whenever markers are hidden or we're not in practice.
+        private void OnSpawnMarkerButtonHandler(CCSPlayerController player, PlayerButtons pressed, PlayerButtons released)
+        {
+            if (!spawnMarkersActive || !isPractice)
+                return;
+            if ((pressed & PlayerButtons.Use) == 0)
+                return;
+            if (!IsPlayerValid(player) || player.IsBot || !player.UserId.HasValue)
+                return;
+            if (player.TeamNum != (byte)CsTeam.CounterTerrorist && player.TeamNum != (byte)CsTeam.Terrorist)
+                return;
+            var pawn = player.PlayerPawn.Value;
+            if (pawn == null || pawn.AbsOrigin == null)
+                return;
+
+            int uid = player.UserId.Value;
+            float now = Server.CurrentTime;
+            if (lastSpawnMarkerUseTime.TryGetValue(uid, out float last) && now - last < spawnMarkerUseCooldown)
+                return;
+
+            // Eye position + forward unit vector from the view angles.
+            Vector origin = pawn.AbsOrigin;
+            Vector eye = new Vector(origin.X, origin.Y, origin.Z + 64.0f);
+            QAngle ang = pawn.EyeAngles;
+            double pitch = ang.X * Math.PI / 180.0;
+            double yaw = ang.Y * Math.PI / 180.0;
+            var forwardX = (float)(Math.Cos(pitch) * Math.Cos(yaw));
+            var forwardY = (float)(Math.Cos(pitch) * Math.Sin(yaw));
+            var forwardZ = (float)(-Math.Sin(pitch));
+
+            int bestIndex = -1;
+            float bestDot = spawnMarkerAimMinDot;
+            for (int i = 0; i < activeSpawnMarkers.Count; i++)
+            {
+                Vector sp = activeSpawnMarkers[i].PlayerPosition;
+                // Exclude the spawn you're standing exactly on (issue #11: 8u radius) so you can
+                // still re-center onto a neighbouring marker you're merely near.
+                float hdx = sp.X - origin.X, hdy = sp.Y - origin.Y, vdz = sp.Z - origin.Z;
+                if (hdx * hdx + hdy * hdy <= spawnMarkerStandRadiusSq && Math.Abs(vdz) <= spawnMarkerStandHeight)
+                    continue;
+                // Aim at ~mid-beam (spawn + 40z) so looking at the visible beam registers, and
+                // pick the marker with the tightest aim cone (largest dot with the view forward).
+                float tx = sp.X - eye.X, ty = sp.Y - eye.Y, tz = (sp.Z + 40.0f) - eye.Z;
+                float dist = (float)Math.Sqrt(tx * tx + ty * ty + tz * tz);
+                if (dist < 1.0f)
+                    continue;
+                float dot = (tx * forwardX + ty * forwardY + tz * forwardZ) / dist;
+                if (dot > bestDot)
+                {
+                    bestDot = dot;
+                    bestIndex = i;
+                }
+            }
+
+            if (bestIndex < 0)
+                return;
+
+            lastSpawnMarkerUseTime[uid] = now;
+            Position target = activeSpawnMarkers[bestIndex];
+            // Defer off the input callback and re-validate (rules #4 / #7): teleport upright so a
+            // steep spawn angle doesn't tilt the model.
+            Server.NextFrame(() =>
+            {
+                if (!IsPlayerValid(player))
+                    return;
+                TeleportUpright(player, target.PlayerPosition, target.PlayerAngle);
+            });
         }
 
         [ConsoleCommand("css_hidespawns", "Hides the highlighted spawns")]
@@ -3132,7 +3274,8 @@ namespace MatchZy
         {
             if (!isPractice || !IsPlayerValid(player))
                 return;
-            RemoveSpawnBeams();
+            RemoveSpawnBeams();   // also disarms the +use interaction
+            PrintToPlayerChat(player!, Localizer.ForPlayer(player, "matchzy.pm.spawnmarkersoff"));
         }
 
         private void ResetAllPlayerPracticeSettings(bool enteringPractice)
@@ -3218,7 +3361,7 @@ namespace MatchZy
                 }
             }
 
-            playerPawn.Teleport(teamSpawns[closestIndex].PlayerPosition, teamSpawns[closestIndex].PlayerAngle, new Vector(0, 0, 0));
+            TeleportUpright(player, teamSpawns[closestIndex].PlayerPosition, teamSpawns[closestIndex].PlayerAngle);
         }
 
         public void TeleportPlayerToWorstSpawn(CCSPlayerController player, byte teamNum)
@@ -3243,7 +3386,7 @@ namespace MatchZy
                 }
             }
 
-            playerPawn.Teleport(teamSpawns[farthestIndex].PlayerPosition, teamSpawns[farthestIndex].PlayerAngle, new Vector(0, 0, 0));
+            TeleportUpright(player, teamSpawns[farthestIndex].PlayerPosition, teamSpawns[farthestIndex].PlayerAngle);
         }
     }
 }

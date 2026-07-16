@@ -4,6 +4,16 @@ Customized fork of [MatchZy](https://github.com/shobhit-pathak/MatchZy) by Shobh
 
 Fork version numbering is independent of upstream. Upstream changelog: <https://github.com/shobhit-pathak/MatchZy/blob/main/CHANGELOG.md>
 
+# 0.8.55
+
+#### July 16, 2026
+
+- Practice spawn markers are now interactive: with `.showspawns` active, aim at a spawn marker and press USE (E) to teleport to that spawn. `.hidespawns` (or leaving practice) disarms it.
+- Practice spawn markers are now lifted slightly off the floor so they stay visible over shallow water (e.g. de_ancient) instead of sinking out of sight.
+- Practice `.back` with no number now steps backward through your grenade history like CS:GO practice mode: the first `.back` jumps to your most recent nade, each further `.back` goes one older, and it stops at the oldest instead of printing a usage message. `.last` and `.back <number>` set the starting point, and the cursor resets when you throw a new nade.
+- Fixed practice spawn teleports (`.spawn`, best/worst spawn) tilting the whole player model sideways at steep spawn angles after a recent CS2 update: they now keep the body upright (same fix already used for `.last` / `.back` nade lineups).
+- Build now compiles against the fork's CounterStrikeSharp API DLL at `~/CounterStrikeSharp` (1.0.398) instead of the NuGet package (which tops out at 1.0.371), so the plugin matches the newer server runtime ABI. This fixes an `EntryPointNotFound` error triggered on 1.0.39x runtimes.
+
 # 0.8.54
 
 #### July 16, 2026

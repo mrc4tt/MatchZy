@@ -3505,6 +3505,23 @@ namespace MatchZy
             });
         }
 
+        // Lightweight upright teleport for non-nade repositioning (.spawn, best/worst
+        // spawn). Same body-tilt fix as TeleportAndClearPose (issue MatchZy-Enhanced#8:
+        // a CS2 update made Teleport write pitch/roll into the model transform, tilting
+        // the WHOLE body sideways at steep angles) but WITHOUT the grenade/weapon
+        // re-deploy - a plain spawn teleport has no stuck throw pose to clear, so the
+        // heavier TeleportAndClearPose path (knife-bounce + SelectItem) is overkill.
+        // Full-angle teleport snaps the LOCAL player's view; flatten the SOURCE rotation
+        // (m_angRotation), not the derived AbsRotation, over a few frames while the
+        // teleport rotation settles.
+        public static void TeleportUpright(CCSPlayerController? player, Vector position, QAngle angle)
+        {
+            if (player == null || !player.IsValid || player.PlayerPawn.Value == null)
+                return;
+            player.PlayerPawn.Value.Teleport(position, angle, new Vector(0, 0, 0));
+            FlattenBodyRotationFrames(player, angle.Y, 6);
+        }
+
         // Server-side weapon switch by classname. CS2's `use weapon_x` / `slotN`
         // console commands do NOT switch when issued via ExecuteClientCommand on
         // this build, so we set the active-weapon handle directly (same mechanism

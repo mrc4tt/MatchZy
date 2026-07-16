@@ -126,6 +126,8 @@ public partial class MatchZy
             // Cleanup practice mode data
             noFlashList.Remove(userId);
             lastGrenadesData.Remove(userId);
+            lastGrenadeBackCursor.Remove(userId);
+            lastSpawnMarkerUseTime.Remove(userId);
             nadeSpecificLastGrenadeData.Remove(userId);
 
             // Leak fix: a .timer repeating timer (0.2s REPEAT) keeps firing
@@ -344,6 +346,11 @@ public partial class MatchZy
                     {
                         lastGrenadesData[client].RemoveAt(0);
                     }
+
+                    // Reset the no-arg .back cursor: a new throw makes "back" start over from
+                    // the newest nade (issue MatchZy-Enhanced#7). Also avoids a stale index
+                    // after the RemoveAt(0) history trim renumbers the list.
+                    lastGrenadeBackCursor.Remove(client);
 
                     lastGrenadeThrownTime[(int)projectile.Index] = DateTime.Now;
                     if (smokeColorEnabled.Value && nadeType == "smoke")

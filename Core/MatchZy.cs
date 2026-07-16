@@ -16,7 +16,7 @@ namespace MatchZy
     public partial class MatchZy : BasePlugin
     {
         public override string ModuleName => "MatchZy";
-        public override string ModuleVersion => "0.8.54";
+        public override string ModuleVersion => "0.8.55";
         public override string ModuleAuthor => "WD- Edited by Miksen @ FSHOST.me";
         public override string ModuleDescription => "A plugin for running and managing CS2 practice/pugs/scrims/matches!";
         public string chatPrefix = $"{ChatColors.Green}[MatchZy]{ChatColors.Default}";
@@ -568,6 +568,10 @@ namespace MatchZy
             // string has no server xref), so no print hook can suppress it. The hook only spammed
             // the DynoHook "could not allocate trampoline" error for zero benefit.
             RegisterListener<Listeners.OnTick>(RenderReadyPanel);
+
+            // Practice interactive spawn markers: +use aimed at a .showspawns beam teleports
+            // to that spawn. Edge-triggered (fires once on Use press), gated on spawnMarkersActive.
+            RegisterListener<Listeners.OnPlayerButtonsChanged>(OnSpawnMarkerButtonHandler);
 
             RegisterEventHandler<EventPlayerTeam>(
                 (@event, info) =>
