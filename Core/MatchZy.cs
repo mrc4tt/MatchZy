@@ -143,6 +143,13 @@ namespace MatchZy
         public bool isSaveNadesAsGlobalEnabled = false;
         public bool isPlayOutEnabled = false;
         public bool isPlayOutEnabled2 = false;
+        // Folder name of a detected dedicated map plugin (CS2-SimpleAdmin / CS2MapChange), or null.
+        // When set, MatchZy yields the map command: it registers neither css_map nor handles .map,
+        // so a single .map does not fire two changelevels (which disconnects players). Set in Load.
+        private string? _conflictingMapPlugin;
+        // Server time of the last accepted map-change request, to debounce a duplicate .map that
+        // fires both the chat dispatch and css_map (on servers where '.' is a chat trigger).
+        private float _lastMapChangeRequestTime = -999f;
         public bool playerHasTakenDamage = false;
 
         // User command - action map
@@ -303,16 +310,26 @@ namespace MatchZy
                     Server.ExecuteCommand($"execifexists {cfgFolderName}/{ConfigFiles.Paths.Config}");
                 }
 
-                // Register css_map dynamically (NOT via a [ConsoleCommand] attribute) and only when
-                // matchzy_map_console_command_enabled is true, so an admin running a dedicated map
-                // plugin (CS2MapChange / CS2-SimpleAdmin) can set it to 0 and MatchZy will not
-                // register css_map at all. Two plugins registering the same ConCommand otherwise
-                // conflict and can block players from connecting. Deferred so the config.cfg value
-                // is applied first. The .map chat command stays available regardless.
+                // Detect a dedicated map plugin (CS2-SimpleAdmin / CS2MapChange) now - folder scan,
+                // config-independent - so both the console css_map registration below AND the .map
+                // chat dispatch (see EventPlayerChat) can yield to it. If MatchZy also handled the
+                // map change, one .map would fire TWO changelevels (MatchZy + that plugin via
+                // CSS routing .map -> css_map), disconnecting players (NETWORK_DISCONNECT_CREATE_SERVER_FAILED).
+                _conflictingMapPlugin = DetectConflictingMapPlugin();
+
+                // Register css_map dynamically (NOT via a [ConsoleCommand] attribute) only when
+                // enabled AND no dedicated map plugin is present. Deferred so the config.cfg value
+                // is applied first.
                 AddTimer(3.0f, () =>
                 {
-                    if (mapConsoleCommandEnabled.Value)
-                        AddCommand("css_map", "Changes the map (map name or workshop id)", (p, c) => OnMapCommand(p, c));
+                    if (!mapConsoleCommandEnabled.Value)
+                        return;
+                    if (_conflictingMapPlugin != null)
+                    {
+                        Log($"[css_map] '{_conflictingMapPlugin}' detected - MatchZy is not registering css_map or handling .map (that plugin owns the map command).");
+                        return;
+                    }
+                    AddCommand("css_map", "Changes the map (map name or workshop id)", (p, c) => OnMapCommand(p, c));
                 });
 
                 teamSides[matchzyTeam1] = "CT";
@@ -517,7 +534,6 @@ namespace MatchZy
                 { ".matchadmin", OnMatchAdminCommand },
                 { ".ma", OnMatchAdminCommand },
                 { ".matchsetup", OnMatchSetupCommand },
-                { ".lastmatch", OnLastMatchCommand },
                 //{ ".color", OnColorCommand }
                 //{ ".gg", OnGGCommand }
             };
@@ -1123,17 +1139,16 @@ namespace MatchZy
                         HandleAdminSayCommand(player, messageCommandArg);
                     }
 
-                    // .map chat command is always available (dot-prefix, no clash with a
-                    // css_map from CS2-SimpleAdmin). The console css_map is separately
-                    // gated by matchzy_map_console_command_enabled.
-                    if (message.StartsWith(".map"))
+                    // .map chat dispatch (CSS's default chat triggers are ! and /, so . is not
+                    // auto-routed to css_map - MatchZy handles it here). Skip it when MatchZy is
+                    // yielding the map command (convar off, or a dedicated map plugin detected) so
+                    // the owning plugin handles .map alone. HandleMapChangeCommand is also debounced,
+                    // which covers servers that DO add . as a chat trigger (then .map hits both this
+                    // dispatch and css_map) - without it the map would change twice and disconnect
+                    // players (NETWORK_DISCONNECT_CREATE_SERVER_FAILED).
+                    if (message.StartsWith(".map") && mapConsoleCommandEnabled.Value && _conflictingMapPlugin == null)
                     {
                         HandleMapChangeCommand(player, messageCommandArg);
-                    }
-
-                    if (message.StartsWith(".stats"))
-                    {
-                        HandleStatsCommand(player, messageCommandArg);
                     }
 
                     if (message.StartsWith(".savenade") || message.StartsWith(".sn"))

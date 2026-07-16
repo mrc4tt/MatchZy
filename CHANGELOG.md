@@ -1,6 +1,6 @@
 # Changelog
 
-Customized fork of [MatchZy](https://github.com/shobhit-pathak/MatchZy) by Shobhit Pathak, adapted for CS2 game-server hosting. On top of upstream it adds a remote log HTTP API, G5API compatibility, auto changelevel, advanced stats (HLTV 2.0 rating / KAST / clutch / opening duels), a coach system, a pause overhaul, in-game admin and match-setup menus, and in-game stats commands.
+Customized fork of [MatchZy](https://github.com/shobhit-pathak/MatchZy) by Shobhit Pathak, adapted for CS2 game-server hosting. On top of upstream it adds a remote log HTTP API, G5API compatibility, auto changelevel, advanced stats (HLTV 2.0 rating / KAST / clutch / opening duels), a coach system, a pause overhaul, and in-game admin and match-setup menus.
 
 Fork version numbering is independent of upstream. Upstream changelog: <https://github.com/shobhit-pathak/MatchZy/blob/main/CHANGELOG.md>
 
@@ -12,7 +12,8 @@ Fork version numbering is independent of upstream. Upstream changelog: <https://
 - The native "WARMUP" HUD banner is now hidden during the ready phase (convar `matchzy_ready_hide_warmup_hud`, default `true`) so it no longer overlaps the ready panel. A "fake warmup" keeps the pre-match ready phase playing like warmup (round never ends, respawn on death, no round-time expiry) while the banner is hidden, and the center panel no longer flashes.
 - Fixed the ready panel showing the wrong mode: switching `.scrim` / `.hill` during warmup now updates the panel immediately, and `.hill` -> `.match` no longer leaves the server stuck in hill mode.
 - Practice grenade spawns and `.breakrestore` now resolve their signatures from the fork's `gamedata.json` by key instead of hardcoded byte patterns, so they self-heal on a CS2 update without a plugin rebuild.
-- `css_map` is now registered only when `matchzy_map_console_command_enabled` is `true`. Set it to `false` when another plugin (CS2MapChange, CS2-SimpleAdmin) owns `css_map`: MatchZy no longer registers the command at all, avoiding a ConCommand conflict that could block players from connecting. The `.map` chat command is unaffected.
+- Added `matchzy_ready_clantag_enabled` (default `true`) to toggle the `[READY]` / `[UNREADY]` scoreboard clan tags shown during the ready phase.
+- MatchZy now auto-yields the map command when a dedicated map plugin (CS2-SimpleAdmin / CS2MapChange) is installed alongside: it registers neither `css_map` nor handles the `.map` chat command, letting the other plugin own map changes. This avoids a `css_map` ConCommand conflict (which could block players from connecting) and a double map change (two plugins both firing a changelevel disconnected players). Map changes are also debounced, so a single `.map` never changes the map twice even on servers that add `.` as a chat trigger (where `.map` hits both the chat dispatch and `css_map`). `matchzy_map_console_command_enabled` (default `true`) gates the console command; set it `false` to never register `css_map`.
 
 # 0.8.52
 

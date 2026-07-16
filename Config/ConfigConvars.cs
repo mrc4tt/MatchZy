@@ -41,6 +41,8 @@ namespace MatchZy
 
         public FakeConVar<bool> readyHintBlinkEnabled = new("matchzy_ready_hint_blink", "Whether the HTML 'READY UP' panel blinks the 'YOU ARE NOT READY' line to grab attention (style 1 only). Default: false", false);
 
+        public FakeConVar<bool> readyClanTagEnabled = new("matchzy_ready_clantag_enabled", "Whether to show [READY] / [UNREADY] clan tags on the scoreboard during the ready phase. Default: true", true);
+
         public FakeConVar<bool> everyoneIsAdmin = new("matchzy_everyone_is_admin", "If set to true, all the players will have admin privilege. Default: false", false);
 
         public FakeConVar<bool> allowPauseCommand = new("matchzy_allow_pause", "Enable or disable .pause command", true);
@@ -65,7 +67,7 @@ namespace MatchZy
 
         public FakeConVar<bool> asayConsoleEnabled = new("matchzy_asay_console_enabled", "Whether MatchZy responds to the css_asay console command (!asay, all-chat). Disable if another plugin such as CS2-SimpleAdmin owns css_asay, to avoid duplicate chat output. The .asay chat command stays available regardless. Default: true", true);
 
-        public FakeConVar<bool> mapConsoleCommandEnabled = new("matchzy_map_console_command_enabled", "Whether MatchZy registers the css_map console command (!map). Set to false if another plugin such as CS2MapChange or CS2-SimpleAdmin owns css_map: MatchZy then does NOT register it, avoiding a ConCommand conflict that can block players from connecting. The .map chat command stays available regardless. Default: true", true);
+        public FakeConVar<bool> mapConsoleCommandEnabled = new("matchzy_map_console_command_enabled", "Whether MatchZy registers the css_map console command (!map). MatchZy also auto-yields it: if a dedicated map plugin (CS2-SimpleAdmin / CS2MapChange) is installed alongside, css_map is NOT registered even when this is true, avoiding a ConCommand conflict that can block players from connecting. Set false to never register it. The .map chat command stays available regardless. Default: true", true);
 
         public FakeConVar<bool> coachDebugEnabled = new("matchzy_coach_debug", "Coach-spawn debug: logs/announces each real-player spawn reassignment, keeps coaches alive (no suicide) for inspection, and runs spawn enforcement during warmup so it can be tested with bots without starting a full match. Default: false", false);
 

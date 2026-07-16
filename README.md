@@ -1,6 +1,19 @@
 ## A forked MatchZy plugin - customized
 
-Customized [MatchZy](https://github.com/shobhit-pathak/MatchZy) fork for CS2 competitive servers. Adds a remote log API, G5API compatibility, auto changelevel, advanced stats, a coach system, pause overhauls, in-game admin and match-setup menus, and in-game stats commands.
+Customized [MatchZy](https://github.com/shobhit-pathak/MatchZy) fork for CS2 competitive servers. Adds a remote log API, G5API compatibility, auto changelevel, advanced stats, a coach system, pause overhauls, and in-game admin and match-setup menus.
+
+## In-game commands
+
+Type in chat with a dot prefix (the `!` / `css_` prefixes work too, e.g. `!ready` / `css_ready`).
+
+**Help & admin (admins only):**
+
+- `.help` - commands available in the current phase.
+- `.mhelp` - summary of admin commands.
+- `.ma` / `.matchadmin` - in-game admin menu (needs CS2MenuManager).
+- `.matchsetup` - in-game match-setup wizard (needs CS2MenuManager).
+- `.map <name/id>` - change map (name or workshop id; auto-yields to a dedicated map plugin if one is installed).
+- Match flow: `.match`, `.scrim`, `.prac`, `.dry`, `.warmup`, and the ready commands (`.ready` / `.r`, `.forceready`).
 
 ## Requirements
 

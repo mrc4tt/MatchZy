@@ -193,6 +193,9 @@ matchzy_ready_hide_warmup_hud true
 // Whether the HTML 'READY UP' panel blinks the 'YOU ARE NOT READY' line to grab attention (style 1 only). Default: false
 matchzy_ready_hint_blink false
 
+// Whether to show [READY] / [UNREADY] clan tags on the scoreboard during the ready phase. Default: true
+matchzy_ready_clantag_enabled true
+
 // Message to show when the match starts. Use $$$ to break message into multiple lines. Set to """" to disable.
 // Available variables: {TIME}, {MATCH_ID}, {MAP}, {MAPNUMBER}, {TEAM1}, {TEAM2}, {TEAM1_SCORE}, {TEAM2_SCORE}
 // Available Colors: {Default}, {Darkred}, {Green}, {LightYellow}, {LightBlue}, {Olive}, {Lime}, {Red}, {Purple}, {Grey}, {Yellow}, {Gold}, {Silver}, {Blue}, {DarkBlue}
@@ -206,8 +209,9 @@ matchzy_match_start_message """"
 matchzy_match_end_auto_changelevel 1
 
 // Whether MatchZy registers the css_map console command (!map). Default value: true
-// Set to false if another plugin such as CS2MapChange or CS2-SimpleAdmin owns css_map: MatchZy then
-// does NOT register it, avoiding a ConCommand conflict that can block players from connecting.
+// MatchZy auto-yields it: if a dedicated map plugin (CS2-SimpleAdmin / CS2MapChange) is installed
+// alongside, css_map is NOT registered even when this is true, avoiding a ConCommand conflict that
+// can block players from connecting. Set to false to never register it.
 // The .map chat command stays available regardless of this setting.
 matchzy_map_console_command_enabled true
 ",
@@ -1153,24 +1157,57 @@ ammo_grenade_limit_total 4
                 }
                 FlushBlock();
 
-                if (missingBlocks.Count == 0)
+                const string header = "// --- Added by MatchZy update (missing cvars appended) ---";
+
+                // Collapse duplicate update headers left by older builds, which appended a FRESH
+                // header on every load (one per newly-added cvar). Keep the first; removing the
+                // rest only drops redundant comment lines, never a cvar. Ensures there is only ever
+                // ONE "Added by MatchZy update" header in the file.
+                var lines = existing.Replace("\r\n", "\n").Split('\n').ToList();
+                int firstHeaderIdx = lines.FindIndex(l => l.Trim() == header);
+                bool removedDuplicateHeaders = false;
+                if (firstHeaderIdx >= 0)
+                {
+                    for (int i = lines.Count - 1; i > firstHeaderIdx; i--)
+                    {
+                        if (lines[i].Trim() == header)
+                        {
+                            lines.RemoveAt(i);
+                            removedDuplicateHeaders = true;
+                        }
+                    }
+                }
+
+                // Nothing new to add and no duplicates to clean -> leave the file untouched.
+                if (missingBlocks.Count == 0 && !removedDuplicateHeaders)
                 {
                     return;
                 }
 
-                var sb = new System.Text.StringBuilder();
-                if (!existing.EndsWith("\n"))
+                var sb = new System.Text.StringBuilder(string.Join("\n", lines).TrimEnd('\n'));
+                sb.Append('\n');
+                if (missingBlocks.Count > 0)
                 {
                     sb.Append('\n');
+                    // Add the header only when the file has none (after the dedup above).
+                    if (firstHeaderIdx < 0)
+                    {
+                        sb.Append(header).Append('\n');
+                    }
+                    foreach (var block in missingBlocks)
+                    {
+                        sb.Append(block);
+                        sb.Append("\n\n");
+                    }
                 }
-                sb.Append("\n// --- Added by MatchZy update (missing cvars appended) ---\n");
-                foreach (var block in missingBlocks)
-                {
-                    sb.Append(block);
-                    sb.Append("\n\n");
-                }
-                File.AppendAllText(filePath, sb.ToString());
-                Console.WriteLine($"[MatchZy] Appended {missingBlocks.Count} missing cvar(s) to {ConfigFiles.Paths.Config}.");
+
+                // Rewrite (not append): only redundant header comment lines were removed, so admin
+                // edits to actual cvars are preserved.
+                File.WriteAllText(filePath, sb.ToString());
+                if (missingBlocks.Count > 0)
+                    Console.WriteLine($"[MatchZy] Appended {missingBlocks.Count} missing cvar(s) to {ConfigFiles.Paths.Config}.");
+                if (removedDuplicateHeaders)
+                    Console.WriteLine($"[MatchZy] Collapsed duplicate update headers in {ConfigFiles.Paths.Config}.");
             }
             catch (Exception ex)
             {

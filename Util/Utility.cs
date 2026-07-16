@@ -1406,6 +1406,15 @@ namespace MatchZy
                 }
             }
 
+            // Debounce: on servers that add '.' as a chat trigger, one ".map" fires BOTH the .map
+            // chat dispatch AND css_map, so HandleMapChangeCommand runs twice for one request.
+            // Ignore a second request within 2s so the map does not change twice (a double
+            // changelevel disconnects players: NETWORK_DISCONNECT_CREATE_SERVER_FAILED). Placed
+            // after validation so a typo never blocks an immediate retry.
+            if (Server.CurrentTime - _lastMapChangeRequestTime < 2.0f)
+                return;
+            _lastMapChangeRequestTime = Server.CurrentTime;
+
             // Validated named map (or a workshop id) - safe to tear down and change now.
             // Stop demo recording before map change to prevent GOTV crash.
             if (isDemoRecording)
@@ -1664,6 +1673,13 @@ namespace MatchZy
         {
             // Clear clan tags if match is live or in practice/dryrun mode
             if (matchStarted || isPractice || isDryRun)
+            {
+                ClearClanTags();
+                return;
+            }
+
+            // [READY]/[UNREADY] scoreboard tags disabled by convar - strip any and stop.
+            if (!readyClanTagEnabled.Value)
             {
                 ClearClanTags();
                 return;

@@ -965,11 +965,34 @@ namespace MatchZy
             Server.PrintToChatAll($"{adminChatPrefix} {message}");
         }
 
+        // Detect a sibling plugin that owns css_map (CS2-SimpleAdmin / CS2MapChange and variants)
+        // by scanning the plugins directory (MatchZy's own folder's parent). Returns the folder
+        // name, or null if none. Lets MatchZy auto-yield css_map so two plugins never register the
+        // same ConCommand (which can block players from connecting).
+        private string? DetectConflictingMapPlugin()
+        {
+            try
+            {
+                var pluginsDir = Path.GetDirectoryName(ModuleDirectory);
+                if (string.IsNullOrEmpty(pluginsDir) || !Directory.Exists(pluginsDir))
+                    return null;
+                foreach (var dir in Directory.GetDirectories(pluginsDir))
+                {
+                    var name = Path.GetFileName(dir);
+                    if (name.Contains("SimpleAdmin", StringComparison.OrdinalIgnoreCase)
+                        || name.Contains("MapChange", StringComparison.OrdinalIgnoreCase))
+                        return name;
+                }
+            }
+            catch { /* best effort - fall through to registering css_map */ }
+            return null;
+        }
+
         // NOT a [ConsoleCommand] - registered dynamically in Load() only when
-        // matchzy_map_console_command_enabled is true (see the AddCommand there). This avoids a
-        // ConCommand-registration conflict with a dedicated map plugin (CS2MapChange /
-        // CS2-SimpleAdmin) that would block connections. The convar check below is kept as a
-        // defence in case the command is ever registered while disabled.
+        // matchzy_map_console_command_enabled is true AND no dedicated map plugin is detected
+        // (see the AddCommand in Load). This avoids a ConCommand-registration conflict with a
+        // dedicated map plugin (CS2MapChange / CS2-SimpleAdmin) that would block connections. The
+        // convar check below is kept as a defence in case the command is ever registered anyway.
         public void OnMapCommand(CCSPlayerController? player, CommandInfo? command)
         {
             if (command == null)
