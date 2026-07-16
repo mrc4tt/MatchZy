@@ -407,7 +407,7 @@ namespace MatchZy
                 try
                 {
                     // Read existing JSON content
-                    string existingJson = File.ReadAllText(savednadesPath);
+                    string existingJson = ReadSavedNadesJson(savednadesPath);
 
                     // Deserialize the existing JSON content
                     var savedNadesDict = JsonSerializer.Deserialize<Dictionary<string, Dictionary<string, Dictionary<string, string>>>>(existingJson) ?? new Dictionary<string, Dictionary<string, Dictionary<string, string>>>();
@@ -490,7 +490,7 @@ namespace MatchZy
                 try
                 {
                     // Read existing JSON content
-                    string existingJson = File.ReadAllText(savednadesPath);
+                    string existingJson = ReadSavedNadesJson(savednadesPath);
 
                     //Console.WriteLine($"Existing JSON Content: {existingJson}");
 
@@ -569,7 +569,7 @@ namespace MatchZy
                         string savednadesPath = Path.Join(Server.GameDirectory + "/csgo/cfg", savednadesfileName);
 
                         // Read existing JSON content
-                        string existingJson = File.ReadAllText(savednadesPath);
+                        string existingJson = ReadSavedNadesJson(savednadesPath);
 
                         //Console.WriteLine($"Existing JSON Content: {existingJson}");
 
@@ -630,6 +630,14 @@ namespace MatchZy
             }
         }
 
+        // Read savednades.json, tolerating its absence. On a fresh server (or before
+        // the first .savenade) the file does not exist yet; File.ReadAllText would throw
+        // FileNotFoundException, which the callers' catch (JsonException) does NOT cover,
+        // crashing .listnades/.loadnade/.delnade/.importnade. Returning "{}" yields an
+        // empty dict so the normal "no lineups" branches fire instead.
+        private static string ReadSavedNadesJson(string path)
+            => File.Exists(path) ? File.ReadAllText(path) : "{}";
+
         private void HandleListNadesCommand(CCSPlayerController? player, string nadeFilter)
         {
             if (!isPractice || player == null)
@@ -642,7 +650,7 @@ namespace MatchZy
             try
             {
                 // Read existing JSON content
-                string existingJson = File.ReadAllText(savednadesPath);
+                string existingJson = ReadSavedNadesJson(savednadesPath);
 
                 //Console.WriteLine($"Existing JSON Content: {existingJson}");
 
@@ -702,7 +710,7 @@ namespace MatchZy
                 try
                 {
                     // Read existing JSON content
-                    string existingJson = File.ReadAllText(savednadesPath);
+                    string existingJson = ReadSavedNadesJson(savednadesPath);
 
                     //Console.WriteLine($"Existing JSON Content: {existingJson}");
 
