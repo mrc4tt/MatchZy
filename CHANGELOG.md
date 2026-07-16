@@ -4,14 +4,19 @@ Customized fork of [MatchZy](https://github.com/shobhit-pathak/MatchZy) by Shobh
 
 Fork version numbering is independent of upstream. Upstream changelog: <https://github.com/shobhit-pathak/MatchZy/blob/main/CHANGELOG.md>
 
+# 0.8.54
+
+#### July 16, 2026
+
+- Fixed practice rethrow (`.throw` / `.rt` / `.throwsmoke` etc.) only working for flashbangs: smoke / HE / molotov / decoy re-throws silently did nothing when their native `*_Create` signature failed to resolve from `gamedata/matchzy.json`. They now fall back to the managed entity API (like flash always has) so a rethrow always spawns, and log a clear warning when the signature was missing so a stale/undeployed gamedata file is diagnosable. Also added incendiary (CT molotov) rethrow support.
+- Fixed re-thrown grenades spinning wrong: the projectile's angular velocity (spin) was being set to its linear launch velocity on rethrow. The real spin is now captured at throw time and replayed, so a rethrown nade tumbles like the original (cosmetic; landing spot was already correct).
+- Added `.grt` (`.globalrethrow`, console `css_grt`) in practice: rethrows every player's last thrown grenade at once, for setting up full team executes in one command.
+- Fixed `.listnades` / `.loadnade` / `.delnade` / `.importnade` throwing a `FileNotFoundException` (server error spam) on a fresh server before any lineup was saved: the missing `savednades.json` is now treated as empty instead of crashing the command.
+
 # 0.8.53
 
 #### July 15, 2026
 
-- Added `.grt` (`.globalrethrow`, console `css_grt`) in practice: rethrows every player's last thrown grenade at once, for setting up full team executes in one command.
-- Fixed `.listnades` / `.loadnade` / `.delnade` / `.importnade` throwing a `FileNotFoundException` (server error spam) on a fresh server before any lineup was saved: the missing `savednades.json` is now treated as empty instead of crashing the command.
-- Fixed practice rethrow (`.throw` / `.rt` / `.throwsmoke` etc.) only working for flashbangs: smoke / HE / molotov / decoy re-throws silently did nothing when their native `*_Create` signature failed to resolve from `gamedata/matchzy.json`. They now fall back to the managed entity API (like flash always has) so a rethrow always spawns, and log a clear warning when the signature was missing so a stale/undeployed gamedata file is diagnosable. Also added incendiary (CT molotov) rethrow support.
-- Fixed re-thrown grenades spinning wrong: the projectile's angular velocity (spin) was being set to its linear launch velocity on rethrow. The real spin is now captured at throw time and replayed, so a rethrown nade tumbles like the original (cosmetic; landing spot was already correct).
 - Reworked the "waiting for players" ready screen into a per-player HTML panel: title, progress bar, ready count, CT/T split, current mode (Match / Scrim / Hill / Match Setup), and each player's own READY / NOT READY status, shown in their own language. New convar `matchzy_ready_hint_style` (0 = classic center text, 1 = HTML panel, default `1`) and `matchzy_ready_hint_blink` (blink the NOT READY line to grab attention, style 1 only, default `false`).
 - The native "WARMUP" HUD banner is now hidden during the ready phase (convar `matchzy_ready_hide_warmup_hud`, default `true`) so it no longer overlaps the ready panel. A "fake warmup" keeps the pre-match ready phase playing like warmup (round never ends, respawn on death, no round-time expiry) while the banner is hidden, and the center panel no longer flashes.
 - Fixed the ready panel showing the wrong mode: switching `.scrim` / `.hill` during warmup now updates the panel immediately, and `.hill` -> `.match` no longer leaves the server stuck in hill mode.
