@@ -1,3 +1,7 @@
+> **Mirror notice:** This GitHub repo is a read-only mirror. Development happens on
+> [git.miksen.me](https://git.miksen.me/mikkel/matchzy). Please open issues and pull requests there.
+> Issues opened here are synced automatically, but the Forgejo repo is canonical.
+
 ## A forked MatchZy plugin - customized
 
 Customized [MatchZy](https://github.com/shobhit-pathak/MatchZy) fork for CS2 competitive servers. Adds a remote log API, G5API compatibility, auto changelevel, advanced stats, a coach system, pause overhauls, and in-game admin and match-setup menus.
