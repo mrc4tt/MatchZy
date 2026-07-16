@@ -1,0 +1,138 @@
+name: Build and Release
+on:
+  push:
+    paths-ignore:
+      - documentation/**
+      - '**/*.md'
+    branches:
+      - main
+  workflow_dispatch:
+
+# Needed by softprops/action-gh-release to create the GitHub release.
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Build and Release
+    runs-on: ubuntu-latest
+    env:
+      # Auth for the "forgejo" NuGet source (CS2MenuManager) in nuget.config. On the GitHub
+      # mirror, add repo secrets FORGEJO_USER + RELEASE_TOKEN so `dotnet restore` can reach the
+      # feed at git.miksen.me (GITHUB_TOKEN there cannot authenticate to the Forgejo instance).
+      NuGetPackageSourceCredentials_forgejo: "Username=${{ secrets.FORGEJO_USER || 'mikkel' }};Password=${{ secrets.RELEASE_TOKEN || secrets.GITHUB_TOKEN }}"
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          if command -v sudo >/dev/null 2>&1; then SUDO=sudo; else SUDO=; fi
+          $SUDO apt-get update
+          $SUDO apt-get install -y p7zip-full jq curl wget
+
+      - name: Get MatchZy Version
+        id: matchzy_version
+        run: |
+          VERSION=$(grep -oP 'ModuleVersion\s*=>\s*"\K[^"]*' Core/MatchZy.cs)
+          if [ -z "$VERSION" ]; then
+            echo "Error: Could not extract version from Core/MatchZy.cs"
+            exit 1
+          fi
+          echo "MATCHZY_VERSION=$VERSION" >> $GITHUB_ENV
+          echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "10.0"
+
+      - name: Build MatchZy package
+        run: |
+          set -e
+          # Plugin only. The CounterStrikeSharp runtime bundles (with-cssharp-linux/windows zips)
+          # are no longer shipped - install CounterStrikeSharp separately on the server.
+          dotnet publish -c Release -o package/addons/counterstrikesharp/plugins/MatchZy
+          # Ship cfgs under cfg/MatchZy/ so they extract to csgo/cfg/MatchZy/ - the dir the plugin
+          # execs (exec matchzy/live.cfg etc).
+          mkdir -p package/cfg/MatchZy
+          cp cfg/*.cfg package/cfg/MatchZy/
+          cd package && 7z a -tzip ../MatchZy-${{ env.MATCHZY_VERSION }}.zip . && cd ..
+
+      - name: Extract release notes
+        run: |
+          # Top version block of CHANGELOG.md becomes the release body.
+          awk '/^# [0-9]/{n++} n==1' CHANGELOG.md > notes.md || true
+          [ -s notes.md ] || echo "Automated build." > notes.md
+
+      # --- GitHub release (runs on the github.com mirror) ---
+      - name: Create GitHub Release
+        if: github.server_url == 'https://github.com'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ env.MATCHZY_VERSION }}
+          name: MatchZy ${{ env.MATCHZY_VERSION }}
+          body_path: notes.md
+          files: MatchZy-${{ env.MATCHZY_VERSION }}.zip
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      # --- Forgejo release (runs on the Forgejo instance) ---
+      - name: Check if Forgejo release exists
+        id: check_release
+        if: github.server_url != 'https://github.com'
+        run: |
+          STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
+            -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
+            "${{ github.server_url }}/api/v1/repos/${{ github.repository }}/releases/tags/${{ env.MATCHZY_VERSION }}")
+          if [ "$STATUS" = "200" ]; then
+            echo "Release ${{ env.MATCHZY_VERSION }} already exists. Skipping."
+            echo "SKIP=true" >> $GITHUB_OUTPUT
+          else
+            echo "New version detected: ${{ env.MATCHZY_VERSION }}"
+            echo "SKIP=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Create Forgejo Release
+        if: github.server_url != 'https://github.com' && steps.check_release.outputs.SKIP == 'false'
+        env:
+          GITEA_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -e
+          BODY=$(jq -Rs . < notes.md)
+          echo "Creating release ${{ env.MATCHZY_VERSION }}..."
+          RELEASE_RESPONSE=$(curl -s -X POST \
+            "${{ github.server_url }}/api/v1/repos/${{ github.repository }}/releases" \
+            -H "Authorization: token $GITEA_TOKEN" \
+            -H "Content-Type: application/json" \
+            -d "{
+              \"tag_name\": \"${{ env.MATCHZY_VERSION }}\",
+              \"name\": \"MatchZy ${{ env.MATCHZY_VERSION }}\",
+              \"body\": $BODY,
+              \"draft\": false,
+              \"prerelease\": false
+            }")
+
+          RELEASE_ID=$(echo "$RELEASE_RESPONSE" | jq -r '.id // empty')
+          if [ -z "$RELEASE_ID" ]; then
+            echo "Error: Failed to create release!"
+            echo "$RELEASE_RESPONSE"
+            exit 1
+          fi
+          echo "Created release with ID: $RELEASE_ID"
+
+          for file in MatchZy-${{ env.MATCHZY_VERSION }}*.zip; do
+            echo "Uploading $file..."
+            UPLOAD_RESPONSE=$(curl -s -X POST \
+              "${{ github.server_url }}/api/v1/repos/${{ github.repository }}/releases/$RELEASE_ID/assets?name=$file" \
+              -H "Authorization: token $GITEA_TOKEN" \
+              -H "Content-Type: application/octet-stream" \
+              --data-binary "@$file")
+            ASSET_ID=$(echo "$UPLOAD_RESPONSE" | jq -r '.id // empty')
+            if [ -z "$ASSET_ID" ]; then
+              echo "Warning: Upload may have failed for $file"
+              echo "$UPLOAD_RESPONSE"
+            else
+              echo "Uploaded $file (asset ID: $ASSET_ID)"
+            fi
+          done
