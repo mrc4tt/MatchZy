@@ -33,6 +33,20 @@ Type in chat with a dot prefix (the `!` / `css_` prefixes work too, e.g. `!ready
    ```
    game/csgo/addons/counterstrikesharp/plugins/MatchZy/
    ```
-5. Restart the server, or run `css_plugins reload MatchZy`.
+5. Copy `gamedata/matchzy.json` to the CounterStrikeSharp gamedata directory:
+   ```
+   game/csgo/addons/counterstrikesharp/gamedata/matchzy.json
+   ```
+   (The release `.zip` already includes it at this path.)
+6. Restart the server, or run `css_plugins reload MatchZy`.
+
+## Gamedata
+
+MatchZy resolves a few game functions by key from CounterStrikeSharp's gamedata (CounterStrikeSharp merges every `*.json` in its `gamedata/` directory). The shipped `gamedata/matchzy.json` provides them, so nothing needs to be added to the core `gamedata.json`. The required keys (linux + windows signatures) are:
+
+- `CCSGameRules_PostCleanUp` - `.breakrestore` (respawn breakable props in practice).
+- `CSmokeGrenadeProjectile_Create`, `CHEGrenadeProjectile_Create`, `CMolotovProjectile_Create`, `CDecoyProjectile_Create` - practice grenade rethrow (`.rt` / `.last` / `.back`).
+
+Signatures shift when Valve updates CS2. If a rethrow or `.breakrestore` stops working after a game update, regenerate the signatures for the new `libserver.so` (Linux) / `server.dll` (Windows) and update `gamedata/matchzy.json`. Missing or stale keys degrade gracefully (the feature no-ops), they do not crash the plugin.
 
 > **Note on CS2MenuManager:** it is a build-time NuGet reference but only a runtime dependency of the menu commands. The menu assembly is resolved lazily on first use, so the plugin loads without it and only `.matchadmin` / `.matchsetup` are affected. If you install it, place it before MatchZy in load order.

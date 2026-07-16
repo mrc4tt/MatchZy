@@ -57,6 +57,12 @@ jobs:
           # execs (exec matchzy/live.cfg etc).
           mkdir -p package/cfg/MatchZy
           cp cfg/*.cfg package/cfg/MatchZy/
+          # Ship MatchZy's gamedata so CounterStrikeSharp auto-loads it (it merges every *.json in
+          # the gamedata dir). Provides the signatures MatchZy resolves by key - practice grenade
+          # rethrow (.rt/.last/.back) and .breakrestore - so it works on stock CSS without editing
+          # the core gamedata.json.
+          mkdir -p package/addons/counterstrikesharp/gamedata
+          cp gamedata/matchzy.json package/addons/counterstrikesharp/gamedata/matchzy.json
           cd package && 7z a -tzip ../MatchZy-${{ env.MATCHZY_VERSION }}.zip . && cd ..
 
       - name: Extract release notes
