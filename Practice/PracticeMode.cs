@@ -2631,6 +2631,38 @@ namespace MatchZy
                 AddTimer(lastGrenade.Delay, () => lastGrenade.Throw(player));
         }
 
+        [ConsoleCommand("css_grt", "Rethrows every player's last thrown grenade at once")]
+        [ConsoleCommand("css_globalrethrow", "Rethrows every player's last thrown grenade at once")]
+        public void OnGlobalRethrowCommand(CCSPlayerController? player, CommandInfo? command)
+        {
+            if (!isPractice)
+                return;
+
+            int thrown = 0;
+            foreach (var target in Utilities.GetPlayers())
+            {
+                // Re-validate every target - GetPlayers can include stale/disconnecting slots.
+                if (!IsPlayerValid(target) || !target.UserId.HasValue)
+                    continue;
+                int userId = target.UserId.Value;
+                if (!lastGrenadesData.ContainsKey(userId) || lastGrenadesData[userId].Count <= 0)
+                    continue;
+
+                GrenadeThrownData lastGrenade = lastGrenadesData[userId].Last();
+                if (lastGrenade == null)
+                    continue;
+
+                // Capture the target so the delayed callback throws for the right player;
+                // Throw() re-validates before touching the pawn (safe if they leave meanwhile).
+                CCSPlayerController thrower = target;
+                AddTimer(lastGrenade.Delay, () => lastGrenade.Throw(thrower));
+                thrown++;
+            }
+
+            if (player != null)
+                PrintToPlayerChat(player, $"Rethrew {thrown} grenade(s).");
+        }
+
         [ConsoleCommand("css_savepos", "Saves the player location")]
         public void OnSavePosCommand(CCSPlayerController? player, CommandInfo? command)
         {
