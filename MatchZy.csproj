@@ -10,13 +10,20 @@
          3.50.2 build (CVE patched, GLIBC_2.14 so it loads on old game containers). The flag
          is on the transitive package version, not the binary we actually deploy. -->
     <NoWarn>$(NoWarn);NU1903</NoWarn>
+    <!-- CounterStrikeSharp API is COMPILED against the fork's own build, not NuGet: NuGet
+         tops out at 1.0.371 while the fork runtime is 1.0.39x, and that ABI gap surfaces as
+         EntryPointNotFound/MissingMethod at runtime. Override CssApiDir on the command line
+         (-p:CssApiDir=...) to point at a different fork checkout / server runtime if needed.
+         Keep this matched to the runtime deployed on the target server. -->
+    <CssApiDir Condition="'$(CssApiDir)' == ''">$(HOME)/CounterStrikeSharp/managed/CounterStrikeSharp.API/bin/Release/net10.0</CssApiDir>
   </PropertyGroup>
   <ItemGroup>
-    <PackageReference Include="CounterStrikeSharp.API" Version="1.0.371">
-      <PrivateAssets>none</PrivateAssets>
-      <ExcludeAssets>runtime</ExcludeAssets>
-      <IncludeAssets>compile; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
-    </PackageReference>
+    <!-- Compile-only reference (Private=false => not copied to output; the server's own
+         CounterStrikeSharp.API.dll is loaded at runtime). Replaces the NuGet PackageReference. -->
+    <Reference Include="CounterStrikeSharp.API">
+      <HintPath>$(CssApiDir)/CounterStrikeSharp.API.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
     <PackageReference Include="CsvHelper" Version="33.1.0" />
     <PackageReference Include="Dapper" Version="2.1.72" />
     <PackageReference Include="Microsoft.Data.Sqlite" Version="8.0.0" />
