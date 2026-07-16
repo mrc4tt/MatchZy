@@ -66,16 +66,24 @@ jobs:
           [ -s notes.md ] || echo "Automated build." > notes.md
 
       # --- GitHub release (runs on the github.com mirror) ---
+      # Uses the gh CLI (a run: step) rather than a marketplace action: the Forgejo runner tries
+      # to clone every `uses:` action at prep time - before the `if` is evaluated - and
+      # softprops/action-gh-release is not mirrored to data.forgejo.org, which failed the whole
+      # job. A run: step is simply skipped by the `if` with nothing to fetch. gh is preinstalled
+      # on GitHub-hosted runners.
       - name: Create GitHub Release
         if: github.server_url == 'https://github.com'
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: ${{ env.MATCHZY_VERSION }}
-          name: MatchZy ${{ env.MATCHZY_VERSION }}
-          body_path: notes.md
-          files: MatchZy-${{ env.MATCHZY_VERSION }}.zip
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -e
+          VER="${{ env.MATCHZY_VERSION }}"
+          ASSET="MatchZy-${VER}.zip"
+          if gh release view "$VER" >/dev/null 2>&1; then
+            gh release upload "$VER" "$ASSET" --clobber
+          else
+            gh release create "$VER" "$ASSET" --title "MatchZy $VER" --notes-file notes.md
+          fi
 
       # --- Forgejo release (runs on the Forgejo instance) ---
       - name: Check if Forgejo release exists
