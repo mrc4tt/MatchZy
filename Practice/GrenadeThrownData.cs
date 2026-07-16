@@ -84,6 +84,16 @@ public class GrenadeThrownData
         );
     }
 
+    // Managed fallback when a native *_Create sig didn't resolve from gamedata. Logs loudly so a
+    // missing/stale gamedata entry is diagnosable instead of a silent dead rethrow.
+    private static T? CreateGrenadeFallback<T>(string className, string sigKey) where T : CBaseCSGrenadeProjectile
+    {
+        Console.WriteLine($"[MatchZy] {sigKey} sig unresolved - using entity API for '{className}'. Verify gamedata/matchzy.json is deployed to addons/counterstrikesharp/gamedata/ and matches this CS2 build.");
+        var ent = Utilities.CreateEntityByName<T>(className);
+        ent?.DispatchSpawn();
+        return ent;
+    }
+
     public void Throw(CCSPlayerController player)
     {
         // Validate player before accessing any properties
@@ -97,41 +107,54 @@ public class GrenadeThrownData
         if (Velocity.X * Velocity.X + Velocity.Y * Velocity.Y + Velocity.Z * Velocity.Z < 1.0f)
             return;
 
+        // Native *_Create factories are resolved by sig from gamedata/matchzy.json. When a sig
+        // is missing/stale (or the gamedata file isn't deployed) the factory is null and the old
+        // code silently no-op'd - so smoke/he/molotov/decoy just never re-threw while flash (which
+        // already used the managed entity API) kept working. Fall back to CreateEntityByName for
+        // every type so a rethrow ALWAYS spawns a projectile; the common Teleport block below
+        // imparts the recorded launch velocity regardless of how the entity was created.
         CBaseCSGrenadeProjectile? grenadeEntity = null;
         switch (Type)
         {
             case "smoke":
             {
                 grenadeEntity = GrenadeFunctions.CSmokeGrenadeProjectile_CreateFunc?.Invoke(Position.Handle, Angle.Handle, Velocity.Handle, Velocity.Handle, IntPtr.Zero, ItemIndex, (int)player.Team);
+                grenadeEntity ??= CreateGrenadeFallback<CSmokeGrenadeProjectile>("smokegrenade_projectile", "CSmokeGrenadeProjectile_Create");
                 break;
             }
             case "molotov":
+            case "incendiary":
             {
                 grenadeEntity = GrenadeFunctions.CMolotovProjectile_CreateFunc?.Invoke(Position.Handle, Angle.Handle, Velocity.Handle, Velocity.Handle, IntPtr.Zero, ItemIndex);
+                grenadeEntity ??= CreateGrenadeFallback<CMolotovProjectile>(Type == "incendiary" ? "incendiary_projectile" : "molotov_projectile", "CMolotovProjectile_Create");
                 break;
             }
             case "hegrenade":
             {
                 grenadeEntity = GrenadeFunctions.CHEGrenadeProjectile_CreateFunc?.Invoke(Position.Handle, Angle.Handle, Velocity.Handle, Velocity.Handle, IntPtr.Zero, ItemIndex);
+                grenadeEntity ??= CreateGrenadeFallback<CHEGrenadeProjectile>("hegrenade_projectile", "CHEGrenadeProjectile_Create");
                 break;
             }
             case "decoy":
             {
                 grenadeEntity = GrenadeFunctions.CDecoyProjectile_CreateFunc?.Invoke(Position.Handle, Angle.Handle, Velocity.Handle, Velocity.Handle, IntPtr.Zero, ItemIndex);
+                grenadeEntity ??= CreateGrenadeFallback<CDecoyProjectile>("decoy_projectile", "CDecoyProjectile_Create");
                 break;
             }
             case "flash":
             {
+                // Flash has no native factory - always the managed path.
                 grenadeEntity = Utilities.CreateEntityByName<CFlashbangProjectile>("flashbang_projectile");
-                if (grenadeEntity == null)
-                    return;
-                grenadeEntity.DispatchSpawn();
+                grenadeEntity?.DispatchSpawn();
                 break;
             }
             default:
                 Console.WriteLine($"[MatchZy] Unknown Grenade: {Type}");
                 break;
         }
+
+        if (grenadeEntity == null)
+            return;
 
         // Apply the recorded launch transform to EVERY grenade type - including smoke.
         // Smokes were previously excluded (DesignerName != "smokegrenade_projectile"),
