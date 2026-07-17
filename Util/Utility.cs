@@ -305,6 +305,10 @@ namespace MatchZy
             string list = string.Join(", ", notReady.Take(6));
             if (notReady.Count > 6)
                 list += $" +{notReady.Count - 6}";
+            // Bound the length: long / decorated names entity-expand a lot and can push the HTML
+            // panel past its size cap, dropping trailing lines.
+            if (list.Length > 64)
+                list = list.Substring(0, 64) + "...";
             // Raw here (used by both the plain-center text and the HTML panel). The HTML panel
             // entity-encodes it via PanelSafe at render; the classic center text wants it plain.
             _rpWaiting = notReady.Count > 0 ? list : "";
@@ -494,9 +498,11 @@ namespace MatchZy
                     sb.Append($"<font class='fontSize-sm' color='#c8c8c8'>{PanelSafe(Localizer.ForPlayer(target, "matchzy.ready.mode", mode))}</font><br>");
                     sb.Append($"{bar} <font class='fontSize-m' color='#ffffff'>{_rpReady} / {_rpRequired}</font><br>");
                     sb.Append($"<font class='fontSize-sm' color='#9ecbff'>CT {_rpCtReady}/{_rpCtCount}</font><font class='fontSize-sm' color='#ffffff'> &nbsp; </font><font class='fontSize-sm' color='#ffb36b'>T {_rpTReady}/{_rpTCount}</font>");
-                    if (_rpWaiting.Length > 0)
-                        sb.Append($"<br><font class='fontSize-sm' color='#9a9a9a'>{PanelSafe(Localizer.ForPlayer(target, "matchzy.ready.waitingon", _rpWaiting))}</font>");
 
+                    // Self-status (YOU ARE (NOT) READY) is the most important line, so render it
+                    // BEFORE the "waiting on" list. CS2's center-HTML panel has a size cap and drops
+                    // the tail when a long localized string + player names push it over; keeping the
+                    // status ahead of the expendable waiting-on line means the status always shows.
                     bool isPlaying = target.TeamNum == 2 || target.TeamNum == 3;
                     if (isPlaying)
                     {
@@ -507,6 +513,9 @@ namespace MatchZy
                         else
                             sb.Append("<br><font class='fontSize-m' color='#ff3b3b'>&nbsp;</font>"); // blink off-frame: keep height
                     }
+
+                    if (_rpWaiting.Length > 0)
+                        sb.Append($"<br><font class='fontSize-sm' color='#9a9a9a'>{PanelSafe(Localizer.ForPlayer(target, "matchzy.ready.waitingon", _rpWaiting))}</font>");
 
                     // Only re-send when the content changed (or on the keepalive tick). Re-sending
                     // identical HTML every tick re-triggers the panel's show animation -> flashing.
