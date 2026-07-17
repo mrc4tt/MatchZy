@@ -373,7 +373,8 @@ namespace MatchZy
         // - in classic style (matchzy_ready_hint_style 0) - broadcast the plain center text.
         private void SendReadyStatusHintMessage()
         {
-            if (!readyAvailable || matchStarted)
+            // Dryrun (.dryrun) is a practice-style mode with no ready gate - don't show the ready hint.
+            if (!readyAvailable || matchStarted || isDryRun)
                 return;
             try
             {
@@ -394,9 +395,10 @@ namespace MatchZy
         // so each sees the panel in their own language with their OWN ready state highlighted.
         private void RenderReadyPanel()
         {
-            if (!readyAvailable || matchStarted || readyHintStyle.Value != 1)
+            if (!readyAvailable || matchStarted || readyHintStyle.Value != 1 || isDryRun)
             {
-                // Left the ready phase (or classic style) - drop the fake-warmup override so it
+                // Left the ready phase (dryrun / classic style / match started) - drop the fake-warmup
+                // override so it
                 // never leaks into live play. Fires within a tick of matchStarted flipping, well
                 // inside the knife/live freezetime, so the round conditions are normal before play.
                 if (_fakeWarmupActive)
