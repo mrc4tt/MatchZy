@@ -187,6 +187,9 @@ matchzy_enable_damage_report true
 // Ready-status display mode. 0 = classic center text. 1 = HTML READY-UP panel (progress bar, per-player status) with the native warmup suppressed: own WARMUP badge, no native 'Warmup' pill, frozen 1:00 top timer. Default: 0
 matchzy_ready_hint_style 0
 
+// Blink the 'YOU ARE NOT READY' line on the HTML READY-UP panel to grab attention. ONLY applies when matchzy_ready_hint_style is 1 (the HTML panel); it has no effect in classic style (0). Default: false
+matchzy_ready_hint_blink false
+
 // Whether to show [READY] / [UNREADY] clan tags on the scoreboard during the ready phase. Default: true
 matchzy_ready_clantag_enabled true
 

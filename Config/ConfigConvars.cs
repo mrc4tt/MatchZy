@@ -42,7 +42,7 @@ namespace MatchZy
         //       round timer; no netvar can blank it)
         public FakeConVar<int> readyHintStyle = new("matchzy_ready_hint_style", "Ready-status display mode. 0 = classic center text. 1 = HTML READY-UP panel (progress bar, per-player status) with the native warmup suppressed: own WARMUP badge, no native 'Warmup' pill, frozen 1:00 top timer. Default: 0", 0);
 
-        public FakeConVar<bool> readyHintBlinkEnabled = new("matchzy_ready_hint_blink", "Whether the HTML 'READY UP' panel blinks the 'YOU ARE NOT READY' line to grab attention (style 1 only). Default: false", false);
+        public FakeConVar<bool> readyHintBlinkEnabled = new("matchzy_ready_hint_blink", "Blink the 'YOU ARE NOT READY' line on the HTML READY-UP panel to grab attention. ONLY applies when matchzy_ready_hint_style is 1 (the HTML panel); no effect in classic style (0). Default: false", false);
 
         public FakeConVar<bool> readyClanTagEnabled = new("matchzy_ready_clantag_enabled", "Whether to show [READY] / [UNREADY] clan tags on the scoreboard during the ready phase. Default: true", true);
 
