@@ -16,21 +16,31 @@
          (-p:CssApiDir=...) to point at a different fork checkout / server runtime if needed.
          Keep this matched to the runtime deployed on the target server. -->
     <CssApiDir Condition="'$(CssApiDir)' == ''">$(HOME)/CounterStrikeSharp/managed/CounterStrikeSharp.API/bin/Release/net10.0</CssApiDir>
+    <CssApiDll>$(CssApiDir)/CounterStrikeSharp.API.dll</CssApiDll>
+    <!-- Use the fork API DLL only when it's actually present (local dev). On CI there is no fork
+         checkout, so fall back to the NuGet package below. HAS_CSS_TRACE gates the fork-only Trace
+         API (see Practice/GrenadePredictor.cs): defined only when compiling against the fork. -->
+    <HasForkCssApi Condition="Exists('$(CssApiDll)')">true</HasForkCssApi>
+    <DefineConstants Condition="'$(HasForkCssApi)' == 'true'">$(DefineConstants);HAS_CSS_TRACE</DefineConstants>
   </PropertyGroup>
   <ItemGroup>
-    <!-- Compile-only reference (Private=false => not copied to output; the server's own
-         CounterStrikeSharp.API.dll is loaded at runtime). Replaces the NuGet PackageReference. -->
-    <Reference Include="CounterStrikeSharp.API">
-      <HintPath>$(CssApiDir)/CounterStrikeSharp.API.dll</HintPath>
+    <!-- LOCAL: compile against the fork's own CounterStrikeSharp API DLL (has Trace + the 1.0.39x
+         surface). Private=false => not copied to output; the server loads its own at runtime. The
+         ExcludeAssets=all package below neutralizes the transitive NuGet copy so it can't shadow it. -->
+    <Reference Include="CounterStrikeSharp.API" Condition="'$(HasForkCssApi)' == 'true'">
+      <HintPath>$(CssApiDll)</HintPath>
       <Private>false</Private>
     </Reference>
-    <!-- Neutralize the transitive NuGet CounterStrikeSharp.API that CS2MenuManager pulls in
-         (1.0.369, predates the fork's Trace/newer API): a direct ExcludeAssets=all reference wins
-         over the transitive one and contributes nothing, so the fork <Reference> above is the sole
-         provider of CSS API types. Without this, the compiler binds to NuGet 1.0.369 and the fork
-         DLL (Trace, etc.) is shadowed. -->
-    <PackageReference Include="CounterStrikeSharp.API" Version="1.0.371">
+    <PackageReference Include="CounterStrikeSharp.API" Version="1.0.371" Condition="'$(HasForkCssApi)' == 'true'">
       <ExcludeAssets>all</ExcludeAssets>
+    </PackageReference>
+    <!-- CI (no fork checkout): compile against the NuGet package (runtime excluded; the server loads
+         its own DLL). The predictor's Trace-only bounce sim is #if HAS_CSS_TRACE'd out here and
+         falls back to a no-collision estimate; every other API MatchZy uses exists in 1.0.371. -->
+    <PackageReference Include="CounterStrikeSharp.API" Version="1.0.371" Condition="'$(HasForkCssApi)' != 'true'">
+      <PrivateAssets>none</PrivateAssets>
+      <ExcludeAssets>runtime</ExcludeAssets>
+      <IncludeAssets>compile; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
     </PackageReference>
     <PackageReference Include="CsvHelper" Version="33.1.0" />
     <PackageReference Include="Dapper" Version="2.1.72" />

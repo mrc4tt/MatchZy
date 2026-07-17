@@ -58,7 +58,7 @@ namespace MatchZy
             float speed = predictThrowSpeed.Value;
             Vector vel = new Vector(fx * speed, fy * speed, fz * speed);
 
-            var (path, landing, bounces) = SimulateGrenade(start, vel);
+            var (path, landing, bounces) = SimulateGrenade(start, vel, origin.Z);
 
             ClearPrediction();
             DrawPrediction(path, landing);
@@ -66,23 +66,25 @@ namespace MatchZy
             PrintToPlayerChat(player, Localizer.ForPlayer(player, "matchzy.pm.predictresult", $"{bounces}"));
         }
 
-        // Ballistic forward-sim with world-trace bounces. Integrates a parabola (gravity), ray-traces
-        // each step against solid geometry, and on a hit reflects the velocity across the surface
-        // normal (restitution predictElasticity) and bleeds tangential speed (predictFriction) until
-        // it comes to rest or the flight time cap. Returns the sampled path, the resting (landing)
-        // point, and the bounce count. Constants are convars for live calibration.
-        private (List<Vector> path, Vector landing, int bounces) SimulateGrenade(Vector start, Vector startVel)
+        // Ballistic forward-sim. With the fork's Trace API (HAS_CSS_TRACE) it ray-traces each step
+        // against solid geometry and reflects on hits (real wall/floor bounces). Without it (CI build
+        // against NuGet, which lacks Trace) it falls back to a no-collision estimate that lands where
+        // the parabola descends back to the thrower's floor plane. Returns the sampled path, the
+        // resting (landing) point, and the bounce count.
+        private (List<Vector> path, Vector landing, int bounces) SimulateGrenade(Vector start, Vector startVel, float floorZ)
         {
             const float dt = 1.0f / 64.0f;
             float g = predictGravity.Value;
-            float e = predictElasticity.Value;
-            float fr = predictFriction.Value;
 
             var path = new List<Vector> { new Vector(start.X, start.Y, start.Z) };
             Vector pos = new Vector(start.X, start.Y, start.Z);
             Vector v = new Vector(startVel.X, startVel.Y, startVel.Z);
-            var opts = new TraceOptions { InteractsWith = Masks.Solid };
             int bounces = 0;
+
+#if HAS_CSS_TRACE
+            float e = predictElasticity.Value;
+            float fr = predictFriction.Value;
+            var opts = new TraceOptions { InteractsWith = Masks.Solid };
 
             for (int step = 0; step < 320; step++)   // up to ~5s of flight
             {
@@ -126,6 +128,24 @@ namespace MatchZy
                         path.Add(new Vector(pos.X, pos.Y, pos.Z));
                 }
             }
+#else
+            // No Trace API (NuGet build): no-collision parabola, landing at the floor plane.
+            for (int step = 0; step < 320; step++)
+            {
+                v.Z -= g * dt;
+                Vector next = new Vector(pos.X + v.X * dt, pos.Y + v.Y * dt, pos.Z + v.Z * dt);
+                if (v.Z < 0 && next.Z <= floorZ && pos.Z > floorZ)
+                {
+                    float t = (pos.Z - floorZ) / (pos.Z - next.Z);
+                    Vector hit = new Vector(pos.X + (next.X - pos.X) * t, pos.Y + (next.Y - pos.Y) * t, floorZ);
+                    path.Add(hit);
+                    return (path, hit, bounces);
+                }
+                pos = next;
+                if ((step & 1) == 0)
+                    path.Add(new Vector(pos.X, pos.Y, pos.Z));
+            }
+#endif
             return (path, pos, bounces);
         }
 
