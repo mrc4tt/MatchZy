@@ -1181,8 +1181,35 @@ ammo_grenade_limit_total 4
                     }
                 }
 
-                // Nothing new to add and no duplicates to clean -> leave the file untouched.
-                if (missingBlocks.Count == 0 && !removedDuplicateHeaders)
+                // Prune retired cvars: a convar that was renamed/removed leaves a dead line in old
+                // config.cfg files that spams "Unknown command '<name>'!" every time config.cfg execs.
+                // Remove the setting line (or a commented-out one) plus a directly-preceding help
+                // comment. Only EXACT retired names are touched; the current replacement (if any) is
+                // appended by the missing-cvar pass above, so this migrates the file cleanly.
+                var retiredCvars = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+                {
+                    "matchzy_ready_hint_suppress_warmup", // renamed -> matchzy_ready_hide_warmup_hud
+                };
+                bool removedRetired = false;
+                for (int i = lines.Count - 1; i >= 0; i--)
+                {
+                    var t = lines[i].Trim();
+                    if (t.Length == 0)
+                        continue;
+                    string first = t.StartsWith("//")
+                        ? t.TrimStart('/').Trim().Split(new[] { ' ', '\t' }, 2)[0]
+                        : t.Split(new[] { ' ', '\t' }, 2)[0];
+                    if (!retiredCvars.Contains(first))
+                        continue;
+                    lines.RemoveAt(i);
+                    // Also drop a single directly-preceding help comment (not the update header).
+                    if (i - 1 >= 0 && lines[i - 1].Trim().StartsWith("//") && lines[i - 1].Trim() != header)
+                        lines.RemoveAt(i - 1);
+                    removedRetired = true;
+                }
+
+                // Nothing new to add and nothing to clean -> leave the file untouched.
+                if (missingBlocks.Count == 0 && !removedDuplicateHeaders && !removedRetired)
                 {
                     return;
                 }
@@ -1211,6 +1238,8 @@ ammo_grenade_limit_total 4
                     Console.WriteLine($"[MatchZy] Appended {missingBlocks.Count} missing cvar(s) to {ConfigFiles.Paths.Config}.");
                 if (removedDuplicateHeaders)
                     Console.WriteLine($"[MatchZy] Collapsed duplicate update headers in {ConfigFiles.Paths.Config}.");
+                if (removedRetired)
+                    Console.WriteLine($"[MatchZy] Removed retired cvar line(s) from {ConfigFiles.Paths.Config}.");
             }
             catch (Exception ex)
             {

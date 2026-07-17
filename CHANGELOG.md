@@ -27,6 +27,7 @@ Fork version numbering is independent of upstream. Upstream changelog: <https://
 - Practice `.delnade` can now delete multiple lineups at once: `.delnade <name1> <name2> ...` removes each, and `.delnade all` removes every lineup you saved on the current map. It reports which were deleted and which were not found.
 - Fixed a rare `ArrayTypeMismatchException` when entering practice (`.prac` -> `GetSpawns`) on servers running a call-history crash tracer: the spawn lists are now pre-sized so the list-grow path that tripped it is never taken.
 - Added `matchzy_ready_up_by_ping` (default `true`): set it `false` to stop pinging (middle-mouse / scroll button) from toggling your ready status, for players who ready up by accident.
+- config.cfg now auto-removes retired convar lines on load (starting with the renamed `matchzy_ready_hint_suppress_warmup`, now `matchzy_ready_hide_warmup_hud`), so an upgraded server no longer spams "Unknown command" when config.cfg execs.
 - Fixed getting stuck in the spectator/observer camera for several seconds after picking a team during the ready phase (with the HTML ready panel): hiding the native warmup also disabled warmup's auto-respawn, so a fresh team-joiner was not spawned. Players are now respawned on join, with a periodic safety sweep that keeps every T/CT player spawned during the ready phase.
 
 # 0.8.55
