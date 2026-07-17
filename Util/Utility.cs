@@ -413,6 +413,16 @@ namespace MatchZy
                             gr.GameRestart = expectedRestart;
                             changed = true;
                         }
+                        // Freeze the round timer during the ready phase. Forcing warmup off (to hide
+                        // the native banner) also drops mp_warmup_pausetimer, so the round timer would
+                        // otherwise count down (the "warmup timer is back" bug). Keeping the round
+                        // start time current each tick holds the displayed time constant = paused,
+                        // matching what pausetimer does in real warmup.
+                        if (_fakeWarmupActive)
+                        {
+                            gr.RoundStartTime = Server.CurrentTime;
+                            changed = true;
+                        }
                     }
                     if (changed)
                         Utilities.SetStateChanged(_readyProxy!, "CCSGameRulesProxy", "m_pGameRules");
@@ -444,7 +454,11 @@ namespace MatchZy
                         continue;
 
                     var sb = new StringBuilder();
-                    sb.Append($"<font class='fontSize-l' color='#ffcf3f'>{Localizer.ForPlayer(target, "matchzy.ready.title")}</font><br>");
+                    // WARMUP badge: the native "WARMUP" banner is hidden while the HTML panel is up,
+                    // so the panel carries the warmup indicator itself. Static (no per-tick change) so
+                    // it does not defeat the below change-detection and re-trigger the show animation.
+                    sb.Append($"<font class='fontSize-l' color='#ff9a3c'>&#9679; {Localizer.ForPlayer(target, "matchzy.ready.warmuptag")}</font><br>");
+                    sb.Append($"<font class='fontSize-m' color='#ffcf3f'>{Localizer.ForPlayer(target, "matchzy.ready.title")}</font><br>");
                     sb.Append($"<font class='fontSize-sm' color='#c8c8c8'>{Localizer.ForPlayer(target, "matchzy.ready.mode", mode)}</font><br>");
                     sb.Append($"{bar} <font class='fontSize-m' color='#ffffff'>{_rpReady} / {_rpRequired}</font><br>");
                     sb.Append($"<font class='fontSize-sm' color='#9ecbff'>CT {_rpCtReady}/{_rpCtCount}</font><font class='fontSize-sm' color='#ffffff'> &nbsp; </font><font class='fontSize-sm' color='#ffb36b'>T {_rpTReady}/{_rpTCount}</font>");

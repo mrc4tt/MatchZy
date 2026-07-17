@@ -16,7 +16,7 @@ namespace MatchZy
     public partial class MatchZy : BasePlugin
     {
         public override string ModuleName => "MatchZy";
-        public override string ModuleVersion => "0.8.55";
+        public override string ModuleVersion => "0.8.56";
         public override string ModuleAuthor => "WD- Edited by Miksen @ FSHOST.me";
         public override string ModuleDescription => "A plugin for running and managing CS2 practice/pugs/scrims/matches!";
         public string chatPrefix = $"{ChatColors.Green}[MatchZy]{ChatColors.Default}";
@@ -528,6 +528,23 @@ namespace MatchZy
                 { ".worsttspawn", OnWorstTSpawnCommand },
                 { ".savepos", OnSavePosCommand },
                 { ".loadpos", OnLoadPosCommand },
+                { ".listpos", OnListPosCommand },
+                { ".delpos", OnDelPosCommand },
+                { ".flashtest", OnFlashTestCommand },
+                { ".ft", OnFlashTestCommand },
+                { ".blind", OnSelfFlashCommand },
+                { ".wipe", OnWipeNadesCommand },
+                { ".clearnades", OnWipeNadesCommand },
+                { ".jt", OnJumpThrowCommand },
+                { ".jumpthrow", OnJumpThrowCommand },
+                { ".cleanup", OnCleanupCommand },
+                { ".autoclear", OnAutoClearCommand },
+                { ".landmarker", OnLandMarkerCommand },
+                { ".lm", OnLandMarkerCommand },
+                { ".mynades", OnMyNadesCommand },
+                { ".arc", OnArcCommand },
+                { ".traceline", OnArcCommand },
+                { ".predict", OnPredictCommand },
                 { ".version", OnMatchZyVersionCommand },
                 { ".readycheck", OnReadyCheckCommand },
                 { ".rcheck", OnReadyCheckCommand },
@@ -572,6 +589,11 @@ namespace MatchZy
             // Practice interactive spawn markers: +use aimed at a .showspawns beam teleports
             // to that spawn. Edge-triggered (fires once on Use press), gated on spawnMarkersActive.
             RegisterListener<Listeners.OnPlayerButtonsChanged>(OnSpawnMarkerButtonHandler);
+
+            // Demo-arc sampler: samples traced grenades each tick. No-op unless .arc is on
+            // and a grenade is mid-flight.
+            RegisterListener<Listeners.OnTick>(TraceArcTick);
+
 
             RegisterEventHandler<EventPlayerTeam>(
                 (@event, info) =>
@@ -1187,6 +1209,23 @@ namespace MatchZy
                         HandleLoadNadeCommand(player, messageCommandArg);
                     }
 
+                    // Named position slots (#2). No-arg .savepos/.loadpos/.listpos/.delpos hit the
+                    // exact-match block above (returns early); these fire only for the arg forms.
+                    if (message.StartsWith(".savepos "))
+                    {
+                        HandleSavePosCommand(player, messageCommandArg);
+                    }
+
+                    if (message.StartsWith(".loadpos "))
+                    {
+                        HandleLoadPosCommand(player, messageCommandArg);
+                    }
+
+                    if (message.StartsWith(".delpos "))
+                    {
+                        HandleDelPosCommand(player, messageCommandArg);
+                    }
+
                     if (message.StartsWith(".spawn") || message.StartsWith(".sp"))
                     {
                         HandleSpawnCommand(player, messageCommandArg, player.TeamNum, "spawn");
@@ -1284,6 +1323,17 @@ namespace MatchZy
                     }
 
                     var userId = player!.UserId;
+
+                    // #3 flash-test HUD: tell the VICTIM their own blind duration (pop-flash /
+                    // self-flash tuning), opt-in per player via .flashtest. Distinct from the
+                    // attacker readout above.
+                    if (userId != null && !player.IsBot && flashTestList.Contains((int)userId))
+                    {
+                        double ownBlind = Math.Round(@event.BlindDuration, 2);
+                        bool self = attacker!.Handle == player.Handle;
+                        PrintToPlayerChat(player, Localizer.ForPlayer(player, self ? "matchzy.pm.flashtestself" : "matchzy.pm.flashtestother", $"{ownBlind}"));
+                    }
+
                     if (userId != null && noFlashList.Contains((int)userId))
                     {
                         Server.NextFrame(() =>

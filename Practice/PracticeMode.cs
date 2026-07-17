@@ -114,9 +114,18 @@ namespace MatchZy
         }
     }
 
+    // Demo-arc: sampled flight path of one thrown grenade (see TraceArcTick / DrawArc).
+    public class NadeArcTrace
+    {
+        public List<Vector> Points = new();
+        public int Ticks = 0;
+    }
+
     public partial class MatchZy
     {
         int maxLastGrenadesSavedLimit = 512;
+        // Per-account saved-lineup cap (.savenade / .mynades).
+        const int maxSavedNades = 500;
         Dictionary<int, List<GrenadeThrownData>> lastGrenadesData = new();
         // Per-player cursor into lastGrenadesData for no-arg .back stepping (issue
         // MatchZy-Enhanced#7 / CS:GO prac parity). Absent = not stepping yet: the first
@@ -141,6 +150,24 @@ namespace MatchZy
         Dictionary<int, DateTime> lastGrenadeThrownTime = new();
         Dictionary<int, PlayerPracticeTimer> playerTimers = new();
         Dictionary<int, PlayerLocationData> savedPlayerLocationData = new();
+        // Named position slots (#2): .savepos <name> / .loadpos <name> / .listpos / .delpos <name>.
+        // Separate from the single default slot above (no-arg .savepos/.loadpos). userId -> name -> pos.
+        Dictionary<int, Dictionary<string, PlayerLocationData>> namedPlayerPositions = new();
+        const int maxNamedPositions = 32;
+        // Flash-test HUD (#3): userIds who opted into a chat readout of their own blind duration
+        // whenever they get flashed (pop-flash / self-flash tuning). Toggled by .flashtest / .ft.
+        readonly HashSet<int> flashTestList = new();
+        // .autoclear: when true, every detonation wipes older utility and keeps only the just-
+        // detonated result (fast lineup iteration). Server-wide toggle.
+        bool autoClearUtility = false;
+        // .landmarker: when true, each detonation drops a short-lived beam at the impact point.
+        bool showLandingMarkers = false;
+        // .arc / .traceline (demo-arc): when true, each thrown grenade's flight is sampled
+        // (projectile index -> point list) and drawn as a CBeam poly-line when it lands. Sampling
+        // runs in TraceArcTick, gated so it's a no-op when nothing is being traced.
+        bool traceNadeArcs = false;
+        readonly Dictionary<uint, NadeArcTrace> tracedArcs = new();
+        int arcTickCounter = 0;
 
         public Dictionary<byte, List<Position>> spawnsData = GetEmptySpawnsData();
         public Dictionary<byte, List<Position>> coachSpawns = GetEmptySpawnsData();
@@ -239,7 +266,7 @@ namespace MatchZy
             GetSpawns();
             Server.PrintToChatAll($" {ChatColors.Green}Spawns: {ChatColors.Default}.spawn, .ctspawn, .tspawn, .bestspawn, .worstspawn");
             Server.PrintToChatAll($" {ChatColors.Green}Bots: {ChatColors.Default}.bot, .ctbot, .tbot, .nobots, .crouchbot, .boost, .crouchboost");
-            Server.PrintToChatAll($" {ChatColors.Green}Nades: {ChatColors.Default}.loadnade, .savenade, .importnade, .listnades");
+            Server.PrintToChatAll($" {ChatColors.Green}Nades: {ChatColors.Default}.loadnade, .savenade, .delnade, .importnade, .listnades, .mynades");
             Server.PrintToChatAll($" {ChatColors.Green}Nade Throw: {ChatColors.Default}.rethrow, .throwindex <index>, .lastindex, .delay <number>");
             Server.PrintToChatAll($" {ChatColors.Green}Utility & Toggles: {ChatColors.Default}.clear, .fastforward, .last, .back, .solid, .impacts, .traj");
             Server.PrintToChatAll($" {ChatColors.Green}Utility & Toggles: {ChatColors.Default}.nadecam, .savepos, .loadpos");
@@ -445,6 +472,16 @@ namespace MatchZy
                         }
                     }
 
+                    // Per-account save cap: allow overwriting an existing name, but block
+                    // brand-new lineups once the player hits maxSavedNades.
+                    bool isNewLineup = !savedNadesDict.ContainsKey(playerSteamID) || !savedNadesDict[playerSteamID].ContainsKey(lineupName);
+                    int currentCount = savedNadesDict.TryGetValue(playerSteamID, out var existingSlots) ? existingSlots.Count : 0;
+                    if (isNewLineup && currentCount >= maxSavedNades)
+                    {
+                        PrintToPlayerChat(player, Localizer.ForPlayer(player, "matchzy.pm.nadelimitreached", $"{maxSavedNades}"));
+                        return;
+                    }
+
                     // Update or add the new lineup information
                     if (!savedNadesDict.ContainsKey(playerSteamID))
                     {
@@ -486,79 +523,99 @@ namespace MatchZy
             }
         }
 
+        [ConsoleCommand("css_mynades", "Shows how many grenade lineups you have saved")]
+        public void OnMyNadesCommand(CCSPlayerController? player, CommandInfo? command)
+        {
+            if (!isPractice || player == null)
+                return;
+            string steamId = isSaveNadesAsGlobalEnabled ? "default" : player.SteamID.ToString();
+            string path = Path.Join(Server.GameDirectory + "/csgo/cfg", MatchZyCfgRel("savednades.json"));
+            int count = 0;
+            try
+            {
+                if (File.Exists(path))
+                {
+                    var dict = JsonSerializer.Deserialize<Dictionary<string, Dictionary<string, Dictionary<string, string>>>>(ReadSavedNadesJson(path));
+                    if (dict != null && dict.TryGetValue(steamId, out var slots))
+                        count = slots.Count;
+                }
+            }
+            catch (Exception e)
+            {
+                Log($"[MyNades] {e.Message}");
+            }
+            PrintToPlayerChat(player, Localizer.ForPlayer(player, "matchzy.pm.mynades", $"{count}", $"{maxSavedNades}"));
+        }
+
         private void HandleDeleteNadeCommand(CCSPlayerController? player, string saveNadeName)
         {
             if (!isPractice || player == null)
                 return;
 
-            if (!string.IsNullOrWhiteSpace(saveNadeName))
+            if (string.IsNullOrWhiteSpace(saveNadeName))
             {
-                // Grab player steamid
-                string playerSteamID;
-                if (isSaveNadesAsGlobalEnabled == false)
+                ReplyToUserCommand(player, Localizer.ForPlayer(player, "matchzy.cc.usage", ".delnade <name> [name2 ...] | .delnade all"));
+                return;
+            }
+
+            string playerSteamID = isSaveNadesAsGlobalEnabled ? "default" : player.SteamID.ToString();
+            string savednadesPath = Path.Join(Server.GameDirectory + "/csgo/cfg", MatchZyCfgRel("savednades.json"));
+
+            try
+            {
+                string existingJson = ReadSavedNadesJson(savednadesPath);
+                var savedNadesDict = JsonSerializer.Deserialize<Dictionary<string, Dictionary<string, Dictionary<string, string>>>>(existingJson) ?? new Dictionary<string, Dictionary<string, Dictionary<string, string>>>();
+
+                if (!savedNadesDict.TryGetValue(playerSteamID, out var slots) || slots.Count == 0)
                 {
-                    playerSteamID = player.SteamID.ToString();
+                    ReplyToUserCommand(player, Localizer.ForPlayer(player, "matchzy.pm.lineupnotfound", saveNadeName));
+                    return;
+                }
+
+                string currentMap = Server.MapName;
+                string[] names = saveNadeName.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+                var deleted = new List<string>();
+                var notFound = new List<string>();
+
+                if (names.Length == 1 && names[0].Equals("all", StringComparison.OrdinalIgnoreCase))
+                {
+                    // Delete every lineup this player saved on the current map.
+                    foreach (var kv in slots.Where(k => k.Value.TryGetValue("Map", out var m) && m == currentMap).ToList())
+                    {
+                        slots.Remove(kv.Key);
+                        deleted.Add(kv.Key);
+                    }
                 }
                 else
                 {
-                    playerSteamID = "default";
-                }
-
-                // Define the file path
-                string savednadesfileName = MatchZyCfgRel("savednades.json");
-                string savednadesPath = Path.Join(Server.GameDirectory + "/csgo/cfg", savednadesfileName);
-
-                try
-                {
-                    // Read existing JSON content
-                    string existingJson = ReadSavedNadesJson(savednadesPath);
-
-                    //Console.WriteLine($"Existing JSON Content: {existingJson}");
-
-                    // Deserialize the existing JSON content
-                    var savedNadesDict = JsonSerializer.Deserialize<Dictionary<string, Dictionary<string, Dictionary<string, string>>>>(existingJson) ?? new Dictionary<string, Dictionary<string, Dictionary<string, string>>>();
-
-                    // Check if the lineup exists for the given SteamID and name
-                    if (savedNadesDict.ContainsKey(playerSteamID) && savedNadesDict[playerSteamID].ContainsKey(saveNadeName))
+                    // Delete each named lineup (only if it lives on the current map, as before).
+                    foreach (var name in names)
                     {
-                        var lineupInfo = savedNadesDict[playerSteamID][saveNadeName];
-
-                        // Check if the lineup is for the current maps
-                        if (lineupInfo.ContainsKey("Map") && lineupInfo["Map"] == Server.MapName)
+                        if (slots.TryGetValue(name, out var info) && info.TryGetValue("Map", out var m) && m == currentMap)
                         {
-                            // Remove the specified lineup
-                            savedNadesDict[playerSteamID].Remove(saveNadeName);
-
-                            // Serialize the updated dictionary back to JSON
-                            string updatedJson = JsonSerializer.Serialize(savedNadesDict, new JsonSerializerOptions { WriteIndented = true });
-
-                            // Write the updated JSON content back to the file
-                            File.WriteAllText(savednadesPath, updatedJson);
-
-                            // ReplyToUserCommand(player, $"Lineup '{saveNadeName}' deleted successfully.");
-                            ReplyToUserCommand(player, Localizer.ForPlayer(player, "matchzy.pm.lineupdeletesuccess", saveNadeName));
+                            slots.Remove(name);
+                            deleted.Add(name);
                         }
                         else
                         {
-                            // ReplyToUserCommand(player, $"Lineup '{saveNadeName}' not found on the current map!");
-                            ReplyToUserCommand(player, Localizer.ForPlayer(player, "matchzy.pm.nadenotfoundonmap", saveNadeName));
+                            notFound.Add(name);
                         }
                     }
-                    else
-                    {
-                        // ReplyToUserCommand(player, $"Lineup '{saveNadeName}' not found!");
-                        ReplyToUserCommand(player, Localizer.ForPlayer(player, "matchzy.pm.lineupnotfound", saveNadeName));
-                    }
                 }
-                catch (JsonException ex)
+
+                if (deleted.Count > 0)
                 {
-                    Log($"Error handling JSON: {ex.Message}");
+                    File.WriteAllText(savednadesPath, JsonSerializer.Serialize(savedNadesDict, new JsonSerializerOptions { WriteIndented = true }));
+                    ReplyToUserCommand(player, Localizer.ForPlayer(player, "matchzy.pm.nadesdeleted", string.Join(", ", deleted)));
                 }
+                if (notFound.Count > 0)
+                    ReplyToUserCommand(player, Localizer.ForPlayer(player, "matchzy.pm.nadesnotfound", string.Join(", ", notFound)));
+                if (deleted.Count == 0 && notFound.Count == 0)
+                    ReplyToUserCommand(player, Localizer.ForPlayer(player, "matchzy.pm.lineupnotfound", saveNadeName));
             }
-            else
+            catch (JsonException ex)
             {
-                // ReplyToUserCommand(player, $"Usage: .delnade <name>");
-                ReplyToUserCommand(player, Localizer.ForPlayer(player, "matchzy.cc.usage", $".delnade <name>"));
+                Log($"Error handling JSON: {ex.Message}");
             }
         }
 
@@ -871,6 +928,141 @@ namespace MatchZy
             // so folding the flag/list reset here disarms interaction on all of them.
             spawnMarkersActive = false;
             activeSpawnMarkers.Clear();
+        }
+
+        // #F self-flash: throw a flashbang at your own face for pop-flash reaction reps
+        // (no teammate/bind needed). Spawns a flashbang_projectile at eye height moving
+        // forward a hair so it arms and pops in front of you. Marked Globalname="custom"
+        // so OnEntitySpawned does NOT record it into the .last/.rt nade history.
+        [ConsoleCommand("css_blind", "Throw a flashbang at yourself (pop-flash reaction practice)")]
+        public void OnSelfFlashCommand(CCSPlayerController? player, CommandInfo? command)
+        {
+            if (!isPractice || player == null || !player.UserId.HasValue || player.PlayerPawn.Value == null)
+                return;
+            if (player.TeamNum != (byte)CsTeam.CounterTerrorist && player.TeamNum != (byte)CsTeam.Terrorist)
+                return;
+            var pawn = player.PlayerPawn.Value;
+            if (pawn.AbsOrigin == null)
+                return;
+
+            Vector origin = pawn.AbsOrigin;
+            QAngle ang = pawn.EyeAngles;
+            double pitch = ang.X * Math.PI / 180.0;
+            double yaw = ang.Y * Math.PI / 180.0;
+            float fx = (float)(Math.Cos(pitch) * Math.Cos(yaw));
+            float fy = (float)(Math.Cos(pitch) * Math.Sin(yaw));
+            float fz = (float)(-Math.Sin(pitch));
+            Vector spawnPos = new Vector(origin.X + fx * 20f, origin.Y + fy * 20f, origin.Z + 62f);
+            Vector velocity = new Vector(fx * 150f, fy * 150f, fz * 150f + 60f);
+
+            var flash = Utilities.CreateEntityByName<CFlashbangProjectile>("flashbang_projectile");
+            if (flash == null)
+            {
+                PrintToPlayerChat(player, Localizer.ForPlayer(player, "matchzy.pm.selfflashfail"));
+                return;
+            }
+            flash.DispatchSpawn();
+            flash.InitialPosition.X = spawnPos.X;
+            flash.InitialPosition.Y = spawnPos.Y;
+            flash.InitialPosition.Z = spawnPos.Z;
+            flash.InitialVelocity.X = velocity.X;
+            flash.InitialVelocity.Y = velocity.Y;
+            flash.InitialVelocity.Z = velocity.Z;
+            flash.Teleport(spawnPos, new QAngle(0, 0, 0), velocity);
+            flash.Globalname = "custom";
+            flash.TeamNum = player.TeamNum;
+            flash.Thrower.Raw = player.PlayerPawn.Raw;
+            flash.OriginalThrower.Raw = player.PlayerPawn.Raw;
+            flash.OwnerEntity.Raw = player.PlayerPawn.Raw;
+            PrintToPlayerChat(player, Localizer.ForPlayer(player, "matchzy.pm.selfflash"));
+        }
+
+        // #I wipe: clear this player's grenade throw history (.last / .back / .rt / .throwindex
+        // sources) without leaving/re-entering practice.
+        [ConsoleCommand("css_wipe", "Clears your grenade throw history")]
+        [ConsoleCommand("css_clearnades", "Clears your grenade throw history")]
+        public void OnWipeNadesCommand(CCSPlayerController? player, CommandInfo? command)
+        {
+            if (!isPractice || player == null || !player.UserId.HasValue)
+                return;
+            int userId = player.UserId.Value;
+            lastGrenadesData.Remove(userId);
+            nadeSpecificLastGrenadeData.Remove(userId);
+            lastGrenadeBackCursor.Remove(userId);
+            PrintToPlayerChat(player, Localizer.ForPlayer(player, "matchzy.pm.nadeswiped"));
+        }
+
+        // #A1 EXPERIMENTAL server-side jumpthrow. There is no usercmd/RunCommand hook exposed
+        // and m_nButtons is client-authoritative (the engine rewrites it from the client cmd each
+        // tick), so this drives the movement-services button-state array directly over a short
+        // frame chain: hold Attack a few frames to pull the pin, then on the throw frame set Jump
+        // and clear Attack in the same frame (release -> airborne throw). May be clobbered by the
+        // client cmd on some builds - hence the matchzy_experimental_jumpthrow gate. Never touches
+        // ChangeTeam/weapon-strip paths, so no crash class; worst case it just does nothing.
+        [ConsoleCommand("css_jt", "Experimental: jumpthrow the held grenade (matchzy_experimental_jumpthrow)")]
+        [ConsoleCommand("css_jumpthrow", "Experimental: jumpthrow the held grenade (matchzy_experimental_jumpthrow)")]
+        public void OnJumpThrowCommand(CCSPlayerController? player, CommandInfo? command)
+        {
+            if (!isPractice || player == null || !IsPlayerValid(player) || !player.UserId.HasValue)
+                return;
+
+            if (!experimentalJumpThrow.Value)
+            {
+                PrintToPlayerChat(player, Localizer.ForPlayer(player, "matchzy.pm.jtdisabled"));
+                return;
+            }
+
+            var pawn = player.PlayerPawn.Value;
+            if (pawn?.MovementServices == null)
+                return;
+
+            string? active = pawn.WeaponServices?.ActiveWeapon?.Value?.DesignerName;
+            bool isNade = active is "weapon_smokegrenade" or "weapon_hegrenade" or "weapon_flashbang"
+                or "weapon_molotov" or "weapon_incgrenade" or "weapon_decoy";
+            if (!isNade)
+            {
+                PrintToPlayerChat(player, Localizer.ForPlayer(player, "matchzy.pm.jtnotgrenade"));
+                return;
+            }
+
+            JumpThrowStep(player, 0);
+            PrintToPlayerChat(player, Localizer.ForPlayer(player, "matchzy.pm.jtthrown"));
+        }
+
+        // One frame of the forced jumpthrow input sequence (see OnJumpThrowCommand).
+        private void JumpThrowStep(CCSPlayerController player, int step)
+        {
+            const int primeFrames = 5;                 // frames holding Attack to pull the pin
+            const int throwFrame = primeFrames;        // frame to jump + release
+            const int totalFrames = primeFrames + 3;   // trailing frames to stop forcing input
+
+            if (!IsPlayerValid(player) || player.PlayerPawn.Value?.MovementServices == null)
+                return;
+
+            try
+            {
+                var ms = new CCSPlayer_MovementServices(player.PlayerPawn.Value.MovementServices.Handle);
+                var states = ms.Buttons.ButtonStates;   // Span<ulong> over native m_pButtonStates
+                if (states.Length > 0)
+                {
+                    ulong attack = (ulong)PlayerButtons.Attack;
+                    ulong jump = (ulong)PlayerButtons.Jump;
+                    if (step < primeFrames)
+                        states[0] |= attack;                        // hold Attack -> prime
+                    else if (step == throwFrame)
+                        states[0] = (states[0] | jump) & ~attack;    // jump + release -> throw
+                    else
+                        states[0] &= ~(attack | jump);               // stop forcing
+                }
+            }
+            catch (Exception e)
+            {
+                Log($"[JumpThrow] {e.Message}");
+                return;
+            }
+
+            if (step < totalFrames)
+                Server.NextFrame(() => JumpThrowStep(player, step + 1));
         }
 
         [ConsoleCommand("css_god", "Sets Infinite health for player")]
@@ -2217,6 +2409,146 @@ namespace MatchZy
             RemoveGrenadeEntities();
         }
 
+        [ConsoleCommand("css_cleanup", "Clears all utility currently on the map")]
+        public void OnCleanupCommand(CCSPlayerController? player, CommandInfo? command)
+        {
+            if (!isPractice || player == null)
+                return;
+            RemoveGrenadeEntities();
+            PrintToPlayerChat(player, Localizer.ForPlayer(player, "matchzy.pm.utilitycleared"));
+        }
+
+        [ConsoleCommand("css_autoclear", "Toggle auto-clearing older utility when a new grenade detonates")]
+        public void OnAutoClearCommand(CCSPlayerController? player, CommandInfo? command)
+        {
+            if (!isPractice || player == null)
+                return;
+            autoClearUtility = !autoClearUtility;
+            PrintToPlayerChat(player, Localizer.ForPlayer(player, autoClearUtility ? "matchzy.pm.autoclearon" : "matchzy.pm.autoclearoff"));
+        }
+
+        [ConsoleCommand("css_landmarker", "Toggle a beam marker at each grenade's detonation point")]
+        [ConsoleCommand("css_lm", "Toggle a beam marker at each grenade's detonation point")]
+        public void OnLandMarkerCommand(CCSPlayerController? player, CommandInfo? command)
+        {
+            if (!isPractice || player == null)
+                return;
+            showLandingMarkers = !showLandingMarkers;
+            PrintToPlayerChat(player, Localizer.ForPlayer(player, showLandingMarkers ? "matchzy.pm.landmarkeron" : "matchzy.pm.landmarkeroff"));
+        }
+
+        [ConsoleCommand("css_arc", "Toggle drawing the trajectory arc of thrown grenades")]
+        [ConsoleCommand("css_traceline", "Toggle drawing the trajectory arc of thrown grenades")]
+        public void OnArcCommand(CCSPlayerController? player, CommandInfo? command)
+        {
+            if (!isPractice || player == null)
+                return;
+            traceNadeArcs = !traceNadeArcs;
+            PrintToPlayerChat(player, Localizer.ForPlayer(player, traceNadeArcs ? "matchzy.pm.arcon" : "matchzy.pm.arcoff"));
+        }
+
+        // Register a freshly-thrown projectile for arc tracing (called from OnEntitySpawnedHandler
+        // when .arc is on). projectile.Index keys the sampled points collected each tick.
+        public void RegisterArcTrace(uint projectileIndex)
+        {
+            if (!traceNadeArcs)
+                return;
+            tracedArcs[projectileIndex] = new NadeArcTrace();
+        }
+
+        // OnTick sampler: append each traced projectile's position, and when it lands (entity gone)
+        // or a safety cap is hit, draw its arc and drop it. Cheap no-op while nothing is traced.
+        private void TraceArcTick()
+        {
+            if (tracedArcs.Count == 0)
+                return;
+            if (!isPractice)
+            {
+                tracedArcs.Clear();
+                return;
+            }
+
+            arcTickCounter++;
+            bool sample = (arcTickCounter % 2) == 0;   // ~32 samples/sec
+
+            List<uint>? finished = null;
+            foreach (var kv in tracedArcs)
+            {
+                var trace = kv.Value;
+                trace.Ticks++;
+                var ent = Utilities.GetEntityFromIndex<CBaseCSGrenadeProjectile>((int)kv.Key);
+                bool alive = ent != null && ent.IsValid && ent.AbsOrigin != null;
+                if (alive && sample && trace.Points.Count < 160)
+                {
+                    var o = ent!.AbsOrigin!;
+                    trace.Points.Add(new Vector(o.X, o.Y, o.Z));
+                }
+                // Finish when the projectile is gone (detonated) or after a safety cap (~4s at 64t)
+                // guards against an index that was reused by another entity.
+                if (!alive || trace.Ticks > 256)
+                    (finished ??= new()).Add(kv.Key);
+            }
+
+            if (finished != null)
+            {
+                foreach (var idx in finished)
+                {
+                    DrawArc(tracedArcs[idx].Points);
+                    tracedArcs.Remove(idx);
+                }
+            }
+        }
+
+        // Store a recorded throw into the per-player history (source for .last / .back / .rt /
+        // .throwindex). Shared by the normal AbsVelocity path and the position-delta recovery
+        // path in OnEntitySpawnedHandler.
+        public void RecordThrownNade(int client, string nadeType, Vector position, QAngle angle, Vector playerPos, QAngle eyeAngles, ushort itemIndex, float duckAmount, Vector velocity, Vector angularVelocity)
+        {
+            var data = new GrenadeThrownData(position, angle, velocity, playerPos, eyeAngles, nadeType, DateTime.Now, itemIndex, duckAmount, angularVelocity);
+            if (!lastGrenadesData.ContainsKey(client))
+                lastGrenadesData[client] = new();
+            if (!nadeSpecificLastGrenadeData.ContainsKey(client))
+                nadeSpecificLastGrenadeData[client] = new();
+
+            nadeSpecificLastGrenadeData[client][nadeType] = data;
+            lastGrenadesData[client].Add(data);
+            if (maxLastGrenadesSavedLimit != 0 && lastGrenadesData[client].Count > maxLastGrenadesSavedLimit)
+                lastGrenadesData[client].RemoveAt(0);
+
+            // Reset the no-arg .back cursor: a new throw restarts stepping from the newest nade
+            // (issue MatchZy-Enhanced#7), and avoids a stale index after the history trim.
+            lastGrenadeBackCursor.Remove(client);
+        }
+
+        // Draw a sampled arc as a chain of CBeams, auto-removed after a few seconds.
+        private void DrawArc(List<Vector> pts)
+        {
+            if (pts.Count < 2)
+                return;
+            var beams = new List<CBeam>();
+            for (int i = 0; i < pts.Count - 1; i++)
+            {
+                var b = Utilities.CreateEntityByName<CBeam>("beam");
+                if (b == null)
+                    continue;
+                b.LifeState = 1;
+                b.Width = 1.5f;
+                b.Render = Color.Cyan;
+                b.EndPos.X = pts[i + 1].X;
+                b.EndPos.Y = pts[i + 1].Y;
+                b.EndPos.Z = pts[i + 1].Z;
+                b.Teleport(pts[i], new QAngle(0, 0, 0), new Vector(0, 0, 0));
+                b.DispatchSpawn();
+                beams.Add(b);
+            }
+            AddTimer(10.0f, () =>
+            {
+                foreach (var b in beams)
+                    if (b != null && b.IsValid)
+                        SafeRemoveEntity(b, "arc");
+            });
+        }
+
         [ConsoleCommand("css_spec", "Switches team to Spectator")]
         public void OnSpecCommand(CCSPlayerController? player, CommandInfo? command)
         {
@@ -2416,13 +2748,10 @@ namespace MatchZy
                 );
         }
 
-        // RemoveGrenadeEntities SAFE
-        public void RemoveGrenadeEntities()
+        // Snapshot every live utility entity (projectiles + smoke clouds + infernos),
+        // deduped by handle. Snapshotting first avoids removing during enumeration (crash).
+        private List<(CBaseEntity entity, string label)> GatherUtilityEntities()
         {
-            if (!isPractice)
-                return;
-
-            // Snapshot entities first; removing during enumeration can crash the server
             var entities = new List<(CBaseEntity? entity, string label)>();
 
             entities.AddRange(Utilities.FindAllEntitiesByDesignerName<CSmokeGrenadeProjectile>("smokegrenade_projectile").Select(e => ((CBaseEntity?)e, "smoke")));
@@ -2432,7 +2761,6 @@ namespace MatchZy
             entities.AddRange(Utilities.FindAllEntitiesByDesignerName<CFlashbangProjectile>("flashbang_projectile").Select(e => ((CBaseEntity?)e, "flashbang")));
             entities.AddRange(Utilities.FindAllEntitiesByDesignerName<CDecoyProjectile>("decoy_projectile").Select(e => ((CBaseEntity?)e, "decoy")));
 
-            // Deduplicate by handle to avoid double-removal crashes
             var unique = new List<(CBaseEntity entity, string label)>();
             var seen = new HashSet<nint>();
             foreach (var (entity, label) in entities)
@@ -2443,7 +2771,16 @@ namespace MatchZy
                     continue;
                 unique.Add((entity, label));
             }
+            return unique;
+        }
 
+        // RemoveGrenadeEntities SAFE
+        public void RemoveGrenadeEntities()
+        {
+            if (!isPractice)
+                return;
+
+            var unique = GatherUtilityEntities();
             // Defer actual removal to next frame to avoid touching entities mid-update
             Server.NextFrame(() =>
             {
@@ -2451,6 +2788,68 @@ namespace MatchZy
                 {
                     SafeRemoveEntity(entity, label);
                 }
+            });
+        }
+
+        // Clear all utility EXCEPT what sits within `radius` of keepPos. Used by .autoclear
+        // on a detonation: the just-detonated smoke cloud / inferno spawns at the detonation
+        // point, so keeping a small radius preserves the newest result while wiping older util.
+        public void ClearUtilityExcept(Vector keepPos, float radius)
+        {
+            if (!isPractice)
+                return;
+
+            var unique = GatherUtilityEntities();
+            float r2 = radius * radius;
+            Server.NextFrame(() =>
+            {
+                foreach (var (entity, label) in unique)
+                {
+                    if (entity != null && entity.IsValid && entity.AbsOrigin is { } o)
+                    {
+                        float dx = o.X - keepPos.X, dy = o.Y - keepPos.Y, dz = o.Z - keepPos.Z;
+                        if (dx * dx + dy * dy + dz * dz <= r2)
+                            continue;   // keep the just-detonated / nearby utility
+                    }
+                    SafeRemoveEntity(entity, label);
+                }
+            });
+        }
+
+        // Called from every detonate handler. Runs the opt-in detonation behaviors:
+        // .autoclear (wipe older utility, keep what just detonated at (x,y,z)) and
+        // .landmarker (draw a temporary beam at the detonation point).
+        public void OnUtilityDetonated(float x, float y, float z)
+        {
+            if (!isPractice)
+                return;
+            if (autoClearUtility)
+                ClearUtilityExcept(new Vector(x, y, z), 200f);
+            if (showLandingMarkers)
+                DrawLandingMarker(x, y, z);
+        }
+
+        // Landing marker: a short vertical beam at a detonation point, auto-removed after a
+        // few seconds. Reuses the CBeam draw from the spawn markers. RemoveSpawnBeams also clears
+        // these (shared "beam" designer), which is fine - a mode transition wipes both.
+        private void DrawLandingMarker(float x, float y, float z)
+        {
+            CBeam? beam = Utilities.CreateEntityByName<CBeam>("beam");
+            if (beam == null)
+                return;
+            beam.LifeState = 1;
+            beam.Width = 3;
+            beam.Render = Color.Yellow;
+            Vector basePos = new Vector(x, y, z + 4.0f);
+            beam.EndPos.X = x;
+            beam.EndPos.Y = y;
+            beam.EndPos.Z = z + 70.0f;
+            beam.Teleport(basePos, new QAngle(0, 0, 0), new Vector(0, 0, 0));
+            beam.DispatchSpawn();
+            AddTimer(6.0f, () =>
+            {
+                if (beam != null && beam.IsValid)
+                    SafeRemoveEntity(beam, "landmarker");
             });
         }
 
@@ -2734,8 +3133,31 @@ namespace MatchZy
                 PrintToPlayerChat(player, $"Rethrew {thrown} grenade(s).");
         }
 
-        [ConsoleCommand("css_savepos", "Saves the player location")]
+        // Normalize a named-position slot: trim, lowercase, keep [a-z0-9_-], cap length.
+        // Empty result => caller falls back to the default (no-arg) slot.
+        private static string SanitizePosName(string? raw)
+        {
+            if (string.IsNullOrWhiteSpace(raw))
+                return "";
+            var sb = new System.Text.StringBuilder();
+            foreach (char c in raw.Trim().ToLowerInvariant())
+            {
+                if (char.IsLetterOrDigit(c) || c == '_' || c == '-')
+                    sb.Append(c);
+                if (sb.Length >= 24)
+                    break;
+            }
+            return sb.ToString();
+        }
+
+        [ConsoleCommand("css_savepos", "Saves the player location. Usage: .savepos [name]")]
         public void OnSavePosCommand(CCSPlayerController? player, CommandInfo? command)
+        {
+            string name = command != null && command.ArgCount >= 2 ? command.ArgByIndex(1) : "";
+            HandleSavePosCommand(player, name);
+        }
+
+        public void HandleSavePosCommand(CCSPlayerController? player, string name)
         {
             if (!isPractice || player == null || !player.UserId.HasValue || player.PlayerPawn.Value == null)
                 return;
@@ -2744,14 +3166,39 @@ namespace MatchZy
             var pawn = player.PlayerPawn.Value;
             Vector position = new(pawn.AbsOrigin?.X, pawn.AbsOrigin?.Y, pawn.AbsOrigin?.Z);
             QAngle angle = new(pawn.EyeAngles?.X, pawn.EyeAngles?.Y, pawn.EyeAngles?.Z);
+            var data = new PlayerLocationData(position, angle);
 
-            savedPlayerLocationData[userId] = new PlayerLocationData(position, angle);
-            //Log($"[SavePos] Saved position for UserID {userId}, Position: {position}, Angle: {angle}!");
-            PrintToPlayerChat(player, Localizer["matchzy.pm.savepos"]);
+            string slot = SanitizePosName(name);
+            if (slot == "")
+            {
+                // Default single slot (unchanged behavior).
+                savedPlayerLocationData[userId] = data;
+                PrintToPlayerChat(player, Localizer["matchzy.pm.savepos"]);
+                return;
+            }
+
+            if (!namedPlayerPositions.TryGetValue(userId, out var slots))
+            {
+                slots = new();
+                namedPlayerPositions[userId] = slots;
+            }
+            if (!slots.ContainsKey(slot) && slots.Count >= maxNamedPositions)
+            {
+                PrintToPlayerChat(player, Localizer.ForPlayer(player, "matchzy.pm.posslotsfull", $"{maxNamedPositions}"));
+                return;
+            }
+            slots[slot] = data;
+            PrintToPlayerChat(player, Localizer.ForPlayer(player, "matchzy.pm.saveposnamed", slot));
         }
 
-        [ConsoleCommand("css_loadpos", "Loads the last saved player location")]
+        [ConsoleCommand("css_loadpos", "Loads a saved player location. Usage: .loadpos [name]")]
         public void OnLoadPosCommand(CCSPlayerController? player, CommandInfo? command)
+        {
+            string name = command != null && command.ArgCount >= 2 ? command.ArgByIndex(1) : "";
+            HandleLoadPosCommand(player, name);
+        }
+
+        public void HandleLoadPosCommand(CCSPlayerController? player, string name)
         {
             if (!isPractice || player == null || !player.UserId.HasValue)
                 return;
@@ -2760,14 +3207,85 @@ namespace MatchZy
                 return;
 
             int userId = player.UserId.Value;
-            if (!savedPlayerLocationData.TryGetValue(userId, out var playerLocationData))
+            string slot = SanitizePosName(name);
+
+            if (slot == "")
             {
-                PrintToPlayerChat(player, Localizer["matchzy.pm.notsavedpos"]);
+                if (!savedPlayerLocationData.TryGetValue(userId, out var defaultData))
+                {
+                    PrintToPlayerChat(player, Localizer["matchzy.pm.notsavedpos"]);
+                    return;
+                }
+                defaultData.LoadPosition(player);
+                PrintToPlayerChat(player, Localizer["matchzy.pm.loadpos"]);
                 return;
             }
 
-            playerLocationData.LoadPosition(player);
-            PrintToPlayerChat(player, Localizer["matchzy.pm.loadpos"]);
+            if (!namedPlayerPositions.TryGetValue(userId, out var slots) || !slots.TryGetValue(slot, out var data))
+            {
+                PrintToPlayerChat(player, Localizer.ForPlayer(player, "matchzy.pm.notsavedposnamed", slot));
+                return;
+            }
+            data.LoadPosition(player);
+            PrintToPlayerChat(player, Localizer.ForPlayer(player, "matchzy.pm.loadposnamed", slot));
+        }
+
+        [ConsoleCommand("css_listpos", "Lists your named saved positions")]
+        public void OnListPosCommand(CCSPlayerController? player, CommandInfo? command)
+        {
+            HandleListPosCommand(player);
+        }
+
+        public void HandleListPosCommand(CCSPlayerController? player)
+        {
+            if (!isPractice || player == null || !player.UserId.HasValue)
+                return;
+            int userId = player.UserId.Value;
+            if (!namedPlayerPositions.TryGetValue(userId, out var slots) || slots.Count == 0)
+            {
+                PrintToPlayerChat(player, Localizer.ForPlayer(player, "matchzy.pm.posnonenamed"));
+                return;
+            }
+            PrintToPlayerChat(player, Localizer.ForPlayer(player, "matchzy.pm.poslist", string.Join(", ", slots.Keys.OrderBy(k => k))));
+        }
+
+        [ConsoleCommand("css_delpos", "Deletes a named saved position. Usage: .delpos <name>")]
+        public void OnDelPosCommand(CCSPlayerController? player, CommandInfo? command)
+        {
+            string name = command != null && command.ArgCount >= 2 ? command.ArgByIndex(1) : "";
+            HandleDelPosCommand(player, name);
+        }
+
+        public void HandleDelPosCommand(CCSPlayerController? player, string name)
+        {
+            if (!isPractice || player == null || !player.UserId.HasValue)
+                return;
+            int userId = player.UserId.Value;
+            string slot = SanitizePosName(name);
+            if (slot == "")
+            {
+                PrintToPlayerChat(player, Localizer.ForPlayer(player, "matchzy.cc.usage", ".delpos <name>"));
+                return;
+            }
+            if (namedPlayerPositions.TryGetValue(userId, out var slots) && slots.Remove(slot))
+                PrintToPlayerChat(player, Localizer.ForPlayer(player, "matchzy.pm.delposnamed", slot));
+            else
+                PrintToPlayerChat(player, Localizer.ForPlayer(player, "matchzy.pm.notsavedposnamed", slot));
+        }
+
+        [ConsoleCommand("css_flashtest", "Toggle a readout of your own blind duration when flashed")]
+        public void OnFlashTestCommand(CCSPlayerController? player, CommandInfo? command)
+        {
+            if (!isPractice || player == null || !player.UserId.HasValue)
+                return;
+            int userId = player.UserId.Value;
+            if (flashTestList.Remove(userId))
+                PrintToPlayerChat(player, Localizer.ForPlayer(player, "matchzy.pm.flashtestoff"));
+            else
+            {
+                flashTestList.Add(userId);
+                PrintToPlayerChat(player, Localizer.ForPlayer(player, "matchzy.pm.flashteston"));
+            }
         }
 
         [ConsoleCommand("css_throwsmoke", "Throws the last thrown smoke")]

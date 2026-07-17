@@ -4,6 +4,27 @@ Customized fork of [MatchZy](https://github.com/shobhit-pathak/MatchZy) by Shobh
 
 Fork version numbering is independent of upstream. Upstream changelog: <https://github.com/shobhit-pathak/MatchZy/blob/main/CHANGELOG.md>
 
+# 0.8.56
+
+#### July 16, 2026
+
+- Practice named position slots: `.savepos <name>` saves a position under a name, `.loadpos <name>` teleports back to it, `.listpos` lists your saved names, and `.delpos <name>` removes one (up to 32 per player). `.savepos` / `.loadpos` with no name keep working as the single default slot.
+- Practice flash test: `.flashtest` (or `.ft`) toggles a chat readout of your own blind duration each time you get flashed, for tuning pop-flashes and self-flashes.
+- Practice self-flash: `.blind` throws a flashbang at your own face for pop-flash reaction reps (no teammate or client bind needed).
+- Practice `.wipe` (or `.clearnades`) clears your grenade throw history (the source for `.last` / `.back` / `.rt` / `.throwindex`) without leaving and re-entering practice.
+- Practice `.jt` (`.jumpthrow`) jumpthrows the grenade in your hand, gated behind the new convar `matchzy_experimental_jumpthrow` (default `false`). Experimental: it forces the jump and release server-side, which the engine may ignore on some CS2 builds, so it ships off by default.
+- Practice `.cleanup` clears all utility currently on the map (smokes, mollies, infernos, live projectiles).
+- Practice `.autoclear` toggles auto-clearing utility: when on, each time a grenade detonates the older utility is removed and only the just-detonated result is kept, for fast lineup iteration.
+- Practice `.landmarker` (`.lm`) toggles a marker at each grenade's detonation point so you can see exactly where it landed.
+- Practice `.arc` (`.traceline`) toggles drawing the flight path of thrown grenades as an in-world trajectory line.
+- Practice saved grenade lineups are now capped at 500 per player, and `.mynades` shows how many you have saved.
+- Fixed `.rt` / `.throw` (rethrow last grenade) silently doing nothing after a normal mouse1 throw: a freshly thrown grenade could be recorded with zero velocity (its velocity field lags a frame on current CS2 builds), which the rethrow's zero-velocity guard then dropped. The launch velocity is now recovered from the projectile's movement when the direct read comes back empty.
+- Added an experimental grenade landing predictor: `.predict` draws the flight arc and a landing marker for the grenade in your hand, gated behind `matchzy_experimental_predictor` (default `false`). It forward-simulates the throw with world collision (wall/floor bounces), tunable live via `matchzy_predict_gravity` / `matchzy_predict_throwspeed` / `matchzy_predict_elasticity` / `matchzy_predict_friction`, with a `matchzy_predict_debug` readout of predicted-vs-actual landing distance for calibration.
+- Fixed a countdown timer appearing during the ready phase when the HTML ready panel (`matchzy_ready_hint_style 1`) is used: hiding the native WARMUP banner also dropped `mp_warmup_pausetimer`, so the round timer counted down. The timer is now frozen during the ready phase, matching paused warmup.
+- The HTML ready panel now shows a `WARMUP` badge at the top, since the native WARMUP banner is hidden while the panel is up.
+- Practice `.delnade` can now delete multiple lineups at once: `.delnade <name1> <name2> ...` removes each, and `.delnade all` removes every lineup you saved on the current map. It reports which were deleted and which were not found.
+- Added `matchzy_ready_up_by_ping` (default `true`): set it `false` to stop pinging (middle-mouse / scroll button) from toggling your ready status, for players who ready up by accident.
+
 # 0.8.55
 
 #### July 16, 2026

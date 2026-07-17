@@ -137,6 +137,9 @@ public partial class MatchZy
             if (playerTimers.Remove(userId, out var practiceTimer))
                 practiceTimer.KillTimer();
             savedPlayerLocationData.Remove(userId);
+            namedPlayerPositions.Remove(userId);
+            flashTestList.Remove(userId);
+            lastPredictedLanding.Remove(userId);
 
             if (isMatchLive && autoPauseEnabled.Value)
             {
@@ -321,44 +324,60 @@ public partial class MatchZy
                     Vector angularVelocity = new(projectile.AngVelocity.X, projectile.AngVelocity.Y, projectile.AngVelocity.Z);
                     string nadeType = Constants.ProjectileTypeMap[entity.Entity.DesignerName];
 
-                    if (!lastGrenadesData.ContainsKey(client))
-                    {
-                        lastGrenadesData[client] = new();
-                    }
-
-                    if (!nadeSpecificLastGrenadeData.ContainsKey(client))
-                    {
-                        nadeSpecificLastGrenadeData[client] = new() { };
-                    }
-
                     float duckAmount = 0.0f;
                     if (player.PlayerPawn.Value.MovementServices != null && player.PlayerPawn.Value.MovementServices.Handle != IntPtr.Zero)
                     {
                         duckAmount = new CCSPlayer_MovementServices(player.PlayerPawn.Value.MovementServices.Handle).DuckAmount;
                     }
 
-                    GrenadeThrownData lastGrenadeThrown = new(position, angle, velocity, throwerSceneNode.AbsOrigin, player.PlayerPawn.Value.EyeAngles, nadeType, DateTime.Now, projectile.ItemIndex, duckAmount, angularVelocity);
+                    Vector playerOrigin = new(throwerSceneNode.AbsOrigin.X, throwerSceneNode.AbsOrigin.Y, throwerSceneNode.AbsOrigin.Z);
+                    QAngle eyeAngles = player.PlayerPawn.Value.EyeAngles;
+                    ushort itemIndex = projectile.ItemIndex;
+                    uint projIndex = projectile.Index;
 
-                    nadeSpecificLastGrenadeData[client][nadeType] = lastGrenadeThrown;
-                    lastGrenadesData[client].Add(lastGrenadeThrown);
-
-                    if (maxLastGrenadesSavedLimit != 0 && lastGrenadesData[client].Count > maxLastGrenadesSavedLimit)
-                    {
-                        lastGrenadesData[client].RemoveAt(0);
-                    }
-
-                    // Reset the no-arg .back cursor: a new throw makes "back" start over from
-                    // the newest nade (issue MatchZy-Enhanced#7). Also avoids a stale index
-                    // after the RemoveAt(0) history trim renumbers the list.
-                    lastGrenadeBackCursor.Remove(client);
-
-                    lastGrenadeThrownTime[(int)projectile.Index] = DateTime.Now;
+                    lastGrenadeThrownTime[(int)projIndex] = DateTime.Now;
+                    RegisterArcTrace(projIndex);
                     if (smokeColorEnabled.Value && nadeType == "smoke")
                     {
                         CSmokeGrenadeProjectile smokeProjectile = new(entity.Handle);
                         smokeProjectile.SmokeColor.X = GetPlayerTeammateColor(player).R;
                         smokeProjectile.SmokeColor.Y = GetPlayerTeammateColor(player).G;
                         smokeProjectile.SmokeColor.Z = GetPlayerTeammateColor(player).B;
+                    }
+
+                    // Capture the launch velocity. On current CS2 builds a freshly-spawned
+                    // grenade's AbsVelocity can read ~0 (physics moves AbsOrigin but the velocity
+                    // field lags a frame), so a normal mouse1 throw got stored with velocity 0 and
+                    // Throw()'s zero-velocity guard silently dropped .rt / .throw. Trust AbsVelocity
+                    // when it's clearly alive (>= 50 u/s); otherwise recover it from the projectile's
+                    // position delta over the next frame (AbsOrigin is reliably live).
+                    float velMagSq = velocity.X * velocity.X + velocity.Y * velocity.Y + velocity.Z * velocity.Z;
+                    if (velMagSq >= 2500f)
+                    {
+                        RecordThrownNade(client, nadeType, position, angle, playerOrigin, eyeAngles, itemIndex, duckAmount, velocity, angularVelocity);
+                    }
+                    else
+                    {
+                        Vector p0 = new(position.X, position.Y, position.Z);
+                        Server.NextFrame(() =>
+                        {
+                            try
+                            {
+                                var ent2 = Utilities.GetEntityFromIndex<CBaseCSGrenadeProjectile>((int)projIndex);
+                                if (ent2 == null || !ent2.IsValid || ent2.AbsOrigin == null)
+                                    return;
+                                var o = ent2.AbsOrigin;
+                                // (p1 - p0) per tick -> units/sec (CS2 default 64 tick).
+                                Vector recovered = new((o.X - p0.X) * 64f, (o.Y - p0.Y) * 64f, (o.Z - p0.Z) * 64f);
+                                if (coachDebugEnabled.Value)
+                                    Log($"[NadeRecord] AbsVelocity low ({System.Math.Sqrt(velMagSq):0}); recovered {recovered.X:0}/{recovered.Y:0}/{recovered.Z:0} from position delta");
+                                RecordThrownNade(client, nadeType, p0, angle, playerOrigin, eyeAngles, itemIndex, duckAmount, recovered, angularVelocity);
+                            }
+                            catch (Exception)
+                            {
+                                // Projectile detonated/freed between frames - ignore.
+                            }
+                        });
                     }
                 }
                 catch (Exception)
@@ -410,6 +429,9 @@ public partial class MatchZy
             lastGrenadeThrownTime.Remove(@event.Entityid);
         }
 
+        if (player!.UserId.HasValue)
+            CalibratePrediction(player.UserId.Value, @event.X, @event.Y, @event.Z);
+        OnUtilityDetonated(@event.X, @event.Y, @event.Z);
         return HookResult.Continue;
     }
 
@@ -426,6 +448,7 @@ public partial class MatchZy
             lastGrenadeThrownTime.Remove(@event.Entityid);
         }
 
+        OnUtilityDetonated(@event.X, @event.Y, @event.Z);
         return HookResult.Continue;
     }
 
@@ -442,6 +465,7 @@ public partial class MatchZy
             lastGrenadeThrownTime.Remove(@event.Entityid);
         }
 
+        OnUtilityDetonated(@event.X, @event.Y, @event.Z);
         return HookResult.Continue;
     }
 
@@ -457,6 +481,7 @@ public partial class MatchZy
             PrintToPlayerChat(player!, Localizer.ForPlayer(player, "matchzy.pracc.molotov", player!.PlayerName, $"{(DateTime.Now - thrownTime).TotalSeconds:0.00}"));
         }
 
+        OnUtilityDetonated(@event.Get<float>("x"), @event.Get<float>("y"), @event.Get<float>("z"));
         return HookResult.Continue;
     }
 
@@ -473,6 +498,7 @@ public partial class MatchZy
             lastGrenadeThrownTime.Remove(@event.Entityid);
         }
 
+        OnUtilityDetonated(@event.Get<float>("x"), @event.Get<float>("y"), @event.Get<float>("z"));
         return HookResult.Continue;
     }
 
@@ -482,6 +508,11 @@ public partial class MatchZy
         {
             // Only process pings during warmup when ready system is active
             if (!readyAvailable || matchStarted || !isWarmup)
+                return HookResult.Continue;
+
+            // Opt-out: some players ready up by accident when pinging. matchzy_ready_up_by_ping
+            // false disables the ping->ready toggle (they use .ready / the ready panel instead).
+            if (!readyUpByPing.Value)
                 return HookResult.Continue;
 
             CCSPlayerController? player = @event.Userid;

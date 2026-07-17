@@ -196,6 +196,9 @@ matchzy_ready_hint_blink false
 // Whether to show [READY] / [UNREADY] clan tags on the scoreboard during the ready phase. Default: true
 matchzy_ready_clantag_enabled true
 
+// Whether pinging (middle-mouse / scroll button) toggles your ready status during warmup. Set false if players ready up by accident when pinging. Default: true
+matchzy_ready_up_by_ping true
+
 // Message to show when the match starts. Use $$$ to break message into multiple lines. Set to """" to disable.
 // Available variables: {TIME}, {MATCH_ID}, {MAP}, {MAPNUMBER}, {TEAM1}, {TEAM2}, {TEAM1_SCORE}, {TEAM2_SCORE}
 // Available Colors: {Default}, {Darkred}, {Green}, {LightYellow}, {LightBlue}, {Olive}, {Lime}, {Red}, {Purple}, {Grey}, {Yellow}, {Gold}, {Silver}, {Blue}, {DarkBlue}

@@ -43,6 +43,8 @@ namespace MatchZy
 
         public FakeConVar<bool> readyClanTagEnabled = new("matchzy_ready_clantag_enabled", "Whether to show [READY] / [UNREADY] clan tags on the scoreboard during the ready phase. Default: true", true);
 
+        public FakeConVar<bool> readyUpByPing = new("matchzy_ready_up_by_ping", "Whether pinging (middle-mouse / scroll button) toggles your ready status during warmup. Set false if players ready up by accident when pinging. Default: true", true);
+
         public FakeConVar<bool> everyoneIsAdmin = new("matchzy_everyone_is_admin", "If set to true, all the players will have admin privilege. Default: false", false);
 
         public FakeConVar<bool> allowPauseCommand = new("matchzy_allow_pause", "Enable or disable .pause command", true);
@@ -70,6 +72,18 @@ namespace MatchZy
         public FakeConVar<bool> mapConsoleCommandEnabled = new("matchzy_map_console_command_enabled", "Whether MatchZy registers the css_map console command (!map). MatchZy also auto-yields it: if a dedicated map plugin (CS2-SimpleAdmin / CS2MapChange) is installed alongside, css_map is NOT registered even when this is true, avoiding a ConCommand conflict that can block players from connecting. Set false to never register it. The .map chat command stays available regardless. Default: true", true);
 
         public FakeConVar<bool> coachDebugEnabled = new("matchzy_coach_debug", "Coach-spawn debug: logs/announces each real-player spawn reassignment, keeps coaches alive (no suicide) for inspection, and runs spawn enforcement during warmup so it can be tested with bots without starting a full match. Default: false", false);
+
+        public FakeConVar<bool> experimentalJumpThrow = new("matchzy_experimental_jumpthrow", "EXPERIMENTAL: enable the practice .jt jumpthrow. Forces jump + grenade-release via server-side button injection (m_nButtons); the engine reads client buttons authoritatively so this may not fire on every CS2 build. Off by default. Default: false", false);
+
+        // EXPERIMENTAL grenade predictor (.predict). Physics constants are convars so the sim can be
+        // calibrated live against real throws without recompiling. Defaults are starting guesses.
+        public FakeConVar<bool> experimentalPredictor = new("matchzy_experimental_predictor", "EXPERIMENTAL: enable the practice .predict grenade landing predictor. Default: false", false);
+        public FakeConVar<bool> predictDebug = new("matchzy_predict_debug", "Log predicted-vs-actual grenade landing distance for calibrating the .predict sim. Default: false", false);
+        public FakeConVar<float> predictGravity = new("matchzy_predict_gravity", "Predictor: grenade gravity in units/s^2 (calibration). Default: 320", 320.0f);
+        public FakeConVar<float> predictElasticity = new("matchzy_predict_elasticity", "Predictor: bounce restitution 0-1 (calibration). Default: 0.45", 0.45f);
+        public FakeConVar<float> predictFriction = new("matchzy_predict_friction", "Predictor: per-bounce speed loss 0-1 (calibration). Default: 0.2", 0.2f);
+        public FakeConVar<float> predictThrowSpeed = new("matchzy_predict_throwspeed", "Predictor: normal-throw release speed in units/s (calibration). Default: 750", 750.0f);
+
 
         [ConsoleCommand("matchzy_whitelist_enabled_default", "Whether Whitelist is enabled by default or not. Default value: false")]
         public void MatchZyWLConvar(CCSPlayerController? player, CommandInfo command)
