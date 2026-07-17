@@ -217,7 +217,16 @@ namespace MatchZy
 
         public static Dictionary<byte, List<Position>> GetEmptySpawnsData()
         {
-            return new Dictionary<byte, List<Position>> { { (byte)CsTeam.CounterTerrorist, new List<Position>() }, { (byte)CsTeam.Terrorist, new List<Position>() } };
+            // Pre-size the lists. Growing a List (List.AddWithResize) threw
+            // ArrayTypeMismatchException when GetSpawns runs under the AcceleratorCSS Harmony tracer
+            // (patched GetSpawns_Patch1): the resize allocates a fresh backing array and the
+            // instrumented generic path mistyped it. A capacity that comfortably covers any
+            // competitive map means the throwing resize path is never taken.
+            return new Dictionary<byte, List<Position>>
+            {
+                { (byte)CsTeam.CounterTerrorist, new List<Position>(128) },
+                { (byte)CsTeam.Terrorist, new List<Position>(128) },
+            };
         }
 
         public void StartPracticeMode()

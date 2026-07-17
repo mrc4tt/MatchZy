@@ -92,53 +92,49 @@ jobs:
           fi
 
       # --- Forgejo release (runs on the Forgejo instance) ---
-      - name: Check if Forgejo release exists
-        id: check_release
+      # Create the release if missing, otherwise UPDATE it in place: delete the old same-name
+      # asset and re-upload. This lets a same-version fix (no ModuleVersion bump) refresh the zip
+      # on an existing release instead of being skipped (mirrors the GitHub --clobber behavior).
+      - name: Create or update Forgejo Release
         if: github.server_url != 'https://github.com'
-        run: |
-          STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
-            -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
-            "${{ github.server_url }}/api/v1/repos/${{ github.repository }}/releases/tags/${{ env.MATCHZY_VERSION }}")
-          if [ "$STATUS" = "200" ]; then
-            echo "Release ${{ env.MATCHZY_VERSION }} already exists. Skipping."
-            echo "SKIP=true" >> $GITHUB_OUTPUT
-          else
-            echo "New version detected: ${{ env.MATCHZY_VERSION }}"
-            echo "SKIP=false" >> $GITHUB_OUTPUT
-          fi
-
-      - name: Create Forgejo Release
-        if: github.server_url != 'https://github.com' && steps.check_release.outputs.SKIP == 'false'
         env:
           GITEA_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -e
+          API="${{ github.server_url }}/api/v1/repos/${{ github.repository }}"
+          VER="${{ env.MATCHZY_VERSION }}"
           BODY=$(jq -Rs . < notes.md)
-          echo "Creating release ${{ env.MATCHZY_VERSION }}..."
-          RELEASE_RESPONSE=$(curl -s -X POST \
-            "${{ github.server_url }}/api/v1/repos/${{ github.repository }}/releases" \
-            -H "Authorization: token $GITEA_TOKEN" \
-            -H "Content-Type: application/json" \
-            -d "{
-              \"tag_name\": \"${{ env.MATCHZY_VERSION }}\",
-              \"name\": \"MatchZy ${{ env.MATCHZY_VERSION }}\",
-              \"body\": $BODY,
-              \"draft\": false,
-              \"prerelease\": false
-            }")
 
-          RELEASE_ID=$(echo "$RELEASE_RESPONSE" | jq -r '.id // empty')
+          REL=$(curl -s -H "Authorization: token $GITEA_TOKEN" "$API/releases/tags/$VER")
+          RELEASE_ID=$(echo "$REL" | jq -r '.id // empty')
+
           if [ -z "$RELEASE_ID" ]; then
-            echo "Error: Failed to create release!"
-            echo "$RELEASE_RESPONSE"
-            exit 1
+            echo "Creating release $VER..."
+            REL=$(curl -s -X POST "$API/releases" \
+              -H "Authorization: token $GITEA_TOKEN" \
+              -H "Content-Type: application/json" \
+              -d "{\"tag_name\":\"$VER\",\"name\":\"MatchZy $VER\",\"body\":$BODY,\"draft\":false,\"prerelease\":false}")
+            RELEASE_ID=$(echo "$REL" | jq -r '.id // empty')
+            if [ -z "$RELEASE_ID" ]; then
+              echo "Error: Failed to create release!"
+              echo "$REL"
+              exit 1
+            fi
+            echo "Created release with ID: $RELEASE_ID"
+          else
+            echo "Release $VER already exists (ID: $RELEASE_ID); updating its assets."
           fi
-          echo "Created release with ID: $RELEASE_ID"
 
-          for file in MatchZy-${{ env.MATCHZY_VERSION }}*.zip; do
+          for file in MatchZy-${VER}*.zip; do
+            # Replace an existing same-name asset so the zip is refreshed, not duplicated.
+            EXIST_ID=$(echo "$REL" | jq -r --arg n "$file" '.assets[]? | select(.name==$n) | .id')
+            if [ -n "$EXIST_ID" ]; then
+              echo "Deleting old asset $file (ID: $EXIST_ID)"
+              curl -s -X DELETE "$API/releases/$RELEASE_ID/assets/$EXIST_ID" -H "Authorization: token $GITEA_TOKEN" >/dev/null
+            fi
             echo "Uploading $file..."
             UPLOAD_RESPONSE=$(curl -s -X POST \
-              "${{ github.server_url }}/api/v1/repos/${{ github.repository }}/releases/$RELEASE_ID/assets?name=$file" \
+              "$API/releases/$RELEASE_ID/assets?name=$file" \
               -H "Authorization: token $GITEA_TOKEN" \
               -H "Content-Type: application/octet-stream" \
               --data-binary "@$file")
