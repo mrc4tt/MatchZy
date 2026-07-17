@@ -24,6 +24,14 @@
       <HintPath>$(CssApiDir)/CounterStrikeSharp.API.dll</HintPath>
       <Private>false</Private>
     </Reference>
+    <!-- Neutralize the transitive NuGet CounterStrikeSharp.API that CS2MenuManager pulls in
+         (1.0.369, predates the fork's Trace/newer API): a direct ExcludeAssets=all reference wins
+         over the transitive one and contributes nothing, so the fork <Reference> above is the sole
+         provider of CSS API types. Without this, the compiler binds to NuGet 1.0.369 and the fork
+         DLL (Trace, etc.) is shadowed. -->
+    <PackageReference Include="CounterStrikeSharp.API" Version="1.0.371">
+      <ExcludeAssets>all</ExcludeAssets>
+    </PackageReference>
     <PackageReference Include="CsvHelper" Version="33.1.0" />
     <PackageReference Include="Dapper" Version="2.1.72" />
     <PackageReference Include="Microsoft.Data.Sqlite" Version="8.0.0" />
