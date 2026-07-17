@@ -305,7 +305,9 @@ namespace MatchZy
             string list = string.Join(", ", notReady.Take(6));
             if (notReady.Count > 6)
                 list += $" +{notReady.Count - 6}";
-            _rpWaiting = notReady.Count > 0 ? System.Net.WebUtility.HtmlEncode(list) : "";
+            // Raw here (used by both the plain-center text and the HTML panel). The HTML panel
+            // entity-encodes it via PanelSafe at render; the classic center text wants it plain.
+            _rpWaiting = notReady.Count > 0 ? list : "";
 
             // Classic plain-center message (style 0) - built here so the 1s timer just broadcasts it.
             string line1 = Localizer["matchzy.hint.waitingforplayers", _rpReady, _rpTotal];
@@ -315,6 +317,33 @@ namespace MatchZy
                 : $"{line1}\n{line2}";
 
             _readyStatusDirty = false;
+        }
+
+        // Make a string safe for a CS2 center-HTML panel: escape the HTML metacharacters and convert
+        // any non-ASCII character to a numeric HTML entity. The panel renderer breaks on raw
+        // multibyte UTF-8 (localized text / player names with accents), cutting the line and
+        // everything after it; numeric entities render correctly.
+        private static string PanelSafe(string? s)
+        {
+            if (string.IsNullOrEmpty(s))
+                return string.Empty;
+            var sb = new StringBuilder(s.Length);
+            foreach (char c in s)
+            {
+                switch (c)
+                {
+                    case '&': sb.Append("&amp;"); break;
+                    case '<': sb.Append("&lt;"); break;
+                    case '>': sb.Append("&gt;"); break;
+                    default:
+                        if (c > 0x7F)
+                            sb.Append("&#").Append((int)c).Append(';');
+                        else
+                            sb.Append(c);
+                        break;
+                }
+            }
+            return sb.ToString();
         }
 
         // Undo the ready-phase HUD manipulation (forced m_bWarmupPeriod=false / m_bGameRestart)
@@ -457,21 +486,24 @@ namespace MatchZy
                     // WARMUP badge: the native "WARMUP" banner is hidden while the HTML panel is up,
                     // so the panel carries the warmup indicator itself. Static (no per-tick change) so
                     // it does not defeat the below change-detection and re-trigger the show animation.
-                    sb.Append($"<font class='fontSize-l' color='#ff9a3c'>&#9679; {Localizer.ForPlayer(target, "matchzy.ready.warmuptag")}</font><br>");
-                    sb.Append($"<font class='fontSize-m' color='#ffcf3f'>{Localizer.ForPlayer(target, "matchzy.ready.title")}</font><br>");
-                    sb.Append($"<font class='fontSize-sm' color='#c8c8c8'>{Localizer.ForPlayer(target, "matchzy.ready.mode", mode)}</font><br>");
+                    // Every localized/dynamic value goes through PanelSafe: CS2's center-HTML panel
+                    // breaks on raw multibyte UTF-8 (Danish o-slash / a-ring, Albanian e-diaeresis),
+                    // dropping that line and everything after it (e.g. the trailing NOT-READY line).
+                    sb.Append($"<font class='fontSize-l' color='#ff9a3c'>&#9679; {PanelSafe(Localizer.ForPlayer(target, "matchzy.ready.warmuptag"))}</font><br>");
+                    sb.Append($"<font class='fontSize-m' color='#ffcf3f'>{PanelSafe(Localizer.ForPlayer(target, "matchzy.ready.title"))}</font><br>");
+                    sb.Append($"<font class='fontSize-sm' color='#c8c8c8'>{PanelSafe(Localizer.ForPlayer(target, "matchzy.ready.mode", mode))}</font><br>");
                     sb.Append($"{bar} <font class='fontSize-m' color='#ffffff'>{_rpReady} / {_rpRequired}</font><br>");
                     sb.Append($"<font class='fontSize-sm' color='#9ecbff'>CT {_rpCtReady}/{_rpCtCount}</font><font class='fontSize-sm' color='#ffffff'> &nbsp; </font><font class='fontSize-sm' color='#ffb36b'>T {_rpTReady}/{_rpTCount}</font>");
                     if (_rpWaiting.Length > 0)
-                        sb.Append($"<br><font class='fontSize-sm' color='#9a9a9a'>{Localizer.ForPlayer(target, "matchzy.ready.waitingon", _rpWaiting)}</font>");
+                        sb.Append($"<br><font class='fontSize-sm' color='#9a9a9a'>{PanelSafe(Localizer.ForPlayer(target, "matchzy.ready.waitingon", _rpWaiting))}</font>");
 
                     bool isPlaying = target.TeamNum == 2 || target.TeamNum == 3;
                     if (isPlaying)
                     {
                         if (playerReadyStatus.TryGetValue(target.UserId.Value, out bool isReady) && isReady)
-                            sb.Append($"<br><font class='fontSize-m' color='#37ff8b'>&#10004; {Localizer.ForPlayer(target, "matchzy.ready.youready")}</font>");
+                            sb.Append($"<br><font class='fontSize-m' color='#37ff8b'>&#10004; {PanelSafe(Localizer.ForPlayer(target, "matchzy.ready.youready"))}</font>");
                         else if (notReadyVisible)
-                            sb.Append($"<br><font class='fontSize-m' color='#ff3b3b'>&#10008; {Localizer.ForPlayer(target, "matchzy.ready.notready")}</font>");
+                            sb.Append($"<br><font class='fontSize-m' color='#ff3b3b'>&#10008; {PanelSafe(Localizer.ForPlayer(target, "matchzy.ready.notready"))}</font>");
                         else
                             sb.Append("<br><font class='fontSize-m' color='#ff3b3b'>&nbsp;</font>"); // blink off-frame: keep height
                     }
