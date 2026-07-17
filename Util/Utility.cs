@@ -508,13 +508,16 @@ namespace MatchZy
                         continue;
 
                     var sb = new StringBuilder();
-                    // WARMUP badge: the native "WARMUP" banner is hidden while the HTML panel is up,
-                    // so the panel carries the warmup indicator itself. Static (no per-tick change) so
-                    // it does not defeat the below change-detection and re-trigger the show animation.
+                    // WARMUP badge: only when the native "WARMUP" banner is hidden (readyHideWarmupHud),
+                    // the panel carries the warmup indicator itself. With the native banner shown
+                    // (matchzy_ready_hide_warmup_hud 0) it already sits above the panel, so skip the
+                    // badge to avoid a duplicate "WARMUP". Static (no per-tick change) so it does not
+                    // defeat the below change-detection and re-trigger the show animation.
                     // Every localized/dynamic value goes through PanelSafe: CS2's center-HTML panel
                     // breaks on raw multibyte UTF-8 (Danish o-slash / a-ring, Albanian e-diaeresis),
                     // dropping that line and everything after it (e.g. the trailing NOT-READY line).
-                    sb.Append($"<font class='fontSize-l' color='#ff9a3c'>&#9679; {PanelSafe(Localizer.ForPlayer(target, "matchzy.ready.warmuptag"))}</font><br>");
+                    if (readyHideWarmupHud.Value)
+                        sb.Append($"<font class='fontSize-l' color='#ff9a3c'>&#9679; {PanelSafe(Localizer.ForPlayer(target, "matchzy.ready.warmuptag"))}</font><br>");
                     sb.Append($"<font class='fontSize-m' color='#ffcf3f'>{PanelSafe(Localizer.ForPlayer(target, "matchzy.ready.title"))}</font><br>");
                     sb.Append($"<font class='fontSize-sm' color='#c8c8c8'>{PanelSafe(Localizer.ForPlayer(target, "matchzy.ready.mode", mode))}</font><br>");
                     sb.Append($"{bar} <font class='fontSize-m' color='#ffffff'>{_rpReady} / {_rpRequired}</font><br>");
