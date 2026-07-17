@@ -461,6 +461,27 @@ namespace MatchZy
                         Utilities.SetStateChanged(_readyProxy!, "CCSGameRulesProxy", "m_pGameRules");
                 }
 
+                // Catch-all respawn: while the fake warmup suppresses the engine's auto-respawn, keep
+                // every T/CT human spawned. Rescues anyone stuck in the observer cam after picking a
+                // team (the reported "stuck as spectator" bug) that the join-respawn handler missed.
+                // Throttled to ~1s; only the dead (Health <= 0) are respawned so a live player is
+                // never yanked to spawn, and coaches are skipped (they are intentionally unspawned).
+                if (_fakeWarmupActive && _readyTickCounter % 64 == 0)
+                {
+                    foreach (var p in Utilities.GetPlayers())
+                    {
+                        if (p == null || !p.IsValid || p.IsBot || p.IsHLTV)
+                            continue;
+                        if (p.TeamNum != (byte)CsTeam.Terrorist && p.TeamNum != (byte)CsTeam.CounterTerrorist)
+                            continue;
+                        if (matchzyTeam1.coach.Contains(p) || matchzyTeam2.coach.Contains(p))
+                            continue;
+                        if (p.PlayerPawn?.Value != null && p.PlayerPawn.Value.Health > 0)
+                            continue;
+                        p.Respawn();
+                    }
+                }
+
                 // Blink = alternate the NOT-READY line visible/hidden ~twice a second when
                 // matchzy_ready_hint_blink is on; always visible otherwise.
                 bool notReadyVisible = !readyHintBlinkEnabled.Value || (_readyTickCounter % 64 < 40);

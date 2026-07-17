@@ -640,6 +640,47 @@ namespace MatchZy
                 }
             );
 
+            // Respawn a fresh team-joiner during the ready-phase "fake warmup". The HTML ready panel
+            // (matchzy_ready_hint_style 1) forces m_bWarmupPeriod=false to hide the native banner,
+            // which also disables warmup's automatic respawn of someone who just picked a team - so
+            // they get stuck in the observer/spectator cam for several seconds until a later respawn
+            // wave. Respawn them promptly. T/CT only (never respawn a spectator -> crash), and only if
+            // they aren't already alive.
+            RegisterEventHandler<EventPlayerTeam>(
+                (@event, info) =>
+                {
+                    if (!readyAvailable || matchStarted || !_fakeWarmupActive)
+                        return HookResult.Continue;
+                    if (@event.Team != (int)CsTeam.Terrorist && @event.Team != (int)CsTeam.CounterTerrorist)
+                        return HookResult.Continue;
+
+                    CCSPlayerController? player = @event.Userid;
+                    if (!IsHumanPlayerValid(player))
+                        return HookResult.Continue;
+                    // Coaches are intentionally unspawned - never respawn them.
+                    if (matchzyTeam1.coach.Contains(player!) || matchzyTeam2.coach.Contains(player!))
+                        return HookResult.Continue;
+
+                    // Defer off the team-change event, then re-validate: they may have moved again.
+                    AddTimer(0.2f, () =>
+                    {
+                        if (!IsPlayerValid(player))
+                            return;
+                        if (player!.TeamNum != (byte)CsTeam.Terrorist && player.TeamNum != (byte)CsTeam.CounterTerrorist)
+                            return;
+                        if (matchzyTeam1.coach.Contains(player) || matchzyTeam2.coach.Contains(player))
+                            return;
+                        // Already spawned (alive) -> leave them; only rescue the stuck observer.
+                        if (player.PlayerPawn?.Value != null && player.PlayerPawn.Value.Health > 0)
+                            return;
+                        player.Respawn();
+                    });
+
+                    return HookResult.Continue;
+                },
+                HookMode.Post
+            );
+
             AddCommandListener(
                 "jointeam",
                 (player, info) =>
