@@ -184,14 +184,8 @@ matchzy_hostname_format """"
 // Whether to show damage report after each round or not. Default: true.
 matchzy_enable_damage_report true
 
-// Ready-status display style. 0 = classic center text, 1 = HTML READY-UP panel (progress bar, per-player status). Default: 1
-matchzy_ready_hint_style 1
-
-// In HTML style (1), hide the native CS2 'WARMUP' HUD banner during the ready phase so it does not compete with the panel. Set false if it disrupts warmup. Default: true
-matchzy_ready_hide_warmup_hud true
-
-// Whether the HTML 'READY UP' panel blinks the 'YOU ARE NOT READY' line to grab attention (style 1 only). Default: false
-matchzy_ready_hint_blink false
+// Ready-status display mode. 0 = classic center text. 1 = HTML READY-UP panel (progress bar, per-player status) with the native warmup suppressed: own WARMUP badge, no native 'Warmup' pill, frozen 1:00 top timer. Default: 0
+matchzy_ready_hint_style 0
 
 // Whether to show [READY] / [UNREADY] clan tags on the scoreboard during the ready phase. Default: true
 matchzy_ready_clantag_enabled true
@@ -1188,7 +1182,9 @@ ammo_grenade_limit_total 4
                 // appended by the missing-cvar pass above, so this migrates the file cleanly.
                 var retiredCvars = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
                 {
-                    "matchzy_ready_hint_suppress_warmup", // renamed -> matchzy_ready_hide_warmup_hud
+                    "matchzy_ready_hint_suppress_warmup", // renamed -> matchzy_ready_hide_warmup_hud (itself now retired)
+                    "matchzy_ready_hide_warmup_hud",      // folded into matchzy_ready_hint_style modes 1/2
+                    "matchzy_ready_block_warmup_announce",// removed: experimental warmup-announce block (dead end)
                 };
                 bool removedRetired = false;
                 for (int i = lines.Count - 1; i >= 0; i--)

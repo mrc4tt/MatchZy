@@ -272,6 +272,11 @@ namespace MatchZy
                 }
             }
 
+            // Practice team-damage: grenade / molotov / friendly-fire testing would otherwise trip the
+            // round's team-damage penalties (kick / warn). Disable them in practice regardless of which
+            // cfg branch ran above.
+            Server.ExecuteCommand("mp_autokick 0; mp_spawnprotectiontime 0; mp_td_dmgtokick 0; mp_td_dmgtowarn 0; mp_td_spawndmgthreshold 0; mp_tkpunish 0");
+
             GetSpawns();
             Server.PrintToChatAll($" {ChatColors.Green}Spawns: {ChatColors.Default}.spawn, .ctspawn, .tspawn, .bestspawn, .worstspawn");
             Server.PrintToChatAll($" {ChatColors.Green}Bots: {ChatColors.Default}.bot, .ctbot, .tbot, .nobots, .crouchbot, .boost, .crouchboost");
@@ -288,76 +293,62 @@ namespace MatchZy
             // Resetting spawn data to avoid any glitches
             spawnsData = GetEmptySpawnsData();
 
-            // FIX #1: Changed from 1 to int.MaxValue to properly find minimum priority
-            int minPriority = int.MaxValue;
-
-            // Find the minimum priority among CT spawns
-            var spawnsct = Utilities.FindAllEntitiesByDesignerName<SpawnPoint>("info_player_counterterrorist");
-            foreach (var spawn in spawnsct)
+            int ctSkipped = 0, tSkipped = 0;
+            try
             {
-                if (spawn.IsValid && spawn.Enabled && spawn.Priority < minPriority)
-                {
-                    minPriority = spawn.Priority;
-                }
+                // Materialize the entity queries to a concrete List<SpawnPoint> BEFORE iterating.
+                // Iterating the lazy IEnumerable from FindAllEntitiesByDesignerName directly threw
+                // ArrayTypeMismatchException when GetSpawns runs under the AcceleratorCSS Harmony
+                // tracer (GetSpawns_Patch1): the instrumented generic-enumerator path mistypes its
+                // backing array. A concrete List materialized outside the hot loop dodges it, and the
+                // pre-sized spawnsData lists (GetEmptySpawnsData) avoid the resize path too.
+                var spawnsct = Utilities.FindAllEntitiesByDesignerName<SpawnPoint>("info_player_counterterrorist").ToList();
+                ctSkipped = CollectMinPrioritySpawns(spawnsct, (byte)CsTeam.CounterTerrorist);
+
+                var spawnst = Utilities.FindAllEntitiesByDesignerName<SpawnPoint>("info_player_terrorist").ToList();
+                tSkipped = CollectMinPrioritySpawns(spawnst, (byte)CsTeam.Terrorist);
             }
-
-            // Collect ALL CT spawns with the minimum priority
-            // IMPORTANT: We need all competitive spawns (not just 5) so that when a coach is present,
-            // there are enough spawn points for the 5 regular players to use
-            int ctSkipped = 0;
-            foreach (var spawn in spawnsct)
+            catch (Exception e)
             {
-                if (spawn.IsValid && spawn.Enabled && spawn.Priority == minPriority)
-                {
-                    // Some workshop maps ship spawn entities without a fully-populated
-                    // CBodyComponent/SceneNode; constructing a Position from null would NRE.
-                    var origin = spawn.CBodyComponent?.SceneNode?.AbsOrigin;
-                    var rotation = spawn.CBodyComponent?.SceneNode?.AbsRotation;
-                    if (origin == null || rotation == null)
-                    {
-                        ctSkipped++;
-                        continue;
-                    }
-                    spawnsData[(byte)CsTeam.CounterTerrorist].Add(new Position(origin, rotation));
-                }
-            }
-
-            // FIX #2: Reset minPriority for T spawns instead of reusing CT's value
-            minPriority = int.MaxValue;
-
-            var spawnst = Utilities.FindAllEntitiesByDesignerName<SpawnPoint>("info_player_terrorist");
-
-            // FIX #3: Find the minimum priority among T spawns
-            foreach (var spawn in spawnst)
-            {
-                if (spawn.IsValid && spawn.Enabled && spawn.Priority < minPriority)
-                {
-                    minPriority = spawn.Priority;
-                }
-            }
-
-            // Collect ALL T spawns with the minimum priority
-            // IMPORTANT: We need all competitive spawns (not just 5) so that when a coach is present,
-            // there are enough spawn points for the 5 regular players to use
-            int tSkipped = 0;
-            foreach (var spawn in spawnst)
-            {
-                if (spawn.IsValid && spawn.Enabled && spawn.Priority == minPriority)
-                {
-                    var origin = spawn.CBodyComponent?.SceneNode?.AbsOrigin;
-                    var rotation = spawn.CBodyComponent?.SceneNode?.AbsRotation;
-                    if (origin == null || rotation == null)
-                    {
-                        tSkipped++;
-                        continue;
-                    }
-                    spawnsData[(byte)CsTeam.Terrorist].Add(new Position(origin, rotation));
-                }
+                // Never let a spawn-scan failure (or a tracer artifact) crash the .prac command; keep
+                // whatever was collected so far.
+                Log($"[GetSpawns] Error scanning spawns: {e.GetType().Name}: {e.Message}");
             }
 
             Log($"[GetSpawns] Loaded {spawnsData[(byte)CsTeam.CounterTerrorist].Count} CT spawns, {spawnsData[(byte)CsTeam.Terrorist].Count} T spawns" + (ctSkipped + tSkipped > 0 ? $" (skipped {ctSkipped} CT / {tSkipped} T with null body/scene components)" : ""));
 
             GetCoachSpawns();
+        }
+
+        // Finds the minimum spawn priority in the (already materialized) list, then collects every
+        // enabled spawn at that priority into spawnsData[team]. Returns how many were skipped for a
+        // null body/scene component (some workshop maps ship spawns without a populated SceneNode,
+        // which would NRE when building a Position). IMPORTANT: all competitive spawns are kept (not
+        // just 5) so a coach present still leaves enough points for the 5 regular players.
+        private int CollectMinPrioritySpawns(List<SpawnPoint> spawns, byte team)
+        {
+            int minPriority = int.MaxValue;
+            foreach (var spawn in spawns)
+            {
+                if (spawn.IsValid && spawn.Enabled && spawn.Priority < minPriority)
+                    minPriority = spawn.Priority;
+            }
+
+            int skipped = 0;
+            foreach (var spawn in spawns)
+            {
+                if (!spawn.IsValid || !spawn.Enabled || spawn.Priority != minPriority)
+                    continue;
+                var origin = spawn.CBodyComponent?.SceneNode?.AbsOrigin;
+                var rotation = spawn.CBodyComponent?.SceneNode?.AbsRotation;
+                if (origin == null || rotation == null)
+                {
+                    skipped++;
+                    continue;
+                }
+                spawnsData[team].Add(new Position(origin, rotation));
+            }
+            return skipped;
         }
 
         private void HandleSpawnCommand(CCSPlayerController? player, string commandArg, byte teamNum, string command)
@@ -1507,17 +1498,13 @@ namespace MatchZy
                         _ => CsTeam.Terrorist,
                     };
 
-                // Add bot to opposite team or forced team
+                // Add bot to opposite team or forced team. Use ONLY bot_add_t / bot_add_ct - it already
+                // routes the bot to that team. A preceding bot_join_team ALSO spawned a bot, so the two
+                // together produced two bots per .bot (confirmed via diag: one .bot -> Crew + Shamat).
                 if (targetTeam == CsTeam.Terrorist)
-                {
-                    Server.ExecuteCommand("bot_join_team T");
                     Server.ExecuteCommand("bot_add_t");
-                }
                 else
-                {
-                    Server.ExecuteCommand("bot_join_team CT");
                     Server.ExecuteCommand("bot_add_ct");
-                }
 
                 // Once bot is added, we teleport it to the requested position
                 var targetPlayer = player; // Capture for timer safety
@@ -2035,7 +2022,8 @@ namespace MatchZy
 
                         if (!isAlreadyUsed && unusedBotFound)
                         {
-                            Log($"UNUSED BOT FOUND: {tempPlayer.UserId.Value} EXECUTING: kickid {tempPlayer.UserId.Value}");
+                            // Extra bot from bot_add spawning two - kick it (bot_quota is pinned below
+                            // so it will not refill).
                             Server.ExecuteCommand($"kickid {tempPlayer.UserId.Value}");
                             continue;
                         }
@@ -2113,6 +2101,15 @@ namespace MatchZy
                         unusedBotFound = true;
                     }
                 }
+
+                // Lock bot_quota to exactly the number of tracked practice bots. With bot_quota_mode
+                // normal, kicking an extra bot (from bot_add spawning two, or a quota fill) triggers an
+                // immediate REFILL - so the extra keeps coming back. Pinning the quota to our tracked
+                // count stops the refill loop, so .bot leaves exactly one new bot.
+                int trackedBotCount;
+                lock (_botsDictLock)
+                    trackedBotCount = pracUsedBots.Count;
+                Server.ExecuteCommand($"bot_quota_mode normal; bot_quota {trackedBotCount}");
 
                 if (!unusedBotFound)
                 {
@@ -2361,7 +2358,8 @@ namespace MatchZy
         {
             if (!isPractice || player == null)
                 return;
-            Server.ExecuteCommand("bot_kick");
+            // Drop the quota to 0 BEFORE kicking, else bot_quota_mode normal refills the kicked bots.
+            Server.ExecuteCommand("bot_quota 0; bot_kick");
             pracUsedBots = new Dictionary<int, Dictionary<string, object>>();
             CleanupAllCollisionTimers();
         }

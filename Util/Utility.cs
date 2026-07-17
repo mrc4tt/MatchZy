@@ -390,6 +390,21 @@ namespace MatchZy
             }
         }
 
+        public override void Unload(bool hotReload)
+        {
+            // The ready-phase "fake warmup" (matchzy_ready_hint_style 1) forces m_bWarmupPeriod off +
+            // RoundTime 0 + mp_ignore_round_win_conditions each tick from RenderReadyPanel. If the
+            // plugin unloads/reloads while it is active, that per-tick upkeep stops but the gamerules
+            // are left mid-override, so the round instantly times out ("penalty for running out of
+            // time", the score jumps). Restore normal warmup so unload/reload leaves a sane state.
+            if (_fakeWarmupActive)
+            {
+                Server.ExecuteCommand("mp_ignore_round_win_conditions 0; mp_respawn_on_death_ct 0; mp_respawn_on_death_t 0; mp_warmup_start; mp_warmup_pausetimer 1");
+                _fakeWarmupActive = false;
+            }
+            base.Unload(hotReload);
+        }
+
         // OnTick: re-send the center HTML panel EVERY tick so the native "WARMUP" HUD (from
         // mp_warmup_pausetimer) cannot flicker through it. Rendered per player and localized,
         // so each sees the panel in their own language with their OWN ready state highlighted.
@@ -398,13 +413,35 @@ namespace MatchZy
             if (!readyAvailable || matchStarted || readyHintStyle.Value != 1 || isDryRun)
             {
                 // Left the ready phase (dryrun / classic style / match started) - drop the fake-warmup
-                // override so it
-                // never leaks into live play. Fires within a tick of matchStarted flipping, well
-                // inside the knife/live freezetime, so the round conditions are normal before play.
+                // override so it never leaks into live play. Fires within a tick of matchStarted
+                // flipping, well inside the knife/live freezetime, so the round conditions are normal
+                // before play.
                 if (_fakeWarmupActive)
                 {
                     Server.ExecuteCommand("mp_ignore_round_win_conditions 0; mp_respawn_on_death_ct 0; mp_respawn_on_death_t 0");
                     _fakeWarmupActive = false;
+
+                    // Mode 1 ended real warmup (m_bWarmupPeriod=false) + set mp_roundtime 60 to hide the
+                    // native warmup HUD. If we are leaving mode 1 but are STILL in the ready phase (e.g.
+                    // switched to classic style 0), re-START real warmup so the native warmup HUD comes
+                    // back instead of a leftover 60:00 round timer. A bare m_bWarmupPeriod=true netvar
+                    // flip is NOT enough - the client warmup HUD only re-appears when warmup actually
+                    // (re)starts, so run mp_warmup_start. Skip when the match is starting - live play
+                    // must not be forced back into warmup.
+                    if (readyAvailable && !matchStarted)
+                    {
+                        Server.ExecuteCommand("mp_warmup_start; mp_warmup_pausetimer 1");
+                        // The last HTML panel (mode 1) has a ~5s center-HUD lifetime and would linger
+                        // on top of the classic center hint after switching to mode 0. Blank it now and
+                        // draw the classic hint immediately instead of waiting for its 1s timer.
+                        _lastPanelHtml.Clear();
+                        foreach (var p in Utilities.GetPlayers())
+                        {
+                            if (p != null && p.IsValid && !p.IsBot && !p.IsHLTV)
+                                p.PrintToCenterHtml(" ", 1);
+                        }
+                        SendReadyStatusHintMessage();
+                    }
                 }
                 return;
             }
@@ -426,7 +463,7 @@ namespace MatchZy
                 if (gr != null)
                 {
                     bool changed = false;
-                    if (readyHideWarmupHud.Value && gr.WarmupPeriod)
+                    if (readyHintStyle.Value == 1 && gr.WarmupPeriod)
                     {
                         gr.WarmupPeriod = false;
                         changed = true;
@@ -448,14 +485,19 @@ namespace MatchZy
                             gr.GameRestart = expectedRestart;
                             changed = true;
                         }
-                        // Freeze the round timer during the ready phase. Forcing warmup off (to hide
-                        // the native banner) also drops mp_warmup_pausetimer, so the round timer would
-                        // otherwise count down (the "warmup timer is back" bug). Keeping the round
-                        // start time current each tick holds the displayed time constant = paused,
-                        // matching what pausetimer does in real warmup.
+                        // Neutralize the top round timer during the ready phase. Forcing warmup off
+                        // (to hide the native banner) reveals + runs the round timer HUD (the "warmup
+                        // timer is back" bug). The client always DRAWS the round timer while warmup is
+                        // off - its visibility is keyed on m_bWarmupPeriod, not on the time values, so
+                        // no netvar blanks it. So freeze it at a NON-zero value: RoundStartTime=now +
+                        // RoundTime=60 each tick pins the remaining time at a static 1:00. Do NOT use 0
+                        // here - remaining=0 makes the round perpetually "expired", so CS2 fires the
+                        // running-out-of-time penalty and ends rounds every tick (score climbs, and the
+                        // leak on unload is instant). 60 never reaches 0, so the round never times out.
                         if (_fakeWarmupActive)
                         {
                             gr.RoundStartTime = Server.CurrentTime;
+                            gr.RoundTime = 60;
                             changed = true;
                         }
                     }
@@ -510,16 +552,13 @@ namespace MatchZy
                         continue;
 
                     var sb = new StringBuilder();
-                    // WARMUP badge: only when the native "WARMUP" banner is hidden (readyHideWarmupHud),
-                    // the panel carries the warmup indicator itself. With the native banner shown
-                    // (matchzy_ready_hide_warmup_hud 0) it already sits above the panel, so skip the
-                    // badge to avoid a duplicate "WARMUP". Static (no per-tick change) so it does not
-                    // defeat the below change-detection and re-trigger the show animation.
                     // Every localized/dynamic value goes through PanelSafe: CS2's center-HTML panel
                     // breaks on raw multibyte UTF-8 (Danish o-slash / a-ring, Albanian e-diaeresis),
                     // dropping that line and everything after it (e.g. the trailing NOT-READY line).
-                    if (readyHideWarmupHud.Value)
-                        sb.Append($"<font class='fontSize-l' color='#ff9a3c'>&#9679; {PanelSafe(Localizer.ForPlayer(target, "matchzy.ready.warmuptag"))}</font><br>");
+                    // WARMUP badge: the native warmup is suppressed (m_bWarmupPeriod=false above), so
+                    // the panel carries its own indicator. Static (no per-tick change) so it does not
+                    // defeat the change-detection below and re-trigger the panel's show animation.
+                    sb.Append($"<font class='fontSize-l' color='#ff9a3c'>&#9679; {PanelSafe(Localizer.ForPlayer(target, "matchzy.ready.warmuptag"))}</font><br>");
                     sb.Append($"<font class='fontSize-m' color='#ffcf3f'>{PanelSafe(Localizer.ForPlayer(target, "matchzy.ready.title"))}</font><br>");
                     sb.Append($"<font class='fontSize-sm' color='#c8c8c8'>{PanelSafe(Localizer.ForPlayer(target, "matchzy.ready.mode", mode))}</font><br>");
                     sb.Append($"{bar} <font class='fontSize-m' color='#ffffff'>{_rpReady} / {_rpRequired}</font><br>");

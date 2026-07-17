@@ -4,6 +4,17 @@ Customized fork of [MatchZy](https://github.com/shobhit-pathak/MatchZy) by Shobh
 
 Fork version numbering is independent of upstream. Upstream changelog: <https://github.com/shobhit-pathak/MatchZy/blob/main/CHANGELOG.md>
 
+# 0.8.57
+
+#### July 17, 2026
+
+- Fixed `.bot` spawning two bots at once: the redundant `bot_join_team` before `bot_add_t`/`bot_add_ct` spawned an extra bot, and `bot_quota_mode normal` then refilled any kicked extra. `.bot` now adds exactly one bot (quota is pinned to the tracked bot count).
+- Practice now disables the round's team-damage penalties (autokick / team-damage warn/kick / TK punish), so grenade / molotov / friendly-fire testing no longer risks a kick.
+- Fixed a lingering ghost body in practice: a player who disconnects mid-practice could leave an orphaned pawn (the round is kept alive so the engine does not always reap it). The disconnecting pawn is now removed on the next frame.
+- The ready-status display is controlled by a single convar, `matchzy_ready_hint_style`: `0` = classic center text (default), `1` = HTML READY-UP panel with the native warmup suppressed (panel shows its own `WARMUP` badge and no native pill, at the cost of a frozen `1:00` round timer top-center). This folds in the old `matchzy_ready_hide_warmup_hud` toggle (retired) and the experimental `matchzy_ready_block_warmup_announce` (removed); both are auto-removed from an existing config.cfg on update. Note: hiding the native warmup is what forces CS2 to draw the round timer, and no server value can blank it, hence the frozen `1:00`.
+- Hardened practice spawn loading (`.prac`): the spawn scan is now materialized and guarded so it cannot crash the command (fixes an `ArrayTypeMismatchException` seen when running under the AcceleratorCSS Harmony tracer).
+- Fixed the ready phase after a live plugin reload (`css_plugins unload/load`): per-player ready state and the gamerules warmup state are now restored on hot reload, so the ready hint counts connected players (with the NotReady list) and displays correctly instead of reading 0/0 or staying invisible until a round restart.
+
 # 0.8.56
 
 #### July 16, 2026
@@ -22,13 +33,12 @@ Fork version numbering is independent of upstream. Upstream changelog: <https://
 - Added an experimental grenade landing predictor: `.predict` draws the flight arc and a landing marker for the grenade in your hand, gated behind `matchzy_experimental_predictor` (default `false`). It forward-simulates the throw (with world-collision wall/floor bounces when built against a CounterStrikeSharp API that exposes the trace natives, otherwise a no-collision estimate), tunable live via `matchzy_predict_gravity` / `matchzy_predict_throwspeed` / `matchzy_predict_elasticity` / `matchzy_predict_friction`, with a `matchzy_predict_debug` readout of predicted-vs-actual landing distance for calibration.
 - Fixed a countdown timer appearing during the ready phase when the HTML ready panel (`matchzy_ready_hint_style 1`) is used: hiding the native WARMUP banner also dropped `mp_warmup_pausetimer`, so the round timer counted down. The timer is now frozen during the ready phase, matching paused warmup.
 - The HTML ready panel now shows a `WARMUP` badge at the top, since the native WARMUP banner is hidden while the panel is up.
-- The in-panel `WARMUP` badge now only shows when the native banner is hidden (`matchzy_ready_hide_warmup_hud 1`). Set `matchzy_ready_hide_warmup_hud 0` to show the native WARMUP banner above the panel instead (real warmup, so the timer freezes natively and team-joiners spawn normally).
 - Fixed the HTML ready panel dropping lines (e.g. the NOT READY status) in languages with accented characters such as Danish and Albanian: accented text broke the center-HTML rendering, so it is now escaped to render correctly in every language.
 - Practice `.delnade` can now delete multiple lineups at once: `.delnade <name1> <name2> ...` removes each, and `.delnade all` removes every lineup you saved on the current map. It reports which were deleted and which were not found.
 - Fixed a rare `ArrayTypeMismatchException` when entering practice (`.prac` -> `GetSpawns`) on servers running a call-history crash tracer: the spawn lists are now pre-sized so the list-grow path that tripped it is never taken.
 - Added `matchzy_ready_up_by_ping` (default `true`): set it `false` to stop pinging (middle-mouse / scroll button) from toggling your ready status, for players who ready up by accident.
 - The ready panel (and classic ready hint) no longer shows during `.dryrun`, which has no ready gate.
-- config.cfg now auto-removes retired convar lines on load (starting with the renamed `matchzy_ready_hint_suppress_warmup`, now `matchzy_ready_hide_warmup_hud`), so an upgraded server no longer spams "Unknown command" when config.cfg execs.
+- config.cfg now auto-removes retired convar lines on load, so an upgraded server no longer spams "Unknown command" when config.cfg execs.
 - Fixed getting stuck in the spectator/observer camera for several seconds after picking a team during the ready phase (with the HTML ready panel): hiding the native warmup also disabled warmup's auto-respawn, so a fresh team-joiner was not spawned. Players are now respawned on join, with a periodic safety sweep that keeps every T/CT player spawned during the ready phase.
 
 # 0.8.55
@@ -55,7 +65,7 @@ Fork version numbering is independent of upstream. Upstream changelog: <https://
 #### July 15, 2026
 
 - Reworked the "waiting for players" ready screen into a per-player HTML panel: title, progress bar, ready count, CT/T split, current mode (Match / Scrim / Hill / Match Setup), and each player's own READY / NOT READY status, shown in their own language. New convar `matchzy_ready_hint_style` (0 = classic center text, 1 = HTML panel, default `1`) and `matchzy_ready_hint_blink` (blink the NOT READY line to grab attention, style 1 only, default `false`).
-- The native "WARMUP" HUD banner is now hidden during the ready phase (convar `matchzy_ready_hide_warmup_hud`, default `true`) so it no longer overlaps the ready panel. A "fake warmup" keeps the pre-match ready phase playing like warmup (round never ends, respawn on death, no round-time expiry) while the banner is hidden, and the center panel no longer flashes.
+- The native "WARMUP" HUD banner can be hidden during the ready phase (with the HTML ready panel) so it no longer overlaps the panel. A "fake warmup" keeps the pre-match ready phase playing like warmup (round never ends, respawn on death, no round-time expiry) while the banner is hidden, and the center panel no longer flashes.
 - Fixed the ready panel showing the wrong mode: switching `.scrim` / `.hill` during warmup now updates the panel immediately, and `.hill` -> `.match` no longer leaves the server stuck in hill mode.
 - Practice grenade spawns and `.breakrestore` now resolve their signatures by key from CounterStrikeSharp's gamedata instead of hardcoded byte patterns. MatchZy ships its own `gamedata/matchzy.json` (auto-loaded by CounterStrikeSharp, included in the release `.zip` at `addons/counterstrikesharp/gamedata/matchzy.json`), so it works on stock CounterStrikeSharp without editing the core `gamedata.json`. Missing/stale keys degrade gracefully instead of crashing.
 - Added `matchzy_ready_clantag_enabled` (default `true`) to toggle the `[READY]` / `[UNREADY]` scoreboard clan tags shown during the ready phase.

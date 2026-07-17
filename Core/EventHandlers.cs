@@ -109,6 +109,22 @@ public partial class MatchZy
 
             int userId = player.UserId.Value;
 
+            // Practice orphaned-pawn cleanup: in practice the round is kept alive (buddha /
+            // ignore_round_win_conditions), so a disconnecting human's pawn can linger as a
+            // ghost collision body instead of being reaped. Capture its handle now and Remove()
+            // it next frame, but only if the handle still resolves to that same pawn (guards
+            // against the engine having already freed it -> Remove on a dead entity crashes).
+            if (isPractice && !player.IsBot && !player.IsHLTV && player.PlayerPawn?.IsValid == true && player.PlayerPawn.Value != null)
+            {
+                CCSPlayerPawn orphanPawn = player.PlayerPawn.Value;
+                uint orphanRaw = orphanPawn.EntityHandle.Raw;
+                Server.NextFrame(() =>
+                {
+                    if (orphanPawn.IsValid && orphanPawn.EntityHandle.Raw == orphanRaw)
+                        orphanPawn.Remove();
+                });
+            }
+
             if (playerReadyStatus.Remove(userId))
             {
                 connectedPlayers--;

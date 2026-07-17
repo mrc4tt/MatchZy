@@ -706,7 +706,7 @@ public partial class MatchZy
                     continue;
                 }
 
-                List<Position> positionList = new();
+                List<Position> positionList = new(64);
 
                 foreach (var positionData in entry.Value)
                 {

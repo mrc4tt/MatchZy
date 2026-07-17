@@ -16,7 +16,7 @@ namespace MatchZy
     public partial class MatchZy : BasePlugin
     {
         public override string ModuleName => "MatchZy";
-        public override string ModuleVersion => "0.8.56";
+        public override string ModuleVersion => "0.8.57";
         public override string ModuleAuthor => "WD- Edited by Miksen @ FSHOST.me";
         public override string ModuleDescription => "A plugin for running and managing CS2 practice/pugs/scrims/matches!";
         public string chatPrefix = $"{ChatColors.Green}[MatchZy]{ChatColors.Default}";
@@ -585,6 +585,53 @@ namespace MatchZy
             // string has no server xref), so no print hook can suppress it. The hook only spammed
             // the DynoHook "could not allocate trampoline" error for zero benefit.
             RegisterListener<Listeners.OnTick>(RenderReadyPanel);
+
+            // Hot load/reload while a ready phase is already up: run the panel render immediately on
+            // the next frame instead of waiting for the natural OnTick, so the native "Warmup" HUD is
+            // suppressed and the panel drawn as fast as possible (minimizes the native-warmup flash
+            // right after the plugin finishes loading). No-op if not in a ready phase / not style 1.
+            // Also restart the classic-hint timer: RenderReadyPanel (mode 1) re-registers as an OnTick
+            // listener on every Load, but the mode-0 classic center box is driven by this 1s timer,
+            // which is only started inside StartWarmup - not re-run on a hot reload if the server is
+            // already in warmup. Without this, mode 0 shows nothing after unload/load. The callback
+            // self-gates on readyAvailable, so restarting it unconditionally is safe.
+            if (hotReload)
+            {
+                Server.NextFrame(() => { try { RenderReadyPanel(); } catch { } });
+                readyStatusHintTimer?.Kill();
+                readyStatusHintTimer = AddTimer(1.0f, SendReadyStatusHintMessage, TimerFlags.REPEAT);
+
+                // A hot reload starts a fresh plugin instance with EMPTY per-player state - connect
+                // events (EventPlayerConnectFull) do not replay - so the ready system reads 0/0 and the
+                // NotReady list is empty. Re-populate playerData / playerReadyStatus from the currently
+                // connected humans so the ready gate + hint count them. Deferred 1s so readyAvailable
+                // has settled after the reload.
+                //
+                // Also clear the leftover mode-1 gamerules manipulation: m_bGameRestart stuck true (mode
+                // 1 sets it every tick for anti-flash) makes the engine think a restart is in progress,
+                // which SUPPRESSES the mode-0 classic center print (it broadcasts but is invisible until
+                // a round restart). RestoreReadyPhaseGameState resets m_bGameRestart=false +
+                // m_bWarmupPeriod=true. Guarded so a live match is never touched.
+                AddTimer(1.0f, () =>
+                {
+                    foreach (var p in Utilities.GetPlayers())
+                    {
+                        if (p == null || !p.IsValid || p.IsBot || p.IsHLTV || !p.UserId.HasValue)
+                            continue;
+                        int uid = p.UserId.Value;
+                        playerData[uid] = p;
+                        if (!playerReadyStatus.ContainsKey(uid))
+                            playerReadyStatus[uid] = (readyAvailable && !matchStarted)
+                                ? (matchConfig.MinPlayersToReady == -1)
+                                : true;
+                    }
+                    connectedPlayers = playerData.Count;
+                    _readyStatusDirty = true;
+
+                    if (readyAvailable && !matchStarted)
+                        RestoreReadyPhaseGameState();
+                });
+            }
 
             // Practice interactive spawn markers: +use aimed at a .showspawns beam teleports
             // to that spawn. Edge-triggered (fires once on Use press), gated on spawnMarkersActive.

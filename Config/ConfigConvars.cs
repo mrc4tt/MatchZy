@@ -35,9 +35,12 @@ namespace MatchZy
 
         public FakeConVar<bool> enableDamageReport = new("matchzy_enable_damage_report", "Whether to show damage report after each round or not. Default: true", true);
 
-        public FakeConVar<int> readyHintStyle = new("matchzy_ready_hint_style", "Ready-status display style. 0 = classic center text, 1 = HTML READY-UP panel (progress bar, per-player status). Default: 1", 1);
-
-        public FakeConVar<bool> readyHideWarmupHud = new("matchzy_ready_hide_warmup_hud", "In HTML style (1), hide the native CS2 'WARMUP' HUD banner during the ready phase (sets m_bWarmupPeriod networked false) so it does not compete with the panel. Set false if it disrupts warmup. Default: true", true);
+        // One convar picks the ready-status display mode:
+        //   0 = classic center text (old style; warmup left untouched)
+        //   1 = HTML READY-UP panel, warmup suppressed: own WARMUP badge, no native 'Warmup' pill,
+        //       but a frozen 1:00 round timer top-center (hiding warmup forces the client to draw the
+        //       round timer; no netvar can blank it)
+        public FakeConVar<int> readyHintStyle = new("matchzy_ready_hint_style", "Ready-status display mode. 0 = classic center text. 1 = HTML READY-UP panel (progress bar, per-player status) with the native warmup suppressed: own WARMUP badge, no native 'Warmup' pill, frozen 1:00 top timer. Default: 0", 0);
 
         public FakeConVar<bool> readyHintBlinkEnabled = new("matchzy_ready_hint_blink", "Whether the HTML 'READY UP' panel blinks the 'YOU ARE NOT READY' line to grab attention (style 1 only). Default: false", false);
 
