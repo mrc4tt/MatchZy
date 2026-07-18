@@ -16,7 +16,7 @@ namespace MatchZy
     public partial class MatchZy : BasePlugin
     {
         public override string ModuleName => "MatchZy";
-        public override string ModuleVersion => "0.8.57";
+        public override string ModuleVersion => "0.8.58";
         public override string ModuleAuthor => "WD- Edited by Miksen @ FSHOST.me";
         public override string ModuleDescription => "A plugin for running and managing CS2 practice/pugs/scrims/matches!";
         public string chatPrefix = $"{ChatColors.Green}[MatchZy]{ChatColors.Default}";
@@ -425,6 +425,7 @@ namespace MatchZy
                 { ".endscrim", OnStopMatchCommand },
                 { ".stopgame", OnStopMatchCommand },
                 { ".stopmatch", OnStopMatchCommand },
+                { ".matchstop", OnStopMatchCommand },
                 { ".exitscrim", OnStopMatchCommand },
                 { ".end", OnStopMatchCommand },
                 { ".settings", OnMatchSettingsCommand },
@@ -1216,8 +1217,17 @@ namespace MatchZy
                         }
                         else
                         {
-                            // Player not found even after updating, skip processing
-                            return HookResult.Continue;
+                            // playerData intentionally excludes team==None players during match setup /
+                            // match-mode-only (the ready/whitelist gate). But that must NOT kill chat
+                            // command dispatch, else a spectator/unassigned admin loses EVERY dot command
+                            // (.ma, .match, .stopmatch, ...) - !ma still works only because CSS's ! trigger
+                            // bypasses this path. Resolve the controller directly so dot commands dispatch;
+                            // each handler still runs its own admin/state checks.
+                            var directPlayer = Utilities.GetPlayerFromUserid(playerUserId);
+                            if (directPlayer != null && directPlayer.IsValid && !directPlayer.IsBot && !directPlayer.IsHLTV)
+                                player = directPlayer;
+                            else
+                                return HookResult.Continue;
                         }
                     }
 

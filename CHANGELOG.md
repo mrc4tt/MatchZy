@@ -4,6 +4,14 @@ Customized fork of [MatchZy](https://github.com/shobhit-pathak/MatchZy) by Shobh
 
 Fork version numbering is independent of upstream. Upstream changelog: <https://github.com/shobhit-pathak/MatchZy/blob/main/CHANGELOG.md>
 
+# 0.8.58
+
+#### July 18, 2026
+
+- Fixed dot-prefix chat commands (`.ma`, `.match`, `.stopmatch`, ...) doing nothing during match setup: a spectator / unassigned admin is excluded from the internal player map while a match is being set up, which stopped the chat handler from resolving them, so only the `!` versions (e.g. `!ma`) worked. Dot commands now dispatch for those players too.
+- Fixed `.stopmatch` and the "Stop Match" button in the `.ma` / `css_ma` admin menu not stopping a match that had been set up but was not yet live (setup / veto / warmup / knife). Stop now works in every pre-live and live state, not just once the match goes live.
+- Added `.matchstop` as an alias for stopping/ending a match (alongside the existing `.stopmatch`, `.endmatch`, `.stopgame`, `.endgame`, `.forcestop`, `.forceend`, `.end`, `.exitscrim`).
+
 # 0.8.57
 
 #### July 17, 2026

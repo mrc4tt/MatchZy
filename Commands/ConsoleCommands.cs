@@ -749,10 +749,18 @@ namespace MatchZy
                     return;
                 }
 
-                if (matchStarted && isMatchLive)
+                // Stop must work in EVERY pre-live and live state, not just isMatchLive. A match set up
+                // via .match / .matchsetup sits in setup / veto / warmup / knife (matchStarted but not
+                // yet isMatchLive) - the old `matchStarted && isMatchLive` gate made .stopmatch and the
+                // css_ma "Stop Match" button a silent no-op there ("cannot stop once started").
+                if (matchStarted || isMatchSetup || isVeto || isPreVeto)
                 {
-                    Server.PrintToChatAll($"{chatPrefix} An admin force-ended the match.");
+                    Server.PrintToChatAll($"{chatPrefix} An admin stopped the match.");
                     ResetMatch(true, "ended_early");
+                }
+                else
+                {
+                    ReplyToUserCommand(player, Localizer.ForPlayer(player, "matchzy.utility.matchended"));
                 }
             }
             else
