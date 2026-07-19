@@ -4,6 +4,15 @@ Customized fork of [MatchZy](https://github.com/shobhit-pathak/MatchZy) by Shobh
 
 Fork version numbering is independent of upstream. Upstream changelog: <https://github.com/shobhit-pathak/MatchZy/blob/main/CHANGELOG.md>
 
+# 0.8.60
+
+#### July 19, 2026
+
+- Fixed the coach falling out of the map with a black screen on maps where the team spawn backs onto the map edge (Mirage T): the behind-team spot is now validated with wall and floor probes and moves closer to the spawn until it is inside the world.
+- Fixed players being re-teleported every round while a coach was on, even on the coachless side: anyone standing on any valid team spawn is now left alone (maps like Mirage enable more spawn points than the team size), and near-duplicate spawn points can no longer seat two players almost on top of each other.
+- New `.coachtest` (admin): instantly places you like a coach on your current side and back again on the second run - lets a single admin verify coach placement on any map without bots or a match.
+- Coach spawn computation is hardened against the AcceleratorCSS tracer: a failure now falls back to the fixed viewing spot instead of erroring in the spawn handler.
+
 # 0.8.59
 
 #### July 19, 2026

@@ -16,7 +16,7 @@ namespace MatchZy
     public partial class MatchZy : BasePlugin
     {
         public override string ModuleName => "MatchZy";
-        public override string ModuleVersion => "0.8.59";
+        public override string ModuleVersion => "0.8.60";
         public override string ModuleAuthor => "WD- Edited by Miksen @ FSHOST.me";
         public override string ModuleDescription => "A plugin for running and managing CS2 practice/pugs/scrims/matches!";
         public string chatPrefix = $"{ChatColors.Green}[MatchZy]{ChatColors.Default}";
@@ -560,6 +560,7 @@ namespace MatchZy
                 { ".traceline", OnArcCommand },
                 { ".nades", OnNadesMenuCommand },
                 { ".warmupbots", OnWarmupBotsCommand },
+                { ".coachtest", OnCoachTestCommand },
                 { ".version", OnMatchZyVersionCommand },
                 { ".readycheck", OnReadyCheckCommand },
                 { ".rcheck", OnReadyCheckCommand },

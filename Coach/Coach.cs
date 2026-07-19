@@ -254,7 +254,13 @@ public partial class MatchZy
             // This does NOT depend on the min-priority `spawnsData` filter, which can come up
             // short on maps where the lowest-priority set is smaller than the team size and
             // leave a player stranded. Fall back to spawnsData only if the entity scan fails.
-            List<Position> spawns = GetTopCompetitiveSpawns(side, realPlayers.Count);
+            // Fetch MORE candidates than players (+5): some maps enable more legit spawns than team
+            // size (Mirage T has 10), and the engine freely seats players on any of them. With only
+            // the strict top-N, a player standing on a perfectly fine spawn outside that subset was
+            // force-moved EVERY round (observed: the same two bots re-teleported each round, even on
+            // the coachless side). The stability pre-pass below now keeps anyone standing on ANY
+            // valid candidate; the extra spawns only ever receive a displaced player as fallback.
+            List<Position> spawns = GetTopCompetitiveSpawns(side, realPlayers.Count + 5);
             if (spawns.Count == 0)
                 spawns = spawnsData.TryGetValue(side, out List<Position>? fallback) ? fallback : new List<Position>();
             if (spawns.Count == 0)
@@ -353,7 +359,50 @@ public partial class MatchZy
     private List<Position> GetTopCompetitiveSpawns(byte side, int count)
     {
         string designerName = side == (byte)CsTeam.CounterTerrorist ? "info_player_counterterrorist" : "info_player_terrorist";
-        return Utilities.FindAllEntitiesByDesignerName<SpawnPoint>(designerName).Where(s => s.IsValid && s.Enabled && s.CBodyComponent?.SceneNode != null).OrderBy(s => s.Priority).Take(count).Select(s => new Position(s.CBodyComponent!.SceneNode!.AbsOrigin, s.CBodyComponent.SceneNode.AbsRotation)).ToList();
+        // MATERIALIZE the native entity enumeration first and guard the whole scan: under the
+        // AcceleratorCSS Harmony tracer, iterating the lazy enumerable inside a patched method throws
+        // ArrayTypeMismatchException (same artifact the 0.8.57 .prac spawn fix addressed). On failure
+        // return empty - callers fall back to spawnsData / the JSON coach spot.
+        List<(int Priority, uint Index, Position Pos)> candidates = new();
+        try
+        {
+            var raw = Utilities.FindAllEntitiesByDesignerName<SpawnPoint>(designerName).ToList();
+            foreach (var s in raw)
+            {
+                if (s == null || !s.IsValid || !s.Enabled || s.CBodyComponent?.SceneNode == null)
+                    continue;
+                candidates.Add(((int)s.Priority, s.Index, new Position(s.CBodyComponent.SceneNode.AbsOrigin, s.CBodyComponent.SceneNode.AbsRotation)));
+            }
+        }
+        catch (Exception e)
+        {
+            Log($"[GetTopCompetitiveSpawns] scan failed (team {side}): {e.GetType().Name}: {e.Message}");
+            return new List<Position>();
+        }
+        // Deterministic order: Priority, then entity index (plain Priority sort left ties arbitrary).
+        candidates.Sort((a, b) => a.Priority != b.Priority ? a.Priority.CompareTo(b.Priority) : a.Index.CompareTo(b.Index));
+        const float minSpawnGapSq = 64.0f * 64.0f;
+        var picked = new List<Position>(count);
+        foreach (var (_, _, c) in candidates)
+        {
+            if (picked.Count >= count)
+                break;
+            bool tooClose = false;
+            foreach (var p in picked)
+            {
+                float dx = c.PlayerPosition.X - p.PlayerPosition.X;
+                float dy = c.PlayerPosition.Y - p.PlayerPosition.Y;
+                float dz = c.PlayerPosition.Z - p.PlayerPosition.Z;
+                if (dx * dx + dy * dy + dz * dz < minSpawnGapSq)
+                {
+                    tooClose = true;
+                    break;
+                }
+            }
+            if (!tooClose)
+                picked.Add(c);
+        }
+        return picked;
     }
 
     /// <summary>
@@ -364,6 +413,23 @@ public partial class MatchZy
     /// coaches sideways. Returns false if no team spawns were found (caller falls back to the JSON spot).
     /// </summary>
     private bool TryGetBehindTeamCoachSpawn(byte teamNum, int coachIdx, out Position result)
+    {
+        result = null!;
+        try
+        {
+            return TryGetBehindTeamCoachSpawnCore(teamNum, coachIdx, out result);
+        }
+        catch (Exception e)
+        {
+            // Never let a placement computation escape into the spawn-event handler (an unguarded
+            // ArrayTypeMismatch from the AcceleratorCSS tracer did exactly that). Fall back to the
+            // JSON viewing spot.
+            Log($"[TryGetBehindTeamCoachSpawn] failed (team {teamNum}): {e.GetType().Name}: {e.Message}");
+            return false;
+        }
+    }
+
+    private bool TryGetBehindTeamCoachSpawnCore(byte teamNum, int coachIdx, out Position result)
     {
         result = null!;
         var spawns = GetTopCompetitiveSpawns(teamNum, 10);
@@ -396,19 +462,95 @@ public partial class MatchZy
             if (proj < minProj) minProj = proj;
         }
 
-        const float margin = 220.0f;   // units behind the rear-most spawn
-        const float up = 90.0f;        // units above for an overview
+        const float up = 90.0f;        // units above the floor for an overview
         const float pitch = 12.0f;     // downward look pitch (degrees)
-        // Behind the rear-most spawn by `margin`, laterally centred on the cluster.
-        float baseX = cx + fx * (minProj - margin);
-        float baseY = cy + fy * (minProj - margin);
+        float yawDeg = (float)(Math.Atan2(fy, fx) * 180.0 / Math.PI);
         // Spread extra coaches sideways (perpendicular to the facing axis) so they don't stack.
         float rx = fy, ry = -fx;
         float spread = coachIdx * 55.0f;
-        var pos = new Vector(baseX + rx * spread, baseY + ry * spread, cz + up);
-        float yawDeg = (float)(Math.Atan2(fy, fx) * 180.0 / Math.PI);
-        result = new Position(pos, new QAngle(pitch, yawDeg, 0.0f));
+        // Rear-most spawn point at eye height - the wall/void probe starts here.
+        var rear = new Vector(cx + fx * minProj + rx * spread, cy + fy * minProj + ry * spread, cz + 64.0f);
+
+#if HAS_CSS_TRACE
+        // The naive "220u behind" can land OUTSIDE the world on maps whose spawn backs onto the map
+        // edge (Mirage T: coach fell into the void with a black screen). Validate each candidate:
+        // the path from the rear spawn to it must be clear (not through a wall), and there must be a
+        // floor under it. Shrink the margin until a valid spot is found; give up -> caller falls back.
+        try
+        {
+            var opts = new TraceOptions { InteractsWith = Masks.Solid };
+            foreach (float margin in new[] { 220.0f, 160.0f, 110.0f, 70.0f, 40.0f })
+            {
+                var cand = new Vector(rear.X - fx * margin, rear.Y - fy * margin, rear.Z);
+                // Wall probe: rear spawn -> candidate must not pass through solid.
+                var wall = Trace.TraceEndShape(rear, cand, null, opts);
+                if (wall.DidHit())
+                    continue;
+                // Floor probe: there must be ground beneath (void = no hit = outside the map).
+                var floor = Trace.TraceEndShape(cand, new Vector(cand.X, cand.Y, cand.Z - 600.0f), null, opts);
+                if (!floor.DidHit())
+                    continue;
+                result = new Position(new Vector(cand.X, cand.Y, floor.HitPoint.Z + up), new QAngle(pitch, yawDeg, 0.0f));
+                return true;
+            }
+        }
+        catch
+        {
+            // Trace failure - fall through to the unvalidated fallback below.
+        }
+#endif
+        // No validated spot (or no trace API): fall back to a short, safe hover just behind and above
+        // the rear spawn instead of a far unvalidated point.
+        result = new Position(new Vector(rear.X - fx * 40.0f, rear.Y - fy * 40.0f, cz + up), new QAngle(pitch, yawDeg, 0.0f));
         return true;
+    }
+
+    // ── .coachtest : solo debug of the coach placement ─────────────────────────────────────────
+    // The real coach flow only runs on a SPAWN event (so .coach during warmup does nothing until a
+    // respawn/round start, which makes solo testing awkward). .coachtest places YOU like a coach
+    // right now: computes the behind-team spot for your current side, teleports + freezes +
+    // invisible + undamageable - exactly the live placement path. Run again to release.
+    private readonly HashSet<int> _coachTestActive = new();
+
+    [ConsoleCommand("css_coachtest", "Debug: place yourself like a coach right now; run again to release")]
+    public void OnCoachTestCommand(CCSPlayerController? player, CommandInfo? command)
+    {
+        if (!IsPlayerValid(player) || !player!.UserId.HasValue)
+            return;
+        if (!IsPlayerAdmin(player, "css_coachtest", "@css/map", "@custom/prac"))
+        {
+            SendPlayerNotAdminMessage(player);
+            return;
+        }
+        int uid = player.UserId.Value;
+        var pawn = player.PlayerPawn.Value;
+        if (pawn == null)
+            return;
+
+        if (_coachTestActive.Remove(uid))
+        {
+            // Release: visible, walkable, damageable again.
+            SetPlayerVisible(player);
+            pawn.MoveType = MoveType_t.MOVETYPE_WALK;
+            pawn.ActualMoveType = MoveType_t.MOVETYPE_WALK;
+            pawn.TakesDamage = true;
+            ReplyToUserCommand(player, "[CoachTest] released - you are a normal player again.");
+            return;
+        }
+
+        if (player.TeamNum != (byte)CsTeam.Terrorist && player.TeamNum != (byte)CsTeam.CounterTerrorist)
+        {
+            ReplyToUserCommand(player, "[CoachTest] join T or CT first.");
+            return;
+        }
+        if (!TryGetBehindTeamCoachSpawn(player.TeamNum, 0, out Position spot))
+        {
+            ReplyToUserCommand(player, "[CoachTest] could not compute a behind-team spot (no team spawns found).");
+            return;
+        }
+        MoveCoachToPosition(player, spot, "coachtest");
+        _coachTestActive.Add(uid);
+        ReplyToUserCommand(player, $"[CoachTest] placed at ({spot.PlayerPosition.X:0}, {spot.PlayerPosition.Y:0}, {spot.PlayerPosition.Z:0}) - run .coachtest again to release.");
     }
 
     private void MoveCoachToPosition(CCSPlayerController coach, Position position, string timing)
