@@ -233,6 +233,8 @@ namespace MatchZy
         {
             if (matchStarted)
                 return;
+            // Practice manages its own bots; clear any warmup aim-bots first.
+            KillWarmupBots();
             isPractice = true;
             isDryRun = false;
             isWarmup = false;
@@ -283,7 +285,7 @@ namespace MatchZy
             Server.PrintToChatAll($" {ChatColors.Green}Nades: {ChatColors.Default}.loadnade, .savenade, .delnade, .importnade, .listnades, .mynades");
             Server.PrintToChatAll($" {ChatColors.Green}Nade Throw: {ChatColors.Default}.rethrow, .throwindex <index>, .lastindex, .delay <number>");
             Server.PrintToChatAll($" {ChatColors.Green}Utility & Toggles: {ChatColors.Default}.clear, .fastforward, .last, .back, .solid, .impacts, .traj");
-            Server.PrintToChatAll($" {ChatColors.Green}Utility & Toggles: {ChatColors.Default}.nadecam, .savepos, .loadpos");
+            Server.PrintToChatAll($" {ChatColors.Green}Utility & Toggles: {ChatColors.Default}.savepos, .loadpos");
             Server.PrintToChatAll($" {ChatColors.Green}Sides & Others: {ChatColors.Default}.ct, .t, .spec, .fas, .god, .dryrun, .break, .nobreak, .exitprac");
             Server.PrintToChatAll($" {ChatColors.Default}Input {ChatColors.Green}.help{ChatColors.Default} View the full list of commands");
         }
@@ -413,10 +415,22 @@ namespace MatchZy
 
             if (!string.IsNullOrWhiteSpace(saveNadeName))
             {
-                // Split string into 2 parts
+                // Parse: <name> [throwtype] [comment]. The 2nd token is treated as a throw style only
+                // if it is a recognized one (normal/jump/run/walk/crouch...); otherwise it is part of
+                // the comment. So both ".sn ctspawn jumpthrow bad smoke" and ".sn ctspawn just a note"
+                // work - the first stores Throw="Jumpthrow" Desc="bad smoke", the second Desc="just a note".
                 string[] lineupUserString = saveNadeName.Split(' ');
                 string lineupName = lineupUserString[0];
-                string lineupDesc = string.Join(" ", lineupUserString, 1, lineupUserString.Length - 1);
+                string lineupThrow = "";
+                int descStart = 1;
+                if (lineupUserString.Length >= 2)
+                {
+                    string? t = NormalizeThrowType(lineupUserString[1]);
+                    if (t != null) { lineupThrow = t; descStart = 2; }
+                }
+                string lineupDesc = lineupUserString.Length > descStart
+                    ? string.Join(" ", lineupUserString, descStart, lineupUserString.Length - descStart)
+                    : "";
 
                 // Get player info: steamid, pos, ang
                 string playerSteamID;
@@ -440,7 +454,12 @@ namespace MatchZy
                 QAngle playerAngle = playerPawn.EyeAngles;
                 Vector playerPos = sceneNode.AbsOrigin;
                 string currentMapName = Server.MapName;
-                string nadeType = GetNadeType(playerPawn.WeaponServices!.ActiveWeapon.Value!.DesignerName);
+                // Resolve the grenade in hand. Saving while holding a knife/pistol/rifle (or with no
+                // active weapon) is allowed on purpose: Type stays empty and the marker label shows a
+                // blank "[]" type line (name + throw still render). The ?? "" keeps this null-safe so
+                // the command never throws when no weapon is active.
+                string activeWeapon = playerPawn.WeaponServices?.ActiveWeapon?.Value?.DesignerName ?? "";
+                string nadeType = GetNadeType(activeWeapon);
 
                 // Define the file path
                 string savednadesfileName = MatchZyCfgRel("savednades.json");
@@ -501,6 +520,7 @@ namespace MatchZy
                         { "Desc", lineupDesc },
                         { "Map", currentMapName },
                         { "Type", nadeType },
+                        { "Throw", lineupThrow },
                     };
 
                     // Serialize the updated dictionary back to JSON
@@ -508,6 +528,7 @@ namespace MatchZy
 
                     // Write the updated JSON content back to the file
                     File.WriteAllText(savednadesPath, updatedJson);
+                    RefreshNadeMarkersIfActive(player);
 
                     PrintToPlayerChat(player, Localizer.ForPlayer(player, "matchzy.pm.lineupsavedsucces", lineupName));
                     PrintToAllChat(Localizer["matchzy.pm.playersavedlineup", player.PlayerName, $"{lineupName} {playerPos} {playerAngle}"]);
@@ -519,7 +540,7 @@ namespace MatchZy
             }
             else
             {
-                ReplyToUserCommand(player, Localizer.ForPlayer(player, "matchzy.cc.usage", $".savenade <name>"));
+                ReplyToUserCommand(player, Localizer.ForPlayer(player, "matchzy.cc.usage", $".savenade <name> [throwtype] <comment> (throwtype: normal/jump/run/walk/crouch; shows on the .shownades label)"));
             }
         }
 
@@ -606,6 +627,7 @@ namespace MatchZy
                 if (deleted.Count > 0)
                 {
                     File.WriteAllText(savednadesPath, JsonSerializer.Serialize(savedNadesDict, new JsonSerializerOptions { WriteIndented = true }));
+                    RefreshNadeMarkersIfActive(player);
                     ReplyToUserCommand(player, Localizer.ForPlayer(player, "matchzy.pm.nadesdeleted", string.Join(", ", deleted)));
                 }
                 if (notFound.Count > 0)
@@ -686,6 +708,7 @@ namespace MatchZy
 
                         // Write the updated JSON content back to the file
                         File.WriteAllText(savednadesPath, updatedJson);
+                        RefreshNadeMarkersIfActive(player);
 
                         // ReplyToUserCommand(player, $"Lineup '{lineupName}' imported and saved successfully.");
                         ReplyToUserCommand(player, Localizer.ForPlayer(player, "matchzy.pm.lineupimportedsuccess"));
@@ -737,37 +760,26 @@ namespace MatchZy
 
                 ReplyToUserCommand(player, $"\x0D-----All Saved Lineups for \x06{Server.MapName}\x0D-----");
 
-                // List lineups for the specified player
-                ListLineups(player, "default", Server.MapName, savedNadesDict, nadeFilter);
-
-                // List lineups for the current player
-                ListLineups(player, player.SteamID.ToString(), Server.MapName, savedNadesDict, nadeFilter);
+                var ordered = OrderedLineupsForMap(player, savedNadesDict, nadeFilter);
+                if (ordered.Count == 0)
+                {
+                    ReplyToUserCommand(player, Localizer.ForPlayer(player, "matchzy.pm.nosavedlineups", Server.MapName));
+                }
+                else
+                {
+                    for (int i = 0; i < ordered.Count; i++)
+                    {
+                        string type = ordered[i].Info.TryGetValue("Type", out var t) ? t : "";
+                        string name = ordered[i].Name;
+                        // #N [Type] .ln <Name> or .ln #N
+                        ReplyToUserCommand(player, $"\x06#{i + 1} [{type}] \x0D.ln \x06{name}\x0D or .ln #{i + 1}");
+                    }
+                }
             }
             catch (JsonException ex)
             {
                 Log($"Error handling JSON: {ex.Message}");
                 ReplyToUserCommand(player, $"Error handling JSON. Please check the server logs.");
-            }
-        }
-
-        private void ListLineups(CCSPlayerController player, string steamID, string mapName, Dictionary<string, Dictionary<string, Dictionary<string, string>>> savedNadesDict, string nadeFilter)
-        {
-            if (savedNadesDict.ContainsKey(steamID))
-            {
-                foreach (var kvp in savedNadesDict[steamID])
-                {
-                    // Check if a filter is provided, and if so, apply the filter
-                    if ((string.IsNullOrWhiteSpace(nadeFilter) || kvp.Key.Contains(nadeFilter, StringComparison.OrdinalIgnoreCase)) && kvp.Value.ContainsKey("Map") && kvp.Value["Map"] == mapName)
-                    {
-                        // Format and reply with the lineup name
-                        ReplyToUserCommand(player, $"\x06[{kvp.Value["Type"]}] \x0D.loadnade \x06{kvp.Key}");
-                    }
-                }
-            }
-            else
-            {
-                // ReplyToUserCommand(player, $"No saved lineups found for the specified SteamID: ({steamID}).");
-                ReplyToUserCommand(player, Localizer.ForPlayer(player, "matchzy.pm.nosavedlineups", steamID));
             }
         }
 
@@ -794,6 +806,20 @@ namespace MatchZy
 
                     // Deserialize the existing JSON content
                     var savedNadesDict = JsonSerializer.Deserialize<Dictionary<string, Dictionary<string, Dictionary<string, string>>>>(existingJson) ?? new Dictionary<string, Dictionary<string, Dictionary<string, string>>>();
+
+                    // Load by index: .ln #3 or .ln 3 -> the 3rd lineup as numbered by .listnades.
+                    string idxArg = loadNadeName.Trim().TrimStart('#');
+                    if (int.TryParse(idxArg, out int loadIdx))
+                    {
+                        var ordered = OrderedLineupsForMap(player, savedNadesDict, "");
+                        if (loadIdx >= 1 && loadIdx <= ordered.Count)
+                            loadNadeName = ordered[loadIdx - 1].Name;
+                        else
+                        {
+                            ReplyToUserCommand(player, Localizer.ForPlayer(player, "matchzy.pm.nadenotfound", loadNadeName));
+                            return;
+                        }
+                    }
 
                     bool lineupFound = false;
                     bool lineupOnWrongMap = false;
@@ -928,6 +954,8 @@ namespace MatchZy
             // so folding the flag/list reset here disarms interaction on all of them.
             spawnMarkersActive = false;
             activeSpawnMarkers.Clear();
+            // Also tear down grenade-library markers (same mode-transition paths).
+            HideNadeMarkers();
         }
 
         // #F self-flash: throw a flashbang at your own face for pop-flash reaction reps
@@ -1156,10 +1184,10 @@ namespace MatchZy
             isDryRun = true;
         }
 
-        [ConsoleCommand("css_exitdryrun", "Exit Dryrun & Start Practice")]
-        [ConsoleCommand("css_exitdry", "Exit Dryrun & Start Practice")]
-        [ConsoleCommand("css_stopdry", "Exit Dryrun & Start Practice")]
-        [ConsoleCommand("css_enddry", "Exit Dryrun & Start Practice")]
+        [ConsoleCommand("css_exitdryrun", "Exit Dryrun (back to match warmup)")]
+        [ConsoleCommand("css_exitdry", "Exit Dryrun (back to match warmup)")]
+        [ConsoleCommand("css_stopdry", "Exit Dryrun (back to match warmup)")]
+        [ConsoleCommand("css_enddry", "Exit Dryrun (back to match warmup)")]
         public void OnExitDryCommand(CCSPlayerController? player, CommandInfo? command)
         {
             if (!IsPlayerAdmin(player, "css_exitdry", "@css/map", "@custom/prac"))
@@ -1175,9 +1203,13 @@ namespace MatchZy
             }
 
             ExecExitDryCFG();
-            StartPracticeMode();
-
+            // Exit dryrun to match warmup, NOT back into practice. Dryrun is usually a pre-match test,
+            // so returning to practice was surprising; land in the neutral match-warmup hub (same as
+            // .exitprac) and let the admin run .prac themselves if they want practice again.
             isDryRun = false;
+            StartMatchMode();
+            HandlePlayoutConfig();
+            ReplyToUserCommand(player, Localizer.ForPlayer(player, "matchzy.pm.exitdry"));
         }
 
         [ConsoleCommand("css_spawn", "Teleport to provided spawn")]
@@ -1514,7 +1546,7 @@ namespace MatchZy
                     {
                         if (targetPlayer != null && targetPlayer.IsValid && targetPlayer.Connected == PlayerConnectedState.Connected)
                         {
-                            SpawnBot(targetPlayer, crouch, boost);
+                            SpawnBot(targetPlayer, crouch, boost, targetTeam);
                         }
                         else
                         {
@@ -1651,12 +1683,7 @@ namespace MatchZy
             // disable noclip on spawn -- all no clipping functionality is handled by the plugin!
             // Movement adjustments are consistent with cs2-noclip.
             CBasePlayerPawn pawn = player!.PlayerPawn.Value!;
-            if (pawn.MoveType == MoveType_t.MOVETYPE_NOCLIP)
-            {
-                pawn.MoveType = MoveType_t.MOVETYPE_WALK;
-                pawn.ActualMoveType = MoveType_t.MOVETYPE_WALK;
-                Utilities.SetStateChanged(pawn, "CBaseEntity", "m_MoveType");
-            }
+            pawn.ResetNoclipToWalk();
 
             if (matchStarted && (matchzyTeam1.coach.Contains(player!) || matchzyTeam2.coach.Contains(player!)))
             {
@@ -1987,7 +2014,7 @@ namespace MatchZy
             }
         }
 
-        private void SpawnBot(CCSPlayerController botOwner, bool crouch, bool boost = false)
+        private void SpawnBot(CCSPlayerController botOwner, bool crouch, bool boost = false, CsTeam targetTeam = CsTeam.None)
         {
             try
             {
@@ -2029,6 +2056,18 @@ namespace MatchZy
                         }
                         if (isAlreadyUsed)
                         {
+                            continue;
+                        }
+
+                        // TEAM CHECK: bot_add pair-spawn delivers one bot per team, and the enumeration
+                        // order is arbitrary - claiming the first unused bot could grab the WRONG-team
+                        // one (a CT player got a CT bot). Never claim a bot on the wrong team; kick it
+                        // (it's the pair extra). Unassigned (team 0, still joining) is claimable - it is
+                        // the bot bot_add_t/_ct itself requested.
+                        if (targetTeam != CsTeam.None && tempPlayer.TeamNum != (byte)targetTeam && tempPlayer.TeamNum != (byte)CsTeam.None)
+                        {
+                            Log($"[SpawnBot] kicking wrong-team pair bot {tempPlayer.PlayerName} (team {tempPlayer.TeamNum}, wanted {(byte)targetTeam})");
+                            Server.ExecuteCommand($"kickid {tempPlayer.UserId.Value}");
                             continue;
                         }
 
@@ -2117,6 +2156,13 @@ namespace MatchZy
                 }
 
                 isSpawningBot = false;
+
+                // Late-pair sweep: on current CS2 builds one bot_add_t/_ct can spawn a PAIR (one per
+                // team, balance behavior), and the second bot often arrives a tick AFTER the dedupe
+                // enumeration above - so it was never seen, the erroneous-spawn kicker skipped it
+                // (isSpawningBot was still true), and ".bot added a bot to each team". Sweep again
+                // shortly after and kick anything untracked, regardless of arrival timing.
+                AddTimer(0.6f, KickUntrackedPracticeBots);
             }
             catch (JsonException ex)
             {
@@ -2126,6 +2172,38 @@ namespace MatchZy
             {
                 Log($"[SpawnBot - FATAL] Unexpected error: {ex.Message}");
                 isSpawningBot = false;
+            }
+        }
+
+        // Kick every practice bot that is neither a tracked .bot nor a bot-replay puppet, then re-pin
+        // the quota. Idempotent; safe to run any time in practice.
+        private void KickUntrackedPracticeBots()
+        {
+            try
+            {
+                if (!isPractice || isSpawningBot)
+                    return;
+                foreach (var p in Utilities.GetPlayers())
+                {
+                    if (p == null || !p.IsValid || !p.IsBot || p.IsHLTV || !p.UserId.HasValue)
+                        continue;
+                    bool tracked;
+                    lock (_botsDictLock)
+                        tracked = pracUsedBots.ContainsKey(p.UserId.Value);
+                    if (!tracked)
+                    {
+                        Log($"[SpawnBot] kicking late untracked bot {p.PlayerName} (pair-spawn leftover)");
+                        Server.ExecuteCommand($"kickid {p.UserId.Value}");
+                    }
+                }
+                int trackedCount;
+                lock (_botsDictLock)
+                    trackedCount = pracUsedBots.Count;
+                Server.ExecuteCommand($"bot_quota {trackedCount}");
+            }
+            catch (Exception e)
+            {
+                Log($"[SpawnBot] late sweep: {e.Message}");
             }
         }
 
@@ -2947,7 +3025,7 @@ namespace MatchZy
             }
             GrenadeThrownData grenadeThrown = nadeSpecificLastGrenadeData[userId][nadeType];
             if (grenadeThrown != null)
-                AddTimer(grenadeThrown.Delay, () => grenadeThrown.Throw(player));
+                AddTimer(grenadeThrown.Delay, () => grenadeThrown.Throw(player, SmokeColorForThrow(player)));
         }
 
         public void HandleBackCommand(CCSPlayerController? player, string number)
@@ -3039,7 +3117,7 @@ namespace MatchZy
                     {
                         positionNumber -= 1;
                         GrenadeThrownData grenadeThrown = lastGrenadesData[userId][positionNumber];
-                        AddTimer(grenadeThrown.Delay, () => grenadeThrown.Throw(player));
+                        AddTimer(grenadeThrown.Delay, () => grenadeThrown.Throw(player, SmokeColorForThrow(player)));
                         // PrintToPlayerChat(player, $"Throwing grenade of history position: {positionNumber+1}/{lastGrenadesData[userId].Count}");
                         PrintToPlayerChat(player, Localizer["matchzy.pm.throwgrenadehistory", $"{positionNumber + 1}/{lastGrenadesData[userId].Count}"]);
                     }
@@ -3105,7 +3183,7 @@ namespace MatchZy
             }
             GrenadeThrownData lastGrenade = lastGrenadesData[userId].Last();
             if (lastGrenade != null)
-                AddTimer(lastGrenade.Delay, () => lastGrenade.Throw(player));
+                AddTimer(lastGrenade.Delay, () => lastGrenade.Throw(player, SmokeColorForThrow(player)));
         }
 
         [ConsoleCommand("css_grt", "Rethrows every player's last thrown grenade at once")]
@@ -3132,7 +3210,7 @@ namespace MatchZy
                 // Capture the target so the delayed callback throws for the right player;
                 // Throw() re-validates before touching the pawn (safe if they leave meanwhile).
                 CCSPlayerController thrower = target;
-                AddTimer(lastGrenade.Delay, () => lastGrenade.Throw(thrower));
+                AddTimer(lastGrenade.Delay, () => lastGrenade.Throw(thrower, SmokeColorForThrow(thrower)));
                 thrown++;
             }
 
@@ -3602,11 +3680,8 @@ namespace MatchZy
             player.PrintToChat($" {ChatColors.Green}Show Impacts: {ChatColors.Default}{enabled}");
         }
 
-        // nadepreview
         private readonly bool[] _pipPreviewEnabled = new bool[64];
 
-        [ConsoleCommand("css_nadepreview", "Toggles nade preview mode for practices")]
-        [ConsoleCommand("css_previewnade", "Toggles nade preview mode for practices")]
         [ConsoleCommand("css_cam", "Toggles nade preview mode for practices")]
         [ConsoleCommand("css_nadecam", "Toggles nade preview mode for practices")]
         [ConsoleCommand("css_traj", "Toggles sv_grenade_trajectory_prac_pipreview in practice mode")]

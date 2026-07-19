@@ -43,24 +43,32 @@ public partial class MatchZy
             GetCoachSpawns();
         }
 
-        if (coachSpawns.Count > 0 && coachSpawns.TryGetValue(player.TeamNum, out List<Position>? coachTeamSpawns) && coachTeamSpawns != null && coachTeamSpawns.Count > 0)
-        {
-            // Deterministic per-coach assignment so multiple coaches on the same side never
-            // collide on the same viewing position. The previous `new Random()` was seeded by
-            // wall-clock time, so coaches spawning on the same tick drew identical indices and
-            // stacked on top of each other.
-            List<CCSPlayerController> sideCoaches = coaches.Where(c => IsPlayerValid(c) && c.TeamNum == player.TeamNum).OrderBy(c => c.Slot).ToList();
-            int coachIdx = sideCoaches.IndexOf(player);
-            if (coachIdx < 0)
-                coachIdx = 0;
+        // Deterministic per-coach index so multiple coaches on the same side never collide on the
+        // same spot. (The previous new Random() was wall-clock seeded, so coaches spawning on the same
+        // tick drew identical indices and stacked.)
+        List<CCSPlayerController> sideCoaches = coaches.Where(c => IsPlayerValid(c) && c.TeamNum == player.TeamNum).OrderBy(c => c.Slot).ToList();
+        int coachIdx = sideCoaches.IndexOf(player);
+        if (coachIdx < 0)
+            coachIdx = 0;
 
-            // If a side has more coaches than configured viewing positions, wrap around the
-            // position list and nudge each extra coach by an offset so they don't perfectly
-            // overlap. Handles 1-5+ coaches per side without needing per-map JSON edits.
+        // Place the coach BEHIND its team's spawns, computed live from the map's competitive spawns.
+        // Keeps the coach clear of the 5 players' spawn cluster (so it can't bump their spawn points)
+        // and works on every map with no per-map JSON. Falls back to the fixed JSON viewing spot only
+        // when no team spawns resolve.
+        Position? newPosition = null;
+        if (TryGetBehindTeamCoachSpawn(player.TeamNum, coachIdx, out Position behindPos))
+        {
+            newPosition = behindPos;
+        }
+        else if (coachSpawns.Count > 0 && coachSpawns.TryGetValue(player.TeamNum, out List<Position>? coachTeamSpawns) && coachTeamSpawns != null && coachTeamSpawns.Count > 0)
+        {
             Position basePosition = coachTeamSpawns[coachIdx % coachTeamSpawns.Count];
             int overflow = coachIdx / coachTeamSpawns.Count;
-            Position newPosition = new(new Vector(basePosition.PlayerPosition.X + overflow * 40.0f, basePosition.PlayerPosition.Y, basePosition.PlayerPosition.Z + overflow * 8.0f), basePosition.PlayerAngle);
+            newPosition = new(new Vector(basePosition.PlayerPosition.X + overflow * 40.0f, basePosition.PlayerPosition.Y, basePosition.PlayerPosition.Z + overflow * 8.0f), basePosition.PlayerAngle);
+        }
 
+        if (newPosition != null)
+        {
             // Immediate teleport during spawn event
             AddTimer(
                 0.01f,
@@ -75,6 +83,10 @@ public partial class MatchZy
                     SetPlayerInvisible(player: player, setWeaponsInvisible: false);
                     player.PlayerPawn.Value.MoveType = MoveType_t.MOVETYPE_NONE;
                     player.PlayerPawn.Value.ActualMoveType = MoveType_t.MOVETYPE_NONE;
+                    // The coach is an INVISIBLE body near the team - teammates spraying through its
+                    // spot register team damage on it (and can kill it), which trips team-damage
+                    // penalties / weird round endings. Make it untouchable.
+                    player.PlayerPawn.Value.TakesDamage = false;
 
                     HandleCoachWeapons(player);
                     player.InGameMoneyServices!.Account = 0;
@@ -255,12 +267,33 @@ public partial class MatchZy
                 Log($"[EnforceCompetitiveSpawns] Team {side}: {realPlayers.Count} players > {spawns.Count} spawns, seating nearest {spawns.Count}");
             }
 
-            // Optimal one-to-one assignment: repeatedly bind the globally-closest remaining
-            // (player, spawn) pair. Beats the old spawn-centric greedy because the coach-bumped
-            // player snaps back to the freed competitive slot instead of staying at the far
-            // overflow spawn. N<=5 per side so the O(N^3) loop is trivial.
+            // STABILITY PRE-PASS: any player already standing ON a competitive spawn keeps it and is
+            // NOT touched. The old flow teleported every player each round (even the ones the engine
+            // had already seated correctly), which read as "our spawns get thrown around whenever a
+            // coach is on". After this pass only the genuinely displaced player(s) remain.
             List<CCSPlayerController> remainingPlayers = new(realPlayers);
             List<Position> remainingSpawns = new(spawns);
+            const float keepDistSq = 40.0f * 40.0f;
+            for (int pi = remainingPlayers.Count - 1; pi >= 0; pi--)
+            {
+                Vector pos = remainingPlayers[pi].PlayerPawn.Value!.CBodyComponent!.SceneNode!.AbsOrigin;
+                for (int si = 0; si < remainingSpawns.Count; si++)
+                {
+                    Vector sp = remainingSpawns[si].PlayerPosition;
+                    float dx = sp.X - pos.X, dy = sp.Y - pos.Y, dz = sp.Z - pos.Z;
+                    if (dx * dx + dy * dy + dz * dz <= keepDistSq)
+                    {
+                        // Already seated on this spawn - claim the pair, no teleport.
+                        remainingPlayers.RemoveAt(pi);
+                        remainingSpawns.RemoveAt(si);
+                        break;
+                    }
+                }
+            }
+
+            // Remaining (displaced) players: bind the globally-closest (player, spawn) pairs. Beats a
+            // spawn-centric greedy because the coach-bumped player snaps to the freed competitive slot
+            // instead of staying at the far overflow spawn. N<=5 per side so O(N^3) is trivial.
             while (remainingPlayers.Count > 0 && remainingSpawns.Count > 0)
             {
                 int bestP = -1,
@@ -323,6 +356,61 @@ public partial class MatchZy
         return Utilities.FindAllEntitiesByDesignerName<SpawnPoint>(designerName).Where(s => s.IsValid && s.Enabled && s.CBodyComponent?.SceneNode != null).OrderBy(s => s.Priority).Take(count).Select(s => new Position(s.CBodyComponent!.SceneNode!.AbsOrigin, s.CBodyComponent.SceneNode.AbsRotation)).ToList();
     }
 
+    /// <summary>
+    /// Option B: compute a coach viewing position BEHIND the team's own spawns. Guarantees the coach
+    /// never lands inside the 5 players' spawn cluster (so it can't bump/scramble their spawn points):
+    /// it projects every team spawn onto the spawn-facing axis, takes the rear-most, and places the
+    /// coach a margin further back + up, looking the way the team faces. coachIdx spreads multiple
+    /// coaches sideways. Returns false if no team spawns were found (caller falls back to the JSON spot).
+    /// </summary>
+    private bool TryGetBehindTeamCoachSpawn(byte teamNum, int coachIdx, out Position result)
+    {
+        result = null!;
+        var spawns = GetTopCompetitiveSpawns(teamNum, 10);
+        if (spawns.Count == 0)
+            return false;
+
+        float cx = 0, cy = 0, cz = 0, fx = 0, fy = 0;
+        foreach (var s in spawns)
+        {
+            cx += s.PlayerPosition.X;
+            cy += s.PlayerPosition.Y;
+            cz += s.PlayerPosition.Z;
+            double yaw = s.PlayerAngle.Y * Math.PI / 180.0;
+            fx += (float)Math.Cos(yaw);
+            fy += (float)Math.Sin(yaw);
+        }
+        int n = spawns.Count;
+        cx /= n; cy /= n; cz /= n;
+
+        // Average spawn-facing direction (the way the team looks out of spawn).
+        float flen = (float)Math.Sqrt(fx * fx + fy * fy);
+        if (flen < 0.0001f) { fx = 1; fy = 0; flen = 1; }
+        fx /= flen; fy /= flen;
+
+        // Rear-most spawn along that axis (most negative projection = furthest back).
+        float minProj = 0;
+        foreach (var s in spawns)
+        {
+            float proj = (s.PlayerPosition.X - cx) * fx + (s.PlayerPosition.Y - cy) * fy;
+            if (proj < minProj) minProj = proj;
+        }
+
+        const float margin = 220.0f;   // units behind the rear-most spawn
+        const float up = 90.0f;        // units above for an overview
+        const float pitch = 12.0f;     // downward look pitch (degrees)
+        // Behind the rear-most spawn by `margin`, laterally centred on the cluster.
+        float baseX = cx + fx * (minProj - margin);
+        float baseY = cy + fy * (minProj - margin);
+        // Spread extra coaches sideways (perpendicular to the facing axis) so they don't stack.
+        float rx = fy, ry = -fx;
+        float spread = coachIdx * 55.0f;
+        var pos = new Vector(baseX + rx * spread, baseY + ry * spread, cz + up);
+        float yawDeg = (float)(Math.Atan2(fy, fx) * 180.0 / Math.PI);
+        result = new Position(pos, new QAngle(pitch, yawDeg, 0.0f));
+        return true;
+    }
+
     private void MoveCoachToPosition(CCSPlayerController coach, Position position, string timing)
     {
         if (!IsPlayerValid(coach))
@@ -338,6 +426,8 @@ public partial class MatchZy
             // Lock movement
             coach.PlayerPawn.Value.MoveType = MoveType_t.MOVETYPE_NONE;
             coach.PlayerPawn.Value.ActualMoveType = MoveType_t.MOVETYPE_NONE;
+            // Untouchable: teammates must not be able to damage/kill the invisible coach body.
+            coach.PlayerPawn.Value.TakesDamage = false;
 
             // Teleport to viewing position
             coach.PlayerPawn.Value.Teleport(position.PlayerPosition, position.PlayerAngle, new Vector(0, 0, 0));

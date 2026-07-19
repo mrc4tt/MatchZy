@@ -806,7 +806,8 @@ ff_damage_reduction_bullets 0.33                // How much to reduce damage don
 ff_damage_reduction_other 0.4                   // How much to reduce damage done to teammates by things other than bullets and grenades.  Range is from 0 - 1 (with 1 being damage equal to what is done to an enemy)
 ff_damage_reduction_grenade_self 1              // How much to damage a player does to himself with his own grenade.  Range is from 0 - 1 (with 1 being damage equal to what is done to an enemy)
 mp_afterroundmoney 0				// amount of money awared to every player after each round
-mp_autokick 0					// Kick idle/team-killing playermp_autoteambalance 0
+mp_autokick 0					// Kick idle/team-killing players
+mp_autoteambalance 0
 mp_buytime 15                           	// How many seconds after round start players can buy items for.
 mp_c4timer 40                           	// How long from when the C4 is armed until it blows
 mp_death_drop_defuser 1				// Drop defuser on player death

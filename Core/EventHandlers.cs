@@ -155,7 +155,6 @@ public partial class MatchZy
             savedPlayerLocationData.Remove(userId);
             namedPlayerPositions.Remove(userId);
             flashTestList.Remove(userId);
-            lastPredictedLanding.Remove(userId);
 
             if (isMatchLive && autoPauseEnabled.Value)
             {
@@ -355,10 +354,23 @@ public partial class MatchZy
                     RegisterArcTrace(projIndex);
                     if (smokeColorEnabled.Value && nadeType == "smoke")
                     {
-                        CSmokeGrenadeProjectile smokeProjectile = new(entity.Handle);
-                        smokeProjectile.SmokeColor.X = GetPlayerTeammateColor(player).R;
-                        smokeProjectile.SmokeColor.Y = GetPlayerTeammateColor(player).G;
-                        smokeProjectile.SmokeColor.Z = GetPlayerTeammateColor(player).B;
+                        // Set the smoke tint ONE FRAME after spawn. Setting m_nSmokeColor synchronously
+                        // in OnEntitySpawned ran before the projectile finished initializing, so the
+                        // engine re-defaulted the color and the tint reverted to grey once the smoke
+                        // bloomed (the "goes back to normal after a few seconds" bug). Deferring to
+                        // NextFrame - as working colored-smoke plugins do - makes it stick for the
+                        // smoke's whole lifetime.
+                        var smokeCol = GetPlayerTeammateColor(player);
+                        nint smokeHandle = entity.Handle;
+                        Server.NextFrame(() =>
+                        {
+                            var sp = new CSmokeGrenadeProjectile(smokeHandle);
+                            if (sp.Handle == IntPtr.Zero || !sp.IsValid)
+                                return;
+                            sp.SmokeColor.X = smokeCol.R;
+                            sp.SmokeColor.Y = smokeCol.G;
+                            sp.SmokeColor.Z = smokeCol.B;
+                        });
                     }
 
                     // Capture the launch velocity. On current CS2 builds a freshly-spawned
@@ -445,8 +457,6 @@ public partial class MatchZy
             lastGrenadeThrownTime.Remove(@event.Entityid);
         }
 
-        if (player!.UserId.HasValue)
-            CalibratePrediction(player.UserId.Value, @event.X, @event.Y, @event.Z);
         OnUtilityDetonated(@event.X, @event.Y, @event.Z);
         return HookResult.Continue;
     }

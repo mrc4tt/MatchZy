@@ -94,7 +94,7 @@ public class GrenadeThrownData
         return ent;
     }
 
-    public void Throw(CCSPlayerController player)
+    public void Throw(CCSPlayerController player, (int R, int G, int B)? smokeColor = null)
     {
         // Validate player before accessing any properties
         if (player == null || !player.IsValid || player.Connected != PlayerConnectedState.Connected || !player.PlayerPawn.IsValid || player.PlayerPawn.Value == null)
@@ -186,6 +186,18 @@ public class GrenadeThrownData
             grenadeEntity.Thrower.Raw = player.PlayerPawn.Raw;
             grenadeEntity.OriginalThrower.Raw = player.PlayerPawn.Raw;
             grenadeEntity.OwnerEntity.Raw = player.PlayerPawn.Raw;
+
+            // Colored smoke on rethrow (.throw / .rt). The normal-throw color is applied in the
+            // OnEntitySpawned handler, but that handler SKIPS Globalname=="custom" projectiles (set
+            // above to stop re-recording), so a rethrown smoke was never colored. Apply it here from
+            // the color the caller passed (null when matchzy_smoke_color_enabled is false).
+            if (Type == "smoke" && smokeColor.HasValue)
+            {
+                var smoke = new CSmokeGrenadeProjectile(grenadeEntity.Handle);
+                smoke.SmokeColor.X = smokeColor.Value.R;
+                smoke.SmokeColor.Y = smokeColor.Value.G;
+                smoke.SmokeColor.Z = smokeColor.Value.B;
+            }
         }
     }
 }

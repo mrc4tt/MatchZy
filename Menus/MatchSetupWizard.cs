@@ -79,6 +79,15 @@ namespace MatchZy
                 }
             );
             menu.AddItem(
+                "Best of 2 (BO2)",
+                (p, _) =>
+                {
+                    activeSetup!.NumMaps = 2;
+                    activeSetup.SelectedMaps.Clear();
+                    OpenMapModeMenu(p);
+                }
+            );
+            menu.AddItem(
                 "Best of 3 (BO3)",
                 (p, _) =>
                 {
@@ -94,6 +103,16 @@ namespace MatchZy
                     activeSetup!.NumMaps = 5;
                     activeSetup.SelectedMaps.Clear();
                     OpenMapModeMenu(p);
+                }
+            );
+            // Series is the top wizard menu (no PrevMenu), so add an explicit way back to the css_ma
+            // admin menu. Abandons the in-progress setup (clears activeSetup) - re-enter via New Match Setup.
+            menu.AddItem(
+                "« Back to Admin Menu",
+                (p, _) =>
+                {
+                    activeSetup = null;
+                    OpenMatchAdminMenu(p);
                 }
             );
             menu.AddItem("Cancel Setup", (p, _) => CancelSetup(p));

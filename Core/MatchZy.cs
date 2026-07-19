@@ -16,7 +16,7 @@ namespace MatchZy
     public partial class MatchZy : BasePlugin
     {
         public override string ModuleName => "MatchZy";
-        public override string ModuleVersion => "0.8.58";
+        public override string ModuleVersion => "0.8.59";
         public override string ModuleAuthor => "WD- Edited by Miksen @ FSHOST.me";
         public override string ModuleDescription => "A plugin for running and managing CS2 practice/pugs/scrims/matches!";
         public string chatPrefix = $"{ChatColors.Green}[MatchZy]{ChatColors.Default}";
@@ -369,14 +369,24 @@ namespace MatchZy
                     UpdatePlayersMap();
                     RefreshTeamEntities();
 
-                    // AutoStart reads matchzy_autostart_mode live from its ConVar (preserved across hot-reload).
-                    AutoStart();
+                    // Defer AutoStart the same 1.0s as the cold-load path. On css_plugins restart the
+                    // plugin is unloaded+reloaded, so the FakeConVar is re-registered at its code default
+                    // (autostart_mode=1). config.cfg is re-exec'd above (execifexists) to restore the
+                    // admin's value, but Server.ExecuteCommand only QUEUES the cfg to the command buffer -
+                    // it runs next frame. Calling AutoStart() synchronously here read the stale default
+                    // (1 -> warmup) before `matchzy_autostart_mode 2` applied, so a practice-mode server
+                    // came up in match/warmup after a restart. The 1.0s delay lets the cfg exec land first.
+                    AddTimer(1.0f, AutoStart);
                 }
             }
             catch (Exception ex)
             {
                 Log($"[Load FATAL] Startup config/init failed (non-fatal, plugin still loaded): {ex}");
             }
+
+            // Warm the optional CS2MenuManager assembly on a background thread so the first .ma/.nades
+            // open doesn't JIT the whole menu dependency graph on the game thread (1.7s frame stall).
+            WarmupMenuAssembly();
 
             SetupRestartConfirmationCleanup();
 
@@ -543,9 +553,13 @@ namespace MatchZy
                 { ".landmarker", OnLandMarkerCommand },
                 { ".lm", OnLandMarkerCommand },
                 { ".mynades", OnMyNadesCommand },
+                { ".shownades", HandleShowNadesCommand },
+                { ".hidenades", HandleHideNadesCommand },
+                { ".nadetoggle", HandleNadeToggleCommand },
                 { ".arc", OnArcCommand },
                 { ".traceline", OnArcCommand },
-                { ".predict", OnPredictCommand },
+                { ".nades", OnNadesMenuCommand },
+                { ".warmupbots", OnWarmupBotsCommand },
                 { ".version", OnMatchZyVersionCommand },
                 { ".readycheck", OnReadyCheckCommand },
                 { ".rcheck", OnReadyCheckCommand },
@@ -637,6 +651,14 @@ namespace MatchZy
             // Practice interactive spawn markers: +use aimed at a .showspawns beam teleports
             // to that spawn. Edge-triggered (fires once on Use press), gated on spawnMarkersActive.
             RegisterListener<Listeners.OnPlayerButtonsChanged>(OnSpawnMarkerButtonHandler);
+
+            // Grenade library: +use aimed at a .shownades nade-beam teleports to that lineup.
+            // No-op unless .shownades is active (grenadeLibraryActive gate).
+            RegisterListener<Listeners.OnPlayerButtonsChanged>(OnNadeMarkerButtonHandler);
+
+            // Grenade library: per-player, hide the marker a player stands on so it doesn't block the
+            // throw view (reappears when they walk off). Guarded; no-op unless .shownades is active.
+            RegisterListener<Listeners.CheckTransmit>(OnNadeCheckTransmit);
 
             // Demo-arc sampler: samples traced grenades each tick. No-op unless .arc is on
             // and a grenade is mid-flight.
@@ -790,27 +812,10 @@ namespace MatchZy
                 {
                     try
                     {
-                        if (isDryRun)
-                        {
-                            // Mark dryrun as finished immediately so no other handlers treat this as dryrun
-                            isDryRun = false;
-
-                            // CRITICAL: Do NOT call StartPracticeMode() or mp_restartgame synchronously
-                            // inside EventRoundEnd - the engine is mid-round-transition and player/entity
-                            // state is not stable. Defer to a short timer so the round end completes cleanly.
-                            AddTimer(
-                                0.5f,
-                                () =>
-                                {
-                                    StartPracticeMode();
-                                    PrintToAllChat($"{ChatColors.Green}Practice Mode has been restored. You can run .dry again if you wish.");
-                                    Server.ExecuteCommand("mp_warmup_start; mp_warmup_pausetimer 1; mp_restartgame 1");
-                                }
-                            );
-
-                            return HookResult.Continue;
-                        }
-
+                        // Dryrun does NOT auto-end on round end: it keeps playing rounds (add bots, play
+                        // with friends, run multiple rounds) until an admin explicitly runs .exitdry.
+                        // So no special dryrun handling here - it simply falls through the !isMatchLive
+                        // guard below and rounds continue like a normal non-live game.
                         if (!isMatchLive)
                             return HookResult.Continue;
                         HandlePostRoundEndEvent(@event);
@@ -1302,9 +1307,29 @@ namespace MatchZy
                         HandleListNadesCommand(player, messageCommandArg);
                     }
 
+                    if (message.StartsWith(".libadd"))
+                    {
+                        HandleLibAddCommand(player, messageCommandArg);
+                    }
+
+                    if (message.StartsWith(".libremove"))
+                    {
+                        HandleLibRemoveCommand(player, messageCommandArg);
+                    }
+
+                    if (message.StartsWith(".liblist"))
+                    {
+                        HandleLibListCommand(player, messageCommandArg);
+                    }
+
                     if (message.StartsWith(".loadnade") || message.StartsWith(".ln"))
                     {
                         HandleLoadNadeCommand(player, messageCommandArg);
+                    }
+
+                    if (message.StartsWith(".warmupbots "))
+                    {
+                        HandleWarmupBotsCommand(player, messageCommandArg);
                     }
 
                     // Named position slots (#2). No-arg .savepos/.loadpos/.listpos/.delpos hit the

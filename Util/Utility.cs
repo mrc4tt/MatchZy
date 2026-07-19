@@ -778,6 +778,8 @@ namespace MatchZy
 
         private void StartKnifeRound()
         {
+            // Warmup aim-bots must never survive into the knife round.
+            KillWarmupBots();
             // Kills unready players message timer
             if (unreadyPlayerMessageTimer != null)
             {
@@ -1023,6 +1025,8 @@ namespace MatchZy
 
         private void StartLive()
         {
+            // Warmup aim-bots must never survive into a live match.
+            KillWarmupBots();
             SetupLiveFlagsAndCfg();
             // Early clinch/overtime apply from live.cfg → forces UI to refresh trophy
             // icons when transitioning from scrim/hill back to match mode.
@@ -2832,52 +2836,31 @@ namespace MatchZy
                 player.PrintToChat($" {ChatColors.Default}.scrim {ChatColors.Green}Playout/Scrim Mode");
                 player.PrintToChat($" {ChatColors.Default}.prac {ChatColors.Green}Practice Mode");
                 player.PrintToChat($" {ChatColors.Default}.dry {ChatColors.Green}Dryrun Mode");
+                if (isAdmin)
+                    player.PrintToChat($" {ChatColors.Green}Available commands:{ChatColors.Default} .start, .knife, .playout, .coach <side>, .endmatch");
                 return;
             }
 
-            // ── WAITING FOR READY ──
+            // ── MATCH / SCRIM STATUS (ready phase) ──
+            // Compact status block (no ready panel here - the ready-up hint is its own HUD panel).
+            // Match vs Scrim is distinguished by isMatchModeEnabled; the toggle values (knife / demo /
+            // playout) come straight from the live flags, so scrim naturally shows Knife: Disabled,
+            // Playout: Enabled.
             if (readyAvailable && !matchStarted)
             {
-                (int ctCount, int ctReady) = GetTeamPlayerCount((int)CsTeam.CounterTerrorist);
-                (int tCount, int tReady) = GetTeamPlayerCount((int)CsTeam.Terrorist);
+                string on = $"{ChatColors.Green}Enabled{ChatColors.Default}";
+                string off = $"{ChatColors.Red}Disabled{ChatColors.Default}";
+                bool isScrim = !isMatchModeEnabled;
+                string knife = isKnifeRequired ? on : off;
+                string demorec = IsGOTVEnabled() ? on : off;
+                string playout = isPlayOutEnabled ? on : off;
 
-                int totalReady = playerReadyStatus.Count(kv => kv.Value);
-                var unready = playerReadyStatus
-                    .Where(kv => !kv.Value && playerData.ContainsKey(kv.Key))
-                    .Select(kv => playerData[kv.Key].PlayerName)
-                    .ToList();
-                string knifeStatus = isKnifeRequired ? $"{ChatColors.Green}ON{ChatColors.Default}" : $"{ChatColors.Red}OFF{ChatColors.Default}";
-
-                player!.PrintToChat($"{chatPrefix} {ChatColors.Gold}Waiting for players to ready up");
-                player.PrintToChat($" {ChatColors.Green}.ready{ChatColors.Default} to ready up, {ChatColors.Green}.unready{ChatColors.Default} to cancel");
-
-                if (minimumReadyRequired > 0)
-                {
-                    int need = Math.Max(0, minimumReadyRequired - totalReady);
-                    string needTxt = need > 0
-                        ? $"{ChatColors.Red}need {need} more{ChatColors.Default}"
-                        : $"{ChatColors.Green}ready to start!{ChatColors.Default}";
-                    player.PrintToChat($" Ready: {ChatColors.Green}{totalReady}/{minimumReadyRequired}{ChatColors.Default} ({needTxt}) | CT {ctReady}/{ctCount} | T {tReady}/{tCount}");
-                }
-                else
-                {
-                    player.PrintToChat($" Ready: CT {ChatColors.Green}{ctReady}/{ctCount}{ChatColors.Default} | T {ChatColors.Green}{tReady}/{tCount}{ChatColors.Default} {ChatColors.Grey}(all players must ready)");
-                }
-
-                player.PrintToChat($" Knife: {knifeStatus}");
-
-                if (unready.Count > 0)
-                {
-                    string list = string.Join(", ", unready.Take(6));
-                    if (unready.Count > 6)
-                        list += $" +{unready.Count - 6}";
-                    player.PrintToChat($" {ChatColors.Grey}Not ready: {list}");
-                }
-
-                if (isAdmin)
-                {
-                    player.PrintToChat($" {ChatColors.Red}Admin:{ChatColors.Default} .match .scrim .prac .knife .forceready .force");
-                }
+                player!.PrintToChat($"{chatPrefix} {ChatColors.Gold}{(isScrim ? "Scrim Mode" : "Match Mode")}");
+                player.PrintToChat($" Knife: {knife}, DemoRec: {demorec}, Playout: {playout}");
+                string cmds = isScrim
+                    ? ".start, .playout, .coach <side>, .endmatch"
+                    : ".start, .knife, .playout, .coach <side>, .endmatch";
+                player.PrintToChat($" {ChatColors.Green}Available commands:{ChatColors.Default} {cmds}");
                 return;
             }
 
@@ -3023,7 +3006,6 @@ namespace MatchZy
             player.PrintToConsole("   .solid - Toggle teammate collision");
             player.PrintToConsole("   .impacts - Toggle bullet impacts");
             player.PrintToConsole("   .traj - Toggle grenade trajectory");
-            player.PrintToConsole("   .nadecam - Toggle grenade camera");
             player.PrintToConsole("   .savepos / .loadpos - Save/load position");
             player.PrintToConsole("   .ct / .t / .spec - Switch teams");
             player.PrintToConsole("   .fas / .watchme - Force all spectators");
@@ -3562,6 +3544,7 @@ namespace MatchZy
             // pitch/yaw (the client owns its own view, so only a teleport can force it) - required
             // to actually reproduce the lineup aim.
             pawn.Teleport(position, angle, new Vector(0, 0, 0));
+            pawn.ResetNoclipToWalk();
             // Issue MatchZy-Enhanced#10: the same teleport also writes the pitch into the model's
             // transform, tilting the WHOLE body sideways at steep angles (look up → .last/.back →
             // you see your own sprawled body). Flatten the model back to yaw-only. Must flatten the
@@ -3639,6 +3622,7 @@ namespace MatchZy
             if (player == null || !player.IsValid || player.PlayerPawn.Value == null)
                 return;
             player.PlayerPawn.Value.Teleport(position, angle, new Vector(0, 0, 0));
+            player.PlayerPawn.Value.ResetNoclipToWalk();
             FlattenBodyRotationFrames(player, angle.Y, 6);
         }
 

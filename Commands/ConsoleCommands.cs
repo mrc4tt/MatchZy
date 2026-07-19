@@ -1045,9 +1045,15 @@ namespace MatchZy
             // is allocated correctly at the upcoming warmup→live phase transition.
             // Mid-live convar flips can't move trophy after the slot is allocated.
             HandlePlayoutConfig();
-            ReplyToUserCommand(player, "Scrim/Full30 Mode has been loaded.");
-            ReplyToUserCommand(player, "Knife Round is disabled for this mode.");
-            ReplyToUserCommand(player, "Wait until all players have !ready OR an Admin can !forcestart.");
+            // Same compact status readout as .match, reflecting scrim's flags (knife off, playout on).
+            string on = Localizer.ForPlayer(player, "matchzy.cc.statuson");
+            string off = Localizer.ForPlayer(player, "matchzy.cc.statusoff");
+            string knife = isKnifeRequired ? on : off;
+            string demorec = IsGOTVEnabled() ? on : off;
+            string playout = isPlayOutEnabled ? on : off;
+            ReplyToUserCommand(player, Localizer.ForPlayer(player, "matchzy.cc.scrimloaded"));
+            ReplyToUserCommand(player, Localizer.ForPlayer(player, "matchzy.cc.matchsettings", knife, demorec, playout));
+            ReplyToUserCommand(player, Localizer.ForPlayer(player, "matchzy.cc.matchhelphint"));
         }
 
         [ConsoleCommand("css_hill", "Starts scrim mode")]
@@ -1094,10 +1100,16 @@ namespace MatchZy
                 return;
 
             isKnifeRequired = true;
-            string knifeStatus = isKnifeRequired ? Localizer.ForPlayer(player, "matchzy.cc.enabled") : Localizer.ForPlayer(player, "matchzy.cc.disabled");
-            ReplyToUserCommand(player, Localizer.ForPlayer(player, "matchzy.match.mode.loaded"));
-            ReplyToUserCommand(player, Localizer.ForPlayer(player, "matchzy.cc.knifestatus", knifeStatus));
-            ReplyToUserCommand(player, Localizer.ForPlayer(player, "matchzy.cc.knifecmd"));
+            // Compact match-status readout: show every toggle at a glance (knife / demo recording /
+            // playout) with colored Enabled/Disabled, plus a .help hint.
+            string on = Localizer.ForPlayer(player, "matchzy.cc.statuson");
+            string off = Localizer.ForPlayer(player, "matchzy.cc.statusoff");
+            string knife = isKnifeRequired ? on : off;
+            string demorec = IsGOTVEnabled() ? on : off;
+            string playout = isPlayOutEnabled ? on : off;
+            ReplyToUserCommand(player, Localizer.ForPlayer(player, "matchzy.cc.matchloaded"));
+            ReplyToUserCommand(player, Localizer.ForPlayer(player, "matchzy.cc.matchsettings", knife, demorec, playout));
+            ReplyToUserCommand(player, Localizer.ForPlayer(player, "matchzy.cc.matchhelphint"));
             isMatchModeEnabled = true;
 
             if (matchStarted)
@@ -1245,9 +1257,7 @@ namespace MatchZy
             // inspired by cs2-noclip
             if (player.PlayerPawn.Value.MoveType == MoveType_t.MOVETYPE_NOCLIP)
             {
-                player.PlayerPawn.Value.MoveType = MoveType_t.MOVETYPE_WALK;
-                player.PlayerPawn.Value.ActualMoveType = MoveType_t.MOVETYPE_WALK;
-                Utilities.SetStateChanged(player.PlayerPawn.Value, "CBaseEntity", "m_MoveType");
+                player.PlayerPawn.Value!.ResetNoclipToWalk();
             }
             else
             {

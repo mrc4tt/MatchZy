@@ -32,6 +32,41 @@ namespace MatchZy
             }
         }
 
+        // Pre-JIT the CS2MenuManager assembly on a BACKGROUND thread at Load. Without this the whole
+        // menu dependency graph is assembly-loaded + JIT'd on the game thread at the FIRST menu open
+        // (observed: .nades -> 1772ms frame stall -> recv queue overflow for every client). Doing the
+        // first touch inside Task.Run moves that cost off the game thread; the later real open finds
+        // everything warm. The optional-dependency invariant is preserved: this method itself contains
+        // no menu type (so it always JIT-resolves), the touch happens inside the task, and a missing
+        // plugin just lands in the catch - plugin keeps running, menus degrade as before.
+        private static bool _menuWarmupStarted;
+        public void WarmupMenuAssembly()
+        {
+            if (_menuWarmupStarted)
+                return;
+            _menuWarmupStarted = true;
+            System.Threading.Tasks.Task.Run(() =>
+            {
+                try
+                {
+                    TouchMenuTypes();
+                    Log("[Menu] CS2MenuManager assembly warmed up (background)");
+                }
+                catch (Exception e)
+                {
+                    // Not installed (or failed to load) - menus will report it on first open as usual.
+                    Log($"[Menu] warmup skipped: {e.GetType().Name}");
+                }
+            });
+        }
+
+        // First menu-type touch - kept in its own method so its JIT (and the assembly load it
+        // triggers) happens only when invoked from the warmup task, never on the Load path.
+        private static void TouchMenuTypes()
+        {
+            _ = typeof(WasdMenu).Assembly.FullName;
+        }
+
         [ConsoleCommand("css_matchadmin", "Opens the MatchZy admin chat menu")]
         [ConsoleCommand("css_ma", "Opens the MatchZy admin chat menu")]
         public void OnMatchAdminCommand(CCSPlayerController? player, CommandInfo? command)

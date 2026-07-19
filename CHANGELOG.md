@@ -4,6 +4,30 @@ Customized fork of [MatchZy](https://github.com/shobhit-pathak/MatchZy) by Shobh
 
 Fork version numbering is independent of upstream. Upstream changelog: <https://github.com/shobhit-pathak/MatchZy/blob/main/CHANGELOG.md>
 
+# 0.8.59
+
+#### July 19, 2026
+
+- Practice grenade library: `.shownades` toggles in-world markers for every saved lineup on the map (yours + the shared pack), `.hidenades` hides them, and `css_shownades` can be bound to a key. Markers and labels are colored by grenade type (smoke blue, flash yellow, HE red, molotov orange, decoy grey).
+- Grenade library labels show the type, comment and throw style, are readable from every angle (never mirrored), and no longer clip into walls next to the lineup.
+- Grenade library: press E aimed at a marker to teleport to the lineup with the right grenade equipped; lineups saved on the same spot share one marker and F cycles between them (a counter like 1/2 is shown).
+- Grenade library: the marker you are standing on hides for you only (no beam blocking the throw) and reappears when you walk away - no need to run `.shownades` again.
+- Grenade library shared pack: admins can promote lineups with `.libadd <name>`, remove with `.libremove <name>` and list with `.liblist` - visible to everyone on the server.
+- `.savenade <name> [throwtype] <comment>` accepts an optional throw style (jump/run/walk/crouch) as the second word; `.listnades` numbers lineups and `.ln #N` loads by number. Saving without a grenade in hand is allowed (the label shows a blank type).
+- New `.nades` menu: browse the grenade library by type and click a lineup to load it (requires the CS2MenuManager plugin).
+- New `.warmupbots [count]` (admin): adds aim-warmup bots during the warmup/ready phase; they are removed automatically the moment the knife round or live match starts.
+- Practice `.bot` fixes: the engine could pair-spawn a second bot on the other team (leaving a bot on each team) and could even hand you a bot on your OWN team; both are detected and kicked, so `.bot` adds exactly one bot on the opposing team again.
+- Practice colored smoke no longer reverts to grey a few seconds after blooming, and rethrown smokes (`.rt` / `.throw`) are colored too.
+- Fixed `matchzy_autostart_mode 2` being ignored after `css_plugins restart MatchZy`: the plugin read the convar before config.cfg had re-applied, so a practice server came back up in match mode.
+- Dry Run no longer ends after a single round: play as many rounds as you like (with bots or friends) until an admin runs `.exitdry`, which now returns to match warmup instead of forcing practice mode (run `.prac` yourself if wanted).
+- `.match` and `.scrim` now print a compact status line (Knife / DemoRec / Playout with colored Enabled/Disabled) plus a `.help` hint, and `.help` during the ready phase shows the same status block with the available commands.
+- Coach overhaul: the coach now spawns behind their own team automatically on every map (no per-map file), can no longer be damaged or killed by teammates, and the players' competitive spawns are left untouched (previously everyone was re-teleported each round when a coach was on, which shuffled spawns).
+- Fixed scrim.cfg never applying `mp_autoteambalance 0` (the setting was glued into a comment). Note: existing scrim.cfg files on disk keep the old text - delete the file to regenerate it.
+- Fixed the first `.ma` / `.nades` menu open stalling the server for over a second (the menu library is now warmed up in the background at plugin load).
+- `.shownades` failures now log the full error and a single bad marker no longer prevents the rest from drawing.
+- `.matchsetup` wizard: added a Best of 2 (BO2) series option and a "Back to Admin Menu" entry at the top of the wizard.
+- Removed the experimental `.predict` grenade predictor along with `matchzy_experimental_predictor` and the `matchzy_predict_*` convars.
+
 # 0.8.58
 
 #### July 18, 2026
