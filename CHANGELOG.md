@@ -4,6 +4,20 @@ Customized fork of [MatchZy](https://github.com/shobhit-pathak/MatchZy) by Shobh
 
 Fork version numbering is independent of upstream. Upstream changelog: <https://github.com/shobhit-pathak/MatchZy/blob/main/CHANGELOG.md>
 
+# 0.8.61
+
+#### July 20, 2026
+
+- Coach viewing spot now works across the whole map pool: it stands behind the team with a clear line of sight, keeps a real stand-back distance (no more nose-to-back with a player), refuses spots on a lower level, and drops to an overhead camera above the spawn when no good ground spot exists (mirage, dust2, inferno, nuke, vertigo, overpass, anubis, ancient, train all verified).
+- New `matchzy_coaching_mode` (default 1): 1 uses a `spawns/coach/<map>.json` spot when present (hand-tuned override) otherwise computes it, 2 always computes the coach spot behind the team and ignores the JSON files.
+- Coach spawn files reworked: the old fixed per-map viewing spots were removed (they were the "always the same bad spot" complaint). Placement is computed live for every map; a `spawns/coach/<map>.json` entry is only an optional override, and `.savecoachspawn t|ct` writes/replaces one (saving your exact view angle) for any map that needs hand-tuning.
+- New `.showcoachspawns` (admin): draws the coach viewing spot for both sides in-world (blue = CT, orange = T), matching `matchzy_coaching_mode`, and survives a map change instead of going invisible-but-on. Reloads the JSON each time so hand-edits show immediately.
+- New `.coachtest` (admin, debug): places you like a coach on your current side right now (run again to release) so a single admin can check the coach spot on any map without a match.
+- Coach placement is now silent (no landing sound), the coach can no longer be damaged/killed by teammates, and players already on a competitive spawn are never re-teleported (the reseat only moves a genuinely coach-displaced player, and near-duplicate spawns can't seat two players on top of each other).
+- Coach spawn files are read/written under a case-resolved plugin path (prefers an existing `matchzy` folder over `MatchZy`), so a saved spot is found again on case-sensitive Linux.
+- Practice `.bot` fix: one `bot_add` could pair-spawn a bot on the other team (and the claim was team-blind, so a CT player could get a CT bot); the wrong-team bot is now kicked and `.bot` adds exactly one bot on the opposing team.
+- Fixed a server crash from `.watchme` / `.fas`: forcing the other players to spectator used the live-player team-change path (weapon strip -> other plugins' weapon hooks re-enter on a half-destroyed weapon -> crash). It now drops weapons first and switches team the safe way, the same fix `.t`/`.ct`/`.spec` already had.
+
 # 0.8.60
 
 #### July 19, 2026

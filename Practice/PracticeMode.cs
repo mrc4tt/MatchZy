@@ -2820,17 +2820,37 @@ namespace MatchZy
                 return;
             }
 
-            Utilities
-                .GetPlayers()
-                .ForEach(
-                    (x) =>
+            // .watchme / .fas: force every OTHER human to spectator. Same crash class as the self
+            // switch above - x.ChangeTeam(Spectator) on a live pawn runs the weapon-strip path and
+            // other plugins' weapon hooks re-enter on a half-destroyed weapon -> SIGSEGV. Use the same
+            // safe path: off the command stack -> CommitSuicide (drops weapons) -> next frame
+            // SwitchTeam(Spectator) (signature-based). No respawn (spectator).
+            Server.NextFrame(() =>
+            {
+                foreach (var x in Utilities.GetPlayers())
+                {
+                    if (x == null || !x.IsValid || x.IsBot || x.IsHLTV || x.UserId == player.UserId)
+                        continue;
+                    var target = x;
+                    try
                     {
-                        if (x.IsValid && !x.IsBot && x.UserId != player.UserId)
+                        CCSPlayerPawn? pawn = target.PlayerPawn.Value;
+                        if (pawn != null && pawn.IsValid && target.PawnIsAlive)
+                            pawn.CommitSuicide(explode: false, force: true);
+                        Server.NextFrame(() =>
                         {
-                            x.ChangeTeam(CsTeam.Spectator);
-                        }
+                            if (!IsPlayerValid(target))
+                                return;
+                            try { target.SwitchTeam(CsTeam.Spectator); }
+                            catch (Exception ex) { Log($"[watchme] SwitchTeam failed: {ex.Message}"); }
+                        });
                     }
-                );
+                    catch (Exception ex)
+                    {
+                        Log($"[watchme] {ex.Message}");
+                    }
+                }
+            });
         }
 
         // Snapshot every live utility entity (projectiles + smoke clouds + infernos),

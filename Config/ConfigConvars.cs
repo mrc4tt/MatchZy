@@ -12,6 +12,11 @@ namespace MatchZy
     {
         public FakeConVar<bool> smokeColorEnabled = new("matchzy_smoke_color_enabled", "Whether player-specific smoke color is enabled or not. Default: false", false);
 
+        // Coach viewing-spot source. 1 = use a spawns/coach/<map>.json spot when one exists (hand-tuned
+        // override via .savecoachspawn), otherwise compute it. 2 = always compute the spot behind the
+        // team (ignore the JSON files). Default: 1.
+        public FakeConVar<int> coachingMode = new("matchzy_coaching_mode", "Coach spot source: 1 = spawns/coach JSON override then computed, 2 = always computed (ignore JSON). Default: 1", 1);
+
         public FakeConVar<bool> warmupEnabled = new("matchzy_warmup_enabled", "Whether warmup mode is enabled. If false, warmup.cfg will not be loaded. Default: true", true);
 
         public FakeConVar<bool> techPauseEnabled = new("matchzy_enable_tech_pause", "Whether .tech command is enabled or not. Default: true", true);

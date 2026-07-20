@@ -174,6 +174,10 @@ matchzy_max_saved_last_grenades 512
 // Whether player-specific smoke color is enabled or not. Default: false
 matchzy_smoke_color_enabled false
 
+// Coach viewing-spot source: 1 = use a spawns/coach/<map>.json spot if present (hand-tuned via
+// .savecoachspawn) else compute it, 2 = always compute behind the team (ignore JSON). Default: 1
+matchzy_coaching_mode 1
+
 // If set to true, all the players will have admin privilege. Default: false
 matchzy_everyone_is_admin false
 

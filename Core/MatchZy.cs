@@ -16,7 +16,7 @@ namespace MatchZy
     public partial class MatchZy : BasePlugin
     {
         public override string ModuleName => "MatchZy";
-        public override string ModuleVersion => "0.8.60";
+        public override string ModuleVersion => "0.8.61";
         public override string ModuleAuthor => "WD- Edited by Miksen @ FSHOST.me";
         public override string ModuleDescription => "A plugin for running and managing CS2 practice/pugs/scrims/matches!";
         public string chatPrefix = $"{ChatColors.Green}[MatchZy]{ChatColors.Default}";
@@ -835,6 +835,11 @@ namespace MatchZy
             {
                 // Re-arm AutoStart latch: allow exactly one AutoStart for this new map.
                 autoStartLatched = false;
+
+                // Coach-spawn markers: the beams/labels are destroyed by the map change but the toggle
+                // stayed "on" (stale entity handles). Refresh so .showcoachspawns keeps working across
+                // a map change instead of going invisible-but-still-on.
+                RefreshCoachSpawnVizOnMapStart();
                 AddTimer(
                     1.0f,
                     () =>
@@ -1385,12 +1390,21 @@ namespace MatchZy
                         HandleClearCoachSpawnsCommand(player);
                     }
 
-                    if (message.StartsWith(".listcoachspawns"))
+                    if (message.StartsWith(".showcoachspawns"))
+                    {
+                        OnShowCoachSpawnsCommand(player, null);
+                    }
+                    else if (message.StartsWith(".listcoachspawns"))
                     {
                         HandleListCoachSpawnsCommand(player);
                     }
 
-                    if (message.StartsWith(".coach"))
+                    // Order matters: .coachtest must not be swallowed by the .coach prefix.
+                    if (message.StartsWith(".coachtest"))
+                    {
+                        OnCoachTestCommand(player, null);
+                    }
+                    else if (message.StartsWith(".coach"))
                     {
                         HandleCoachCommand(player, messageCommandArg);
                     }

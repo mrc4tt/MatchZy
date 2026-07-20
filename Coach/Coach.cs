@@ -5,6 +5,7 @@ using CounterStrikeSharp.API.Core;
 using CounterStrikeSharp.API.Core.Attributes.Registration;
 using CounterStrikeSharp.API.Modules.Commands;
 using CounterStrikeSharp.API.Modules.Cvars;
+using CounterStrikeSharp.API.Modules.Memory;
 using CounterStrikeSharp.API.Modules.Utils;
 
 namespace MatchZy;
@@ -38,9 +39,13 @@ public partial class MatchZy
         // This player is a coach - immediately move them to their viewing position
         // This happens DURING the spawn event, preventing them from occupying a competitive spawn
 
-        if (coachSpawns.Count == 0 || !coachSpawns.ContainsKey((byte)CsTeam.CounterTerrorist) || coachSpawns[(byte)CsTeam.CounterTerrorist].Count == 0 || !coachSpawns.ContainsKey((byte)CsTeam.Terrorist) || coachSpawns[(byte)CsTeam.Terrorist].Count == 0)
+        // Load this map's coach JSON once per map. The old "any side empty" guard reloaded every spawn
+        // for single-side files AND never reloaded when both sides were saved - so a map change kept
+        // the previous map's spots. Track the loaded map and reload only when it changes.
+        if (_coachSpawnsLoadedMap != Server.MapName)
         {
             GetCoachSpawns();
+            _coachSpawnsLoadedMap = Server.MapName;
         }
 
         // Deterministic per-coach index so multiple coaches on the same side never collide on the
@@ -51,20 +56,21 @@ public partial class MatchZy
         if (coachIdx < 0)
             coachIdx = 0;
 
-        // Place the coach BEHIND its team's spawns, computed live from the map's competitive spawns.
-        // Keeps the coach clear of the 5 players' spawn cluster (so it can't bump their spawn points)
-        // and works on every map with no per-map JSON. Falls back to the fixed JSON viewing spot only
-        // when no team spawns resolve.
+        // Priority (matchzy_coaching_mode): mode 1 = a hand-saved spawns/coach/<map>.json spot for this
+        // side WINS (admins tune a problem map with .savecoachspawn, no recompile), else compute it;
+        // mode 2 = always compute the spot behind the team, ignoring the JSON files. Compute works on
+        // every map with no per-map file, clear of the players' spawns.
+        bool useJsonSpots = coachingMode.Value != 2;
         Position? newPosition = null;
-        if (TryGetBehindTeamCoachSpawn(player.TeamNum, coachIdx, out Position behindPos))
-        {
-            newPosition = behindPos;
-        }
-        else if (coachSpawns.Count > 0 && coachSpawns.TryGetValue(player.TeamNum, out List<Position>? coachTeamSpawns) && coachTeamSpawns != null && coachTeamSpawns.Count > 0)
+        if (useJsonSpots && coachSpawns.Count > 0 && coachSpawns.TryGetValue(player.TeamNum, out List<Position>? coachTeamSpawns) && coachTeamSpawns != null && coachTeamSpawns.Count > 0)
         {
             Position basePosition = coachTeamSpawns[coachIdx % coachTeamSpawns.Count];
             int overflow = coachIdx / coachTeamSpawns.Count;
             newPosition = new(new Vector(basePosition.PlayerPosition.X + overflow * 40.0f, basePosition.PlayerPosition.Y, basePosition.PlayerPosition.Z + overflow * 8.0f), basePosition.PlayerAngle);
+        }
+        else if (TryGetBehindTeamCoachSpawn(player.TeamNum, coachIdx, out Position behindPos))
+        {
+            newPosition = behindPos;
         }
 
         if (newPosition != null)
@@ -77,12 +83,15 @@ public partial class MatchZy
                     if (!IsPlayerValid(player) || !player.PlayerPawn.IsValid || player.PlayerPawn.Value == null)
                         return;
 
+                    // Freeze BEFORE teleporting: teleporting to an elevated coach spot while MoveType
+                    // was still WALK let the pawn fall a frame and play an audible landing sound.
+                    // MOVETYPE_NONE first = no fall = silent placement.
+                    player.PlayerPawn.Value.MoveType = MoveType_t.MOVETYPE_NONE;
+                    player.PlayerPawn.Value.ActualMoveType = MoveType_t.MOVETYPE_NONE;
                     player.PlayerPawn.Value.Teleport(newPosition.PlayerPosition, newPosition.PlayerAngle, new Vector(0, 0, 0));
 
                     // Setup coach properties
                     SetPlayerInvisible(player: player, setWeaponsInvisible: false);
-                    player.PlayerPawn.Value.MoveType = MoveType_t.MOVETYPE_NONE;
-                    player.PlayerPawn.Value.ActualMoveType = MoveType_t.MOVETYPE_NONE;
                     // The coach is an INVISIBLE body near the team - teammates spraying through its
                     // spot register team damage on it (and can kill it), which trips team-damage
                     // penalties / weird round endings. Make it untouchable.
@@ -225,6 +234,10 @@ public partial class MatchZy
         // coach can grab a good spawn and bump a real player to a far/wrong one. Relocating
         // coaches alone does not fix the already-bumped player - this does, regardless of
         // coach count (1-5+) and regardless of whether a coach-spawn file exists.
+        // Early pass at 0.2s so the coach-displaced player is restored before anyone registers the
+        // wrong spawn; the 0.6s pass stays as an idempotent safety net (players already seated are
+        // never touched, so running twice is free).
+        AddTimer(0.2f, EnforceCompetitiveSpawns);
         AddTimer(0.6f, EnforceCompetitiveSpawns);
 
         Log($"[HandleCoaches] Handled {coaches.Count} coach(es)");
@@ -239,6 +252,19 @@ public partial class MatchZy
     /// Only invoked when coaches are present, so coachless matches keep vanilla spawns.
     /// </summary>
     private void EnforceCompetitiveSpawns()
+    {
+        // Runs on an AddTimer callback: an escaped exception here becomes a CSS runtime error box.
+        try
+        {
+            EnforceCompetitiveSpawnsCore();
+        }
+        catch (Exception e)
+        {
+            Log($"[EnforceCompetitiveSpawns] failed: {e.GetType().Name}: {e.Message}");
+        }
+    }
+
+    private void EnforceCompetitiveSpawnsCore()
     {
         HashSet<CCSPlayerController> coaches = GetAllCoaches();
         bool debug = coachDebugEnabled.Value;
@@ -260,7 +286,11 @@ public partial class MatchZy
             // force-moved EVERY round (observed: the same two bots re-teleported each round, even on
             // the coachless side). The stability pre-pass below now keeps anyone standing on ANY
             // valid candidate; the extra spawns only ever receive a displaced player as fallback.
-            List<Position> spawns = GetTopCompetitiveSpawns(side, realPlayers.Count + 5);
+            // ALL enabled spawns, not a capped pool: the engine seats players freely across every
+            // enabled spawn entity (Mirage CT proved it - a bot sat 93u from the nearest of 11 pooled
+            // candidates, i.e. on a spawn outside the pool, and was re-moved every round). The keep
+            // pass must recognize every spawn the engine can use; the cap only ever limited that.
+            List<Position> spawns = GetTopCompetitiveSpawns(side, 32);
             if (spawns.Count == 0)
                 spawns = spawnsData.TryGetValue(side, out List<Position>? fallback) ? fallback : new List<Position>();
             if (spawns.Count == 0)
@@ -279,7 +309,12 @@ public partial class MatchZy
             // coach is on". After this pass only the genuinely displaced player(s) remain.
             List<CCSPlayerController> remainingPlayers = new(realPlayers);
             List<Position> remainingSpawns = new(spawns);
-            const float keepDistSq = 40.0f * 40.0f;
+            // Keep-tolerance MUST exceed the 64u near-duplicate dedupe in GetTopCompetitiveSpawns:
+            // the engine can seat a player on a spawn entity that the dedupe dropped (its kept twin
+            // is up to 64u away), and with a 40u tolerance that player read as "not on a spawn" and
+            // was re-teleported EVERY round (observed on Mirage CT: the same source coordinate each
+            // time). 75u > 64u closes that gap.
+            const float keepDistSq = 75.0f * 75.0f;
             for (int pi = remainingPlayers.Count - 1; pi >= 0; pi--)
             {
                 Vector pos = remainingPlayers[pi].PlayerPawn.Value!.CBodyComponent!.SceneNode!.AbsOrigin;
@@ -294,6 +329,23 @@ public partial class MatchZy
                         remainingSpawns.RemoveAt(si);
                         break;
                     }
+                }
+            }
+
+            // Diagnostics: whoever is still unmatched is about to be moved - log how far they were
+            // from the nearest candidate so threshold/coverage gaps show up in one log line.
+            if (debug)
+            {
+                foreach (var rp in remainingPlayers)
+                {
+                    Vector pos = rp.PlayerPawn.Value!.CBodyComponent!.SceneNode!.AbsOrigin;
+                    float best = float.MaxValue;
+                    foreach (var s in spawns)
+                    {
+                        float dx = s.PlayerPosition.X - pos.X, dy = s.PlayerPosition.Y - pos.Y, dz = s.PlayerPosition.Z - pos.Z;
+                        best = Math.Min(best, dx * dx + dy * dy + dz * dz);
+                    }
+                    Log($"[CoachDebug] team {side}: {rp.PlayerName} unmatched - nearest candidate {(float)Math.Sqrt(best):0}u away ({spawns.Count} candidates)");
                 }
             }
 
@@ -363,7 +415,11 @@ public partial class MatchZy
         // AcceleratorCSS Harmony tracer, iterating the lazy enumerable inside a patched method throws
         // ArrayTypeMismatchException (same artifact the 0.8.57 .prac spawn fix addressed). On failure
         // return empty - callers fall back to spawnsData / the JSON coach spot.
-        List<(int Priority, uint Index, Position Pos)> candidates = new();
+        // ENTIRE body guarded: on dust2 the ArrayTypeMismatchException artifact (AcceleratorCSS
+        // Harmony tracer) fired in the sort/pick section, which sat OUTSIDE the earlier scan-only
+        // try and escaped into the reseat timer. Value-tuple list + List.Sort replaced with a plain
+        // class list + manual insertion ordering, which the tracer tolerates.
+        var candidates = new List<CoachSpawnCandidate>();
         try
         {
             var raw = Utilities.FindAllEntitiesByDesignerName<SpawnPoint>(designerName).ToList();
@@ -371,7 +427,19 @@ public partial class MatchZy
             {
                 if (s == null || !s.IsValid || !s.Enabled || s.CBodyComponent?.SceneNode == null)
                     continue;
-                candidates.Add(((int)s.Priority, s.Index, new Position(s.CBodyComponent.SceneNode.AbsOrigin, s.CBodyComponent.SceneNode.AbsRotation)));
+                var cand = new CoachSpawnCandidate
+                {
+                    Priority = (int)s.Priority,
+                    Index = s.Index,
+                    Pos = new Position(s.CBodyComponent.SceneNode.AbsOrigin, s.CBodyComponent.SceneNode.AbsRotation),
+                };
+                // Insertion keeping (Priority, Index) order - deterministic, no List.Sort.
+                int at = 0;
+                while (at < candidates.Count
+                       && (candidates[at].Priority < cand.Priority
+                           || (candidates[at].Priority == cand.Priority && candidates[at].Index <= cand.Index)))
+                    at++;
+                candidates.Insert(at, cand);
             }
         }
         catch (Exception e)
@@ -379,30 +447,43 @@ public partial class MatchZy
             Log($"[GetTopCompetitiveSpawns] scan failed (team {side}): {e.GetType().Name}: {e.Message}");
             return new List<Position>();
         }
-        // Deterministic order: Priority, then entity index (plain Priority sort left ties arbitrary).
-        candidates.Sort((a, b) => a.Priority != b.Priority ? a.Priority.CompareTo(b.Priority) : a.Index.CompareTo(b.Index));
         const float minSpawnGapSq = 64.0f * 64.0f;
         var picked = new List<Position>(count);
-        foreach (var (_, _, c) in candidates)
+        try
         {
-            if (picked.Count >= count)
-                break;
-            bool tooClose = false;
-            foreach (var p in picked)
+            foreach (var cand in candidates)
             {
-                float dx = c.PlayerPosition.X - p.PlayerPosition.X;
-                float dy = c.PlayerPosition.Y - p.PlayerPosition.Y;
-                float dz = c.PlayerPosition.Z - p.PlayerPosition.Z;
-                if (dx * dx + dy * dy + dz * dz < minSpawnGapSq)
-                {
-                    tooClose = true;
+                if (picked.Count >= count)
                     break;
+                Position c = cand.Pos;
+                bool tooClose = false;
+                foreach (var p in picked)
+                {
+                    float dx = c.PlayerPosition.X - p.PlayerPosition.X;
+                    float dy = c.PlayerPosition.Y - p.PlayerPosition.Y;
+                    float dz = c.PlayerPosition.Z - p.PlayerPosition.Z;
+                    if (dx * dx + dy * dy + dz * dz < minSpawnGapSq)
+                    {
+                        tooClose = true;
+                        break;
+                    }
                 }
+                if (!tooClose)
+                    picked.Add(c);
             }
-            if (!tooClose)
-                picked.Add(c);
+        }
+        catch (Exception e)
+        {
+            Log($"[GetTopCompetitiveSpawns] pick failed (team {side}): {e.GetType().Name}: {e.Message}");
         }
         return picked;
+    }
+
+    private sealed class CoachSpawnCandidate
+    {
+        public int Priority;
+        public uint Index;
+        public Position Pos = null!;
     }
 
     /// <summary>
@@ -424,7 +505,9 @@ public partial class MatchZy
             // Never let a placement computation escape into the spawn-event handler (an unguarded
             // ArrayTypeMismatch from the AcceleratorCSS tracer did exactly that). Fall back to the
             // JSON viewing spot.
-            Log($"[TryGetBehindTeamCoachSpawn] failed (team {teamNum}): {e.GetType().Name}: {e.Message}");
+            // Full stack: the tracer-induced ArrayTypeMismatch kept surviving section guards, and
+            // Message-only logging made the throwing line unidentifiable.
+            Log($"[TryGetBehindTeamCoachSpawn] failed (team {teamNum}): {e}");
             return false;
         }
     }
@@ -432,7 +515,10 @@ public partial class MatchZy
     private bool TryGetBehindTeamCoachSpawnCore(byte teamNum, int coachIdx, out Position result)
     {
         result = null!;
-        var spawns = GetTopCompetitiveSpawns(teamNum, 10);
+        // ALL enabled spawns (32-cap), not just 10: Ancient CT proved maps can enable more, and the
+        // inside-cluster rejection below is only as good as the spawn list it checks against (a bot
+        // seated on spawn #11 stood right in front of the coach).
+        var spawns = GetTopCompetitiveSpawns(teamNum, 32);
         if (spawns.Count == 0)
             return false;
 
@@ -479,7 +565,11 @@ public partial class MatchZy
         try
         {
             var opts = new TraceOptions { InteractsWith = Masks.Solid };
-            foreach (float margin in new[] { 220.0f, 160.0f, 110.0f, 70.0f, 40.0f })
+            // Spawn-cluster eye point the coach must be able to SEE (LOS requirement below).
+            var clusterEye = new Vector(cx, cy, cz + 64.0f);
+            // Only meaningful stand-back distances: a 40-70u "behind" spot puts the coach nose-to-back
+            // with the rear player (Ancient CT). If nothing >= 110u is clear, use the overhead camera.
+            foreach (float margin in new[] { 220.0f, 160.0f, 110.0f })
             {
                 var cand = new Vector(rear.X - fx * margin, rear.Y - fy * margin, rear.Z);
                 // Wall probe: rear spawn -> candidate must not pass through solid.
@@ -490,17 +580,59 @@ public partial class MatchZy
                 var floor = Trace.TraceEndShape(cand, new Vector(cand.X, cand.Y, cand.Z - 600.0f), null, opts);
                 if (!floor.DidHit())
                     continue;
-                result = new Position(new Vector(cand.X, cand.Y, floor.HitPoint.Z + up), new QAngle(pitch, yawDeg, 0.0f));
+                // The floor behind can be a DIFFERENT level (Inferno: a terrace below the spawn with a
+                // wall in between - the coach ended up staring at bricks). Require (a) the candidate
+                // eye to be at least at the team's eye height (a spot on a LOWER level gives a view
+                // through railings/over walls at best), and (b) clear line of sight back to the
+                // cluster; otherwise try a shorter margin.
+                var eyePos = new Vector(cand.X, cand.Y, floor.HitPoint.Z + up);
+                if (eyePos.Z < clusterEye.Z - 16.0f)
+                    continue;
+                // Must stand CLEAR of the spawn cluster: on maps with radial spawn facings the
+                // averaged "behind" direction can point back INTO the cluster (Ancient CT put the
+                // coach at ground level nose-to-back with a bot). Require distance to the nearest
+                // spawn; too close -> shorter margin won't help either, but the loop falls through
+                // to the overhead fallback.
+                bool insideCluster = false;
+                foreach (var s in spawns)
+                {
+                    float ddx = cand.X - s.PlayerPosition.X, ddy = cand.Y - s.PlayerPosition.Y;
+                    if (ddx * ddx + ddy * ddy < 90.0f * 90.0f)
+                    {
+                        insideCluster = true;
+                        break;
+                    }
+                }
+                if (insideCluster)
+                    continue;
+                var los = Trace.TraceEndShape(eyePos, clusterEye, null, opts);
+                if (los.DidHit())
+                    continue;
+                if (coachDebugEnabled.Value)
+                    Log($"[CoachPlace] team {teamNum}: BEHIND margin={margin:0} pos=({eyePos.X:0},{eyePos.Y:0},{eyePos.Z:0}) spawns={spawns.Count}");
+                result = new Position(eyePos, new QAngle(pitch, yawDeg, 0.0f));
                 return true;
             }
+
+            // No behind-spot with a clear view: hover ABOVE the rear spawn looking down instead - the
+            // rear spawn itself is guaranteed inside the world and has line of sight to the team.
+            // A ceiling probe keeps the hover under covered spawns.
+            float topZ = cz + 150.0f;
+            var ceil = Trace.TraceEndShape(rear, new Vector(rear.X, rear.Y, cz + 200.0f), null, opts);
+            if (ceil.DidHit())
+                topZ = Math.Min(topZ, ceil.HitPoint.Z - 30.0f);
+            var overheadPos = new Vector(rear.X, rear.Y, Math.Max(topZ, cz + 80.0f));
+            if (coachDebugEnabled.Value)
+                Log($"[CoachPlace] team {teamNum}: OVERHEAD pos=({overheadPos.X:0},{overheadPos.Y:0},{overheadPos.Z:0}) spawns={spawns.Count}");
+            result = new Position(overheadPos, new QAngle(40.0f, yawDeg, 0.0f));
+            return true;
         }
         catch
         {
             // Trace failure - fall through to the unvalidated fallback below.
         }
 #endif
-        // No validated spot (or no trace API): fall back to a short, safe hover just behind and above
-        // the rear spawn instead of a far unvalidated point.
+        // No trace API (or it failed): a short, safe hover just behind and above the rear spawn.
         result = new Position(new Vector(rear.X - fx * 40.0f, rear.Y - fy * 40.0f, cz + up), new QAngle(pitch, yawDeg, 0.0f));
         return true;
     }
@@ -779,24 +911,24 @@ public partial class MatchZy
             return;
         }
 
-        // Make sure the in-memory set reflects what's currently on disk before we append.
+        // Sync in-memory set with disk before editing (keeps the OTHER side's saved spot intact).
         if (!HasCoachSpawns())
             GetCoachSpawns();
 
         Vector origin = player.PlayerPawn.Value.CBodyComponent.SceneNode.AbsOrigin;
-        QAngle angle = player.PlayerPawn.Value.CBodyComponent.SceneNode.AbsRotation;
+        // Save the VIEW angle (EyeAngles), not the body AbsRotation (pitch is always 0 on a standing
+        // pawn) - so an elevated overview spot keeps its downward look when the coach is placed there.
+        QAngle angle = player.PlayerPawn.Value.EyeAngles;
 
-        if (!coachSpawns.TryGetValue(team, out List<Position>? list) || list == null)
-        {
-            list = new List<Position>();
-            coachSpawns[team] = list;
-        }
-        list.Add(new Position(origin, angle));
+        // REPLACE this side's spot (one spot per side). Appending stacked duplicates: re-running to
+        // adjust a spot left the old spot at index 0, which is exactly the one the coach then used.
+        coachSpawns[team] = new List<Position> { new Position(origin, angle) };
 
         if (SaveCoachSpawnsFile())
         {
             string sideName = team == (byte)CsTeam.Terrorist ? "T" : "CT";
-            ReplyToUserCommand(player, $"Saved coach spawn #{list.Count} for {sideName} on {Server.MapName}.");
+            ReplyToUserCommand(player, $"Saved {sideName} coach spot on {Server.MapName} ({origin.X:F0}, {origin.Y:F0}, {origin.Z:F0}). Verify with .showcoachspawns.");
+            _coachSpawnsLoadedMap = "";   // force reload on next placement
         }
         else
         {
@@ -824,9 +956,10 @@ public partial class MatchZy
         }
 
         coachSpawns = GetEmptySpawnsData();
+        _coachSpawnsLoadedMap = "";
         try
         {
-            string path = Path.Combine(ModuleDirectory, "spawns", "coach", $"{Server.MapName}.json");
+            string path = Path.Combine(CoachSpawnsDir(), $"{Server.MapName}.json");
             if (File.Exists(path))
                 File.Delete(path);
             ReplyToUserCommand(player, $"Cleared all coach spawns for {Server.MapName}.");
@@ -873,7 +1006,7 @@ public partial class MatchZy
     {
         try
         {
-            string dir = Path.Combine(ModuleDirectory, "spawns", "coach");
+            string dir = CoachSpawnsDir();
             Directory.CreateDirectory(dir);
             string path = Path.Combine(dir, $"{Server.MapName}.json");
 
@@ -908,12 +1041,188 @@ public partial class MatchZy
         }
     }
 
+    // The coach-spawns directory, resolved case-insensitively. ModuleDirectory is whatever casing the
+    // plugin folder happens to have (MatchZy vs matchzy); on case-sensitive Linux a read written under
+    // one casing would be invisible under the other. Prefer an EXISTING sibling dir that matches the
+    // plugin-folder name case-insensitively (lowercase wins if both exist), so read + write always
+    // agree. Cached per session.
+    private string? _coachSpawnsDirCache;
+    private string CoachSpawnsDir()
+    {
+        if (_coachSpawnsDirCache != null)
+            return _coachSpawnsDirCache;
+        string baseDir = ModuleDirectory;
+        try
+        {
+            string parent = Path.GetDirectoryName(ModuleDirectory.TrimEnd('/', '\\')) ?? "";
+            string leaf = Path.GetFileName(ModuleDirectory.TrimEnd('/', '\\'));
+            if (Directory.Exists(parent))
+            {
+                var matches = Directory.GetDirectories(parent)
+                    .Where(d => string.Equals(Path.GetFileName(d), leaf, StringComparison.OrdinalIgnoreCase))
+                    .OrderBy(d => Path.GetFileName(d))   // lowercase sorts after uppercase; take lowercase first below
+                    .ToList();
+                // Prefer an all-lowercase match ("matchzy") if present, else the DLL's own dir.
+                var lower = matches.FirstOrDefault(d => Path.GetFileName(d) == leaf.ToLowerInvariant());
+                baseDir = lower ?? (matches.Count > 0 ? matches[0] : ModuleDirectory);
+            }
+        }
+        catch (Exception e)
+        {
+            Log($"[CoachSpawnsDir] resolve failed, using ModuleDirectory: {e.Message}");
+        }
+        _coachSpawnsDirCache = Path.Combine(baseDir, "spawns", "coach");
+        return _coachSpawnsDirCache;
+    }
+
+    // Resolve the coach viewing spot for a side EXACTLY as OnCoachPlayerSpawn would (mode 1: JSON
+    // override then computed; mode 2: always computed). Used by .showcoachspawns so what you see is
+    // what the coach gets. Returns null if nothing resolves.
+    private Position? ResolveCoachSpot(byte team)
+    {
+        // Always reload from disk (coachSpawns.Count is always 2 - both team keys are pre-created -
+        // so a "Count == 0" guard never reloaded, and a hand-edited JSON never showed up). Cheap; this
+        // is a debug/visualization path.
+        GetCoachSpawns();
+        if (coachingMode.Value != 2
+            && coachSpawns.TryGetValue(team, out List<Position>? list) && list != null && list.Count > 0)
+            return list[0];
+        return TryGetBehindTeamCoachSpawn(team, 0, out Position p) ? p : null;
+    }
+
+    private readonly List<CBaseEntity> _coachSpawnViz = new();
+    private bool _coachSpawnVizOn;
+    // Map that coachSpawns was last loaded for (reload the JSON only on a map change). "" forces reload.
+    private string _coachSpawnsLoadedMap = "";
+
+    [ConsoleCommand("css_showcoachspawns", "Show the coach viewing spot for both sides in-world")]
+    public void OnShowCoachSpawnsCommand(CCSPlayerController? player, CommandInfo? command)
+    {
+        if (!IsPlayerValid(player))
+            return;
+        if (!IsPlayerAdmin(player, "css_showcoachspawns", "@css/config"))
+        {
+            SendPlayerNotAdminMessage(player);
+            return;
+        }
+
+        // Toggle off.
+        if (_coachSpawnVizOn)
+        {
+            ClearCoachSpawnViz();
+            ReplyToUserCommand(player, "Coach spawn markers hidden.");
+            return;
+        }
+
+        int shown = 0;
+        foreach (var (team, name, col) in new[]
+        {
+            ((byte)CsTeam.CounterTerrorist, "CT", System.Drawing.Color.DeepSkyBlue),
+            ((byte)CsTeam.Terrorist, "T", System.Drawing.Color.Orange),
+        })
+        {
+            Position? spot = ResolveCoachSpot(team);
+            if (spot == null)
+                continue;
+            DrawCoachSpawnMarker(spot.PlayerPosition, spot.PlayerAngle, $"COACH {name}", col);
+            shown++;
+        }
+        _coachSpawnVizOn = shown > 0;
+        ReplyToUserCommand(player, shown > 0
+            ? $"Showing {shown} coach spot(s). Run .showcoachspawns again to hide."
+            : "No coach spot resolved for this map.");
+    }
+
+    private void DrawCoachSpawnMarker(Vector pos, QAngle ang, string label, System.Drawing.Color color)
+    {
+        // Tall vertical beam at the spot.
+        var beam = Utilities.CreateEntityByName<CBeam>("beam");
+        if (beam != null)
+        {
+            beam.LifeState = 1;
+            beam.Width = 3.0f;
+            beam.Render = color;
+            beam.EndPos.X = pos.X;
+            beam.EndPos.Y = pos.Y;
+            beam.EndPos.Z = pos.Z + 72.0f;
+            beam.Teleport(new Vector(pos.X, pos.Y, pos.Z), new QAngle(0, 0, 0), new Vector(0, 0, 0));
+            beam.DispatchSpawn();
+            _coachSpawnViz.Add(beam);
+        }
+
+        // Billboard label above it (same proven CPointWorldText setup as the grenade library markers).
+        var text = Utilities.CreateEntityByName<CPointWorldText>("point_worldtext");
+        if (text != null)
+        {
+            text.MessageText = label;
+            text.Color = color;
+            text.FontName = "Arial Bold";
+            Schema.SetSchemaValue(text.Handle, "CPointWorldText", "m_bEnabled", true);
+            Schema.SetSchemaValue(text.Handle, "CPointWorldText", "m_flFontSize", 60.0f);
+            Schema.SetSchemaValue(text.Handle, "CPointWorldText", "m_flWorldUnitsPerPx", 0.25f);
+            Schema.SetSchemaValue(text.Handle, "CPointWorldText", "m_bFullbright", true);
+            Schema.SetSchemaValue(text.Handle, "CPointWorldText", "m_bDrawBackground", true);
+            Schema.SetSchemaValue(text.Handle, "CPointWorldText", "m_flBackgroundBorderWidth", 6.0f);
+            Schema.SetSchemaValue(text.Handle, "CPointWorldText", "m_flBackgroundBorderHeight", 4.0f);
+            Schema.SetSchemaValue(text.Handle, "CPointWorldText", "m_nJustifyHorizontal", 1);
+            Schema.SetSchemaValue(text.Handle, "CPointWorldText", "m_nJustifyVertical", 1);
+            Schema.SetSchemaValue(text.Handle, "CPointWorldText", "m_nReorientMode", 1); // billboard
+            text.Teleport(new Vector(pos.X, pos.Y, pos.Z + 90.0f), new QAngle(0, ang.Y, 90), new Vector(0, 0, 0));
+            text.DispatchSpawn();
+            _coachSpawnViz.Add(text);
+        }
+    }
+
+    private void ClearCoachSpawnViz()
+    {
+        foreach (var e in _coachSpawnViz)
+            if (e != null && e.IsValid)
+                SafeRemoveEntity(e, "coachviz");
+        _coachSpawnViz.Clear();
+        _coachSpawnVizOn = false;
+    }
+
+    // On a map change the marker entities are gone but _coachSpawnVizOn was still true. If markers
+    // were on, redraw them for the NEW map (after a delay so spawn entities exist); otherwise just
+    // drop the stale handles.
+    public void RefreshCoachSpawnVizOnMapStart()
+    {
+        _coachSpawnViz.Clear();   // handles from the old map are dead
+        if (!_coachSpawnVizOn)
+            return;
+        _coachSpawnVizOn = false; // let the redraw re-set it
+        AddTimer(2.0f, () =>
+        {
+            try
+            {
+                int shown = 0;
+                foreach (var (team, name, col) in new[]
+                {
+                    ((byte)CsTeam.CounterTerrorist, "CT", System.Drawing.Color.DeepSkyBlue),
+                    ((byte)CsTeam.Terrorist, "T", System.Drawing.Color.Orange),
+                })
+                {
+                    Position? spot = ResolveCoachSpot(team);
+                    if (spot == null)
+                        continue;
+                    DrawCoachSpawnMarker(spot.PlayerPosition, spot.PlayerAngle, $"COACH {name}", col);
+                    shown++;
+                }
+                _coachSpawnVizOn = shown > 0;
+            }
+            catch (Exception e)
+            {
+                Log($"[CoachSpawnViz] map-start redraw: {e.Message}");
+            }
+        });
+    }
+
     private void GetCoachSpawns()
     {
         coachSpawns = GetEmptySpawnsData();
         try
         {
-            string spawnsConfigPath = Path.Combine(ModuleDirectory, "spawns", "coach", $"{Server.MapName}.json");
+            string spawnsConfigPath = Path.Combine(CoachSpawnsDir(), $"{Server.MapName}.json");
 
             if (!File.Exists(spawnsConfigPath))
             {
