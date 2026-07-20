@@ -8,7 +8,7 @@ Fork version numbering is independent of upstream. Upstream changelog: <https://
 
 #### July 20, 2026
 
-- Coach viewing spot now works across the whole map pool: it stands behind the team with a clear line of sight, keeps a real stand-back distance (no more nose-to-back with a player), refuses spots on a lower level, and drops to an overhead camera above the spawn when no good ground spot exists (mirage, dust2, inferno, nuke, vertigo, overpass, anubis, ancient, train all verified).
+- Coach viewing spots reworked across the whole map pool. By default (matchzy_coaching_mode 1) each active map now ships a hand-tuned spot behind the team; maps without one fall back to a computed spot (stands behind the team with line of sight, keeps a real stand-back distance so it is never nose-to-back with a player, refuses a lower-level spot, and uses an overhead camera above the spawn when no clean ground spot exists).
 - New `matchzy_coaching_mode` (default 1): 1 uses a `spawns/coach/<map>.json` spot when present (hand-tuned override) otherwise computes it, 2 always computes the coach spot behind the team and ignores the JSON files.
 - Coach spawn files reworked: the old fixed per-map viewing spots were removed (they were the "always the same bad spot" complaint). Placement is computed live for every map; a `spawns/coach/<map>.json` entry is only an optional override, and `.savecoachspawn t|ct` writes/replaces one (saving your exact view angle) for any map that needs hand-tuning.
 - New `.showcoachspawns` (admin): draws the coach viewing spot for both sides in-world (blue = CT, orange = T), matching `matchzy_coaching_mode`, and survives a map change instead of going invisible-but-on. Reloads the JSON each time so hand-edits show immediately.
