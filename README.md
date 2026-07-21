@@ -17,7 +17,7 @@ Type in chat with a dot prefix (the `!` / `css_` prefixes work too, e.g. `!ready
 
 ## Requirements
 
-- **CS2 dedicated server** (Linux)
+- **CS2 dedicated server** (Windows/Linux)
 - **[CounterStrikeSharp](https://github.com/roflmuffin/CounterStrikeSharp)**: the plugin framework. This fork targets API 1.0.369 on .NET 10.0.
 - **[CS2MenuManager](https://git.miksen.me/mikkel/CS2MenuManager/releases) (1.0.42+)**: OPTIONAL, required only for the in-game menus. The `.matchadmin` / `.ma` admin menu and the `.matchsetup` wizard use its `WasdMenu` UI. MatchZy loads and runs normally without it; only those two menu commands are unavailable and will reply with a notice instead. Install it if you want the in-game menus.
 
