@@ -143,10 +143,11 @@ namespace MatchZy
 
             foreach (var bp in targets)
             {
-                // Full saved view angle (incl pitch). SpawnBot routes posOverride through
-                // TeleportUpright, which uses the full angle for the bot's aim direction then flattens
-                // the body so the pitch doesn't tilt the model (see SpawnBot). Saved pitch preserved.
-                var pos = new Position(new Vector(bp.X, bp.Y, bp.Z), new QAngle(bp.Pitch, bp.Yaw, 0.0f));
+                // Yaw ONLY - never pass the saver's view pitch to the placement. SpawnBot teleports
+                // the bot with this angle; a steep saved pitch (looking up/down at save time) tilted
+                // the bot's whole model back and lifted it off the ground / under the map. A placed bot
+                // has no use for view pitch (the aim-mirror idea was dropped); it just faces the yaw.
+                var pos = new Position(new Vector(bp.X, bp.Y, bp.Z), new QAngle(0.0f, bp.Yaw, 0.0f));
                 CsTeam team = bp.Team == (byte)CsTeam.CounterTerrorist ? CsTeam.CounterTerrorist : CsTeam.Terrorist;
                 AddBot(player, bp.Crouch, forceTeam: team, boost: false, posOverride: pos);
             }

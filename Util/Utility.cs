@@ -2786,7 +2786,7 @@ namespace MatchZy
                 player!.PrintToChat($"{chatPrefix} {ChatColors.Gold}Practice Mode Commands:");
                 player.PrintToChat($" {ChatColors.Green}Spawns:{ChatColors.Default} .spawn .ctspawn .tspawn .bestspawn .worstspawn");
                 player.PrintToChat($" {ChatColors.Green}Bots:{ChatColors.Default} .bot .cbot .boost .nobot .clearbots");
-                player.PrintToChat($" {ChatColors.Green}Bot Positions:{ChatColors.Default} .savebotpos .loadbotpos .listbotpos .delbotpos .showbotpos .botjiggle");
+                player.PrintToChat($" {ChatColors.Green}Positions:{ChatColors.Default} .sbp .lbp .listbotpos .delbotpos .showbotpos .botjiggle");
                 player.PrintToChat($" {ChatColors.Green}Nades:{ChatColors.Default} .savenade .loadnade .listnades .rethrow .throwindex");
                 player.PrintToChat($" {ChatColors.Green}Utility:{ChatColors.Default} .clear .ff .god .traj .impacts .break .cam .timer");
                 player.PrintToChat($" {ChatColors.Green}Teams:{ChatColors.Default} .ct .t .spec .fas");

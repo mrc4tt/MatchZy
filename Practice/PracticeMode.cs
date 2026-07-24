@@ -173,6 +173,7 @@ namespace MatchZy
         readonly Dictionary<uint, NadeArcTrace> tracedArcs = new();
         int arcTickCounter = 0;
 
+
         public Dictionary<byte, List<Position>> spawnsData = GetEmptySpawnsData();
         public Dictionary<byte, List<Position>> coachSpawns = GetEmptySpawnsData();
 
@@ -1023,79 +1024,6 @@ namespace MatchZy
             nadeSpecificLastGrenadeData.Remove(userId);
             lastGrenadeBackCursor.Remove(userId);
             PrintToPlayerChat(player, Localizer.ForPlayer(player, "matchzy.pm.nadeswiped"));
-        }
-
-        // #A1 EXPERIMENTAL server-side jumpthrow. There is no usercmd/RunCommand hook exposed
-        // and m_nButtons is client-authoritative (the engine rewrites it from the client cmd each
-        // tick), so this drives the movement-services button-state array directly over a short
-        // frame chain: hold Attack a few frames to pull the pin, then on the throw frame set Jump
-        // and clear Attack in the same frame (release -> airborne throw). May be clobbered by the
-        // client cmd on some builds - hence the matchzy_experimental_jumpthrow gate. Never touches
-        // ChangeTeam/weapon-strip paths, so no crash class; worst case it just does nothing.
-        [ConsoleCommand("css_jt", "Experimental: jumpthrow the held grenade (matchzy_experimental_jumpthrow)")]
-        [ConsoleCommand("css_jumpthrow", "Experimental: jumpthrow the held grenade (matchzy_experimental_jumpthrow)")]
-        public void OnJumpThrowCommand(CCSPlayerController? player, CommandInfo? command)
-        {
-            if (!isPractice || player == null || !IsPlayerValid(player) || !player.UserId.HasValue)
-                return;
-
-            if (!experimentalJumpThrow.Value)
-            {
-                PrintToPlayerChat(player, Localizer.ForPlayer(player, "matchzy.pm.jtdisabled"));
-                return;
-            }
-
-            var pawn = player.PlayerPawn.Value;
-            if (pawn?.MovementServices == null)
-                return;
-
-            string? active = pawn.WeaponServices?.ActiveWeapon?.Value?.DesignerName;
-            bool isNade = active is "weapon_smokegrenade" or "weapon_hegrenade" or "weapon_flashbang"
-                or "weapon_molotov" or "weapon_incgrenade" or "weapon_decoy";
-            if (!isNade)
-            {
-                PrintToPlayerChat(player, Localizer.ForPlayer(player, "matchzy.pm.jtnotgrenade"));
-                return;
-            }
-
-            JumpThrowStep(player, 0);
-            PrintToPlayerChat(player, Localizer.ForPlayer(player, "matchzy.pm.jtthrown"));
-        }
-
-        // One frame of the forced jumpthrow input sequence (see OnJumpThrowCommand).
-        private void JumpThrowStep(CCSPlayerController player, int step)
-        {
-            const int primeFrames = 5;                 // frames holding Attack to pull the pin
-            const int throwFrame = primeFrames;        // frame to jump + release
-            const int totalFrames = primeFrames + 3;   // trailing frames to stop forcing input
-
-            if (!IsPlayerValid(player) || player.PlayerPawn.Value?.MovementServices == null)
-                return;
-
-            try
-            {
-                var ms = new CCSPlayer_MovementServices(player.PlayerPawn.Value.MovementServices.Handle);
-                var states = ms.Buttons.ButtonStates;   // Span<ulong> over native m_pButtonStates
-                if (states.Length > 0)
-                {
-                    ulong attack = (ulong)PlayerButtons.Attack;
-                    ulong jump = (ulong)PlayerButtons.Jump;
-                    if (step < primeFrames)
-                        states[0] |= attack;                        // hold Attack -> prime
-                    else if (step == throwFrame)
-                        states[0] = (states[0] | jump) & ~attack;    // jump + release -> throw
-                    else
-                        states[0] &= ~(attack | jump);               // stop forcing
-                }
-            }
-            catch (Exception e)
-            {
-                Log($"[JumpThrow] {e.Message}");
-                return;
-            }
-
-            if (step < totalFrames)
-                Server.NextFrame(() => JumpThrowStep(player, step + 1));
         }
 
         [ConsoleCommand("css_god", "Sets Infinite health for player")]
@@ -2189,6 +2117,12 @@ namespace MatchZy
             }
         }
 
+        // Userids we've already issued a kick for in the late sweep. kickid is async - the bot lingers
+        // a tick or two, so a second sweep (another .bot fired within ~0.6s) would re-see and re-log
+        // the same leftover. Tracking the id here suppresses the duplicate log; the set self-prunes to
+        // still-present bots each sweep, so an id is dropped once its kick actually lands.
+        private readonly HashSet<int> _kickedUntrackedBotIds = new();
+
         // Kick every practice bot that is neither a tracked .bot nor a bot-replay puppet, then re-pin
         // the quota. Idempotent; safe to run any time in practice.
         private void KickUntrackedPracticeBots()
@@ -2197,19 +2131,27 @@ namespace MatchZy
             {
                 if (!isPractice || isSpawningBot)
                     return;
+                var presentBotIds = new HashSet<int>();
                 foreach (var p in Utilities.GetPlayers())
                 {
                     if (p == null || !p.IsValid || !p.IsBot || p.IsHLTV || !p.UserId.HasValue)
                         continue;
+                    int uid = p.UserId.Value;
+                    presentBotIds.Add(uid);
                     bool tracked;
                     lock (_botsDictLock)
-                        tracked = pracUsedBots.ContainsKey(p.UserId.Value);
+                        tracked = pracUsedBots.ContainsKey(uid);
                     if (!tracked)
                     {
-                        Log($"[SpawnBot] kicking late untracked bot {p.PlayerName} (pair-spawn leftover)");
-                        Server.ExecuteCommand($"kickid {p.UserId.Value}");
+                        // Only log the first time we kick this leftover; Add returns false if a prior
+                        // sweep already flagged it (kick still pending) -> no duplicate log spam.
+                        if (_kickedUntrackedBotIds.Add(uid))
+                            Log($"[SpawnBot] kicking late untracked bot {p.PlayerName} (pair-spawn leftover)");
+                        Server.ExecuteCommand($"kickid {uid}");
                     }
                 }
+                // Drop ids whose bot is gone (kick landed), so a later recycled userid logs fresh.
+                _kickedUntrackedBotIds.IntersectWith(presentBotIds);
                 int trackedCount;
                 lock (_botsDictLock)
                     trackedCount = pracUsedBots.Count;
@@ -2774,6 +2716,19 @@ namespace MatchZy
                 {
                     if (!IsPlayerValid(player))
                         return;
+
+                    // Already on the requested side (e.g. .ct while on CT): skip the whole
+                    // suicide -> SwitchTeam -> Respawn cycle. Switching to the team you are already on
+                    // still runs the engine's ChangeBasePlayerTeamAndPendingTeam path with
+                    // req team == current team, which has rarely crashed there - and there is nothing
+                    // to switch. Just put a dead player back in on T/CT (never respawn a spectator).
+                    if ((byte)team == player.TeamNum)
+                    {
+                        if ((team == CsTeam.Terrorist || team == CsTeam.CounterTerrorist) && !player.PawnIsAlive)
+                            player.Respawn();
+                        return;
+                    }
+
                     try
                     {
                         // Flag this player so the side-switch suicide below does NOT count as a

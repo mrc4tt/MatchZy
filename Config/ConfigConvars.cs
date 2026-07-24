@@ -14,6 +14,7 @@ namespace MatchZy
 
         public FakeConVar<float> botJiggleRange = new("matchzy_botjiggle_range", "Practice .botjiggle: how far (units) bots strafe side-to-side. Default: 30", 30.0f);
 
+
         // Coach viewing-spot source. 1 = use a spawns/coach/<map>.json spot when one exists (hand-tuned
         // override via .savecoachspawn), otherwise compute it. 2 = always compute the spot behind the
         // team (ignore the JSON files). Default: 1.
@@ -92,8 +93,6 @@ namespace MatchZy
         public FakeConVar<bool> mapConsoleCommandEnabled = new("matchzy_map_console_command_enabled", "Whether MatchZy registers the css_map console command (!map). MatchZy also auto-yields it: if a dedicated map plugin (CS2-SimpleAdmin / CS2MapChange) is installed alongside, css_map is NOT registered even when this is true, avoiding a ConCommand conflict that can block players from connecting. Set false to never register it. The .map chat command stays available regardless. Default: true", true);
 
         public FakeConVar<bool> coachDebugEnabled = new("matchzy_coach_debug", "Coach-spawn debug: logs/announces each real-player spawn reassignment, keeps coaches alive (no suicide) for inspection, and runs spawn enforcement during warmup so it can be tested with bots without starting a full match. Default: false", false);
-
-        public FakeConVar<bool> experimentalJumpThrow = new("matchzy_experimental_jumpthrow", "EXPERIMENTAL: enable the practice .jt jumpthrow. Forces jump + grenade-release via server-side button injection (m_nButtons); the engine reads client buttons authoritatively so this may not fire on every CS2 build. Off by default. Default: false", false);
 
 
 

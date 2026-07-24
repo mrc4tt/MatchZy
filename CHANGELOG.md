@@ -4,6 +4,17 @@ Customized fork of [MatchZy](https://github.com/shobhit-pathak/MatchZy) by Shobh
 
 Fork version numbering is independent of upstream. Upstream changelog: <https://github.com/shobhit-pathak/MatchZy/blob/main/CHANGELOG.md>
 
+# 0.8.64
+
+#### July 24, 2026
+
+- Fixed a rare server crash when using `.ct` / `.t` / `.spec` to switch to the side you are already on. It ran a redundant suicide plus team-switch to your current team (the engine's `ChangeBasePlayerTeamAndPendingTeam` with the requested team equal to the current one occasionally crashed). It is now a no-op, only respawning you if you were dead on T/CT.
+- `.cbot` / `.crouchbot` / `.duckbot` now boost you on top of the crouched bot (spawn above it), matching `.crouchboost`.
+- Fixed `.crouchboost` / `.cboost` skipping the player-validity and bot-limit checks that `.boost` already ran.
+- Fixed `.loadbotpos` placing a bot tilted or under the map when the saved spot was recorded while looking up or down: the bot is now always placed upright, facing the saved direction.
+- Reduced duplicate "kicking late untracked bot" log spam when spawning several bots in quick succession.
+- Removed the experimental `.jt` / `.jumpthrow` command and the `matchzy_experimental_jumpthrow` convar (the server-side input injection was unreliable across CS2 builds).
+
 # 0.8.63
 
 #### July 24, 2026
