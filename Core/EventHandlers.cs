@@ -201,6 +201,14 @@ public partial class MatchZy
     {
         try
         {
+            // If this changelevel was triggered by a match load whose map differs from the current
+            // one (pendingMatchLoadJson set in LoadMatchFromJSON), capture the caller-set flags before
+            // ResetMatch clears them, so the OnMapStart resume can restore them on the target map.
+            if (pendingMatchLoadJson != null)
+            {
+                pendingMatchLoadIsG5 = isG5ApiMatch;
+                pendingMatchLoadConfigFile = loadedConfigFile;
+            }
             ResetMatch();
             // isKnifeRequired is set explicitly by ResetMatch() - never toggle blindly
         }

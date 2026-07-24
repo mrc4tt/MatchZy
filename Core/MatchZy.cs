@@ -16,7 +16,7 @@ namespace MatchZy
     public partial class MatchZy : BasePlugin
     {
         public override string ModuleName => "MatchZy";
-        public override string ModuleVersion => "0.8.62";
+        public override string ModuleVersion => "0.8.63";
         public override string ModuleAuthor => "WD- Edited by Miksen @ FSHOST.me";
         public override string ModuleDescription => "A plugin for running and managing CS2 practice/pugs/scrims/matches!";
         public string chatPrefix = $"{ChatColors.Green}[MatchZy]{ChatColors.Default}";
@@ -40,6 +40,17 @@ namespace MatchZy
         public int autoStartMode = 1;
         private bool autoStartLatched = false;
         public bool mapReloadRequired = false;
+
+        // Carries a just-loaded match across the changelevel it triggers. When a match config's
+        // first map differs from the current map, LoadMatchFromJSON changelevels to it; that ends the
+        // outgoing map -> OnMapEnd -> ResetMatch, which would wipe the match (get5_status: none). We
+        // stash the config here, skip finishing setup on the outgoing map, and re-load it on the new
+        // map's OnMapStart (where currentMap == mapName, so no second changelevel). isG5ApiMatch and
+        // loadedConfigFile are caller-set after LoadMatchFromJSON returns, so OnMapEndHandler captures
+        // them just before the reset and the resume restores them.
+        public string? pendingMatchLoadJson = null;
+        public bool pendingMatchLoadIsG5 = false;
+        public string pendingMatchLoadConfigFile = "";
 
         public CounterStrikeSharp.API.Modules.Timers.Timer? SideSelectionTimer = null;
 
@@ -855,6 +866,33 @@ namespace MatchZy
                     {
                         // Refresh cached team entities after map load (entities aren't available immediately)
                         RefreshTeamEntities();
+
+                        // Resume a match whose load triggered this changelevel: re-load the stashed
+                        // config on the target map (skipMapChange -> no second changelevel) and restore
+                        // the caller-set flags captured in OnMapEndHandler. Without this the match was
+                        // wiped by the changelevel's ResetMatch and the server would AutoStart instead.
+                        if (pendingMatchLoadJson != null)
+                        {
+                            string json = pendingMatchLoadJson;
+                            bool wasG5 = pendingMatchLoadIsG5;
+                            string configFile = pendingMatchLoadConfigFile;
+                            pendingMatchLoadJson = null;
+                            pendingMatchLoadIsG5 = false;
+                            pendingMatchLoadConfigFile = "";
+                            Log($"[OnMapStart] Resuming pending match load on {mapName} (get5={wasG5})");
+                            bool ok = LoadMatchFromJSON(json, skipMapChange: true);
+                            if (ok)
+                            {
+                                if (wasG5) isG5ApiMatch = true;
+                                if (configFile != "") loadedConfigFile = configFile;
+                            }
+                            else
+                            {
+                                Log($"[OnMapStart] Pending match re-load FAILED on {mapName}; resetting.");
+                                ResetMatch();
+                            }
+                            return;
+                        }
 
                         if (!isMatchSetup)
                         {

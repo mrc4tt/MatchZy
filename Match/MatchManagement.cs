@@ -290,7 +290,7 @@ namespace MatchZy
             return "";
         }
 
-        public bool LoadMatchFromJSON(string jsonData)
+        public bool LoadMatchFromJSON(string jsonData, bool skipMapChange = false)
         {
             JObject jsonDataObject = JObject.Parse(jsonData);
 
@@ -397,10 +397,19 @@ namespace MatchZy
                 string currentMapName = Server.MapName;
                 string mapName = matchConfig.Maplist[0].ToString();
 
-                if (IsMapReloadRequiredForGameMode(matchConfig.Wingman) || mapReloadRequired || currentMapName != mapName)
+                if (!skipMapChange && (IsMapReloadRequiredForGameMode(matchConfig.Wingman) || mapReloadRequired || currentMapName != mapName))
                 {
                     SetCorrectGameMode();
+                    // The match needs a different map than the one we're on. Finishing setup here is
+                    // pointless: the changelevel ends this map -> OnMapEnd -> ResetMatch wipes it, and
+                    // the match would arrive on the new map as "none" (get5_status none/null, default
+                    // team names, no ready). Stash the config and changelevel; OnMapStart re-loads it
+                    // on the target map (skipMapChange, currentMap == mapName -> no second changelevel),
+                    // carrying the match across like get5. Return success so the caller still records
+                    // loadedConfigFile / isG5ApiMatch (captured in OnMapEndHandler, restored on resume).
+                    pendingMatchLoadJson = jsonData;
                     ChangeMap(mapName, 0);
+                    return true;
                 }
             }
             else

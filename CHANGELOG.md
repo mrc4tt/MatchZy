@@ -4,6 +4,12 @@ Customized fork of [MatchZy](https://github.com/shobhit-pathak/MatchZy) by Shobh
 
 Fork version numbering is independent of upstream. Upstream changelog: <https://github.com/shobhit-pathak/MatchZy/blob/main/CHANGELOG.md>
 
+# 0.8.63
+
+#### July 24, 2026
+
+- Fixed a match load being wiped when the config's first map differs from the current map. Loading via `get5_loadmatch_url` / `matchzy_loadmatch` (or the file variants) changelevels to the match map; that changelevel ended the outgoing map and reset the just-loaded match, so the server arrived on the new map with no match (`get5_status` returned `none` / null matchid, default team names, no ready). The match is now carried across the changelevel and re-loaded on the target map, matching get5 behavior. Loading while already on the first map was unaffected and still works.
+
 # 0.8.62
 
 #### July 24, 2026
