@@ -4,6 +4,18 @@ Customized fork of [MatchZy](https://github.com/shobhit-pathak/MatchZy) by Shobh
 
 Fork version numbering is independent of upstream. Upstream changelog: <https://github.com/shobhit-pathak/MatchZy/blob/main/CHANGELOG.md>
 
+# 0.8.62
+
+#### July 24, 2026
+
+- New named bot positions (practice): `.savebotpos <name>` (`.sbp`) saves your current spot as a named bot placement for the current map, `.loadbotpos <name>` (`.lbp`) spawns a bot at that saved spot (no name spawns every saved placement on the map), `.listbotpos` (`.listbp`) lists them, `.delbotpos <name>` (`.dbp`) removes one. Stored per map in `cfg/matchzy/botpositions.json`.
+- New `.showbotpos` (`.showbp`): toggles in-world markers (beam plus name label, CT lime / T orange) at every saved bot placement on the map; redraws itself after a map change.
+- New `.botjiggle`: toggles all practice bots strafing side to side for dodge/aim reps. New `matchzy_botjiggle_range` convar (default 30) tunes the strafe width.
+- `.cbot` / `.crouchbot` / `.duckbot` now boost you on top of the crouched bot (spawn above it), matching `.crouchboost`.
+- Practice now prints the molotov/incendiary burn time in chat when your fire detonates (via the inferno start-burn event), alongside the other utility detonation timings.
+- Fixed bot placements spawning under the map or lying prone: the saved-position file now serializes correctly, and every bot spawn is placed upright (keeps its facing without the view pitch tilting the model or clipping it through the floor).
+- Fixed `.crouchboost` / `.cboost` skipping the player-validity and bot-limit checks that `.boost` already ran.
+
 # 0.8.61
 
 #### July 20, 2026

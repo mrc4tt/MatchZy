@@ -351,6 +351,9 @@ public partial class MatchZy
                     uint projIndex = projectile.Index;
 
                     lastGrenadeThrownTime[(int)projIndex] = DateTime.Now;
+                    // Molotov/incendiary: also key the throw time by PLAYER (see EventInfernoStartburnHandler).
+                    if (nadeType == "molotov" || nadeType == "incendiary")
+                        lastMolotovThrownTime[client] = DateTime.Now;
                     RegisterArcTrace(projIndex);
                     if (smokeColorEnabled.Value && nadeType == "smoke")
                     {
@@ -499,15 +502,42 @@ public partial class MatchZy
     {
         if (!isPractice || isDryRun)
             return HookResult.Continue;
-        CCSPlayerController? player = @event.Userid;
-        if (!IsHumanPlayerValid(player))
-            return HookResult.Continue;
-        if (lastGrenadeThrownTime.TryGetValue(@event.Get<int>("entityid"), out var thrownTime))
-        {
-            PrintToPlayerChat(player!, Localizer.ForPlayer(player, "matchzy.pracc.molotov", player!.PlayerName, $"{(DateTime.Now - thrownTime).TotalSeconds:0.00}"));
-        }
-
+        // Detonation-time message is printed from EventInfernoStartburn (this event has no usable
+        // entityid and fires even on a mid-air burst). Keep this handler only for the autoclear /
+        // land-marker position.
         OnUtilityDetonated(@event.Get<float>("x"), @event.Get<float>("y"), @event.Get<float>("z"));
+        return HookResult.Continue;
+    }
+
+    // Fire started on the ground: read the molotov/incendiary flight time by the OWNER player. This
+    // is the reliable source (molotov_detonate carries no entityid) and a mid-air burst never starts
+    // a fire, so it correctly stays silent.
+    public HookResult EventInfernoStartburnHandler(EventInfernoStartburn @event, GameEventInfo info)
+    {
+        if (!isPractice || isDryRun)
+            return HookResult.Continue;
+        try
+        {
+            var inferno = Utilities.GetEntityFromIndex<CInferno>(@event.Entityid);
+            var owner = inferno?.OwnerEntity?.Value;
+            if (owner == null)
+                return HookResult.Continue;
+            var player = new CCSPlayerPawn(owner.Handle).OriginalController?.Value;
+            if (!IsHumanPlayerValid(player) || !player!.UserId.HasValue)
+                return HookResult.Continue;
+            int client = player.UserId.Value;
+            if (lastMolotovThrownTime.TryGetValue(client, out var thrownTime))
+            {
+                // CT throws incendiary, T throws molotov - label accordingly.
+                string key = player.TeamNum == (byte)CsTeam.CounterTerrorist ? "matchzy.pracc.incendiary" : "matchzy.pracc.molotov";
+                PrintToPlayerChat(player, Localizer.ForPlayer(player, key, player.PlayerName, $"{(DateTime.Now - thrownTime).TotalSeconds:0.00}"));
+                lastMolotovThrownTime.Remove(client);
+            }
+        }
+        catch (Exception e)
+        {
+            Log($"[InfernoStartburn] {e.Message}");
+        }
         return HookResult.Continue;
     }
 

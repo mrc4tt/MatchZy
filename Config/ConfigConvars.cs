@@ -12,6 +12,8 @@ namespace MatchZy
     {
         public FakeConVar<bool> smokeColorEnabled = new("matchzy_smoke_color_enabled", "Whether player-specific smoke color is enabled or not. Default: false", false);
 
+        public FakeConVar<float> botJiggleRange = new("matchzy_botjiggle_range", "Practice .botjiggle: how far (units) bots strafe side-to-side. Default: 30", 30.0f);
+
         // Coach viewing-spot source. 1 = use a spawns/coach/<map>.json spot when one exists (hand-tuned
         // override via .savecoachspawn), otherwise compute it. 2 = always compute the spot behind the
         // team (ignore the JSON files). Default: 1.

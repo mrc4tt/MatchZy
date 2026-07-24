@@ -148,6 +148,10 @@ namespace MatchZy
         const float spawnMarkerStandHeight = 90.0f;     // vertical band for the standing-on check
         Dictionary<int, Dictionary<string, GrenadeThrownData>> nadeSpecificLastGrenadeData = new();
         Dictionary<int, DateTime> lastGrenadeThrownTime = new();
+        // Molotov/incendiary detonation time is keyed by PLAYER userid, not entity id: EventMolotovDetonate
+        // carries no usable entityid (never matched lastGrenadeThrownTime -> no message / absurd times), and
+        // the fire time is read on EventInfernoStartburn (ground burn) so a mid-air burst prints nothing.
+        Dictionary<int, DateTime> lastMolotovThrownTime = new();
         Dictionary<int, PlayerPracticeTimer> playerTimers = new();
         Dictionary<int, PlayerLocationData> savedPlayerLocationData = new();
         // Named position slots (#2): .savepos <name> / .loadpos <name> / .listpos / .delpos <name>.
@@ -282,6 +286,7 @@ namespace MatchZy
             GetSpawns();
             Server.PrintToChatAll($" {ChatColors.Green}Spawns: {ChatColors.Default}.spawn, .ctspawn, .tspawn, .bestspawn, .worstspawn");
             Server.PrintToChatAll($" {ChatColors.Green}Bots: {ChatColors.Default}.bot, .ctbot, .tbot, .nobots, .crouchbot, .boost, .crouchboost");
+            Server.PrintToChatAll($" {ChatColors.Green}Bot Positions: {ChatColors.Default}.savebotpos, .loadbotpos, .listbotpos, .delbotpos, .showbotpos, .botjiggle");
             Server.PrintToChatAll($" {ChatColors.Green}Nades: {ChatColors.Default}.loadnade, .savenade, .delnade, .importnade, .listnades, .mynades");
             Server.PrintToChatAll($" {ChatColors.Green}Nade Throw: {ChatColors.Default}.rethrow, .throwindex <index>, .lastindex, .delay <number>");
             Server.PrintToChatAll($" {ChatColors.Green}Utility & Toggles: {ChatColors.Default}.clear, .fastforward, .last, .back, .solid, .impacts, .traj");
@@ -1400,10 +1405,11 @@ namespace MatchZy
             if (!CanSpawnAnotherBot(player))
                 return;
 
-            // crouched, auto team
+            // crouched, auto team, boost the player onto the crouched bot (spawn above it).
             AddBot(
                 player, /*crouch*/
-                true
+                true,
+                boost: true
             );
         }
 
@@ -1480,7 +1486,7 @@ namespace MatchZy
         [ConsoleCommand("css_duckboost")]
         public void OnCrouchBoostBotCommand(CCSPlayerController? player, CommandInfo? command)
         {
-            if (!isPractice)
+            if (!isPractice || !IsPlayerValid(player))
                 return;
 
             if (IsNoBotsFlagSet())
@@ -1490,10 +1496,13 @@ namespace MatchZy
                 return;
             }
 
+            if (!CanSpawnAnotherBot(player))
+                return;
+
             AddBot(player, true, boost: true);
         }
 
-        private void AddBot(CCSPlayerController? player, bool crouch, CsTeam? forceTeam = null, bool boost = false)
+        private void AddBot(CCSPlayerController? player, bool crouch, CsTeam? forceTeam = null, bool boost = false, Position? posOverride = null)
         {
             try
             {
@@ -1546,7 +1555,7 @@ namespace MatchZy
                     {
                         if (targetPlayer != null && targetPlayer.IsValid && targetPlayer.Connected == PlayerConnectedState.Connected)
                         {
-                            SpawnBot(targetPlayer, crouch, boost, targetTeam);
+                            SpawnBot(targetPlayer, crouch, boost, targetTeam, posOverride);
                         }
                         else
                         {
@@ -2014,7 +2023,7 @@ namespace MatchZy
             }
         }
 
-        private void SpawnBot(CCSPlayerController botOwner, bool crouch, bool boost = false, CsTeam targetTeam = CsTeam.None)
+        private void SpawnBot(CCSPlayerController botOwner, bool crouch, bool boost = false, CsTeam targetTeam = CsTeam.None, Position? posOverride = null)
         {
             try
             {
@@ -2078,8 +2087,9 @@ namespace MatchZy
                             continue;
                         }
 
-                        // Create botOwnerPosition FIRST (before using it in dictionary)
-                        Position botOwnerPosition = new Position(botOwnerPawn.CBodyComponent!.SceneNode!.AbsOrigin, botOwnerPawn.CBodyComponent!.SceneNode!.AbsRotation);
+                        // Create botOwnerPosition FIRST (before using it in dictionary). A posOverride
+                        // (named bot position via .loadbotpos) wins over the owner's current position.
+                        Position botOwnerPosition = posOverride ?? new Position(botOwnerPawn.CBodyComponent!.SceneNode!.AbsOrigin, botOwnerPawn.CBodyComponent!.SceneNode!.AbsRotation);
 
                         // Now safely add to dictionary with lock
                         lock (_botsDictLock)
@@ -2111,8 +2121,12 @@ namespace MatchZy
                             }
                         }
 
-                        // Now safe - we validated PlayerPawn.Value above
-                        tempPlayer.PlayerPawn.Value.Teleport(botOwnerPosition.PlayerPosition, botOwnerPosition.PlayerAngle, new Vector(0, 0, 0));
+                        // Now safe - we validated PlayerPawn.Value above.
+                        // Route every bot spawn through TeleportUpright: full-angle teleport (bot
+                        // inherits facing) then flatten the body scene node over several frames so a
+                        // look-down pitch never tilts the model flat / clips it under the map. Body
+                        // stands upright at the owner's (or the saved spot's) position.
+                        TeleportUpright(tempPlayer, botOwnerPosition.PlayerPosition, botOwnerPosition.PlayerAngle);
 
                         if (boost)
                         {
@@ -2884,6 +2898,11 @@ namespace MatchZy
         {
             if (!isPractice)
                 return;
+
+            // Drop pending detonation times: .clear before utility lands left stale entries that made a
+            // later .rt print absurd flight times.
+            lastGrenadeThrownTime.Clear();
+            lastMolotovThrownTime.Clear();
 
             var unique = GatherUtilityEntities();
             // Defer actual removal to next frame to avoid touching entities mid-update

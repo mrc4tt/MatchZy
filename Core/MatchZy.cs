@@ -16,7 +16,7 @@ namespace MatchZy
     public partial class MatchZy : BasePlugin
     {
         public override string ModuleName => "MatchZy";
-        public override string ModuleVersion => "0.8.61";
+        public override string ModuleVersion => "0.8.62";
         public override string ModuleAuthor => "WD- Edited by Miksen @ FSHOST.me";
         public override string ModuleDescription => "A plugin for running and managing CS2 practice/pugs/scrims/matches!";
         public string chatPrefix = $"{ChatColors.Green}[MatchZy]{ChatColors.Default}";
@@ -459,6 +459,11 @@ namespace MatchZy
                 { ".bot", OnBotCommand },
                 { ".tbot", OnTBotCommand },
                 { ".ctbot", OnCtBotCommand },
+                { ".listbotpos", OnListBotPosCommand },
+                { ".listbp", OnListBotPosCommand },
+                { ".showbotpos", OnShowBotPosCommand },
+                { ".showbp", OnShowBotPosCommand },
+                { ".botjiggle", OnBotJiggleCommand },
                 { ".previewnade", OnTrajCommand },
                 { ".nadepreview", OnTrajCommand },
                 { ".nadecam", OnTrajCommand },
@@ -665,6 +670,9 @@ namespace MatchZy
             // and a grenade is mid-flight.
             RegisterListener<Listeners.OnTick>(TraceArcTick);
 
+            // Botjiggle: strafes practice bots side-to-side each tick. No-op unless .botjiggle is on.
+            RegisterListener<Listeners.OnTick>(OnBotJiggleTick);
+
 
             RegisterEventHandler<EventPlayerTeam>(
                 (@event, info) =>
@@ -840,6 +848,7 @@ namespace MatchZy
                 // stayed "on" (stale entity handles). Refresh so .showcoachspawns keeps working across
                 // a map change instead of going invisible-but-still-on.
                 RefreshCoachSpawnVizOnMapStart();
+                RefreshBotPosVizOnMapStart();
                 AddTimer(
                     1.0f,
                     () =>
@@ -1337,6 +1346,19 @@ namespace MatchZy
                     {
                         HandleWarmupBotsCommand(player, messageCommandArg);
                     }
+                    // Named bot positions (arg forms). Order: longer prefixes first.
+                    if (message.StartsWith(".savebotpos") || message.StartsWith(".sbp"))
+                    {
+                        HandleSaveBotPosCommand(player, messageCommandArg);
+                    }
+                    else if (message.StartsWith(".loadbotpos") || message.StartsWith(".lbp"))
+                    {
+                        HandleLoadBotPosCommand(player, messageCommandArg);
+                    }
+                    else if (message.StartsWith(".delbotpos") || message.StartsWith(".dbp"))
+                    {
+                        HandleDelBotPosCommand(player, messageCommandArg);
+                    }
 
                     // Named position slots (#2). No-arg .savepos/.loadpos/.listpos/.delpos hit the
                     // exact-match block above (returns early); these fire only for the arg forms.
@@ -1491,6 +1513,7 @@ namespace MatchZy
             RegisterEventHandler<EventFlashbangDetonate>(EventFlashbangDetonateHandler);
             RegisterEventHandler<EventHegrenadeDetonate>(EventHegrenadeDetonateHandler);
             RegisterEventHandler<EventMolotovDetonate>(EventMolotovDetonateHandler);
+            RegisterEventHandler<EventInfernoStartburn>(EventInfernoStartburnHandler);
             RegisterEventHandler<EventDecoyStarted>(EventDecoyDetonateHandler);
         }
     }

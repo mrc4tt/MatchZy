@@ -2786,6 +2786,7 @@ namespace MatchZy
                 player!.PrintToChat($"{chatPrefix} {ChatColors.Gold}Practice Mode Commands:");
                 player.PrintToChat($" {ChatColors.Green}Spawns:{ChatColors.Default} .spawn .ctspawn .tspawn .bestspawn .worstspawn");
                 player.PrintToChat($" {ChatColors.Green}Bots:{ChatColors.Default} .bot .cbot .boost .nobot .clearbots");
+                player.PrintToChat($" {ChatColors.Green}Bot Positions:{ChatColors.Default} .savebotpos .loadbotpos .listbotpos .delbotpos .showbotpos .botjiggle");
                 player.PrintToChat($" {ChatColors.Green}Nades:{ChatColors.Default} .savenade .loadnade .listnades .rethrow .throwindex");
                 player.PrintToChat($" {ChatColors.Green}Utility:{ChatColors.Default} .clear .ff .god .traj .impacts .break .cam .timer");
                 player.PrintToChat($" {ChatColors.Green}Teams:{ChatColors.Default} .ct .t .spec .fas");
@@ -2798,7 +2799,8 @@ namespace MatchZy
                 // Console output (unchanged - detailed practice docs)
                 player.PrintToConsole("=== Practice Mode Command List ===\n");
                 player.PrintToConsole("\n【Spawn Point Operations】\n" + ".spawn <number>  Teleport to the specified competitive spawn point of your team\n" + ".ctspawn <number>  Teleport to the specified CT competitive spawn point (alias: .cts)\n" + ".tspawn <number>  Teleport to the specified T competitive spawn point (alias: .ts)\n" + ".bestspawn  Teleport to the nearest team spawn point\n" + ".worstspawn  Teleport to the farthest team spawn point\n" + ".bestctspawn  Teleport to the nearest CT spawn point\n" + ".worstctspawn  Teleport to the farthest CT spawn point\n" + ".besttspawn  Teleport to the nearest T spawn point\n" + ".worsttspawn  Teleport to the farthest T spawn point\n" + ".showspawns  Highlight all competitive spawn points\n" + ".hidespawns  Hide highlighted spawn points\n");
-                player.PrintToConsole("\n【Bot Control】\n" + ".bot  Add a bot at the player's current position\n" + ".crouchbot  Add a crouching bot at the player's current position (alias: .cbot)\n" + ".boost  Add a bot at the current position and boost the player on top of it\n" + ".crouchboost  Add a crouching bot and boost the player on top of it\n" + ".nobot  Remove the bot under the crosshair\n" + ".clearbots  Remove all bots\n");
+                player.PrintToConsole("\n【Bot Control】\n" + ".bot  Add a bot at the player's current position\n" + ".crouchbot  Add a crouching bot and boost the player on top of it (alias: .cbot)\n" + ".boost  Add a bot at the current position and boost the player on top of it\n" + ".crouchboost  Add a crouching bot and boost the player on top of it\n" + ".nobot  Remove the bot under the crosshair\n" + ".clearbots  Remove all bots\n");
+                player.PrintToConsole("\n【Bot Positions】\n" + ".savebotpos <name>  Save your current spot as a named bot placement for this map (alias: .sbp)\n" + ".loadbotpos <name>  Spawn a bot at that saved spot; no name spawns all saved for this map (alias: .lbp)\n" + ".listbotpos  List saved bot placement names on this map (alias: .listbp)\n" + ".delbotpos <name>  Delete a saved bot placement (alias: .dbp)\n" + ".showbotpos  Toggle in-world markers at every saved bot placement (alias: .showbp)\n" + ".botjiggle  Toggle all practice bots strafing side-to-side (matchzy_botjiggle_range tunes width)\n");
                 player.PrintToConsole("\n【Teams & Modes】\n" + ".ct, .t, .spec  Switch the player to the requested team\n" + ".fas /.watchme  Force all players into spectator mode except the one issuing the command\n" + ".dryrun  Enable Dryrun Mode (alias: .dry)\n" + ".god  Enable God Mode\n");
                 player.PrintToConsole("\n【Grenade Management】\n" + ".savenade <n> <optional description>  Save a grenade crosshair (alias: .sn)\n" + ".loadnade <n>  Load a grenade crosshair (alias: .ln)\n" + ".deletenade <n>  Delete a saved grenade crosshair from file (alias: .dn)\n" + ".importnade <code>  Save a crosshair using a code printed in chat or from savednades.cfg (alias: .in)\n" + ".listnades <optional filter>  List all saved crosshairs, filter optional (alias: .lin)\n");
                 player.PrintToConsole("\n【Grenade Throwing】\n" + ".rethrow  Re-throw your last thrown grenade (alias: .rt)\n" + ".last  Teleport to where you threw your last grenade\n" + ".back <number>  Teleport to a specific grenade history position\n" + ".delay <delay_in_seconds>  Set delay on last grenade (used with .rethrow or .throwindex)\n" + ".throwindex <index> <optional index> <optional index>  Throw grenade(s) from specific history index(es)\n" + ".lastindex  Print the index of your last thrown grenade\n" + ".rethrowsmoke  Throw your last smoke grenade\n" + ".rethrownade  Throw your last HE grenade\n" + ".rethrowflash  Throw your last flashbang\n" + ".rethrowmolotov  Throw your last molotov/incendiary\n" + ".rethrowdecoy  Throw your last decoy\n");
@@ -2984,6 +2986,13 @@ namespace MatchZy
             player.PrintToConsole("   .bot / .cbot / .crouchbot - Add bots");
             player.PrintToConsole("   .boost / .crouchboost - Add bot and boost player");
             player.PrintToConsole("   .nobot / .clearbots - Remove bots");
+            player.PrintToConsole("📌 BOT POSITIONS:");
+            player.PrintToConsole("   .savebotpos / .sbp <name> - Save named bot placement");
+            player.PrintToConsole("   .loadbotpos / .lbp <name> - Spawn bot at saved spot (no name = all)");
+            player.PrintToConsole("   .listbotpos / .listbp - List saved placements this map");
+            player.PrintToConsole("   .delbotpos / .dbp <name> - Delete a saved placement");
+            player.PrintToConsole("   .showbotpos / .showbp - Toggle in-world markers");
+            player.PrintToConsole("   .botjiggle - Toggle bots strafing side-to-side");
             player.PrintToConsole("💣 GRENADE MANAGEMENT:");
             player.PrintToConsole("   .savenade / .sn - Save grenade crosshair");
             player.PrintToConsole("   .loadnade / .ln - Load grenade crosshair");
