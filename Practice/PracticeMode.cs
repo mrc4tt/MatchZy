@@ -287,7 +287,7 @@ namespace MatchZy
             GetSpawns();
             Server.PrintToChatAll($" {ChatColors.Green}Spawns: {ChatColors.Default}.spawn, .ctspawn, .tspawn, .bestspawn, .worstspawn");
             Server.PrintToChatAll($" {ChatColors.Green}Bots: {ChatColors.Default}.bot, .ctbot, .tbot, .nobots, .crouchbot, .boost, .crouchboost");
-            Server.PrintToChatAll($" {ChatColors.Green}Bot Positions: {ChatColors.Default}.savebotpos, .loadbotpos, .listbotpos, .delbotpos, .showbotpos, .botjiggle");
+            Server.PrintToChatAll($" {ChatColors.Green}Bot Positions: {ChatColors.Default}.sbp, .lbp, .listbp, .dbp, .showbp, .botjiggle");
             Server.PrintToChatAll($" {ChatColors.Green}Nades: {ChatColors.Default}.loadnade, .savenade, .delnade, .importnade, .listnades, .mynades");
             Server.PrintToChatAll($" {ChatColors.Green}Nade Throw: {ChatColors.Default}.rethrow, .throwindex <index>, .lastindex, .delay <number>");
             Server.PrintToChatAll($" {ChatColors.Green}Utility & Toggles: {ChatColors.Default}.clear, .fastforward, .last, .back, .solid, .impacts, .traj");
