@@ -1061,7 +1061,7 @@ namespace MatchZy
                 Server.ExecuteCommand("mp_match_end_changelevel 0");
                 Server.ExecuteCommand("mp_match_end_restart 0");
                 Server.ExecuteCommand("mp_endmatch_votenextmap 0");
-                Log("[HandlePlayoutConfig] Scrim/Hill playout - clinch=0, overtime=0");
+                Log("[ClinchOvertimeConfig] Scrim/Hill playout mode - clinch=0, overtime=0");
                 return;
             }
 
@@ -1070,7 +1070,7 @@ namespace MatchZy
             string? overtimeEnabled = GetConvarValueFromCFGFile(absoluteCfgPath, "mp_overtime_enable");
             Server.ExecuteCommand($"mp_match_can_clinch {matchCanClinch ?? "1"}");
             Server.ExecuteCommand($"mp_overtime_enable {overtimeEnabled ?? "1"}");
-            Log($"[HandlePlayoutConfig] Match mode - cfg={absoluteCfgPath} clinch={matchCanClinch ?? "1(default)"} overtime={overtimeEnabled ?? "1(default)"}");
+            Log($"[ClinchOvertimeConfig] Match mode - restored clinch={matchCanClinch ?? "1(default)"} overtime={overtimeEnabled ?? "1(default)"} (source: {absoluteCfgPath})");
         }
     }
 }

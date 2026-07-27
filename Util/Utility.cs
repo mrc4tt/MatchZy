@@ -2201,6 +2201,14 @@ namespace MatchZy
             }
 
             playerHasTakenDamage = false;
+
+            // Random spawns: shuffle players across ALL enabled map spawns each live round. Active
+            // when matchzy_random_spawns is on OR a coach is present (RandomSpawnsActive) - so setting
+            // a coach auto-scatters the spawns, which is exactly the "always the same" case. Excludes
+            // coaches. The coach reseat in HandleCoaches() below skips itself while this is on.
+            if (isMatchLive && RandomSpawnsActive())
+                RandomizeSpawns();
+
             HandleCoaches();
             CreateMatchZyRoundDataBackup();
             InitPlayerDamageInfo();
@@ -3084,6 +3092,37 @@ namespace MatchZy
             return false;
         }
 
+        /// <summary>
+        /// Reads mp_freezetime as a float, BY ITS ACTUAL CVAR TYPE. mp_freezetime is a float cvar in
+        /// CS2, so GetPrimitiveValue&lt;int&gt; reinterprets the raw float bits as an int (garbage).
+        /// This switches on cvar.Type and reads the matching primitive, so it works whether Valve ships
+        /// it as a float or an int on a given build. Returns the fallback if the cvar is missing/odd.
+        /// </summary>
+        public float GetFreezeTime(float fallback = 15f)
+        {
+            try
+            {
+                ConVar? cvar = ConVar.Find("mp_freezetime");
+                if (cvar == null)
+                    return fallback;
+                float value = cvar.Type switch
+                {
+                    ConVarType.Float32 or ConVarType.Float64 => cvar.GetPrimitiveValue<float>(),
+                    ConVarType.Int32 => cvar.GetPrimitiveValue<int>(),
+                    ConVarType.Int16 => cvar.GetPrimitiveValue<short>(),
+                    ConVarType.UInt32 => cvar.GetPrimitiveValue<uint>(),
+                    ConVarType.UInt16 => cvar.GetPrimitiveValue<ushort>(),
+                    _ => float.TryParse(GetConvarStringValue(cvar), out float parsed) ? parsed : fallback,
+                };
+                return value >= 0f ? value : fallback;
+            }
+            catch (Exception ex)
+            {
+                Log($"[GetFreezeTime] {ex.Message}");
+                return fallback;
+            }
+        }
+
         public string GetConvarStringValue(ConVar? cvar)
         {
             try
@@ -3963,19 +4002,33 @@ namespace MatchZy
 
         public void RandomizeSpawns()
         {
-            List<CCSPlayerController> players = Utilities.GetPlayers();
-            Dictionary<byte, List<Position>> teamSpawns = new() { { (byte)CsTeam.CounterTerrorist, spawnsData[(byte)CsTeam.CounterTerrorist].Select(position => new Position(position)).ToList() }, { (byte)CsTeam.Terrorist, spawnsData[(byte)CsTeam.Terrorist].Select(position => new Position(position)).ToList() } };
-            Random random = new();
-            foreach (var player in players)
+            // Build per-team pools from ALL enabled spawn entities (GetTopCompetitiveSpawns with a
+            // large cap), NOT the min-priority spawnsData set. spawnsData only holds the lowest-priority
+            // spawns (e.g. Dust2 T = 5 of 10), so randomizing over it still reused the same 5 - the
+            // "spawns are always the same" complaint. Fall back to spawnsData if the live scan fails.
+            Dictionary<byte, List<Position>> teamSpawns = new();
+            foreach (byte side in new[] { (byte)CsTeam.CounterTerrorist, (byte)CsTeam.Terrorist })
             {
-                if (!IsPlayerValid(player))
-                    continue;
+                List<Position> pool = GetTopCompetitiveSpawns(side, 32);
+                if (pool.Count == 0 && spawnsData.TryGetValue(side, out List<Position>? fallback))
+                    pool = fallback.Select(p => new Position(p)).ToList();
+                teamSpawns[side] = pool;
+            }
 
-                if (teamSpawns[player.TeamNum].Count == 0)
-                    break;
-                int randomIndex = random.Next(teamSpawns[player.TeamNum].Count);
-                Position spawnPosition = teamSpawns[player.TeamNum][randomIndex];
-                teamSpawns[player.TeamNum].RemoveAt(randomIndex);
+            // Exclude coaches: they are placed at their own viewing spot by the coach system and
+            // must NOT be teleported onto a competitive spawn (that both mis-seats the coach and eats
+            // a spawn a real player needs). So a CT with 5 players + 1 coach still shuffles only the 5.
+            HashSet<CCSPlayerController> coaches = GetAllCoaches();
+            Random random = new();
+            foreach (var player in Utilities.GetPlayers())
+            {
+                if (!IsPlayerValid(player) || coaches.Contains(player))
+                    continue;
+                if (!teamSpawns.TryGetValue(player.TeamNum, out List<Position>? pool) || pool.Count == 0)
+                    continue;
+                int randomIndex = random.Next(pool.Count);
+                Position spawnPosition = pool[randomIndex];
+                pool.RemoveAt(randomIndex); // claim so no two players share a spawn
                 spawnPosition.Teleport(player);
             }
         }

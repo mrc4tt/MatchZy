@@ -22,6 +22,15 @@ public partial class MatchZy
         return coaches;
     }
 
+    /// <summary>
+    /// Random spawns are active when the admin enabled <c>matchzy_random_spawns</c> OR any coach is
+    /// present. A coach on a side is exactly when the fixed competitive spawns read as "always the
+    /// same", so coaching auto-enables the scatter; it also cleanly resolves coach spawn-displacement
+    /// (all real players are repositioned) so the fixed reseat (EnforceCompetitiveSpawns) is skipped.
+    /// Self-resets when the last coach leaves (.uncoach) - no stored convar flip to clean up.
+    /// </summary>
+    public bool RandomSpawnsActive() => randomSpawnsEnabled.Value || GetAllCoaches().Count > 0;
+
     public HookResult OnCoachPlayerSpawn(EventPlayerSpawn @event, GameEventInfo info)
     {
         // Debug mode runs the coach flow during warmup too (bot testing without a full match).
@@ -209,11 +218,19 @@ public partial class MatchZy
             haveCoachSpawns = HasCoachSpawns();
         }
 
-        int freezeTime = ConVar.Find("mp_freezetime")!.GetPrimitiveValue<int>();
-        freezeTime = freezeTime > 2 ? freezeTime : 2;
+        // Kill the coach EARLY in freezetime so the body is gone BEFORE the round goes live.
+        // round_start fires at the START of freezetime; kill 2s in (after coach placement settles at
+        // 0.05s / 0.5s). On a short freezetime (< 3s) kill just before it ends instead, so the body
+        // is still gone before live. GetFreezeTime reads mp_freezetime by its actual cvar type (it is
+        // a float cvar; reading it as an int reinterprets the bits = garbage, which is what mistimed
+        // the kill into the live round before).
+        float freeze = GetFreezeTime();
+        float killDelay = freeze >= 3.0f ? 2.0f : Math.Max(0.3f, freeze - 0.5f);
+        if (coachDebugEnabled.Value)
+            Log($"[HandleCoaches] mp_freezetime={freeze:F1}s, coach kill scheduled in {killDelay:F1}s");
         // Skip coach cleanup while debugging so coaches stay alive/visible for screenshots.
         if (!coachDebugEnabled.Value)
-            coachKillTimer ??= AddTimer(freezeTime - 1f, KillCoaches);
+            coachKillTimer ??= AddTimer(killDelay, KillCoaches);
 
         if (haveCoachSpawns)
         {
@@ -253,6 +270,11 @@ public partial class MatchZy
     /// </summary>
     private void EnforceCompetitiveSpawns()
     {
+        // Random spawns scatter players across all enabled spawns; reseating them onto the fixed
+        // competitive set would immediately undo it. Skip only when RandomizeSpawns actually runs
+        // (isMatchLive) - in the knife round the reseat still fixes coach spawn-displacement.
+        if (isMatchLive && RandomSpawnsActive())
+            return;
         // Runs on an AddTimer callback: an escaped exception here becomes a CSS runtime error box.
         try
         {

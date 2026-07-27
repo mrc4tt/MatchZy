@@ -2757,12 +2757,19 @@ namespace MatchZy
                                 return;
                             try
                             {
-                                // SwitchTeam, not ChangeTeam. ChangeTeam is a vtable OFFSET in
-                                // gamedata (fragile across CS2 builds) and runs the engine's full
-                                // live team-change path (weapon strip → plugin hooks → SIGSEGV).
-                                // SwitchTeam is SIGNATURE-based (build-robust) and just sets the
-                                // team number; the Respawn below puts the player in on the new side.
-                                player.SwitchTeam(team);
+                                // For T/CT use SwitchTeam, not ChangeTeam. ChangeTeam is a vtable
+                                // OFFSET in gamedata (fragile across CS2 builds) and runs the engine's
+                                // full live team-change path (weapon strip → plugin hooks → SIGSEGV).
+                                // SwitchTeam is SIGNATURE-based (build-robust) and just sets the team
+                                // number; the Respawn below puts the player in on the new side.
+                                // EXCEPTION: SwitchTeam only accepts play teams - SwitchTeam(Spectator=1)
+                                // logs "CCSPlayerPawnBase::SwitchTeam( 1 ) - invalid team index." and
+                                // does nothing. The pawn was suicided above (dead), so ChangeTeam to
+                                // Spectator has no weapons to strip -> safe. No respawn (spectator).
+                                if (team == CsTeam.Spectator)
+                                    player.ChangeTeam(team);
+                                else
+                                    player.SwitchTeam(team);
 
                                 // Practice: respawn onto an actual playing side (T/CT) so you're
                                 // live instantly. NEVER respawn when the target is Spectator -
@@ -2808,10 +2815,17 @@ namespace MatchZy
                             pawn.CommitSuicide(explode: false, force: true);
                         Server.NextFrame(() =>
                         {
-                            if (!IsPlayerValid(target))
+                            // Gate on controller validity only: after the suicide the pawn may be
+                            // invalid, but ChangeTeam operates on the controller.
+                            if (target == null || !target.IsValid)
                                 return;
-                            try { target.SwitchTeam(CsTeam.Spectator); }
-                            catch (Exception ex) { Log($"[watchme] SwitchTeam failed: {ex.Message}"); }
+                            // ChangeTeam, NOT SwitchTeam: SwitchTeam is signature-based and only accepts
+                            // play teams (T/CT) - SwitchTeam(Spectator=1) logs
+                            // "CCSPlayerPawnBase::SwitchTeam( 1 ) - invalid team index." and does nothing.
+                            // The pawn was just suicided above (dead, weapons dropped), so ChangeTeam's
+                            // weapon-strip path has nothing to strip -> no crash. No respawn (spectator).
+                            try { target.ChangeTeam(CsTeam.Spectator); }
+                            catch (Exception ex) { Log($"[watchme] ChangeTeam failed: {ex.Message}"); }
                         });
                     }
                     catch (Exception ex)

@@ -4,6 +4,15 @@ Customized fork of [MatchZy](https://github.com/shobhit-pathak/MatchZy) by Shobh
 
 Fork version numbering is independent of upstream. Upstream changelog: <https://github.com/shobhit-pathak/MatchZy/blob/main/CHANGELOG.md>
 
+# 0.8.65
+
+#### July 27, 2026
+
+- Added `matchzy_random_spawns` (default false): randomizes player spawns each live round across all enabled map spawns instead of the fixed competitive set, so maps no longer always reuse the same spots (e.g. Dust2 T now uses all 10 spawns, not the same 5). For casual/scrim variety only; leave off for ranked matches. While on, the coach spawn-reseat is skipped. (Note: a side can only vary up to the number of spawn entities the map defines - Dust2 CT has only 5, so it cannot vary.)
+- Random spawns now also turn on automatically while a coach is present (no need to set the convar), since a coach on a side is exactly when spawns look "always the same". Coaches are excluded from the shuffle (they stay at their viewing spot). Reverts to normal once the last coach leaves.
+- Fixed the coach being killed ~1 second AFTER the round went live (visible/idle body into the round) instead of during freezetime. The kill is now scheduled at a small fixed delay early in freezetime, so the coach body is reliably gone before the round starts, regardless of the `mp_freezetime` value (previously it read `mp_freezetime` - a float cvar - as an int, mistiming the kill).
+- Fixed `.watchme` / `.fas` (and `.spec`) failing to move players to Spectator and spamming `CCSPlayerPawnBase::SwitchTeam( 1 ) - invalid team index.`: `SwitchTeam` only accepts T/CT, so the Spectator move now uses `ChangeTeam` on the already-dead pawn.
+
 # 0.8.64
 
 #### July 24, 2026
