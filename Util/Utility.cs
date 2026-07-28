@@ -1078,10 +1078,11 @@ namespace MatchZy
                 HandlePlayoutConfig();
                 ForceScoreboardRefresh();
             });
-            // mp_restartgame in scrim.cfg fires ~1s after exec; calling tv_record
-            // synchronously here gets clobbered by the restart, producing empty
-            // demos. Defer past the restart so tv_record sticks.
-            AddTimer(2.0f, () => StartDemoRecording());
+            // scrim.cfg does mp_restartgame, which clobbers a tv_record fired on a fixed timer
+            // (empty demos). Start the demo on the first live round_start AFTER the restart settles
+            // (HandlePostRoundStartEvent), immune to restart timing. Fallback timer if that never comes.
+            demoStartPending = true;
+            AddTimer(6.0f, () => { if (demoStartPending) StartDemoRecording(); });
             ClearClanTags();
 
             // Storing 0-0 score backup file as lastBackupFileName, so that .stop functions properly in first round.
@@ -1118,10 +1119,11 @@ namespace MatchZy
                 HandlePlayoutConfig();
                 ForceScoreboardRefresh();
             });
-            // mp_restartgame in hill.cfg fires ~1s after exec; calling tv_record
-            // synchronously here gets clobbered by the restart, producing empty
-            // demos. Defer past the restart so tv_record sticks.
-            AddTimer(2.0f, () => StartDemoRecording());
+            // hill.cfg does mp_restartgame, which clobbers a tv_record fired on a fixed timer (empty
+            // demos). Start the demo on the first live round_start AFTER the restart settles
+            // (HandlePostRoundStartEvent), immune to restart timing. Fallback timer if that never comes.
+            demoStartPending = true;
+            AddTimer(6.0f, () => { if (demoStartPending) StartDemoRecording(); });
             ClearClanTags();
 
             // Storing 0-0 score backup file as lastBackupFileName, so that .stop functions properly in first round.
@@ -2203,12 +2205,21 @@ namespace MatchZy
 
             playerHasTakenDamage = false;
 
+            // Scrim/hill demo start: their cfg mp_restartgame clobbers a fixed-timer tv_record, so the
+            // start is deferred to here - the first live round_start after the restart settles. Only
+            // fires once (StartDemoRecording clears the flag).
+            if (demoStartPending && isMatchLive)
+                StartDemoRecording();
+
             // Random spawns: shuffle players across ALL enabled map spawns each live round. Active
             // when matchzy_random_spawns is on OR a coach is present (RandomSpawnsActive) - so setting
             // a coach auto-scatters the spawns, which is exactly the "always the same" case. Excludes
             // coaches. The coach reseat in HandleCoaches() below skips itself while this is on.
+            // DEFERRED 0.2s: at round_start the players have not finished (re)spawning, so a synchronous
+            // teleport no-ops and they stay on their engine spawns (the "same cluster every round" bug).
+            // The coach reseat uses the same 0.2s delay for the same reason.
             if (isMatchLive && RandomSpawnsActive())
-                RandomizeSpawns();
+                AddTimer(0.2f, RandomizeSpawns);
 
             HandleCoaches();
             CreateMatchZyRoundDataBackup();
@@ -4016,22 +4027,32 @@ namespace MatchZy
                 teamSpawns[side] = pool;
             }
 
+            if (coachDebugEnabled.Value)
+                Log($"[RandomizeSpawns] pools: CT={teamSpawns[(byte)CsTeam.CounterTerrorist].Count} T={teamSpawns[(byte)CsTeam.Terrorist].Count}");
+
             // Exclude coaches: they are placed at their own viewing spot by the coach system and
             // must NOT be teleported onto a competitive spawn (that both mis-seats the coach and eats
             // a spawn a real player needs). So a CT with 5 players + 1 coach still shuffles only the 5.
             HashSet<CCSPlayerController> coaches = GetAllCoaches();
             Random random = new();
+            int moved = 0, skipped = 0;
             foreach (var player in Utilities.GetPlayers())
             {
                 if (!IsPlayerValid(player) || coaches.Contains(player))
                     continue;
                 if (!teamSpawns.TryGetValue(player.TeamNum, out List<Position>? pool) || pool.Count == 0)
+                {
+                    skipped++;
                     continue;
+                }
                 int randomIndex = random.Next(pool.Count);
                 Position spawnPosition = pool[randomIndex];
                 pool.RemoveAt(randomIndex); // claim so no two players share a spawn
                 spawnPosition.Teleport(player);
+                moved++;
             }
+            if (coachDebugEnabled.Value)
+                Log($"[RandomizeSpawns] moved {moved} player(s), {skipped} skipped (no spawn pool)");
         }
     }
 }

@@ -4,6 +4,13 @@ Customized fork of [MatchZy](https://github.com/shobhit-pathak/MatchZy) by Shobh
 
 Fork version numbering is independent of upstream. Upstream changelog: <https://github.com/shobhit-pathak/MatchZy/blob/main/CHANGELOG.md>
 
+# 0.8.66
+
+#### July 27, 2026
+
+- Fixed GOTV/CSTV demos not recording on `.scrim` and `.hill` (worked on `.match`). scrim.cfg / hill.cfg run `mp_restartgame`, whose restart clobbered the `tv_record` that was started on a fixed 2s timer; the demo now starts on the first live round after the restart settles (with a fallback), so it records reliably.
+- Fixed `matchzy_random_spawns` (and the coach auto-shuffle) leaving players on the same spawns every round: the shuffle ran at round start before players finished respawning, so the teleport did nothing. It now runs a moment later, so spawns actually vary. Added debug lines (under `matchzy_coach_debug`) showing the spawn pool size and how many players were moved.
+
 # 0.8.65
 
 #### July 27, 2026

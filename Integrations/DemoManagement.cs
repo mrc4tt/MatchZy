@@ -21,6 +21,12 @@ namespace MatchZy
         public string activeDemoFile = "";
         public bool isDemoRecording = false;
 
+        // Set by scrim/hill going-live: their cfg does mp_restartgame, which clobbers a tv_record
+        // fired on a fixed timer. Instead we defer the start to the first live round_start AFTER the
+        // restart settles (HandlePostRoundStartEvent), which no fixed delay can race. A fallback timer
+        // still fires it if that round_start never arrives.
+        public bool demoStartPending = false;
+
         private bool IsGOTVEnabled()
         {
             // Check for -nohltv flag
@@ -42,11 +48,19 @@ namespace MatchZy
 
         public void StartDemoRecording()
         {
+            // Idempotent: already recording (e.g. pending-flag + fallback timer both fired) -> no-op,
+            // don't restart the demo mid-file.
+            if (isDemoRecording)
+            {
+                demoStartPending = false;
+                return;
+            }
             // Check if GOTV is properly enabled before starting
             if (!IsGOTVEnabled())
             {
                 return;
             }
+            demoStartPending = false;
 
             string demoFileName = FormatCvarValue(demoNameFormat.Replace(" ", "_")) + ".dem";
             try
