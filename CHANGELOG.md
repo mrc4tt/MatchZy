@@ -12,6 +12,7 @@ Fork version numbering is independent of upstream. Upstream changelog: <https://
 - Random spawns now also turn on automatically while a coach is present (no need to set the convar), since a coach on a side is exactly when spawns look "always the same". Coaches are excluded from the shuffle (they stay at their viewing spot). Reverts to normal once the last coach leaves.
 - Fixed the coach being killed ~1 second AFTER the round went live (visible/idle body into the round) instead of during freezetime. The kill is now scheduled at a small fixed delay early in freezetime, so the coach body is reliably gone before the round starts, regardless of the `mp_freezetime` value (previously it read `mp_freezetime` - a float cvar - as an int, mistiming the kill).
 - Fixed `.watchme` / `.fas` (and `.spec`) failing to move players to Spectator and spamming `CCSPlayerPawnBase::SwitchTeam( 1 ) - invalid team index.`: `SwitchTeam` only accepts T/CT, so the Spectator move now uses `ChangeTeam` on the already-dead pawn.
+- Removed log warning spam `Field CCSPlayerController:m_szClanName is not networked, but SetStateChanged was called on it` (and the same for `CCSGameRules:m_fNextUpdateTeamClanNamesTime`) from the ready clan-tag refresh. Both fields are not networked, so the calls were no-ops; scoreboard tag updates are unaffected.
 
 # 0.8.64
 

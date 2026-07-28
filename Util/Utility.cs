@@ -1873,12 +1873,12 @@ namespace MatchZy
 
         // Set a player's clan tag and force the client scoreboard to re-read it.
         // m_szClan alone often won't live-refresh a Tab-open scoreboard, so also
-        // dirty m_szClanName and fire a per-client event that triggers a name/clan redraw.
+        // fire a per-client event that triggers a name/clan redraw. (m_szClanName
+        // is not networked, so SetStateChanged on it would only warn and no-op.)
         private void ApplyClanTag(CCSPlayerController player, string tag)
         {
             player.Clan = tag ?? "";
             Utilities.SetStateChanged(player, "CCSPlayerController", "m_szClan");
-            Utilities.SetStateChanged(player, "CCSPlayerController", "m_szClanName");
             new EventNextlevelChanged(false).FireEventToClient(player);
         }
 
@@ -1891,8 +1891,9 @@ namespace MatchZy
             if (gameRules?.GameRules == null)
                 return;
 
+            // Server-side timer field (not networked): writing the value is enough,
+            // the engine re-pushes team/clan names once CurrentTime passes it.
             gameRules.GameRules.NextUpdateTeamClanNamesTime = Server.CurrentTime - 0.01f;
-            Utilities.SetStateChanged(gameRules, "CCSGameRules", "m_fNextUpdateTeamClanNamesTime");
         }
 
         private string GetPlayerClanTag(CCSPlayerController player, int userId)
