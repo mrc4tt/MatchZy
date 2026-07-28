@@ -2211,16 +2211,6 @@ namespace MatchZy
             if (demoStartPending && isMatchLive)
                 StartDemoRecording();
 
-            // Random spawns: shuffle players across ALL enabled map spawns each live round. Active
-            // when matchzy_random_spawns is on OR a coach is present (RandomSpawnsActive) - so setting
-            // a coach auto-scatters the spawns, which is exactly the "always the same" case. Excludes
-            // coaches. The coach reseat in HandleCoaches() below skips itself while this is on.
-            // DEFERRED 0.2s: at round_start the players have not finished (re)spawning, so a synchronous
-            // teleport no-ops and they stay on their engine spawns (the "same cluster every round" bug).
-            // The coach reseat uses the same 0.2s delay for the same reason.
-            if (isMatchLive && RandomSpawnsActive())
-                AddTimer(0.2f, RandomizeSpawns);
-
             HandleCoaches();
             CreateMatchZyRoundDataBackup();
             InitPlayerDamageInfo();
@@ -4012,6 +4002,10 @@ namespace MatchZy
             }
         }
 
+        // Dryrun-only: scatters players across all enabled spawns each dryrun round. Live
+        // matches never call this (the matchzy_random_spawns convar and the 0.8.65 coach
+        // auto-scatter were removed in 0.8.67 - competitive rounds always use engine spawns
+        // plus the coach reseat in EnforceCompetitiveSpawns).
         public void RandomizeSpawns()
         {
             // Build per-team pools from ALL enabled spawn entities (GetTopCompetitiveSpawns with a

@@ -22,15 +22,6 @@ public partial class MatchZy
         return coaches;
     }
 
-    /// <summary>
-    /// Random spawns are active when the admin enabled <c>matchzy_random_spawns</c> OR any coach is
-    /// present. A coach on a side is exactly when the fixed competitive spawns read as "always the
-    /// same", so coaching auto-enables the scatter; it also cleanly resolves coach spawn-displacement
-    /// (all real players are repositioned) so the fixed reseat (EnforceCompetitiveSpawns) is skipped.
-    /// Self-resets when the last coach leaves (.uncoach) - no stored convar flip to clean up.
-    /// </summary>
-    public bool RandomSpawnsActive() => randomSpawnsEnabled.Value || GetAllCoaches().Count > 0;
-
     public HookResult OnCoachPlayerSpawn(EventPlayerSpawn @event, GameEventInfo info)
     {
         // Debug mode runs the coach flow during warmup too (bot testing without a full match).
@@ -42,8 +33,19 @@ public partial class MatchZy
             return HookResult.Continue;
 
         HashSet<CCSPlayerController> coaches = GetAllCoaches();
-        if (player == null || !coaches.Contains(player))
+        if (player == null)
             return HookResult.Continue;
+        if (!coaches.Contains(player))
+        {
+            // Real player spawning while a coach is on: the coach body is a 6th team member, so
+            // the engine may have allocated THIS player a non-competitive overflow spawn. Correct
+            // it in the spawn frame (same 0.01s pattern as the coach move below) - the client has
+            // not rendered the spawn yet, so the correction is invisible; no team switches, no
+            // visible freezetime teleport. The timer reseat in HandleCoaches stays as safety net.
+            if (coaches.Count > 0)
+                AddTimer(0.01f, () => FixDisplacedPlayerSpawn(player));
+            return HookResult.Continue;
+        }
 
         // This player is a coach - immediately move them to their viewing position
         // This happens DURING the spawn event, preventing them from occupying a competitive spawn
@@ -193,6 +195,7 @@ public partial class MatchZy
         player!.Clan = $"[{matchZyCoachTeam.teamName} COACH]";
         if (player.InGameMoneyServices != null)
             player.InGameMoneyServices.Account = 0;
+        Server.NextFrame(EnforceCompetitiveTeammateColors);
         ReplyToUserCommand(player, $"You are now coaching {matchZyCoachTeam.teamName}! Use .uncoach to stop coaching");
         PrintToAllChat($"{ChatColors.Green}{player.PlayerName}{ChatColors.Default} is now coaching {ChatColors.Green}{matchZyCoachTeam.teamName}{ChatColors.Default}!");
     }
@@ -218,16 +221,16 @@ public partial class MatchZy
             haveCoachSpawns = HasCoachSpawns();
         }
 
-        // Kill the coach EARLY in freezetime so the body is gone BEFORE the round goes live.
-        // round_start fires at the START of freezetime; kill 2s in (after coach placement settles at
-        // 0.05s / 0.5s). On a short freezetime (< 3s) kill just before it ends instead, so the body
-        // is still gone before live. GetFreezeTime reads mp_freezetime by its actual cvar type (it is
-        // a float cvar; reading it as an int reinterprets the bits = garbage, which is what mistimed
-        // the kill into the live round before).
+        // Kill the coach at the very END of freezetime (~1s before live) - late enough that the
+        // coach is alive at the viewing spot for the whole tactical talk, early enough that the
+        // body is gone before the round goes live. (An early 2s-in kill parked the coach in a
+        // black freezetime death-cam for the rest of freezetime; a kill AFTER live shows an idle
+        // body into the round - both were user-reported.) GetFreezeTime reads mp_freezetime by its
+        // actual cvar type (float; reading it as int reinterprets the bits = garbage).
         float freeze = GetFreezeTime();
-        float killDelay = freeze >= 3.0f ? 2.0f : Math.Max(0.3f, freeze - 0.5f);
+        float killDelay = Math.Max(0.5f, freeze - 1.0f);
         if (coachDebugEnabled.Value)
-            Log($"[HandleCoaches] mp_freezetime={freeze:F1}s, coach kill scheduled in {killDelay:F1}s");
+            Log($"[HandleCoaches] mp_freezetime={freeze:F1}s, coach kill would fire at {killDelay:F1}s - SKIPPED (debug mode keeps coaches alive)");
         // Skip coach cleanup while debugging so coaches stay alive/visible for screenshots.
         if (!coachDebugEnabled.Value)
             coachKillTimer ??= AddTimer(killDelay, KillCoaches);
@@ -257,6 +260,10 @@ public partial class MatchZy
         AddTimer(0.2f, EnforceCompetitiveSpawns);
         AddTimer(0.6f, EnforceCompetitiveSpawns);
 
+        // Coach steals one of the five competitive teammate colors from a real player -
+        // strip the coach's color and re-hand the five colors to the real players.
+        AddTimer(0.5f, EnforceCompetitiveTeammateColors);
+
         Log($"[HandleCoaches] Handled {coaches.Count} coach(es)");
     }
 
@@ -270,11 +277,6 @@ public partial class MatchZy
     /// </summary>
     private void EnforceCompetitiveSpawns()
     {
-        // Random spawns scatter players across all enabled spawns; reseating them onto the fixed
-        // competitive set would immediately undo it. Skip only when RandomizeSpawns actually runs
-        // (isMatchLive) - in the knife round the reseat still fixes coach spawn-displacement.
-        if (isMatchLive && RandomSpawnsActive())
-            return;
         // Runs on an AddTimer callback: an escaped exception here becomes a CSS runtime error box.
         try
         {
@@ -297,24 +299,7 @@ public partial class MatchZy
             if (realPlayers.Count == 0)
                 continue;
 
-            // Pull the canonical first-N competitive spawns straight from the live map entities,
-            // ordered by Priority - the exact set the engine would hand to N coachless players.
-            // This does NOT depend on the min-priority `spawnsData` filter, which can come up
-            // short on maps where the lowest-priority set is smaller than the team size and
-            // leave a player stranded. Fall back to spawnsData only if the entity scan fails.
-            // Fetch MORE candidates than players (+5): some maps enable more legit spawns than team
-            // size (Mirage T has 10), and the engine freely seats players on any of them. With only
-            // the strict top-N, a player standing on a perfectly fine spawn outside that subset was
-            // force-moved EVERY round (observed: the same two bots re-teleported each round, even on
-            // the coachless side). The stability pre-pass below now keeps anyone standing on ANY
-            // valid candidate; the extra spawns only ever receive a displaced player as fallback.
-            // ALL enabled spawns, not a capped pool: the engine seats players freely across every
-            // enabled spawn entity (Mirage CT proved it - a bot sat 93u from the nearest of 11 pooled
-            // candidates, i.e. on a spawn outside the pool, and was re-moved every round). The keep
-            // pass must recognize every spawn the engine can use; the cap only ever limited that.
-            List<Position> spawns = GetTopCompetitiveSpawns(side, 32);
-            if (spawns.Count == 0)
-                spawns = spawnsData.TryGetValue(side, out List<Position>? fallback) ? fallback : new List<Position>();
+            List<Position> spawns = GetCanonicalCompetitiveSpawns(side, realPlayers.Count);
             if (spawns.Count == 0)
                 continue;
 
@@ -331,33 +316,50 @@ public partial class MatchZy
             // coach is on". After this pass only the genuinely displaced player(s) remain.
             List<CCSPlayerController> remainingPlayers = new(realPlayers);
             List<Position> remainingSpawns = new(spawns);
-            // Keep-tolerance MUST exceed the 64u near-duplicate dedupe in GetTopCompetitiveSpawns:
+            // Keep-tolerance MUST exceed the 64u near-duplicate dedupe in GetCompetitiveSpawnCandidates:
             // the engine can seat a player on a spawn entity that the dedupe dropped (its kept twin
             // is up to 64u away), and with a 40u tolerance that player read as "not on a spawn" and
             // was re-teleported EVERY round (observed on Mirage CT: the same source coordinate each
             // time). 75u > 64u closes that gap.
             const float keepDistSq = 75.0f * 75.0f;
-            for (int pi = remainingPlayers.Count - 1; pi >= 0; pi--)
+            // NEAREST-FIRST claiming, not first-within-tolerance. A body the engine nudged between
+            // two spawns (6 bodies on 5 spawns) is within 75u of BOTH neighbors; with first-hit
+            // claiming it stole the spawn another player was standing ON (observed on Ancient CT:
+            // "Wolf unmatched - nearest candidate 1u away" and a 192u re-teleport every round).
+            // Repeatedly claim the globally closest (player, spawn) pair inside tolerance instead;
+            // the player standing 1u from his spawn always wins it. N<=5 per side, O(N^3) trivial.
+            while (remainingPlayers.Count > 0 && remainingSpawns.Count > 0)
             {
-                Vector pos = remainingPlayers[pi].PlayerPawn.Value!.CBodyComponent!.SceneNode!.AbsOrigin;
-                for (int si = 0; si < remainingSpawns.Count; si++)
+                int keepP = -1, keepS = -1;
+                float keepBest = float.MaxValue;
+                for (int pi = 0; pi < remainingPlayers.Count; pi++)
                 {
-                    Vector sp = remainingSpawns[si].PlayerPosition;
-                    float dx = sp.X - pos.X, dy = sp.Y - pos.Y, dz = sp.Z - pos.Z;
-                    if (dx * dx + dy * dy + dz * dz <= keepDistSq)
+                    Vector pos = remainingPlayers[pi].PlayerPawn.Value!.CBodyComponent!.SceneNode!.AbsOrigin;
+                    for (int si = 0; si < remainingSpawns.Count; si++)
                     {
-                        // Already seated on this spawn - claim the pair, no teleport.
-                        remainingPlayers.RemoveAt(pi);
-                        remainingSpawns.RemoveAt(si);
-                        break;
+                        Vector sp = remainingSpawns[si].PlayerPosition;
+                        float dx = sp.X - pos.X, dy = sp.Y - pos.Y, dz = sp.Z - pos.Z;
+                        float dist = dx * dx + dy * dy + dz * dz;
+                        if (dist < keepBest)
+                        {
+                            keepBest = dist;
+                            keepP = pi;
+                            keepS = si;
+                        }
                     }
                 }
+                if (keepP < 0 || keepBest > keepDistSq)
+                    break; // no pair left inside keep tolerance - the rest are genuinely displaced
+                // Already seated on this spawn - claim the pair, no teleport.
+                remainingPlayers.RemoveAt(keepP);
+                remainingSpawns.RemoveAt(keepS);
             }
 
             // Diagnostics: whoever is still unmatched is about to be moved - log how far they were
             // from the nearest candidate so threshold/coverage gaps show up in one log line.
             if (debug)
             {
+                Log($"[CoachDebug] team {side}: {realPlayers.Count - remainingPlayers.Count}/{realPlayers.Count} players verified on competitive spawns ({spawns.Count} canonical)");
                 foreach (var rp in remainingPlayers)
                 {
                     Vector pos = rp.PlayerPawn.Value!.CBodyComponent!.SceneNode!.AbsOrigin;
@@ -432,6 +434,206 @@ public partial class MatchZy
     /// </summary>
     private List<Position> GetTopCompetitiveSpawns(byte side, int count)
     {
+        List<CoachSpawnCandidate> cands = GetCompetitiveSpawnCandidates(side);
+        var result = new List<Position>(Math.Min(count, cands.Count));
+        foreach (var cand in cands)
+        {
+            if (result.Count >= count)
+                break;
+            result.Add(cand.Pos);
+        }
+        return result;
+    }
+
+    /// <summary>
+    /// Competitive teammate colors: the engine hands out the five colors by join order, so a
+    /// coach steals one and a real player ends up colorless. Enforce: coaches get NO color (-1),
+    /// and the (up to) five real players on each side hold the five distinct colors. Idempotent -
+    /// players already holding a unique color keep it, only blanks/duplicates are reassigned.
+    /// Also called after .uncoach so the ex-coach gets a color back.
+    /// </summary>
+    private void EnforceCompetitiveTeammateColors()
+    {
+        try
+        {
+            HashSet<CCSPlayerController> coaches = GetAllCoaches();
+            foreach (byte side in new[] { (byte)CsTeam.CounterTerrorist, (byte)CsTeam.Terrorist })
+            {
+                List<CCSPlayerController> sidePlayers = Utilities.GetPlayers().Where(p => IsPlayerValid(p) && p.TeamNum == side).OrderBy(p => p.Slot).ToList();
+                HashSet<int> used = new();
+                List<CCSPlayerController> needColor = new();
+                foreach (CCSPlayerController p in sidePlayers)
+                {
+                    if (coaches.Contains(p))
+                    {
+                        if (p.CompTeammateColor != -1)
+                        {
+                            p.CompTeammateColor = -1;
+                            Utilities.SetStateChanged(p, "CCSPlayerController", "m_iCompTeammateColor");
+                        }
+                        continue;
+                    }
+                    int c = p.CompTeammateColor;
+                    if (c >= 0 && c <= 4 && !used.Contains(c))
+                        used.Add(c);
+                    else
+                        needColor.Add(p);
+                }
+                int next = 0;
+                foreach (CCSPlayerController p in needColor)
+                {
+                    while (next <= 4 && used.Contains(next))
+                        next++;
+                    if (next > 4)
+                        break; // more than 5 real players on a side (bot testing) - extras stay colorless
+                    p.CompTeammateColor = next;
+                    Utilities.SetStateChanged(p, "CCSPlayerController", "m_iCompTeammateColor");
+                    used.Add(next);
+                }
+            }
+        }
+        catch (Exception e)
+        {
+            Log($"[EnforceCompetitiveTeammateColors] failed: {e.GetType().Name}: {e.Message}");
+        }
+    }
+
+    /// <summary>
+    /// Spawn-frame correction for a real player while coaching: if the engine allocated this
+    /// player a spawn OUTSIDE the canonical competitive set (because the coach body consumed
+    /// one), move them onto the nearest FREE canonical spawn immediately - one frame after the
+    /// spawn event, before the client renders, so nobody sees a teleport. By this point every
+    /// pawn of the round's spawn wave exists, so occupancy checks against live positions are
+    /// accurate. Coach bodies never count as occupying (their own spawn hook moves them away).
+    /// </summary>
+    private void FixDisplacedPlayerSpawn(CCSPlayerController player)
+    {
+        // Runs on an AddTimer callback: an escaped exception would become a CSS runtime error box.
+        try
+        {
+            HashSet<CCSPlayerController> coaches = GetAllCoaches();
+            if (coaches.Count == 0)
+                return;
+            if (!IsPlayerValid(player) || coaches.Contains(player) || !player.PawnIsAlive)
+                return;
+            byte side = player.TeamNum;
+            if (side != (byte)CsTeam.Terrorist && side != (byte)CsTeam.CounterTerrorist)
+                return;
+            Vector? playerPos = player.PlayerPawn.Value?.CBodyComponent?.SceneNode?.AbsOrigin;
+            if (playerPos == null)
+                return;
+
+            List<CCSPlayerController> teamPlayers = Utilities.GetPlayers().Where(p => IsPlayerValid(p) && p.TeamNum == side && !coaches.Contains(p)).ToList();
+            List<Position> canonical = GetCanonicalCompetitiveSpawns(side, teamPlayers.Count);
+            if (canonical.Count == 0)
+                return;
+
+            // Run the SAME nearest-first player<->spawn matching the timer reseat uses (75u
+            // tolerance, globally closest pair claims first). The two passes must agree, or a
+            // player skipped here gets visibly teleported by the reseat 0.2s later. Two earlier
+            // per-spawn heuristics both disagreed with the matching:
+            // - "within 75u = seated" ignored that a CLOSER teammate owns that spawn (Ancient CT:
+            //   Wolf 72u from an occupied spawn read as seated),
+            // - "any teammate within 75u = occupied" let one teammate standing between two spawns
+            //   mark BOTH as taken, so no free spawn was ever found (Inferno T: Crusher 73u from
+            //   a claimed spawn, left for the visible reseat).
+            const float seatDistSq = 75.0f * 75.0f;
+            List<CCSPlayerController> mPlayers = teamPlayers.Where(p => p.PawnIsAlive && p.PlayerPawn.Value?.CBodyComponent?.SceneNode != null).ToList();
+            List<Position> mSpawns = new(canonical);
+            bool playerMatched = false;
+            while (mPlayers.Count > 0 && mSpawns.Count > 0)
+            {
+                int bp = -1, bs = -1;
+                float bd = float.MaxValue;
+                for (int pi = 0; pi < mPlayers.Count; pi++)
+                {
+                    Vector pos = mPlayers[pi].PlayerPawn.Value!.CBodyComponent!.SceneNode!.AbsOrigin;
+                    for (int si = 0; si < mSpawns.Count; si++)
+                    {
+                        Vector sp = mSpawns[si].PlayerPosition;
+                        float dx = sp.X - pos.X, dy = sp.Y - pos.Y, dz = sp.Z - pos.Z;
+                        float d = dx * dx + dy * dy + dz * dz;
+                        if (d < bd)
+                        {
+                            bd = d;
+                            bp = pi;
+                            bs = si;
+                        }
+                    }
+                }
+                if (bp < 0 || bd > seatDistSq)
+                    break; // no pair left inside tolerance
+                if (mPlayers[bp] == player)
+                {
+                    playerMatched = true;
+                    break; // this player rightfully owns a canonical spawn - untouched
+                }
+                mPlayers.RemoveAt(bp);
+                mSpawns.RemoveAt(bs);
+            }
+            if (playerMatched)
+                return;
+
+            // Displaced: move onto the nearest canonical spawn NOT claimed by a closer teammate.
+            Position? best = null;
+            float bestDistSq = float.MaxValue;
+            foreach (Position s in mSpawns)
+            {
+                float dx = s.PlayerPosition.X - playerPos.X, dy = s.PlayerPosition.Y - playerPos.Y, dz = s.PlayerPosition.Z - playerPos.Z;
+                float distSq = dx * dx + dy * dy + dz * dz;
+                if (distSq < bestDistSq)
+                {
+                    bestDistSq = distSq;
+                    best = s;
+                }
+            }
+            if (best == null)
+                return;
+
+            if (coachDebugEnabled.Value)
+                Log($"[FixDisplacedPlayerSpawn] team {side}: {player.PlayerName} off-competitive at spawn, moved to ({best.PlayerPosition.X:F0},{best.PlayerPosition.Y:F0},{best.PlayerPosition.Z:F0})");
+            new Position(best).Teleport(player);
+        }
+        catch (Exception e)
+        {
+            Log($"[FixDisplacedPlayerSpawn] failed: {e.GetType().Name}: {e.Message}");
+        }
+    }
+
+    /// <summary>
+    /// Canonical competitive spawn set for a side = the map's lowest-Priority spawn tier(s), NOT
+    /// every enabled spawn. The engine fills the lowest tier first, so with no coach the team sits
+    /// exactly on this set - the layout teams expect (e.g. Ancient CT: the fixed line of 5). A
+    /// coach adds a 6th body, which overflows one player onto a HIGHER-priority spawn (Ancient CT:
+    /// the dark back corner) - anyone off this set is "displaced" and gets pulled back.
+    /// Tier expansion: whole tiers (Priority ascending) are taken until there are at least
+    /// <paramref name="playerCount"/> spawns. Taking the WHOLE tier keeps the Mirage fix intact:
+    /// Mirage T has 10 equal-priority spawns and the engine seats players freely across all 10,
+    /// so all 10 stay valid and nobody is churned every round. On maps with a strict 5-spawn
+    /// lowest tier (Ancient/Dust2), only those 5 are valid.
+    /// </summary>
+    private List<Position> GetCanonicalCompetitiveSpawns(byte side, int playerCount)
+    {
+        List<CoachSpawnCandidate> cands = GetCompetitiveSpawnCandidates(side);
+        List<Position> spawns = new();
+        for (int ci = 0; ci < cands.Count; ci++)
+        {
+            if (spawns.Count >= playerCount && cands[ci].Priority != cands[ci - 1].Priority)
+                break;
+            spawns.Add(cands[ci].Pos);
+        }
+        if (spawns.Count == 0)
+            spawns = spawnsData.TryGetValue(side, out List<Position>? fallback) ? fallback : new List<Position>();
+        return spawns;
+    }
+
+    /// <summary>
+    /// Scans the live spawn entities for a side and returns them deduped (64u near-duplicate
+    /// filter) and ordered by (Priority, Index) ascending, with the Priority retained so callers
+    /// can reason about priority tiers (the engine fills the lowest tier first).
+    /// </summary>
+    private List<CoachSpawnCandidate> GetCompetitiveSpawnCandidates(byte side)
+    {
         string designerName = side == (byte)CsTeam.CounterTerrorist ? "info_player_counterterrorist" : "info_player_terrorist";
         // MATERIALIZE the native entity enumeration first and guard the whole scan: under the
         // AcceleratorCSS Harmony tracer, iterating the lazy enumerable inside a patched method throws
@@ -466,24 +668,22 @@ public partial class MatchZy
         }
         catch (Exception e)
         {
-            Log($"[GetTopCompetitiveSpawns] scan failed (team {side}): {e.GetType().Name}: {e.Message}");
-            return new List<Position>();
+            Log($"[GetCompetitiveSpawnCandidates] scan failed (team {side}): {e.GetType().Name}: {e.Message}");
+            return new List<CoachSpawnCandidate>();
         }
         const float minSpawnGapSq = 64.0f * 64.0f;
-        var picked = new List<Position>(count);
+        var picked = new List<CoachSpawnCandidate>(candidates.Count);
         try
         {
             foreach (var cand in candidates)
             {
-                if (picked.Count >= count)
-                    break;
                 Position c = cand.Pos;
                 bool tooClose = false;
                 foreach (var p in picked)
                 {
-                    float dx = c.PlayerPosition.X - p.PlayerPosition.X;
-                    float dy = c.PlayerPosition.Y - p.PlayerPosition.Y;
-                    float dz = c.PlayerPosition.Z - p.PlayerPosition.Z;
+                    float dx = c.PlayerPosition.X - p.Pos.PlayerPosition.X;
+                    float dy = c.PlayerPosition.Y - p.Pos.PlayerPosition.Y;
+                    float dz = c.PlayerPosition.Z - p.Pos.PlayerPosition.Z;
                     if (dx * dx + dy * dy + dz * dz < minSpawnGapSq)
                     {
                         tooClose = true;
@@ -491,12 +691,12 @@ public partial class MatchZy
                     }
                 }
                 if (!tooClose)
-                    picked.Add(c);
+                    picked.Add(cand);
             }
         }
         catch (Exception e)
         {
-            Log($"[GetTopCompetitiveSpawns] pick failed (team {side}): {e.GetType().Name}: {e.Message}");
+            Log($"[GetCompetitiveSpawnCandidates] dedupe failed (team {side}): {e.GetType().Name}: {e.Message}");
         }
         return picked;
     }
@@ -804,19 +1004,12 @@ public partial class MatchZy
             return;
 
         CsTeam oldTeam = GetCoachTeam(playerController);
-        if (playerController.Team != oldTeam)
+        if (playerController.Team != oldTeam && (oldTeam == CsTeam.Terrorist || oldTeam == CsTeam.CounterTerrorist))
         {
-            playerController.ChangeTeam(CsTeam.Spectator);
-            AddTimer(
-                0.01f,
-                () =>
-                {
-                    // Re-validate player after timer - may have disconnected
-                    if (!IsPlayerValid(playerController))
-                        return;
-                    playerController.ChangeTeam(oldTeam);
-                }
-            );
+            // Direct switch - the old upstream flow hopped through Spectator first
+            // (ChangeTeam(Spectator) -> ChangeTeam(back)), which is both a ghosting window
+            // and a scoreboard flicker. Coaches must never touch the Spectator team.
+            playerController.ChangeTeam(oldTeam);
         }
         if (playerController.InGameMoneyServices != null)
             playerController.InGameMoneyServices.Account = 0;
@@ -874,10 +1067,31 @@ public partial class MatchZy
                 // Additional safety check for pawn components
                 if (!coach.PlayerPawn.IsValid || coach.PlayerPawn.Value == null || coach.PlayerPawn.Value.CBodyComponent?.SceneNode == null)
                     continue;
+                // Already dead - nothing to kill (suiciding a dead pawn just risks engine noise).
+                if (!coach.PawnIsAlive)
+                    continue;
 
                 Position coachPosition = new(coach.PlayerPawn.Value.CBodyComponent.SceneNode.AbsOrigin, coach.PlayerPawn.Value.CBodyComponent.SceneNode.AbsRotation);
                 coach.PlayerPawn.Value.Teleport(new Vector(coachPosition.PlayerPosition.X, coachPosition.PlayerPosition.Y, coachPosition.PlayerPosition.Z + 20.0f), coachPosition.PlayerAngle, new Vector(0, 0, 0));
+                // The coach body is made untouchable (TakesDamage = false) at placement so
+                // teammates cannot hurt the invisible body - but the suicide is itself a damage
+                // event, and with TakesDamage off CommitSuicide silently does nothing (observed:
+                // "[KillCoaches] Killed ..." logged while the coach stayed alive). Re-enable
+                // damage for the kill; the pawn is dead a tick later so it never becomes shootable.
+                coach.PlayerPawn.Value.TakesDamage = true;
                 coach.PlayerPawn.Value.CommitSuicide(explode: false, force: true);
+                // Always-on (not debug-gated): the freezetime kill is otherwise completely
+                // silent in production logs, which made "coach did not die" impossible to
+                // diagnose from a server log.
+                Log($"[KillCoaches] Killed coach {coach.PlayerName} during freezetime");
+                // Verify with a small delay - the death lands a few ticks after CommitSuicide,
+                // so a next-frame check false-positives.
+                CCSPlayerController coachRef = coach;
+                AddTimer(0.3f, () =>
+                {
+                    if (IsPlayerValid(coachRef) && coachRef.PawnIsAlive)
+                        Log($"[KillCoaches] WARNING: {coachRef.PlayerName} still alive after CommitSuicide");
+                });
             }
         }
         finally

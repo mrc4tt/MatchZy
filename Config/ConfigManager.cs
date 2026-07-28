@@ -69,11 +69,6 @@ namespace MatchZy
 // If set to false, warmup.cfg will not be loaded/executed when entering warmup phases.
 matchzy_warmup_enabled true
 
-// Randomize player spawns each live round across ALL enabled map spawns. Default value: false
-// Breaks competitive spawn consistency (e.g. Dust2 no longer always uses the same 5 T spawns).
-// For casual/scrim variety only - leave false for ranked/official matches.
-// matchzy_random_spawns false
-
 // Whether whitelist is enabled by default or not. Default value: false
 // This is the default value, but whitelist can be toggled by admin using .whitelist command
 matchzy_whitelist_enabled_default false

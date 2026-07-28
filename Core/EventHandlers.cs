@@ -240,43 +240,23 @@ public partial class MatchZy
                 return HookResult.Continue;
             HashSet<CCSPlayerController> coaches = GetAllCoaches();
 
-            foreach (var coach in coaches)
+            // Fallback: a coach still alive when freezetime ends means the scheduled freezetime
+            // kill did not run (it is suppressed during a pause/tactical-timeout window). Kill
+            // them now instead. The old upstream fallback bounced the coach through Spectator
+            // (ChangeTeam Spectator -> back) - never do that: it is a ghosting window and a
+            // visible team flicker. Debug mode keeps coaches alive for inspection on purpose.
+            if (!coachDebugEnabled.Value)
             {
-                if (!IsPlayerValid(coach))
-                    continue;
-                // If coaches are still left alive after freezetime ends, this code will force them to spectate their team again.
-                if (coach.PlayerPawn.Value?.LifeState != (byte)LifeState_t.LIFE_ALIVE)
-                    continue;
-
-                // Safety check for coach pawn components
-                if (coach.PlayerPawn.Value?.CBodyComponent?.SceneNode == null)
-                    continue;
-
-                Position coachPosition = new(coach.PlayerPawn.Value.CBodyComponent.SceneNode.AbsOrigin, coach.PlayerPawn.Value.CBodyComponent.SceneNode.AbsRotation);
-                coach.PlayerPawn.Value.Teleport(new Vector(coachPosition.PlayerPosition.X, coachPosition.PlayerPosition.Y, coachPosition.PlayerPosition.Z + 20.0f), coachPosition.PlayerAngle, new Vector(0, 0, 0));
-                AddTimer(
-                    1.5f,
-                    () =>
+                foreach (var coach in coaches)
+                {
+                    if (!IsPlayerValid(coach))
+                        continue;
+                    if (coach.PlayerPawn.Value?.LifeState == (byte)LifeState_t.LIFE_ALIVE)
                     {
-                        // Re-validate coach after timer delay - player may have disconnected
-                        if (!IsPlayerValid(coach) || !coach.PlayerPawn.IsValid || coach.PlayerPawn.Value == null)
-                            return;
-
-                        coach.PlayerPawn.Value.Teleport(new Vector(coachPosition.PlayerPosition.X, coachPosition.PlayerPosition.Y, coachPosition.PlayerPosition.Z + 20.0f), coachPosition.PlayerAngle, new Vector(0, 0, 0));
-                        CsTeam oldTeam = GetCoachTeam(coach);
-                        coach.ChangeTeam(CsTeam.Spectator);
-                        AddTimer(
-                            0.01f,
-                            () =>
-                            {
-                                // Re-validate for nested timer callback
-                                if (!IsPlayerValid(coach))
-                                    return;
-                                coach.ChangeTeam(oldTeam);
-                            }
-                        );
+                        KillCoaches();
+                        break;
                     }
-                );
+                }
             }
             return HookResult.Continue;
         }
@@ -435,16 +415,17 @@ public partial class MatchZy
     {
         try
         {
-            // We do not broadcast the suicide of the coach
+            // Never broadcast a coach death to clients (no kill-feed entry in the corner).
+            // Match on the VICTIM being a coach, not Attacker == Userid: the forced freezetime
+            // suicide reports the world (null) as attacker, so the old suicide-only guard let
+            // the death notice through.
             if (!matchStarted)
                 return HookResult.Continue;
 
-            if (@event.Attacker == @event.Userid)
+            CCSPlayerController? victim = @event.Userid;
+            if (victim != null && (matchzyTeam1.coach.Contains(victim) || matchzyTeam2.coach.Contains(victim)))
             {
-                if (matchzyTeam1.coach.Contains(@event.Attacker!) || matchzyTeam2.coach.Contains(@event.Attacker!))
-                {
-                    info.DontBroadcast = true;
-                }
+                info.DontBroadcast = true;
             }
             return HookResult.Continue;
         }

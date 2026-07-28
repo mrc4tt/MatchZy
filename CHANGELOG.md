@@ -4,6 +4,20 @@ Customized fork of [MatchZy](https://github.com/shobhit-pathak/MatchZy) by Shobh
 
 Fork version numbering is independent of upstream. Upstream changelog: <https://github.com/shobhit-pathak/MatchZy/blob/main/CHANGELOG.md>
 
+# 0.8.67
+
+#### July 28, 2026
+
+- Removed `matchzy_random_spawns` and the 0.8.65 coach auto-scatter entirely. Live match/scrim rounds always use the map's competitive spawns; a coach never changes player spawn behavior (the coach sits at their own viewing spot and does not take a competitive spawn point). Dryrun mode keeps its random spawns. If your existing config.cfg contains a matchzy_random_spawns line, it can be deleted (a leftover line only causes a harmless unknown-command console note).
+- Fixed a coach still displacing one player off the standard competitive spawns (e.g. Ancient CT: one player left in the back corner instead of the line of 5). The reseat treated every enabled spawn as valid, so the displaced player was never pulled back; it now only accepts the map's lowest-priority (competitive) spawn set and moves the displaced player onto the spawn the coach freed up. Also fixed a player standing exactly on a competitive spawn being re-teleported every round (a neighbouring player could claim that spawn first; spawn claiming is now nearest-first).
+- Added `bot_quota 0` to live.cfg, scrim.cfg, hill.cfg, knife.cfg and warmup.cfg. The CS2 default is 10, so on servers whose base config never zeroes it the engine could quietly add or refill bots during warmup and matches.
+- Added `mp_randomspawn 0` to scrim.cfg, hill.cfg and knife.cfg (live.cfg already had it). The cvar is sticky, so a mode or plugin that had set it to 1 earlier could leave scrim/hill/knife rounds with randomized engine spawns.
+- The coach-displaced player is now corrected in the spawn frame itself (before the client renders), instead of a visible teleport during freezetime - players no longer notice anything when a coach is on. Nobody is ever moved to Spectator (no ghosting window), and the timer-based reseat stays as a safety net.
+- The coach's freezetime death no longer shows up in the kill feed (the old suppression only matched self-attributed suicides; the forced kill reports the world as attacker and slipped through).
+- The coach no longer steals one of the five competitive teammate colors: the coach is set colorless and the five real players on each side always hold the five distinct colors (the ex-coach gets a color back on .uncoach).
+- Fixed the coach not dying at all on current CS2 builds: the coach body is made untouchable at placement, and the engine now drops the forced suicide when the pawn takes no damage - damage is re-enabled for the kill itself. Also moved the kill to the end of freezetime (about 1 second before live) so the coach is alive at the viewing spot for the whole tactical talk, without an idle body entering the live round or a long black death-cam during freezetime.
+- The coach is never moved through the Spectator team anymore (ghosting risk): the freezetime-end fallback for a still-alive coach now kills the coach instead of bouncing them Spectator-and-back, and the coach team fixup switches directly between sides.
+
 # 0.8.66
 
 #### July 27, 2026

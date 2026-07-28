@@ -72,6 +72,9 @@ namespace MatchZy
             if (player.InGameMoneyServices != null)
                 player.InGameMoneyServices.Account = 0;
 
+            // Give the ex-coach a competitive teammate color back (they were forced to -1).
+            Server.NextFrame(EnforceCompetitiveTeammateColors);
+
             ReplyToUserCommand(player, "You are now not coaching any team!");
         }
 
