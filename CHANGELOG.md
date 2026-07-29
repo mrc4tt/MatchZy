@@ -4,6 +4,16 @@ Customized fork of [MatchZy](https://github.com/shobhit-pathak/MatchZy) by Shobh
 
 Fork version numbering is independent of upstream. Upstream changelog: <https://github.com/shobhit-pathak/MatchZy/blob/main/CHANGELOG.md>
 
+# 0.8.68
+
+#### July 29, 2026
+
+- Fixed `.botjiggle` making a freshly spawned `.bot` invisible: the jiggle anchored the new bot at the map spawn point it briefly appeared on and yanked it back there every tick, so it never showed up at the lineup. Jiggle now strafes each bot around its assigned practice spot; bots not spawned via practice commands are no longer jiggled at all.
+- `.bot` now pre-pins bot_quota to the expected count (current bots + 1) right before bot_add, so the engine's quota logic has no headroom to spawn the second bot of a pair in the first place. If the engine pair-spawns anyway, the extra is still detected and kicked as before.
+- Fixed `.bot` / `.tbot` / `.ctbot` sometimes spawning nothing (console: "kicking wrong-team pair bot"): when bot_add pair-spawned one bot per team, the wrong-team bot could be seen first and the requested one arrived a tick later, after the claim pass had already given up and kicked everything. The claim now prefers the requested team over the whole set and retries briefly before failing, so the right bot is kept and only the pair extra is kicked.
+- `.backups` (css_backupmenu) now works when no match is live: it lists the 5 newest backup files on disk (match id, round, score, map, age) with a ready-to-use restore command for each. Useful after a server crash - reconnect, run `.backups`, restore the round the match crashed on.
+- Added `css_loadbackup` as an alias of `matchzy_loadbackup` / `get5_loadbackup`, so a backup file can be restored from chat with `!loadbackup <file>` (admin only). Previously the command was only usable from the server console.
+
 # 0.8.67
 
 #### July 28, 2026

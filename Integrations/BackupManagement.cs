@@ -760,6 +760,7 @@ namespace MatchZy
 
         [ConsoleCommand("get5_loadbackup", "Restore the backup from the provided file")]
         [ConsoleCommand("matchzy_loadbackup", "Restore the backup from the provided file")]
+        [ConsoleCommand("css_loadbackup", "Restore the backup from the provided file")]
         [CommandHelper(minArgs: 1, usage: "<backup_file_name>")]
         public void OnLoadBackupCommand(CCSPlayerController? player, CommandInfo command)
         {
@@ -788,7 +789,9 @@ namespace MatchZy
 
             if (!isMatchLive)
             {
-                ReplyToUserCommand(player, "Match is not live!");
+                // No live match (e.g. after a server crash): list the newest backup
+                // files on disk so the admin can restore without knowing the filename.
+                ShowRecentBackupsFromDisk(player);
                 return;
             }
 
@@ -870,6 +873,77 @@ namespace MatchZy
             {
                 ReplyToUserCommand(player, "───────────────────────────────────");
                 ReplyToUserCommand(player, $"Tip: {ChatColors.Green}!restore <round>{ChatColors.Default}" + $" or {ChatColors.Green}!restorelast{ChatColors.Default} for previous round");
+            }
+        }
+
+        // Crash-recovery listing: with no live match there is no liveMatchId to filter
+        // on, so list the newest backup files on disk across all matches. Restoring one
+        // via loadbackup rebuilds the full match state (config, teams, scores, map)
+        // from the file, including a changelevel if the map differs.
+        private void ShowRecentBackupsFromDisk(CCSPlayerController? player)
+        {
+            string backupDir = Path.Combine(Server.GameDirectory, "csgo", "MatchZyDataBackup");
+            if (!Directory.Exists(backupDir))
+            {
+                ReplyToUserCommand(player, "No backups found (backup folder does not exist).");
+                return;
+            }
+
+            var files = new DirectoryInfo(backupDir)
+                .GetFiles("matchzy_*.json")
+                .OrderByDescending(f => f.LastWriteTime)
+                .Take(5)
+                .ToList();
+
+            if (files.Count == 0)
+            {
+                ReplyToUserCommand(player, "No backups found.");
+                return;
+            }
+
+            ReplyToUserCommand(player, "Recent backups (newest first):");
+            ReplyToUserCommand(player, "───────────────────────────────────");
+
+            int displayed = 0;
+            foreach (var file in files)
+            {
+                var backupData = ParseBackupFile(file.FullName);
+                if (backupData == null)
+                    continue;
+
+                string matchId = backupData.GetValueOrDefault("matchid", "?");
+                string mapName = backupData.GetValueOrDefault("map_name", "?");
+                string round = backupData.GetValueOrDefault("round", "?");
+                string team1 = backupData.GetValueOrDefault("team1_name", "");
+                string team2 = backupData.GetValueOrDefault("team2_name", "");
+                string score1 = backupData.GetValueOrDefault("team1_score", "0");
+                string score2 = backupData.GetValueOrDefault("team2_score", "0");
+                string timestamp = backupData.GetValueOrDefault("timestamp", "");
+
+                if (string.IsNullOrWhiteSpace(team1) || team1 == "team1")
+                    team1 = "CT";
+                if (string.IsNullOrWhiteSpace(team2) || team2 == "team2")
+                    team2 = "T";
+
+                string timeAgo = "";
+                if (DateTime.TryParse(timestamp, out DateTime backupTime))
+                {
+                    var diff = DateTime.Now - backupTime;
+                    timeAgo =
+                        diff.TotalMinutes < 1 ? "just now"
+                        : diff.TotalMinutes < 60 ? $"{(int)diff.TotalMinutes}m ago"
+                        : diff.TotalHours < 24 ? $"{(int)diff.TotalHours}h {diff.Minutes}m ago"
+                        : $"{(int)diff.TotalDays}d ago";
+                }
+
+                ReplyToUserCommand(player, $"  {ChatColors.Yellow}#{matchId} R{round}{ChatColors.Default} | {team1} {ChatColors.Green}{score1}-{score2}{ChatColors.Default} {team2} | {mapName} {ChatColors.Grey}{timeAgo}");
+                ReplyToUserCommand(player, $"  → {ChatColors.Green}!loadbackup {file.Name}");
+                displayed++;
+            }
+
+            if (displayed == 0)
+            {
+                ReplyToUserCommand(player, "No valid round backups found.");
             }
         }
 

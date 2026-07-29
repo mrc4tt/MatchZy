@@ -1467,6 +1467,16 @@ namespace MatchZy
                         _ => CsTeam.Terrorist,
                     };
 
+                // Pre-pin the quota to the count INCLUDING the bot about to be added, so the
+                // engine's quota think has no headroom to add a balance partner alongside
+                // bot_add_t/_ct (the pair-spawn: one .bot -> a bot on each team). SpawnBot
+                // re-pins to the tracked count after the claim, and its claim pass still
+                // kicks a pair extra if the engine adds one anyway.
+                int quotaBotCount;
+                lock (_botsDictLock)
+                    quotaBotCount = pracUsedBots.Count;
+                Server.ExecuteCommand($"bot_quota {quotaBotCount + 1}");
+
                 // Add bot to opposite team or forced team. Use ONLY bot_add_t / bot_add_ct - it already
                 // routes the bot to that team. A preceding bot_join_team ALSO spawned a bot, so the two
                 // together produced two bots per .bot (confirmed via diag: one .bot -> Crew + Shamat).
@@ -1951,137 +1961,167 @@ namespace MatchZy
             }
         }
 
-        private void SpawnBot(CCSPlayerController botOwner, bool crouch, bool boost = false, CsTeam targetTeam = CsTeam.None, Position? posOverride = null)
+        private void SpawnBot(CCSPlayerController botOwner, bool crouch, bool boost = false, CsTeam targetTeam = CsTeam.None, Position? posOverride = null, int attempt = 0)
         {
             try
             {
                 if (!IsPlayerValid(botOwner))
+                {
+                    isSpawningBot = false;
                     return;
+                }
 
                 // ADDED: Validate botOwner has valid pawn and components
                 if (botOwner.PlayerPawn == null || !botOwner.PlayerPawn.IsValid || botOwner.PlayerPawn.Value == null || botOwner.PlayerPawn.Value.CBodyComponent?.SceneNode?.AbsOrigin == null || botOwner.PlayerPawn.Value.CBodyComponent?.SceneNode?.AbsRotation == null)
                 {
                     Log($"[SpawnBot] Bot owner has invalid pawn or components");
+                    isSpawningBot = false;
                     return;
                 }
 
                 var botOwnerPawn = botOwner.PlayerPawn.Value;
 
-                var playerEntities = Utilities.FindAllEntitiesByDesignerName<CCSPlayerController>("cs_player_controller");
-                bool unusedBotFound = false;
+                // Capture the spawn spot on the first attempt so retries land the bot where
+                // the owner stood when the command was issued, not wherever they walked
+                // meanwhile. A posOverride (named bot position via .loadbotpos) still wins.
+                posOverride ??= new Position(botOwnerPawn.CBodyComponent!.SceneNode!.AbsOrigin, botOwnerPawn.CBodyComponent!.SceneNode!.AbsRotation);
 
-                foreach (var tempPlayer in playerEntities)
+                // Gather ALL unused bots first and pick the claim afterwards. bot_add_t/_ct
+                // pair-spawns on current CS2 builds (one bot per team) and the enumeration
+                // order is arbitrary: kicking/claiming while enumerating could kick the bot
+                // we actually want or claim the wrong-team pair extra.
+                List<CCSPlayerController> unusedBots = new();
+                foreach (var tempPlayer in Utilities.FindAllEntitiesByDesignerName<CCSPlayerController>("cs_player_controller"))
                 {
                     if (!IsPlayerValid(tempPlayer))
                         continue;
                     if (!tempPlayer.IsBot || tempPlayer.IsHLTV)
                         continue;
-                    if (tempPlayer.UserId.HasValue)
+                    if (!tempPlayer.UserId.HasValue)
+                        continue;
+                    bool isAlreadyUsed;
+                    lock (_botsDictLock)
                     {
-                        bool isAlreadyUsed = false;
-                        lock (_botsDictLock)
-                        {
-                            isAlreadyUsed = pracUsedBots.ContainsKey(tempPlayer.UserId.Value);
-                        }
+                        isAlreadyUsed = pracUsedBots.ContainsKey(tempPlayer.UserId.Value);
+                    }
+                    if (isAlreadyUsed)
+                        continue;
 
-                        if (!isAlreadyUsed && unusedBotFound)
-                        {
-                            // Extra bot from bot_add spawning two - kick it (bot_quota is pinned below
-                            // so it will not refill).
-                            Server.ExecuteCommand($"kickid {tempPlayer.UserId.Value}");
-                            continue;
-                        }
-                        if (isAlreadyUsed)
-                        {
-                            continue;
-                        }
+                    // ADDED: Validate tempPlayer has valid pawn before proceeding
+                    if (tempPlayer.PlayerPawn == null || !tempPlayer.PlayerPawn.IsValid || tempPlayer.PlayerPawn.Value == null)
+                    {
+                        Log($"[SpawnBot] Bot {tempPlayer.PlayerName} has invalid pawn, skipping");
+                        continue;
+                    }
+                    unusedBots.Add(tempPlayer);
+                }
 
-                        // TEAM CHECK: bot_add pair-spawn delivers one bot per team, and the enumeration
-                        // order is arbitrary - claiming the first unused bot could grab the WRONG-team
-                        // one (a CT player got a CT bot). Never claim a bot on the wrong team; kick it
-                        // (it's the pair extra). Unassigned (team 0, still joining) is claimable - it is
-                        // the bot bot_add_t/_ct itself requested.
-                        if (targetTeam != CsTeam.None && tempPlayer.TeamNum != (byte)targetTeam && tempPlayer.TeamNum != (byte)CsTeam.None)
+                // Prefer the requested team. Unassigned (team 0, still joining) is claimable
+                // as a fallback - it is the bot bot_add_t/_ct itself requested.
+                CCSPlayerController? claimedBot = targetTeam == CsTeam.None
+                    ? unusedBots.FirstOrDefault()
+                    : unusedBots.FirstOrDefault(b => b.TeamNum == (byte)targetTeam)
+                      ?? unusedBots.FirstOrDefault(b => b.TeamNum == (byte)CsTeam.None);
+
+                // The right-team bot of a pair often arrives a tick or two AFTER bot_add, so
+                // a wrong-team-only enumeration here does not mean failure yet. Retry before
+                // giving up, and kick nothing meanwhile (the extras are dealt with once the
+                // outcome is known). isSpawningBot stays true across retries so the
+                // erroneous-spawn kicker and the late sweep leave the incoming bot alone.
+                if (claimedBot == null && attempt < 4)
+                {
+                    var retryOwner = botOwner;
+                    var retryPos = posOverride;
+                    AddTimer(0.15f, () =>
+                    {
+                        if (IsPlayerValid(retryOwner) && retryOwner.Connected == PlayerConnectedState.Connected)
                         {
-                            Log($"[SpawnBot] kicking wrong-team pair bot {tempPlayer.PlayerName} (team {tempPlayer.TeamNum}, wanted {(byte)targetTeam})");
-                            Server.ExecuteCommand($"kickid {tempPlayer.UserId.Value}");
-                            continue;
-                        }
-
-                        // ADDED: Validate tempPlayer has valid pawn before proceeding
-                        if (tempPlayer.PlayerPawn == null || !tempPlayer.PlayerPawn.IsValid || tempPlayer.PlayerPawn.Value == null)
-                        {
-                            Log($"[SpawnBot] Bot {tempPlayer.PlayerName} has invalid pawn, skipping");
-                            continue;
-                        }
-
-                        // Create botOwnerPosition FIRST (before using it in dictionary). A posOverride
-                        // (named bot position via .loadbotpos) wins over the owner's current position.
-                        Position botOwnerPosition = posOverride ?? new Position(botOwnerPawn.CBodyComponent!.SceneNode!.AbsOrigin, botOwnerPawn.CBodyComponent!.SceneNode!.AbsRotation);
-
-                        // Now safely add to dictionary with lock
-                        lock (_botsDictLock)
-                        {
-                            pracUsedBots[tempPlayer.UserId.Value] = new Dictionary<string, object>();
-                            pracUsedBots[tempPlayer.UserId.Value]["controller"] = tempPlayer;
-                            pracUsedBots[tempPlayer.UserId.Value]["position"] = botOwnerPosition;
-                            pracUsedBots[tempPlayer.UserId.Value]["owner"] = botOwner;
-                            pracUsedBots[tempPlayer.UserId.Value]["crouchstate"] = crouch;
-                        }
-
-                        if (crouch)
-                        {
-                            // ADDED: Validate MovementServices before accessing
-                            if (tempPlayer.PlayerPawn.Value.MovementServices != null)
-                            {
-                                CCSPlayer_MovementServices movementService = new(tempPlayer.PlayerPawn.Value.MovementServices.Handle);
-                                AddTimer(0.1f, () => movementService.DuckAmount = 1);
-                                AddTimer(
-                                    0.2f,
-                                    () =>
-                                    {
-                                        if (tempPlayer.PlayerPawn?.Value?.Bot != null)
-                                        {
-                                            tempPlayer.PlayerPawn.Value.Bot.IsCrouching = true;
-                                        }
-                                    }
-                                );
-                            }
-                        }
-
-                        // Now safe - we validated PlayerPawn.Value above.
-                        // Route every bot spawn through TeleportUpright: full-angle teleport (bot
-                        // inherits facing) then flatten the body scene node over several frames so a
-                        // look-down pitch never tilts the model flat / clips it under the map. Body
-                        // stands upright at the owner's (or the saved spot's) position.
-                        TeleportUpright(tempPlayer, botOwnerPosition.PlayerPosition, botOwnerPosition.PlayerAngle);
-
-                        if (boost)
-                        {
-                            // Boost: keep BOTH solid (no DEBRIS) and lift the owner
-                            // onto the bot's crown in the same tick the bot lands, so
-                            // the player rests on top instead of clipping through.
-                            // Disabling collisions here is what made the player sink
-                            // back through the bot (gravity re-overlaps the bot before
-                            // the 0.5s re-solidify timer fires).
-                            float ownerYaw = botOwnerPawn.EyeAngles.Y; // yaw only - keep body flat (issue #10)
-                            botOwnerPawn.Teleport(
-                                new Vector(botOwnerPosition.PlayerPosition.X, botOwnerPosition.PlayerPosition.Y, botOwnerPosition.PlayerPosition.Z + 80.0f),
-                                new QAngle(0, ownerYaw, 0),
-                                new Vector(0, 0, 0)
-                            );
+                            SpawnBot(retryOwner, crouch, boost, targetTeam, retryPos, attempt + 1);
                         }
                         else
                         {
-                            // Your existing collision validation (already good!)
-                            if (IsPlayerValid(botOwner) && IsPlayerValid(tempPlayer) && botOwner.PlayerPawn != null && botOwner.PlayerPawn.IsValid && tempPlayer.PlayerPawn != null && tempPlayer.PlayerPawn.IsValid)
-                            {
-                                TemporarilyDisableCollisions(botOwner, tempPlayer);
-                            }
+                            isSpawningBot = false;
                         }
-                        unusedBotFound = true;
+                    });
+                    return;
+                }
+
+                // Kick every unused bot we are not claiming (pair extras / wrong-team spawns).
+                // bot_quota is pinned below so they will not refill.
+                foreach (var extra in unusedBots)
+                {
+                    if (extra == claimedBot)
+                        continue;
+                    Log($"[SpawnBot] kicking extra pair bot {extra.PlayerName} (team {extra.TeamNum}, wanted {(byte)targetTeam})");
+                    Server.ExecuteCommand($"kickid {extra.UserId!.Value}");
+                }
+
+                if (claimedBot != null)
+                {
+                    Position botOwnerPosition = posOverride;
+
+                    // Now safely add to dictionary with lock
+                    lock (_botsDictLock)
+                    {
+                        pracUsedBots[claimedBot.UserId!.Value] = new Dictionary<string, object>();
+                        pracUsedBots[claimedBot.UserId.Value]["controller"] = claimedBot;
+                        pracUsedBots[claimedBot.UserId.Value]["position"] = botOwnerPosition;
+                        pracUsedBots[claimedBot.UserId.Value]["owner"] = botOwner;
+                        pracUsedBots[claimedBot.UserId.Value]["crouchstate"] = crouch;
+                    }
+
+                    if (crouch)
+                    {
+                        // ADDED: Validate MovementServices before accessing
+                        if (claimedBot.PlayerPawn!.Value!.MovementServices != null)
+                        {
+                            CCSPlayer_MovementServices movementService = new(claimedBot.PlayerPawn.Value.MovementServices.Handle);
+                            AddTimer(0.1f, () => movementService.DuckAmount = 1);
+                            AddTimer(
+                                0.2f,
+                                () =>
+                                {
+                                    if (claimedBot.PlayerPawn?.Value?.Bot != null)
+                                    {
+                                        claimedBot.PlayerPawn.Value.Bot.IsCrouching = true;
+                                    }
+                                }
+                            );
+                        }
+                    }
+
+                    // Now safe - we validated PlayerPawn.Value above.
+                    // Route every bot spawn through TeleportUpright: full-angle teleport (bot
+                    // inherits facing) then flatten the body scene node over several frames so a
+                    // look-down pitch never tilts the model flat / clips it under the map. Body
+                    // stands upright at the owner's (or the saved spot's) position.
+                    TeleportUpright(claimedBot, botOwnerPosition.PlayerPosition, botOwnerPosition.PlayerAngle);
+
+                    if (boost)
+                    {
+                        // Boost: keep BOTH solid (no DEBRIS) and lift the owner
+                        // onto the bot's crown in the same tick the bot lands, so
+                        // the player rests on top instead of clipping through.
+                        // Disabling collisions here is what made the player sink
+                        // back through the bot (gravity re-overlaps the bot before
+                        // the 0.5s re-solidify timer fires).
+                        float ownerYaw = botOwnerPawn.EyeAngles.Y; // yaw only - keep body flat (issue #10)
+                        botOwnerPawn.Teleport(
+                            new Vector(botOwnerPosition.PlayerPosition.X, botOwnerPosition.PlayerPosition.Y, botOwnerPosition.PlayerPosition.Z + 80.0f),
+                            new QAngle(0, ownerYaw, 0),
+                            new Vector(0, 0, 0)
+                        );
+                    }
+                    else
+                    {
+                        // Your existing collision validation (already good!)
+                        if (IsPlayerValid(botOwner) && IsPlayerValid(claimedBot) && botOwner.PlayerPawn != null && botOwner.PlayerPawn.IsValid && claimedBot.PlayerPawn != null && claimedBot.PlayerPawn.IsValid)
+                        {
+                            TemporarilyDisableCollisions(botOwner, claimedBot);
+                        }
                     }
                 }
+                bool unusedBotFound = claimedBot != null;
 
                 // Lock bot_quota to exactly the number of tracked practice bots. With bot_quota_mode
                 // normal, kicking an extra bot (from bot_add spawning two, or a quota fill) triggers an

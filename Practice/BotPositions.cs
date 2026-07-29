@@ -306,7 +306,6 @@ namespace MatchZy
 
         // ── botjiggle : silent side-to-side strafing ─────────────────────────────────────────────
         private bool _botJiggleOn;
-        private readonly Dictionary<int, (Vector Base, QAngle Ang)> _botJiggleBase = new();
         private int _botJiggleTick;
 
         [ConsoleCommand("css_botjiggle", "Toggle bots strafing side-to-side (silent)")]
@@ -317,7 +316,6 @@ namespace MatchZy
             _botJiggleOn = !_botJiggleOn;
             if (!_botJiggleOn)
             {
-                _botJiggleBase.Clear();
                 ReplyToUserCommand(player, Localizer.ForPlayer(player, "matchzy.bp.jiggleoff"));
                 return;
             }
@@ -343,18 +341,26 @@ namespace MatchZy
                     var pawn = p.PlayerPawn?.Value;
                     if (pawn?.AbsOrigin == null)
                         continue;
-                    int uid = p.UserId.Value;
-                    if (!_botJiggleBase.TryGetValue(uid, out var b))
+
+                    // Strafe around the bot's ASSIGNED practice spot (pracUsedBots), not
+                    // wherever the pawn stands when first seen: a freshly added .bot is
+                    // claimed at the map spawn point before SpawnBot teleports it, and
+                    // anchoring there yanked the new bot back across the map every tick,
+                    // so it never appeared at the lineup. Unclaimed bots are not jiggled.
+                    Position? spot = null;
+                    lock (_botsDictLock)
                     {
-                        // Anchor on first sight: base position + facing right vector for the strafe axis.
-                        b = (new Vector(pawn.AbsOrigin.X, pawn.AbsOrigin.Y, pawn.AbsOrigin.Z), pawn.EyeAngles);
-                        _botJiggleBase[uid] = b;
+                        if (pracUsedBots.TryGetValue(p.UserId.Value, out var botData) && botData.TryGetValue("position", out var posObj) && posObj is Position pos)
+                            spot = pos;
                     }
-                    double yaw = b.Ang.Y * Math.PI / 180.0;
+                    if (spot == null)
+                        continue;
+
+                    double yaw = spot.PlayerAngle.Y * Math.PI / 180.0;
                     float rx = (float)Math.Sin(yaw);    // right vector (perpendicular to facing)
                     float ry = -(float)Math.Cos(yaw);
-                    var dst = new Vector(b.Base.X + rx * offset, b.Base.Y + ry * offset, b.Base.Z);
-                    pawn.Teleport(dst, b.Ang, new Vector(0, 0, 0));
+                    var dst = new Vector(spot.PlayerPosition.X + rx * offset, spot.PlayerPosition.Y + ry * offset, spot.PlayerPosition.Z);
+                    pawn.Teleport(dst, spot.PlayerAngle, new Vector(0, 0, 0));
                 }
             }
             catch (Exception e)
