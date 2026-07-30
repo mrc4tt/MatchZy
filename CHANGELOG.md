@@ -4,6 +4,13 @@ Customized fork of [MatchZy](https://github.com/shobhit-pathak/MatchZy) by Shobh
 
 Fork version numbering is independent of upstream. Upstream changelog: <https://github.com/shobhit-pathak/MatchZy/blob/main/CHANGELOG.md>
 
+# 0.8.69
+
+#### July 30, 2026
+
+- Fixed `.t` / `.ct` while spectating in practice: previously the player was either kicked (client drop with NETWORK_DISCONNECT_LOOPDEACTIVATE) or joined the team permanently dead. The switch now calls the engine's own HandleCommand_JoinTeam (immediate mode), which runs the complete join flow and spawns the player. Requires the updated gamedata/matchzy.json (new key: CCSPlayerController_HandleCommandJoinTeam); without it the switch falls back to the old behavior plus a team-menu hint.
+- Fixed a practice side-switch sometimes swallowing the player's next real death on the scoreboard: the no-death flag was set even when no switch suicide fired (e.g. switching while dead or spectating) and lingered until the next death.
+
 # 0.8.68
 
 #### July 29, 2026

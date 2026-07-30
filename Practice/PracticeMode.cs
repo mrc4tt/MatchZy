@@ -2754,7 +2754,11 @@ namespace MatchZy
                 // via Server.NextFrame first.
                 Server.NextFrame(() =>
                 {
-                    if (!IsPlayerValid(player))
+                    // Controller-only validity, NOT IsPlayerValid: a spectator whose player pawn
+                    // the engine already destroyed fails IsPlayerValid's pawn checks, and the
+                    // whole switch would silently no-op for exactly the player this path must
+                    // serve. Pawn-dependent steps below guard themselves.
+                    if (player == null || !player.IsValid || player.Connected != PlayerConnectedState.Connected)
                         return;
 
                     // Already on the requested side (e.g. .ct while on CT): skip the whole
@@ -2762,23 +2766,17 @@ namespace MatchZy
                     // still runs the engine's ChangeBasePlayerTeamAndPendingTeam path with
                     // req team == current team, which has rarely crashed there - and there is nothing
                     // to switch. Just put a dead player back in on T/CT (never respawn a spectator).
+                    // Route through RespawnWhenTeamApplied: a pawn-less ex-spectator no-ops the
+                    // fork's Respawn(), the helper handles that case.
                     if ((byte)team == player.TeamNum)
                     {
                         if ((team == CsTeam.Terrorist || team == CsTeam.CounterTerrorist) && !player.PawnIsAlive)
-                            player.Respawn();
+                            RespawnWhenTeamApplied(player, team, attemptsLeft: 5);
                         return;
                     }
 
                     try
                     {
-                        // Flag this player so the side-switch suicide below does NOT count as a
-                        // death on the practice scoreboard. The engine increments the death stat
-                        // during EventPlayerDeath, AFTER any restore we could do here - so the
-                        // reset is done in the Post EventPlayerDeath handler (fires the exact death
-                        // tick → scoreboard never settles on the +1). See MatchZy.cs.
-                        if (player.UserId.HasValue)
-                            practiceSwitchNoDeath.Add(player.UserId.Value);
-
                         // Kill the live pawn BEFORE changing team. The engine's live-player
                         // ChangeTeam strips/destroys the held weapons inline; weapon-lifecycle hooks
                         // from other plugins (e.g. skin plugins) then re-enter on a half-destroyed
@@ -2787,37 +2785,107 @@ namespace MatchZy
                         // weaponless player never hits that strip path.
                         CCSPlayerPawn? pawn = player.PlayerPawn.Value;
                         if (pawn != null && pawn.IsValid && player.PawnIsAlive)
+                        {
+                            // Flag this player so the side-switch suicide does NOT count as a
+                            // death on the practice scoreboard. The engine increments the death
+                            // stat during EventPlayerDeath, AFTER any restore we could do here -
+                            // so the reset is done in the Post EventPlayerDeath handler (fires the
+                            // exact death tick → scoreboard never settles on the +1). See
+                            // MatchZy.cs. Only flag when a suicide actually fires: a stale flag
+                            // (e.g. from a spectator switch with no pawn to kill) would swallow
+                            // the player's next real death instead.
+                            if (player.UserId.HasValue)
+                                practiceSwitchNoDeath.Add(player.UserId.Value);
                             pawn.CommitSuicide(explode: false, force: true);
+                        }
 
                         // Do the actual switch a frame later, once the death (and weapon drop) has
                         // settled and the pawn is no longer holding anything to strip.
                         Server.NextFrame(() =>
                         {
-                            if (!IsPlayerValid(player))
+                            // Controller-only validity (see the guard at the top of this path):
+                            // IsPlayerValid would reject the pawn-less ex-spectator this branch
+                            // must handle.
+                            if (player == null || !player.IsValid || player.Connected != PlayerConnectedState.Connected)
                                 return;
                             try
                             {
-                                // For T/CT use SwitchTeam, not ChangeTeam. ChangeTeam is a vtable
-                                // OFFSET in gamedata (fragile across CS2 builds) and runs the engine's
-                                // full live team-change path (weapon strip → plugin hooks → SIGSEGV).
-                                // SwitchTeam is SIGNATURE-based (build-robust) and just sets the team
-                                // number; the Respawn below puts the player in on the new side.
-                                // EXCEPTION: SwitchTeam only accepts play teams - SwitchTeam(Spectator=1)
-                                // logs "CCSPlayerPawnBase::SwitchTeam( 1 ) - invalid team index." and
-                                // does nothing. The pawn was suicided above (dead), so ChangeTeam to
-                                // Spectator has no weapons to strip -> safe. No respawn (spectator).
+                                // For a live T<->CT switch use SwitchTeam, not ChangeTeam. ChangeTeam
+                                // is a vtable OFFSET in gamedata (fragile across CS2 builds) and runs
+                                // the engine's full live team-change path (weapon strip → plugin hooks
+                                // → SIGSEGV). SwitchTeam is SIGNATURE-based (build-robust) and just
+                                // sets the team number; the Respawn below puts the player in on the
+                                // new side.
+                                // TWO exceptions - in both the pawn is dead / absent, so the engine's
+                                // weapon-strip path has nothing to strip and the full path is safe:
+                                // 1. Target Spectator: SwitchTeam only accepts play teams -
+                                //    SwitchTeam(Spectator=1) logs "CCSPlayerPawnBase::SwitchTeam( 1 )
+                                //    - invalid team index." and does nothing. Use ChangeTeam. No
+                                //    respawn (spectator).
+                                // 2. Source Spectator/None (.t/.ct while spectating): SwitchTeam only
+                                //    writes the team number - it does NOT leave observer mode or
+                                //    create a player pawn, so a follow-up Respawn fires on an
+                                //    observer-state controller. That is the never-respawn-a-Spectator
+                                //    crash class; live symptom is the client dropping itself with
+                                //    NETWORK_DISCONNECT_LOOPDEACTIVATE right after the switch.
+                                //    ChangeTeam alone is not enough either: it applies the team but
+                                //    leaves the controller POSSESSING the observer pawn, and the
+                                //    respawn vfunc no-ops while observing - the player lands on the
+                                //    team but stays dead forever. Upstream MatchZy never solved this
+                                //    (it blocks the switch with "use the team menu").
+                                //    Every CSS-level API was tried and fails here:
+                                //    ExecuteClientCommandFromServer only dispatches registered
+                                //    ConCommands (FindConCommand) and jointeam is handled in the
+                                //    game's ClientCommand dispatch -> silent no-op;
+                                //    ExecuteClientCommand pushes the command to the client, which
+                                //    refuses server-pushed jointeam -> also inert; and SetPawn on
+                                //    the detached dead pawn SIGSEGVs (both the CSS 4-arg binding
+                                //    and a CS2Fixes-matched 6-arg binding - confirmed twice live).
+                                //    Working fix: call the ENGINE's own join handler directly -
+                                //    HandleCommand_JoinTeam(controller, team, 2 = immediate) -
+                                //    exactly what the engine's spectate/jointeam commands invoke
+                                //    (see handleCommandJoinTeam). Falls back to ChangeTeam (team
+                                //    applies, player stays dead, helper nags the team menu) if the
+                                //    fork gamedata key is missing.
+                                bool fromSpectator = player.TeamNum <= (byte)CsTeam.Spectator;
                                 if (team == CsTeam.Spectator)
+                                {
                                     player.ChangeTeam(team);
+                                }
+                                else if (fromSpectator)
+                                {
+                                    try
+                                    {
+                                        handleCommandJoinTeam.Value.Invoke(player, (byte)team, 2, 0f);
+                                    }
+                                    catch (Exception joinEx)
+                                    {
+                                        Log($"[SideSwitchCommand] HandleCommand_JoinTeam unavailable ({joinEx.Message}), falling back to ChangeTeam");
+                                        player.ChangeTeam(team);
+                                    }
+                                }
                                 else
+                                {
                                     player.SwitchTeam(team);
+                                }
 
                                 // Practice: respawn onto an actual playing side (T/CT) so you're
                                 // live instantly. NEVER respawn when the target is Spectator -
                                 // respawning a spectator crashes the server.
-                                // TEST: respawn immediately (no 0.1s delay) for instant switch.
                                 if (team == CsTeam.Terrorist || team == CsTeam.CounterTerrorist)
                                 {
-                                    player.Respawn();
+                                    if (fromSpectator)
+                                    {
+                                        // ChangeTeam applies the pending team a few frames later
+                                        // and leaves the player dead/observing; the helper polls
+                                        // for the team to land, then respawns (escalating to
+                                        // full-arity SetPawn + respawn vfunc, see helper).
+                                        RespawnWhenTeamApplied(player, team, RespawnRetryAttempts);
+                                    }
+                                    else
+                                    {
+                                        player.Respawn();
+                                    }
                                 }
                             }
                             catch (Exception ex)
@@ -2872,6 +2940,97 @@ namespace MatchZy
                     {
                         Log($"[watchme] {ex.Message}");
                     }
+                }
+            });
+        }
+
+        private const int RespawnRetryAttempts = 20;
+
+        // Engine CCSPlayerController::HandleCommand_JoinTeam(controller, team, flags, f)
+        // - the function the engine's own "jointeam" client command dispatches to
+        // (identified in libserver.so build 14173 by its error string
+        // "HandleCommand_JoinTeam( %d ) - invalid team index."). flags: bit 1 set
+        // (value 3) queues the change to the next round for a dead/spectating player
+        // ("teamchange_pending"); value 2 applies the join IMMEDIATELY - the engine's
+        // internal spectate handler calls (controller, 1, 2). This runs the complete
+        // join flow (leave observer mode, set up the pawn) that no CSS-callable API
+        // reaches: ChangeTeam leaves the controller observing, and both
+        // ExecuteClientCommand variants fail to deliver "jointeam" (see the comment at
+        // the call site). Resolved from the FORK's gamedata key
+        // "CCSPlayerController_HandleCommandJoinTeam" (linux signature; regenerate via
+        // the CS2SigMaker/ida-pro-mcp tooling if a CS2 update breaks it). On stock CSS
+        // gamedata the key is missing - GetSignature throws, the caller catches and
+        // falls back to ChangeTeam + the team-menu hint.
+        private static readonly Lazy<MemoryFunctionVoid<CCSPlayerController, int, int, float>> handleCommandJoinTeam =
+            new(() => new MemoryFunctionVoid<CCSPlayerController, int, int, float>(
+                GameData.GetSignature("CCSPlayerController_HandleCommandJoinTeam")));
+
+        // Respawn a player once a spectator->team join (client-issued "jointeam", see
+        // SideSwitchCommand) has actually applied. The join lands some frames/net round
+        // trips later, so poll on a short timer instead of a single next-frame check.
+        // Stops as soon as the player is alive, disconnects, practice ends, or attempts
+        // run out (~2s at 0.1s per attempt).
+        //
+        // Traps this helper works around (all confirmed on a live server):
+        // - Do NOT gate on IsPlayerValid: it requires a valid PLAYER pawn, which an
+        //   ex-spectator may not have, so the guard would bail out every attempt.
+        //   Controller-level validity is enough for the calls below.
+        // - The fork's Respawn() early-returns on a null pawn; when the pawn handle is
+        //   empty, call the CCSPlayerController_Respawn vfunc directly (it recreates the
+        //   pawn).
+        // - The controller may still possess the OBSERVER pawn after the team applies; in
+        //   that state the respawn vfunc no-ops, so a few plain Respawn() attempts are
+        //   followed by one escalation: re-possess the player pawn via the FULL-ARITY
+        //   SetPawn binding (setPawnFullArity - the CSS built-in 4-arg binding SIGSEGVs,
+        //   see its comment), then the respawn vfunc. This mirrors CS2Fixes'
+        //   CCSPlayerController::Respawn() exactly.
+        // - If nothing lands, tell the player to use the team menu (upstream MatchZy's
+        //   fallback for this same engine limitation).
+        private void RespawnWhenTeamApplied(CCSPlayerController player, CsTeam team, int attemptsLeft)
+        {
+            AddTimer(0.1f, () =>
+            {
+                if (!isPractice || player == null || !player.IsValid || player.Connected != PlayerConnectedState.Connected)
+                    return;
+                if (player.PawnIsAlive)
+                    return;
+                if (player.TeamNum == (byte)team)
+                {
+                    try
+                    {
+                        // NO SetPawn escalation here - EVER. Re-possessing the detached dead
+                        // pawn of an ex-spectator SIGSEGVs, confirmed twice on a live server
+                        // (with the CSS built-in 4-arg binding AND with the CS2Fixes-matched
+                        // full-arity binding). CS2Fixes only ever calls SetPawn on a pawn the
+                        // controller still possesses (their spec-joiners go through the
+                        // ENGINE's own jointeam handler first, hooked at the metamod level,
+                        // which CSS plugins cannot trigger).
+                        if (player.PlayerPawn.Value == null)
+                        {
+                            Log($"[RespawnWhenTeamApplied] {player.PlayerName}: pawn handle empty, calling Respawn vfunc directly ({attemptsLeft} attempts left)");
+                            VirtualFunction.CreateVoid<IntPtr>(player.Handle, GameData.GetOffset("CCSPlayerController_Respawn"))(player.Handle);
+                        }
+                        else
+                        {
+                            player.Respawn();
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        Log($"[RespawnWhenTeamApplied] respawn failed: {ex.Message}");
+                        return;
+                    }
+                    // Don't stop yet: verify next attempt that the respawn actually took
+                    // (it can no-op while the join is still settling).
+                }
+                if (attemptsLeft > 1)
+                {
+                    RespawnWhenTeamApplied(player, team, attemptsLeft - 1);
+                }
+                else
+                {
+                    Log($"[RespawnWhenTeamApplied] gave up: {player.PlayerName} team={player.TeamNum} target={(byte)team} pawnNull={player.PlayerPawn.Value == null} alive={player.PawnIsAlive}");
+                    ReplyToUserCommand(player, Localizer.ForPlayer(player, "matchzy.pm.spectatorbroken"));
                 }
             });
         }
