@@ -1966,7 +1966,7 @@ namespace MatchZy
 
             if (!isMatchSetup)
             {
-                EndSeries(winnerName, restartDelay, t1score, t2score);
+                EndSeries(winnerName, restartDelay, t1score, t2score, writeEndData: false);
                 return;
             }
 
@@ -1974,7 +1974,7 @@ namespace MatchZy
 
             if (matchzyTeam1.seriesScore == matchzyTeam2.seriesScore && remainingMaps <= 0)
             {
-                EndSeries(null, restartDelay, t1score, t2score);
+                EndSeries(null, restartDelay, t1score, t2score, writeEndData: false);
                 return;
             }
             else if (matchConfig.SeriesCanClinch)
@@ -1982,13 +1982,13 @@ namespace MatchZy
                 int mapsToWinSeries = (matchConfig.NumMaps / 2) + 1;
                 if (matchzyTeam1.seriesScore == mapsToWinSeries || matchzyTeam2.seriesScore == mapsToWinSeries)
                 {
-                    EndSeries(null, restartDelay, t1score, t2score);
+                    EndSeries(null, restartDelay, t1score, t2score, writeEndData: false);
                     return;
                 }
             }
             else if (remainingMaps <= 0)
             {
-                EndSeries(null, restartDelay, t1score, t2score);
+                EndSeries(null, restartDelay, t1score, t2score, writeEndData: false);
                 return;
             }
 

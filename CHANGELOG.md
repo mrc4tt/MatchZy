@@ -4,6 +4,12 @@ Customized fork of [MatchZy](https://github.com/shobhit-pathak/MatchZy) by Shobh
 
 Fork version numbering is independent of upstream. Upstream changelog: <https://github.com/shobhit-pathak/MatchZy/blob/main/CHANGELOG.md>
 
+# 0.8.70
+
+#### July 31, 2026
+
+- Fixed match end data being written to the database twice at series end (duplicate "[SetMatchEndData] Match X end data set successfully" log lines). The second write could also overwrite the final map's per-map score with the series score.
+
 # 0.8.69
 
 #### July 30, 2026

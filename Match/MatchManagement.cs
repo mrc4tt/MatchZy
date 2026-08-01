@@ -889,7 +889,7 @@ namespace MatchZy
             return playerTeam;
         }
 
-        public void EndSeries(string? winnerName, int restartDelay, int t1score, int t2score)
+        public void EndSeries(string? winnerName, int restartDelay, int t1score, int t2score, bool writeEndData = true)
         {
             long matchId = liveMatchId;
             (int team1Score, int team2Score) = (matchzyTeam1.seriesScore, matchzyTeam2.seriesScore);
@@ -916,9 +916,15 @@ namespace MatchZy
                 TimeUntilRestore = 10,
             };
 
+            int currentMapNumber = matchConfig.CurrentMapNumber;
             Task.Run(async () =>
             {
-                await database.SetMatchEndDataAsync(matchId, matchConfig.CurrentMapNumber, winnerName ?? "Draw", team1Score, team2Score, winnerName ?? "Draw", team1Score, team2Score);
+                // HandleMatchEnd already wrote end data for this map; writing again here
+                // duplicated the update and could clobber the map row's scores with series scores.
+                if (writeEndData)
+                {
+                    await database.SetMatchEndDataAsync(matchId, currentMapNumber, winnerName ?? "Draw", team1Score, team2Score, winnerName ?? "Draw", team1Score, team2Score);
+                }
                 // Making sure that map end event is fired first
                 await Task.Delay(2000);
                 await SendEventAsync(seriesResultEvent);
