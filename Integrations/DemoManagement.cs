@@ -20,6 +20,7 @@ namespace MatchZy
         public string demoUploadHeaderValue = "";
         public string activeDemoFile = "";
         public bool isDemoRecording = false;
+        public bool isDemoUploadS3Enabled = false;
 
         // Set by scrim/hill going-live: their cfg does mp_restartgame, which clobbers a tv_record
         // fired on a fixed timer. Instead we defer the start to the first live round_start AFTER the
@@ -97,7 +98,54 @@ namespace MatchZy
             {
                 Server.ExecuteCommand("tv_stoprecord");
                 isDemoRecording = false;
+                AddTimer(15, () =>
+                {
+                    // Snapshot the upload settings on the main thread - the Task.Run below must not
+                    // read plugin state while a convar change or ResetMatch could be mutating it.
+                    string uploadURL = demoUploadURL;
+                    string headerKey = demoUploadHeaderKey;
+                    string headerValue = demoUploadHeaderValue;
+                    bool useS3 = isDemoUploadS3Enabled;
+                    string demoFileName = Path.GetFileName(demoPath);
+
+                    Task.Run(async () =>
+                    {
+                        bool uploadSuccess = await UploadFileAsync(demoPath, uploadURL, headerKey, headerValue, liveMatchId, currentMapNumber, roundNumber, useS3);
+
+                        // Only report the result when an upload was actually configured, otherwise every
+                        // server without a demo upload URL would emit a failed demo_upload_ended per map.
+                        if (uploadURL == "") return;
+
+                        await SendEventAsync(new MatchZyDemoUploadedEvent
+                        {
+                            MatchId = liveMatchId,
+                            MapNumber = currentMapNumber,
+                            FileName = demoFileName,
+                            Success = uploadSuccess,
+                        });
+                    });
+                });
             }
+        }
+
+        [ConsoleCommand("get5_demo_upload_header_key", "If defined, a custom HTTP header with this name is added to the HTTP requests for demos")]
+        [ConsoleCommand("matchzy_demo_upload_header_key", "If defined, a custom HTTP header with this name is added to the HTTP requests for demos")]
+        public void DemoUploadHeaderKeyCommand(CCSPlayerController? player, CommandInfo command)
+        {
+            if (player != null) return;
+            string header = command.ArgByIndex(1).Trim();
+
+            if (header != "") demoUploadHeaderKey = header;
+        }
+
+        [ConsoleCommand("get5_demo_upload_header_value", "If defined, the value of the custom header added to the demos sent over HTTP")]
+        [ConsoleCommand("matchzy_demo_upload_header_value", "If defined, the value of the custom header added to the demos sent over HTTP")]
+        public void DemoUploadHeaderValueCommand(CCSPlayerController? player, CommandInfo command)
+        {
+            if (player != null) return;
+            string headerValue = command.ArgByIndex(1).Trim();
+
+            if (headerValue != "") demoUploadHeaderValue = headerValue;
         }
 
         private string FormatDemoName()

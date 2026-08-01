@@ -3826,22 +3826,51 @@ namespace MatchZy
             return value;
         }
 
-        public async Task UploadFileAsync(string? filePath, string fileUploadURL, string headerKey, string headerValue, long matchId, int mapNumber, int roundNumber)
+        public async Task<bool> UploadFileAsync(string? filePath, string fileUploadURL, string headerKey, string headerValue, long matchId, int mapNumber, int roundNumber, bool useS3PresignedPut = false)
         {
             if (filePath == null || fileUploadURL == "")
             {
                 Log($"[UploadFileAsync] Not able to upload the file, either filePath or fileUploadURL is not set. filePath: {filePath} fileUploadURL: {fileUploadURL}");
-                return;
+                return false;
             }
 
             try
             {
-                Log($"[UploadFileAsync] Going to upload the file on {fileUploadURL}. Complete path: {filePath}");
+                Log($"[UploadFileAsync] Going to upload the file on {fileUploadURL}. Complete path: {filePath}" + (useS3PresignedPut ? " (HTTP PUT, S3-compatible)" : ""));
 
                 if (!File.Exists(filePath))
                 {
                     Log($"[UploadFileAsync ERROR] File not found: {filePath}");
-                    return;
+                    return false;
+                }
+
+                // Demos run to hundreds of MB, so this cannot use _sharedHttpClient (10s timeout):
+                // every real upload would be cancelled mid-transfer.
+                using var httpClient = new HttpClient { Timeout = useS3PresignedPut ? TimeSpan.FromHours(2) : TimeSpan.FromMinutes(30) };
+
+                if (useS3PresignedPut)
+                {
+                    using FileStream s3FileStream = File.OpenRead(filePath);
+                    using StreamContent s3Content = new(s3FileStream);
+                    s3Content.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue("application/octet-stream");
+
+                    using HttpRequestMessage s3Request = new(HttpMethod.Put, fileUploadURL) { Content = s3Content };
+
+                    if (!string.IsNullOrEmpty(headerKey) && !string.IsNullOrEmpty(headerValue))
+                    {
+                        s3Request.Headers.TryAddWithoutValidation(headerKey, headerValue);
+                    }
+
+                    HttpResponseMessage s3Response = await httpClient.SendAsync(s3Request);
+
+                    if (s3Response.IsSuccessStatusCode)
+                    {
+                        Log($"[UploadFileAsync] File upload successful for matchId: {matchId} mapNumber: {mapNumber} fileName: {Path.GetFileName(filePath)}.");
+                        return true;
+                    }
+
+                    Log($"[UploadFileAsync ERROR] Failed to upload file. Status code: {s3Response.StatusCode} Response: {await s3Response.Content.ReadAsStringAsync()}");
+                    return false;
                 }
 
                 byte[] fileContent = await File.ReadAllBytesAsync(filePath);
@@ -3867,20 +3896,21 @@ namespace MatchZy
                 }
 
                 request.Content = content;
-                HttpResponseMessage response = await _sharedHttpClient.SendAsync(request);
+                HttpResponseMessage response = await httpClient.SendAsync(request);
 
                 if (response.IsSuccessStatusCode)
                 {
                     Log($"[UploadFileAsync] File upload successful for matchId: {matchId} mapNumber: {mapNumber} fileName: {Path.GetFileName(filePath)}.");
+                    return true;
                 }
-                else
-                {
-                    Log($"[UploadFileAsync ERROR] Failed to upload file. Status code: {response.StatusCode} Response: {await response.Content.ReadAsStringAsync()}");
-                }
+
+                Log($"[UploadFileAsync ERROR] Failed to upload file. Status code: {response.StatusCode} Response: {await response.Content.ReadAsStringAsync()}");
+                return false;
             }
             catch (Exception e)
             {
                 Log($"[UploadFileAsync FATAL] An error occurred: {e.Message}");
+                return false;
             }
         }
 

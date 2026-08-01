@@ -4,6 +4,18 @@ Customized fork of [MatchZy](https://github.com/shobhit-pathak/MatchZy) by Shobh
 
 Fork version numbering is independent of upstream. Upstream changelog: <https://github.com/shobhit-pathak/MatchZy/blob/main/CHANGELOG.md>
 
+# 0.8.71
+
+#### August 1, 2026
+
+- Recorded demos are now uploaded once the map ends, if matchzy_demo_upload_url is set. The fork previously stopped the recording without ever uploading it.
+- Added matchzy_demo_upload_s3 (alias get5_demo_upload_s3). When enabled, the demo is sent with an HTTP PUT and the raw .dem file as the body, for S3-compatible storage that uses presigned upload URLs. Sign the URL with Content-Type application/octet-stream. Default: false.
+- Added matchzy_demo_upload_header_key and matchzy_demo_upload_header_value (aliases get5_demo_upload_header_key / get5_demo_upload_header_value) to send a custom authentication header with the upload.
+- Large demo uploads no longer fail part way through. The upload now has its own timeout instead of sharing the 10 second one used for event publishing.
+- Added the demo_upload_ended event, sent to the remote log URL after each upload with the demo filename and whether it succeeded.
+- An invalid matchzy_demo_upload_url is now reported in the server log instead of being ignored silently.
+- matchzy_demo_upload_url and the two upload header settings are deliberately not written to config.cfg, because a presigned URL and an authentication token are credentials and config.cfg is world readable. Set them from a private cfg. config.cfg documents the syntax in a comment.
+
 # 0.8.70
 
 #### July 31, 2026

@@ -221,11 +221,25 @@ namespace MatchZy
                 return;
             if (!IsValidUrl(url))
             {
-                // Log($"[MatchZyDemoUploadURL] Invalid URL: {url}. Please provide a valid URL for uploading the demo!");
+                Log($"[MatchZyDemoUploadURL] Invalid URL: {url}. Please provide a valid URL for uploading the demo!");
                 return;
             }
 
             demoUploadURL = url;
+        }
+
+        [ConsoleCommand("get5_demo_upload_s3", "If true, demo upload uses HTTP PUT to matchzy_demo_upload_url (e.g. S3 presigned URL) with raw .dem body. Default value: false")]
+        [ConsoleCommand("matchzy_demo_upload_s3", "If true, demo upload uses HTTP PUT to matchzy_demo_upload_url (e.g. S3 presigned URL) with raw .dem body. Default value: false")]
+        public void MatchZyDemoUploadS3(CCSPlayerController? player, CommandInfo command)
+        {
+            if (player != null) return;
+            // Accept 1/0 as well as true/false. bool.TryParse rejects "1", and the upstream
+            // fallback ANDed against the current value, so on a false-default field
+            // "matchzy_demo_upload_s3 1" could never switch it on.
+            string value = command.ArgByIndex(1).Trim();
+            if (value == "") return;
+
+            isDemoUploadS3Enabled = value == "1" || value.Equals("true", StringComparison.OrdinalIgnoreCase);
         }
 
         [ConsoleCommand("matchzy_stop_command_available", "Whether .stop command is enabled or not (to restore the current round). Default value: true")]
