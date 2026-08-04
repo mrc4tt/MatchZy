@@ -260,10 +260,30 @@ namespace MatchZy
         private int _rpReady, _rpRequired, _rpTotal, _rpFilled, _rpCtCount, _rpCtReady, _rpTCount, _rpTReady;
         private string _rpWaiting = "";
         private uint _readyTickCounter;
-        // Last HTML sent to each player (by userid). The panel is only re-sent when its content
+        // Bumped every time ComputeReadyData actually recomputes. Everything the panel renders
+        // from the shared numbers (including the progress bar) is keyed on this, so a tick that
+        // changed nothing can skip the whole build instead of rebuilding and then discovering
+        // the result was identical.
+        private int _rpVersion;
+        private string _rpBar = "";
+        private int _rpBarVersion = -1;
+        // Last panel state per player (by userid). The panel is only re-sent when its content
         // changes (or on a slow keepalive) so PrintToCenterHtml does not re-trigger its show
         // animation every tick - that per-tick re-fire is what makes the panel flash.
-        private readonly Dictionary<int, string> _lastPanelHtml = new();
+        // The stamp fields exist so the comparison does not require building the HTML first:
+        // rendering one panel is a StringBuilder plus ~6 localizer lookups and as many
+        // interpolated strings, and it ran for every player on every tick of the ready phase.
+        private readonly Dictionary<int, PanelState> _lastPanelHtml = new();
+
+        private struct PanelState
+        {
+            public int Version;
+            public string Mode;
+            public bool NotReadyVisible;
+            public bool IsPlaying;
+            public bool IsReady;
+            public string Html;
+        }
         // Cached gamerules proxy for the ready-phase HUD sync (re-fetched when invalid, e.g. after
         // a map change). Avoids a FindAllEntitiesByDesignerName scan every tick.
         private CCSGameRulesProxy? _readyProxy;
@@ -321,6 +341,7 @@ namespace MatchZy
                 : $"{line1}\n{line2}";
 
             _readyStatusDirty = false;
+            _rpVersion++;
         }
 
         // Make a string safe for a CS2 center-HTML panel: escape the HTML metacharacters and convert
@@ -542,14 +563,45 @@ namespace MatchZy
                     : isPlayOutEnabled ? "Scrim"
                     : "Match";
 
-                string bar =
-                    $"<font class='fontSize-m' color='#37ff8b'>{new string('█', _rpFilled)}</font>" +
-                    $"<font class='fontSize-m' color='#3a3a3a'>{new string('█', 12 - _rpFilled)}</font>";
-
-                foreach (var target in Utilities.GetPlayers())
+                // Depends only on _rpFilled, so it follows the ready-data version rather than
+                // allocating two strings and a concat on every tick.
+                if (_rpBarVersion != _rpVersion)
                 {
+                    _rpBar =
+                        $"<font class='fontSize-m' color='#37ff8b'>{new string('█', _rpFilled)}</font>" +
+                        $"<font class='fontSize-m' color='#3a3a3a'>{new string('█', 12 - _rpFilled)}</font>";
+                    _rpBarVersion = _rpVersion;
+                }
+                string bar = _rpBar;
+
+                // Slot loop instead of Utilities.GetPlayers(): that helper allocates a fresh List
+                // on every call, and this runs every tick for the whole ready phase.
+                int maxPlayers = Server.MaxPlayers;
+                for (int slot = 0; slot < maxPlayers; slot++)
+                {
+                    var target = Utilities.GetPlayerFromSlot(slot);
                     if (target == null || !target.IsValid || target.IsBot || target.IsHLTV || !target.UserId.HasValue)
                         continue;
+
+                    int uid = target.UserId.Value;
+                    bool isPlayingNow = target.TeamNum == 2 || target.TeamNum == 3;
+                    bool isReadyNow = isPlayingNow
+                        && playerReadyStatus.TryGetValue(uid, out bool readyFlag)
+                        && readyFlag;
+
+                    // Nothing this player's panel depends on has changed -> skip the build
+                    // entirely. The blink state only matters while they are shown as NOT ready.
+                    if (_lastPanelHtml.TryGetValue(uid, out var cachedState)
+                        && cachedState.Version == _rpVersion
+                        && ReferenceEquals(cachedState.Mode, mode)
+                        && cachedState.IsPlaying == isPlayingNow
+                        && cachedState.IsReady == isReadyNow
+                        && (isReadyNow || !isPlayingNow || cachedState.NotReadyVisible == notReadyVisible))
+                    {
+                        if (keepalive)
+                            target.PrintToCenterHtml(cachedState.Html, 5);
+                        continue;
+                    }
 
                     var sb = new StringBuilder();
                     // Every localized/dynamic value goes through PanelSafe: CS2's center-HTML panel
@@ -568,10 +620,10 @@ namespace MatchZy
                     // BEFORE the "waiting on" list. CS2's center-HTML panel has a size cap and drops
                     // the tail when a long localized string + player names push it over; keeping the
                     // status ahead of the expendable waiting-on line means the status always shows.
-                    bool isPlaying = target.TeamNum == 2 || target.TeamNum == 3;
+                    bool isPlaying = isPlayingNow;
                     if (isPlaying)
                     {
-                        if (playerReadyStatus.TryGetValue(target.UserId.Value, out bool isReady) && isReady)
+                        if (isReadyNow)
                             sb.Append($"<br><font class='fontSize-m' color='#37ff8b'>&#10004; {PanelSafe(Localizer.ForPlayer(target, "matchzy.ready.youready"))}</font>");
                         else if (notReadyVisible)
                             sb.Append($"<br><font class='fontSize-m' color='#ff3b3b'>&#10008; {PanelSafe(Localizer.ForPlayer(target, "matchzy.ready.notready"))}</font>");
@@ -585,10 +637,24 @@ namespace MatchZy
                     // Only re-send when the content changed (or on the keepalive tick). Re-sending
                     // identical HTML every tick re-triggers the panel's show animation -> flashing.
                     string html = sb.ToString();
-                    int uid = target.UserId.Value;
-                    if (!keepalive && _lastPanelHtml.TryGetValue(uid, out var prev) && prev == html)
+                    bool unchanged = _lastPanelHtml.TryGetValue(uid, out var prev) && prev.Html == html;
+
+                    _lastPanelHtml[uid] = new PanelState
+                    {
+                        Version = _rpVersion,
+                        Mode = mode,
+                        NotReadyVisible = notReadyVisible,
+                        IsPlaying = isPlayingNow,
+                        IsReady = isReadyNow,
+                        Html = html,
+                    };
+
+                    // A stamp can change without the rendered text changing (e.g. a ready count
+                    // that does not move the bar). Keep the text comparison as the final gate so
+                    // the panel's show animation is not re-triggered.
+                    if (!keepalive && unchanged)
                         continue;
-                    _lastPanelHtml[uid] = html;
+
                     target.PrintToCenterHtml(html, 5);
                 }
             }

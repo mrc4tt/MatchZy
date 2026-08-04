@@ -322,6 +322,12 @@ namespace MatchZy
             ReplyToUserCommand(player, Localizer.ForPlayer(player, "matchzy.bp.jiggleon"));
         }
 
+        // Scratch objects for the jiggle tick. Vector exposes X/Y/Z as `ref float` into its own
+        // native buffer, so mutating one instance in place is equivalent to handing Teleport a
+        // fresh one - minus a per-bot allocation on every tick.
+        private readonly Vector _jiggleDst = new(0, 0, 0);
+        private readonly Vector _jiggleVel = new(0, 0, 0);
+
         // OnTick listener (registered in Load). No-op unless botjiggle is on.
         public void OnBotJiggleTick()
         {
@@ -334,8 +340,12 @@ namespace MatchZy
                 double phase = _botJiggleTick * 0.18;   // ~ a full sweep every ~2s at 64 tick
                 float offset = (float)Math.Sin(phase) * range;
 
-                foreach (var p in Utilities.GetPlayers())
+                // Slot loop rather than Utilities.GetPlayers(): that helper allocates a fresh
+                // List on every call, and this runs every tick while jiggle is on.
+                int maxPlayers = Server.MaxPlayers;
+                for (int slot = 0; slot < maxPlayers; slot++)
                 {
+                    var p = Utilities.GetPlayerFromSlot(slot);
                     if (p == null || !p.IsValid || !p.IsBot || p.IsHLTV || !p.UserId.HasValue || !p.PawnIsAlive)
                         continue;
                     var pawn = p.PlayerPawn?.Value;
@@ -359,8 +369,13 @@ namespace MatchZy
                     double yaw = spot.PlayerAngle.Y * Math.PI / 180.0;
                     float rx = (float)Math.Sin(yaw);    // right vector (perpendicular to facing)
                     float ry = -(float)Math.Cos(yaw);
-                    var dst = new Vector(spot.PlayerPosition.X + rx * offset, spot.PlayerPosition.Y + ry * offset, spot.PlayerPosition.Z);
-                    pawn.Teleport(dst, spot.PlayerAngle, new Vector(0, 0, 0));
+                    _jiggleDst.X = spot.PlayerPosition.X + rx * offset;
+                    _jiggleDst.Y = spot.PlayerPosition.Y + ry * offset;
+                    _jiggleDst.Z = spot.PlayerPosition.Z;
+                    _jiggleVel.X = 0;
+                    _jiggleVel.Y = 0;
+                    _jiggleVel.Z = 0;
+                    pawn.Teleport(_jiggleDst, spot.PlayerAngle, _jiggleVel);
                 }
             }
             catch (Exception e)
