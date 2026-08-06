@@ -559,6 +559,81 @@ namespace MatchZy
             }
         }
 
+        /// <summary>
+        /// Close out the rows of a match that was stopped before it could finish (.stopmatch,
+        /// css_endmatch, css_restart, an admin-menu stop, ...). Only SetMatchEndDataAsync used to
+        /// write end_time, and it runs on the natural-end and surrender paths only, so a cancelled
+        /// match left end_time NULL forever and looked like it was still running.
+        ///
+        /// winner is deliberately NOT written: a finished match always stores a team name or "Draw"
+        /// (GetMatchWinnerName), so "end_time set + winner empty" is an unambiguous marker for
+        /// "cancelled" that needs no new column and no new value for consumers to learn.
+        ///
+        /// Both UPDATEs require end_time IS NULL so a cancel that lands after a natural end can
+        /// never overwrite the real result.
+        /// </summary>
+        public async Task SetMatchCancelledAsync(long matchId, int mapNumber, int team1Score, int team2Score, int matchTeam1Score, int matchTeam2Score)
+        {
+            if (matchId <= 0)
+            {
+                Log($"[SetMatchCancelled - ERROR] Invalid matchId: {matchId}");
+                return;
+            }
+
+            try
+            {
+                EnsureConnectionOpen();
+
+                string endTime = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss");
+
+                int mapRows = await connection!.ExecuteAsync(
+                    @"
+                    UPDATE matchzy_stats_maps
+                    SET end_time = @EndTime,
+                        team1_score = @Team1Score,
+                        team2_score = @Team2Score
+                    WHERE matchid = @MatchId AND mapnumber = @MapNumber AND end_time IS NULL",
+                    new
+                    {
+                        EndTime = endTime,
+                        Team1Score = team1Score,
+                        Team2Score = team2Score,
+                        MatchId = matchId,
+                        MapNumber = mapNumber,
+                    }
+                );
+
+                await connection!.ExecuteAsync(
+                    @"
+                    UPDATE matchzy_stats_matches
+                    SET end_time = @EndTime,
+                        team1_score = @Team1Score,
+                        team2_score = @Team2Score
+                    WHERE matchid = @MatchId AND end_time IS NULL",
+                    new
+                    {
+                        EndTime = endTime,
+                        Team1Score = matchTeam1Score,
+                        Team2Score = matchTeam2Score,
+                        MatchId = matchId,
+                    }
+                );
+
+                if (mapRows > 0)
+                {
+                    Log($"[SetMatchCancelled] Match {matchId} map {mapNumber} closed as cancelled ({team1Score}-{team2Score})");
+                }
+                else
+                {
+                    Log($"[SetMatchCancelled] Match {matchId} map {mapNumber} already had end_time set, left untouched");
+                }
+            }
+            catch (Exception ex)
+            {
+                Log($"[SetMatchCancelled - FATAL] Error: {ex.Message}");
+            }
+        }
+
         public async Task UpdateTeamNamesAsync(long matchId, string team1Name, string team2Name)
         {
             if (matchId <= 0)

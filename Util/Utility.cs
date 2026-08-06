@@ -1336,6 +1336,30 @@ namespace MatchZy
                     });
                 }
 
+                // Close the database rows of a match that is being stopped before it could finish.
+                // Only SetMatchEndDataAsync writes end_time, and it runs on the natural-end
+                // (HandleMatchEnd) and surrender (EndSeries) paths only, so a match stopped from
+                // here kept end_time NULL forever and read as if it were still running.
+                //
+                // Gated on liveMatchId rather than isMatchLive: the row is INSERTed by
+                // HandleMatchStart -> InitMatchAsync at ready-up, which is BEFORE StartLive sets
+                // isMatchLive, so a stop during the knife round or side selection also has a row to
+                // close. Everything is captured first - the state wipe below sets liveMatchId to -1,
+                // and none of it may be read inside Task.Run.
+                if (matchStarted && cancelReason != null && liveMatchId > 0)
+                {
+                    long cancelledMatchId = liveMatchId;
+                    int cancelledMapNumber = matchConfig.CurrentMapNumber;
+                    (int cancelT1score, int cancelT2score) = GetTeamsScore();
+                    int cancelledSeriesT1 = matchzyTeam1.seriesScore;
+                    int cancelledSeriesT2 = matchzyTeam2.seriesScore;
+
+                    Task.Run(async () =>
+                    {
+                        await database.SetMatchCancelledAsync(cancelledMatchId, cancelledMapNumber, cancelT1score, cancelT2score, cancelledSeriesT1, cancelledSeriesT2);
+                    });
+                }
+
                 if (matchStarted && isDemoRecording)
                 {
                     Server.ExecuteCommand($"tv_stoprecord");
