@@ -21,14 +21,14 @@ namespace MatchZy
         public bool isSpawnKeeping = false;
         public bool isRoundRestorePending = false;
         public string pendingRestoreFileName = "";
+        public CounterStrikeSharp.API.Modules.Timers.Timer? restoreUnpauseTimer = null;
+        private int restoreUnpauseSecondsLeft = 0;
         private Dictionary<ulong, DateTime> pendingRestartConfirmations = new();
         private const int RESTART_CONFIRMATION_TIMEOUT_SECONDS = 30;
         private Dictionary<ulong, DateTime> stopCommandCooldowns = new();
         private const int STOP_COMMAND_COOLDOWN_SECONDS = 3;
         private DateTime stopVoteStartTime = DateTime.MinValue;
         private const int STOP_VOTE_TIMEOUT_SECONDS = 30;
-        private Dictionary<ulong, DateTime> pendingRestoreCurrentConfirmations = new();
-        private const int RESTORE_CURRENT_CONFIRMATION_TIMEOUT_SECONDS = 15;
 
         public Dictionary<string, bool> stopData = new() { { "ct", false }, { "t", false } };
 
@@ -210,7 +210,7 @@ namespace MatchZy
         [ConsoleCommand("css_restartround", "Restores the current round to its beginning")]
         [ConsoleCommand("css_rr", "Restores the current round to its beginning")]
         [ConsoleCommand("css_rrestore", "Restores the current round to its beginning")]
-        [CommandHelper(minArgs: 0, usage: "[yes]")]
+        [CommandHelper(minArgs: 0, usage: "")]
         public void OnRestoreCurrentRoundCommand(CCSPlayerController? player, CommandInfo? command)
         {
             if (!IsPlayerAdmin(player, "css_restorecurrent", "@css/config"))
@@ -255,55 +255,7 @@ namespace MatchZy
             if (!File.Exists(backupPath))
             {
                 ReplyToUserCommand(player, $"Backup for round {currentRound} not found!");
-                ReplyToUserCommand(player, "The round may have just started. Try using !restore {currentRound} instead.");
-                return;
-            }
-
-            // Handle confirmation
-            string argument = "";
-            if (command != null && command.ArgCount >= 2)
-            {
-                argument = command.ArgByIndex(1).ToLower();
-            }
-
-            bool isConfirming = argument == "yes" || argument == "confirm";
-
-            if (!isConfirming)
-            {
-                // First time - ask for confirmation
-                if (player != null)
-                {
-                    pendingRestoreCurrentConfirmations[player.SteamID] = DateTime.Now;
-                }
-
-                ReplyToUserCommand(player, "========================================");
-                ReplyToUserCommand(player, $"⚠️  Restart Round {currentRound}?");
-                ReplyToUserCommand(player, "This will reload the round from the beginning.");
-                ReplyToUserCommand(player, "");
-                ReplyToUserCommand(player, $"To confirm, type: !restartround yes or !rr yes");
-                ReplyToUserCommand(player, $"(Expires in {RESTORE_CURRENT_CONFIRMATION_TIMEOUT_SECONDS}s)");
-                ReplyToUserCommand(player, "========================================");
-                return;
-            }
-
-            // Check if player has pending confirmation
-            if (player != null && pendingRestoreCurrentConfirmations.TryGetValue(player.SteamID, out DateTime confirmTime))
-            {
-                var elapsed = (DateTime.Now - confirmTime).TotalSeconds;
-
-                if (elapsed > RESTORE_CURRENT_CONFIRMATION_TIMEOUT_SECONDS)
-                {
-                    pendingRestoreCurrentConfirmations.Remove(player.SteamID);
-                    ReplyToUserCommand(player, "❌ Confirmation expired.");
-                    return;
-                }
-
-                // Valid confirmation - proceed
-                pendingRestoreCurrentConfirmations.Remove(player.SteamID);
-            }
-            else
-            {
-                ReplyToUserCommand(player, "❌ No pending restore. Use !restartround or !rr");
+                ReplyToUserCommand(player, $"The round may have just started. Try using !restore {currentRound} instead.");
                 return;
             }
 
@@ -333,7 +285,7 @@ namespace MatchZy
 
         [ConsoleCommand("css_restorelast", "Quickly restore the previous round")]
         [ConsoleCommand("css_rl", "Quickly restore the previous round")]
-        public void OnRestoreLastCommand(CCSPlayerController? player, CommandInfo command)
+        public void OnRestoreLastCommand(CCSPlayerController? player, CommandInfo? command)
         {
             if (!IsPlayerAdmin(player, "css_restorelast", "@css/config"))
             {
@@ -569,35 +521,103 @@ namespace MatchZy
                 {
                     gameRules.CTTimeOuts = int.Parse(ctTimeouts);
                 }
-                if (backupData.TryGetValue("valve_backup", out var valveBackup))
                 {
+                    backupData.TryGetValue("valve_backup", out var valveBackup);
+
+                    string csgoDir = Path.Combine(Server.GameDirectory, "csgo");
+                    // The .txt the engine itself wrote for this round, if it is still around. Two names
+                    // can point at it: the one built from the current match id, and the one carried by
+                    // the JSON backup's own file name (they differ once the match id changed since).
                     string tempFileName = fileName.Replace(".json", ".txt");
                     if (backupData.TryGetValue("round", out var roundNumber))
                     {
                         tempFileName = $"matchzy_{liveMatchId}_{matchConfig.CurrentMapNumber}_round{roundNumber}.txt";
                     }
-                    string tempFilePath = Path.Combine(Server.GameDirectory, "csgo", tempFileName);
+                    string tempFilePath = Path.Combine(csgoDir, tempFileName);
 
-                    if (!File.Exists(tempFilePath))
+                    var safeScript = SanitizeValveBackup(valveBackup);
+                    if (!string.IsNullOrWhiteSpace(safeScript))
                     {
-                        var safeScript = SanitizeValveBackup(valveBackup);
+                        // Always write the copy carried by the JSON backup. Only writing when the file is
+                        // absent means a stale or truncated .txt left in csgo/ by an earlier match with the
+                        // same match id and round number gets loaded instead, and the engine fails silently.
+                        if (File.Exists(tempFilePath))
+                        {
+                            long existingLength = new FileInfo(tempFilePath).Length;
+                            if (existingLength != safeScript.Length)
+                            {
+                                Log($"[RestoreRoundBackup] {tempFileName} on disk is {existingLength} bytes, backup carries {safeScript.Length}. Overwriting with the backup copy.");
+                            }
+                        }
                         File.WriteAllText(tempFilePath, safeScript);
+                        Log($"[RestoreRoundBackup] Wrote {tempFilePath} ({safeScript.Length} bytes) for restore of {fileName}.");
                     }
+                    else
+                    {
+                        // The JSON snapshot has no embedded copy: the engine had not written its own round
+                        // file yet when the snapshot was taken (round_start races mp_backup_round_auto).
+                        // The engine file usually lands a moment later and is still on disk, so load that
+                        // one instead of refusing the restore.
+                        string? diskBackup = FindValveRoundBackupOnDisk(csgoDir, tempFileName, fileName);
+                        if (diskBackup == null)
+                        {
+                            // Nothing to load: the round would stay exactly as it is while we announce a
+                            // successful restore and pause the match. Report it instead.
+                            Log($"[RestoreRoundBackup] {fileName} has no valve_backup data and no matching .txt in csgo/, nothing to restore.");
+                            ReplyToUserCommand(player, $"Backup {fileName} contains no round data, nothing was restored.");
+                            return;
+                        }
+
+                        tempFilePath = diskBackup;
+                        tempFileName = Path.GetFileName(tempFilePath);
+                        Log($"[RestoreRoundBackup] {fileName} carries no valve_backup, falling back to {tempFileName} ({new FileInfo(tempFilePath).Length} bytes) on disk.");
+                    }
+
                     int restoreTimer = liveSetupRequired ? 2 : 0;
                     if (liveSetupRequired)
                     {
                         SetupLiveFlagsAndCfg();
                     }
+                    // Scoreboard state belonging to the restored round, applied once the engine is done.
+                    string scoreboardJson = backupData.GetValueOrDefault("scoreboard", "");
+                    int restoredRoundsPlayed = 0;
+                    if (backupData.TryGetValue("round", out var restoredRound))
+                    {
+                        int.TryParse(restoredRound, out restoredRoundsPlayed);
+                    }
                     AddTimer(
                         restoreTimer,
                         () =>
                         {
-                            string fileName = Path.GetFileName(tempFilePath);
+                            var rules = GetGameRules();
+                            if (rules == null)
+                            {
+                                Log($"[RestoreRoundBackup FATAL] Game rules unavailable, cannot load {tempFileName}.");
+                                return;
+                            }
+
+                            int preRoundsPlayed = rules.TotalRoundsPlayed;
+                            (int preTeam1Score, int preTeam2Score) = GetTeamsScore();
+                            string loadFileName = Path.GetFileName(tempFilePath);
+
                             isRoundRestoring = true;
                             isSpawnKeeping = true;
-                            Server.ExecuteCommand($"mp_backup_restore_load_file {fileName}");
+                            Log(
+                                $"[RestoreRoundBackup] Loading {loadFileName}. Rounds played: {preRoundsPlayed}, score: {preTeam1Score}-{preTeam2Score}, target round: {restoredRoundsPlayed}."
+                            );
+                            Server.ExecuteCommand($"mp_backup_restore_load_file {loadFileName}");
                             Server.ExecuteCommand($"mp_teamname_1 {matchzyTeam1.teamName}");
                             Server.ExecuteCommand($"mp_teamname_2 {matchzyTeam2.teamName}");
+                            // Settle the pause state after the load, not before it: the live cfgs set
+                            // mp_backup_restore_load_autopause 1, so the engine pauses on its own here and
+                            // our own pause/unpause has to be the last thing that touches it.
+                            AddTimer(1.0f, HandleRestorePauseState);
+                            // The engine rewrites the scoreboard while it loads the backup, so roll it
+                            // back afterwards. Applied twice because the round restart that follows the
+                            // load can land between the two.
+                            AddTimer(1.2f, () => RestoreScoreboardState(scoreboardJson, restoredRoundsPlayed));
+                            AddTimer(3.0f, () => RestoreScoreboardState(scoreboardJson, restoredRoundsPlayed));
+                            AddTimer(3.5f, () => VerifyRoundRestore(player, fileName, restoredRoundsPlayed, preRoundsPlayed, preTeam1Score, preTeam2Score));
                         }
                     );
                 }
@@ -607,16 +627,280 @@ namespace MatchZy
                 Console.WriteLine($"[MatchZy] [RestoreRoundBackup - FATAL] {e}");
                 return;
             }
+            // The result is announced from VerifyRoundRestore instead of here: at this point the load
+            // command has only been queued, so announcing a successful restore now is a guess.
+        }
 
-            PrintToAllChat(Localizer["matchzy.restore.restoredsuccessfully", fileName]);
-            if (pauseAfterRoundRestore)
+        // Locates the round file the engine wrote itself (mp_backup_round_auto) for a MatchZy JSON backup
+        // that carries no embedded copy. Two names can point at the same round: the one built from the
+        // current match id and map number, and the JSON backup's own name with a .txt extension. Both are
+        // checked, and an empty file counts as not found.
+        private static string? FindValveRoundBackupOnDisk(string csgoDir, params string[] candidateNames)
+        {
+            foreach (var name in candidateNames)
             {
-                Server.ExecuteCommand("mp_pause_match;");
-                stopData["ct"] = false;
-                stopData["t"] = false;
-                isPaused = true;
-                unpauseData["pauseTeam"] = "RoundRestore";
+                if (string.IsNullOrWhiteSpace(name))
+                    continue;
+                string candidate = Path.Combine(csgoDir, Path.GetFileNameWithoutExtension(name) + ".txt");
+                if (File.Exists(candidate) && new FileInfo(candidate).Length > 0)
+                {
+                    return candidate;
+                }
+            }
+            return null;
+        }
+
+        // mp_backup_restore_load_file fails silently. A missing, stale or malformed .txt leaves the round
+        // exactly as it was while MatchZy has already announced a restore and paused the match, which
+        // looks to everyone like "the command did nothing". Compare the round counter against what the
+        // backup said it should be and report what actually happened.
+        private void VerifyRoundRestore(CCSPlayerController? player, string fileName, int expectedRoundsPlayed, int preRoundsPlayed, int preTeam1Score, int preTeam2Score)
+        {
+            var rules = GetGameRules();
+            if (rules == null)
+                return;
+
+            int roundsPlayed = rules.TotalRoundsPlayed;
+            (int team1Score, int team2Score) = GetTeamsScore();
+            Log(
+                $"[RestoreRoundBackup] Post-load state for {fileName}: rounds played {preRoundsPlayed} -> {roundsPlayed} (expected {expectedRoundsPlayed}), score {preTeam1Score}-{preTeam2Score} -> {team1Score}-{team2Score}."
+            );
+
+            // Restoring the round that is already loaded cannot move the counter, so there is nothing to
+            // check. Same when the counter did land on the round the backup was taken at.
+            if (preRoundsPlayed == expectedRoundsPlayed || roundsPlayed == expectedRoundsPlayed)
+            {
+                PrintToAllChat(Localizer["matchzy.restore.restoredsuccessfully", fileName]);
+                return;
+            }
+
+            // The engine ignored the file. Clear the restore flags: isRoundRestoring gates
+            // CreateMatchZyRoundDataBackup, and it is normally cleared by the round start that a
+            // successful load triggers, so leaving it set here would stop every later round backup.
+            isRoundRestoring = false;
+            isSpawnKeeping = false;
+            Log($"[RestoreRoundBackup FATAL] Engine did not load {fileName}. Rounds played is still {roundsPlayed}, expected {expectedRoundsPlayed}.");
+            PrintToAllChat($"{ChatColors.Red}Restore of {fileName} failed.{ChatColors.Default} The server did not load the round backup, match state is unchanged.");
+            if (IsPlayerValid(player))
+            {
+                ReplyToUserCommand(player, "mp_backup_restore_load_file did not take effect. See the server console for the backup file details.");
+            }
+        }
+
+        // Brings MatchZy's pause state in line with what the engine did after a backup was loaded.
+        // With matchzy_pause_after_restore enabled we own the pause, and matchzy_restore_unpause_delay
+        // decides whether it is lifted automatically or has to be unpaused manually. With it disabled we
+        // must actively unpause, because the engine's own mp_backup_restore_load_autopause already paused
+        // the match and MatchZy would think the game is running (leaving .unpause doing nothing).
+        private void HandleRestorePauseState()
+        {
+            restoreUnpauseTimer?.Kill();
+            restoreUnpauseTimer = null;
+
+            if (!pauseAfterRoundRestore)
+            {
+                Server.ExecuteCommand("mp_unpause_match;");
+                isPaused = false;
+                unpauseData["ct"] = false;
+                unpauseData["t"] = false;
+                unpauseData["pauseTeam"] = "";
+                pausedStateTimer?.Kill();
+                pausedStateTimer = null;
+                return;
+            }
+
+            Server.ExecuteCommand("mp_pause_match;");
+            stopData["ct"] = false;
+            stopData["t"] = false;
+            isPaused = true;
+            unpauseData["ct"] = false;
+            unpauseData["t"] = false;
+            unpauseData["pauseTeam"] = "RoundRestore";
+
+            if (!restoreAutoUnpause.Value)
+            {
+                // Manual: both teams (or an admin) have to use .unpause.
                 pausedStateTimer ??= AddTimer(chatTimerDelay, SendPausedStateMessage, TimerFlags.REPEAT);
+                return;
+            }
+
+            int delay = Math.Max(1, restoreUnpauseDelay.Value);
+            restoreUnpauseSecondsLeft = delay;
+            PrintToAllChat($"Round restored. Match unpauses in {ChatColors.Green}{delay}{ChatColors.Default} seconds. Use {ChatColors.Green}.pause{ChatColors.Default} if you are not ready.");
+            restoreUnpauseTimer = AddTimer(
+                1.0f,
+                () =>
+                {
+                    // A manual unpause, or any other pause taking over, cancels the countdown.
+                    if (!isPaused || (string)unpauseData["pauseTeam"] != "RoundRestore")
+                    {
+                        restoreUnpauseTimer?.Kill();
+                        restoreUnpauseTimer = null;
+                        return;
+                    }
+
+                    restoreUnpauseSecondsLeft--;
+                    if (restoreUnpauseSecondsLeft > 0)
+                    {
+                        if (restoreUnpauseSecondsLeft <= 5 || restoreUnpauseSecondsLeft % 10 == 0)
+                        {
+                            PrintToAllChat($"Unpausing in {ChatColors.Green}{restoreUnpauseSecondsLeft}{ChatColors.Default}...");
+                        }
+                        return;
+                    }
+
+                    restoreUnpauseTimer?.Kill();
+                    restoreUnpauseTimer = null;
+                    Server.ExecuteCommand("mp_unpause_match;");
+                    isPaused = false;
+                    unpauseData["ct"] = false;
+                    unpauseData["t"] = false;
+                    unpauseData["pauseTeam"] = "";
+                    pausedStateTimer?.Kill();
+                    pausedStateTimer = null;
+                    PrintToAllChat($"{ChatColors.Green}Match is live!{ChatColors.Default}");
+                },
+                TimerFlags.REPEAT | TimerFlags.STOP_ON_MAPCHANGE
+            );
+        }
+
+        // One player's scoreboard line as it looked when the backup was written.
+        private class ScoreboardSnapshot
+        {
+            public string SteamId { get; set; } = "";
+            public string Name { get; set; } = "";
+            public bool IsBot { get; set; }
+            public int Score { get; set; }
+            public int Mvps { get; set; }
+            public int Kills { get; set; }
+            public int Deaths { get; set; }
+            public int Assists { get; set; }
+            public int Damage { get; set; }
+            public int HeadShotKills { get; set; }
+            public int EnemiesFlashed { get; set; }
+            public int UtilityDamage { get; set; }
+            public int Objective { get; set; }
+            public int EquipmentValue { get; set; }
+            public int MoneySaved { get; set; }
+            public int KillReward { get; set; }
+            public int LiveTime { get; set; }
+            public int CashEarned { get; set; }
+        }
+
+        private string CaptureScoreboardSnapshot()
+        {
+            var snapshot = new List<ScoreboardSnapshot>();
+            try
+            {
+                foreach (var p in Utilities.GetPlayers())
+                {
+                    if (p == null || !p.IsValid || p.IsHLTV)
+                        continue;
+                    var stats = p.ActionTrackingServices?.MatchStats;
+                    if (stats == null)
+                        continue;
+                    snapshot.Add(
+                        new ScoreboardSnapshot
+                        {
+                            SteamId = p.IsBot ? "" : p.SteamID.ToString(),
+                            Name = p.PlayerName,
+                            IsBot = p.IsBot,
+                            Score = p.Score,
+                            Mvps = p.MVPs,
+                            Kills = stats.Kills,
+                            Deaths = stats.Deaths,
+                            Assists = stats.Assists,
+                            Damage = stats.Damage,
+                            HeadShotKills = stats.HeadShotKills,
+                            EnemiesFlashed = stats.EnemiesFlashed,
+                            UtilityDamage = stats.UtilityDamage,
+                            Objective = stats.Objective,
+                            EquipmentValue = stats.EquipmentValue,
+                            MoneySaved = stats.MoneySaved,
+                            KillReward = stats.KillReward,
+                            LiveTime = stats.LiveTime,
+                            CashEarned = stats.CashEarned,
+                        }
+                    );
+                }
+            }
+            catch (Exception e)
+            {
+                Log($"[CaptureScoreboardSnapshot] {e.Message}");
+            }
+            return JsonSerializer.Serialize(snapshot);
+        }
+
+        // Puts the scoreboard back to the restored round. mp_backup_restore_load_file only restores
+        // the score, the round number and the money: the round-history strip at the top of the
+        // scoreboard and every player's kills/deaths/assists/damage keep the values from the rounds
+        // that were rolled back, so a restored match still looks like the later rounds were played.
+        private void RestoreScoreboardState(string scoreboardJson, int roundsPlayed)
+        {
+            if (!restoreScoreboardStats.Value)
+                return;
+
+            try
+            {
+                var rules = GetGameRules();
+                var proxy = Utilities.FindAllEntitiesByDesignerName<CCSGameRulesProxy>("cs_gamerules").FirstOrDefault();
+                if (rules != null && proxy != null && roundsPlayed >= 0)
+                {
+                    var results = rules.MatchStats_RoundResults;
+                    var aliveCt = rules.MatchStats_PlayersAlive_CT;
+                    var aliveT = rules.MatchStats_PlayersAlive_T;
+                    for (int i = roundsPlayed; i < results.Length; i++)
+                        results[i] = 0;
+                    for (int i = roundsPlayed; i < aliveCt.Length; i++)
+                        aliveCt[i] = 0;
+                    for (int i = roundsPlayed; i < aliveT.Length; i++)
+                        aliveT[i] = 0;
+                    Utilities.SetStateChanged(proxy, "CCSGameRulesProxy", "m_pGameRules");
+                }
+
+                if (string.IsNullOrWhiteSpace(scoreboardJson))
+                    return;
+
+                var snapshot = JsonSerializer.Deserialize<List<ScoreboardSnapshot>>(scoreboardJson) ?? new List<ScoreboardSnapshot>();
+
+                foreach (var p in Utilities.GetPlayers())
+                {
+                    if (p == null || !p.IsValid || p.IsHLTV)
+                        continue;
+                    var stats = p.ActionTrackingServices?.MatchStats;
+                    if (stats == null)
+                        continue;
+
+                    // Humans match on SteamID so a reconnect still gets its own line back. Bots have no
+                    // usable SteamID, so they match on name. Anyone missing from the snapshot joined
+                    // after the backup was written and starts from zero.
+                    ScoreboardSnapshot? entry =
+                        p.IsBot ? snapshot.Find(s => s.IsBot && s.Name == p.PlayerName) : snapshot.Find(s => !s.IsBot && s.SteamId == p.SteamID.ToString());
+
+                    stats.Kills = entry?.Kills ?? 0;
+                    stats.Deaths = entry?.Deaths ?? 0;
+                    stats.Assists = entry?.Assists ?? 0;
+                    stats.Damage = entry?.Damage ?? 0;
+                    stats.HeadShotKills = entry?.HeadShotKills ?? 0;
+                    stats.EnemiesFlashed = entry?.EnemiesFlashed ?? 0;
+                    stats.UtilityDamage = entry?.UtilityDamage ?? 0;
+                    stats.Objective = entry?.Objective ?? 0;
+                    stats.EquipmentValue = entry?.EquipmentValue ?? 0;
+                    stats.MoneySaved = entry?.MoneySaved ?? 0;
+                    stats.KillReward = entry?.KillReward ?? 0;
+                    stats.LiveTime = entry?.LiveTime ?? 0;
+                    stats.CashEarned = entry?.CashEarned ?? 0;
+                    p.Score = entry?.Score ?? 0;
+                    p.MVPs = entry?.Mvps ?? 0;
+
+                    Utilities.SetStateChanged(p, "CCSPlayerController", "m_iScore");
+                    Utilities.SetStateChanged(p, "CCSPlayerController", "m_iMVPs");
+                    Utilities.SetStateChanged(p, "CCSPlayerController", "m_pActionTrackingServices");
+                }
+            }
+            catch (Exception e)
+            {
+                Log($"[RestoreScoreboardState] {e.Message}");
             }
         }
 
@@ -672,11 +956,48 @@ namespace MatchZy
                     { "match_loaded", isMatchSetup.ToString() },
                     { "match_config", GetMatchConfig() },
                     { "valve_backup", SanitizeValveBackup(valveBackupContent) },
+                    // Scoreboard snapshot: the engine keeps kills/deaths/damage and the round-history
+                    // strip as they were when the backup is loaded, so we have to put them back ourselves.
+                    { "scoreboard", CaptureScoreboardSnapshot() },
                 };
                 JsonSerializerOptions options = new() { WriteIndented = true };
                 string defaultJson = JsonSerializer.Serialize(roundData, options);
 
                 File.WriteAllText(filePath, defaultJson);
+
+                if (!lastBackupExists)
+                {
+                    // The engine writes its own round file (mp_backup_round_auto) around the same tick as
+                    // this round_start snapshot, so it is often not on disk yet and the JSON ends up with
+                    // an empty valve_backup - which used to make the restore of that round a no-op. Fill
+                    // it in once the engine is done.
+                    string pendingJsonPath = filePath;
+                    string pendingValvePath = lastBackupFilePath;
+                    AddTimer(
+                        2.0f,
+                        () =>
+                        {
+                            try
+                            {
+                                if (!File.Exists(pendingValvePath) || !File.Exists(pendingJsonPath))
+                                    return;
+                                string valveContent = SanitizeValveBackup(File.ReadAllText(pendingValvePath));
+                                if (string.IsNullOrWhiteSpace(valveContent))
+                                    return;
+                                var stored = JsonSerializer.Deserialize<Dictionary<string, string>>(File.ReadAllText(pendingJsonPath));
+                                if (stored == null || !string.IsNullOrWhiteSpace(stored.GetValueOrDefault("valve_backup", "")))
+                                    return;
+                                stored["valve_backup"] = valveContent;
+                                File.WriteAllText(pendingJsonPath, JsonSerializer.Serialize(stored, new JsonSerializerOptions { WriteIndented = true }));
+                                Log($"[CreateMatchZyRoundDataBackup] Filled in valve_backup for {Path.GetFileName(pendingJsonPath)} from {Path.GetFileName(pendingValvePath)}.");
+                            }
+                            catch (Exception ex)
+                            {
+                                Log($"[CreateMatchZyRoundDataBackup valve_backup fill-in] {ex.Message}");
+                            }
+                        }
+                    );
+                }
             }
             catch (Exception e)
             {
@@ -779,7 +1100,7 @@ namespace MatchZy
         [ConsoleCommand("css_backupmenu", "Shows available backups with restore commands")]
         [ConsoleCommand("css_backups", "Shows available backups with restore commands")]
         [ConsoleCommand("css_backup", "Shows available backups with restore commands")]
-        public void OnBackupMenuCommand(CCSPlayerController? player, CommandInfo command)
+        public void OnBackupMenuCommand(CCSPlayerController? player, CommandInfo? command)
         {
             if (!IsPlayerAdmin(player, "css_backupmenu", "@css/config"))
             {

@@ -14,7 +14,7 @@ namespace MatchZy
         // may construct before the engine pointer is ready (would throw → load abort).
         // Resolves to an existing case-variant dir (e.g. "MatchZy") if one is present,
         // so we don't create a duplicate lowercase "matchzy" on case-sensitive Linux fs.
-        private string ServerPath => ResolveConfigDir(Path.Combine(Server.GameDirectory, "csgo", "cfg"), "matchzy");
+        private string ServerPath => ResolveMatchZyCfgDir(Server.GameDirectory);
 
         // Public accessor so the exec path in MatchZy.Load() uses the SAME case-resolved
         // dir the config files were created in. Hardcoding lowercase "matchzy" for the
@@ -22,16 +22,46 @@ namespace MatchZy
         // e.g. "MatchZy" → config.cfg was never exec'd → user cvars (demo_path, etc.) ignored.
         public string GetMatchZyCfgDir() => ServerPath;
 
+        // Resolves csgo/cfg/matchzy without caring about the folder casing on disk. Safe to call
+        // off the main thread: it only touches the filesystem, never Server.* (pass the game
+        // directory captured beforehand).
+        public static string ResolveMatchZyCfgDir(string gameDirectory)
+        {
+            return ResolveConfigDir(Path.Combine(gameDirectory, "csgo", "cfg"), "matchzy");
+        }
+
+        // Picks ONE directory and always the same one, so reads and writes never end up in two
+        // different folders. A server that has both "matchzy" and "MatchZy" (an old upstream install
+        // plus a new one, on a case-sensitive Linux filesystem) used to get whichever one the
+        // filesystem happened to list first, which is why files kept appearing in the folder the
+        // admin was not using. Order: an exact "matchzy" wins, then an all-lowercase match, then the
+        // first match in a stable alphabetical order.
         private static string ResolveConfigDir(string parent, string name)
         {
             try
             {
                 if (Directory.Exists(parent))
                 {
+                    var matches = new List<string>();
                     foreach (var dir in Directory.GetDirectories(parent))
                     {
                         if (string.Equals(Path.GetFileName(dir), name, StringComparison.OrdinalIgnoreCase))
-                            return dir;
+                            matches.Add(dir);
+                    }
+                    if (matches.Count > 0)
+                    {
+                        matches.Sort(StringComparer.Ordinal);
+                        var exact = matches.Find(d => Path.GetFileName(d) == name);
+                        var lower = matches.Find(d => Path.GetFileName(d) == Path.GetFileName(d).ToLowerInvariant());
+                        var chosen = exact ?? lower ?? matches[0];
+                        if (matches.Count > 1)
+                        {
+                            Console.WriteLine(
+                                $"[MatchZy] [ConfigDir] csgo/cfg holds several MatchZy folders ({string.Join(", ", matches.ConvertAll(Path.GetFileName))}). "
+                                    + $"Using '{Path.GetFileName(chosen)}'. Delete the unused one so all settings live in a single folder."
+                            );
+                        }
+                        return chosen;
                     }
                 }
             }
@@ -144,6 +174,21 @@ matchzy_t_name """"
 // Players/admins can unpause the match using !unpause/.unpause. (For players, both the teams will have to use unpause command)
 matchzy_pause_after_restore true
 
+// Whether the match unpauses by itself after a round restore (!restore/!stop). Default value: false
+// false: the match stays paused until both teams (or an admin) use !unpause/.unpause
+// true: the match unpauses on its own after matchzy_restore_unpause_delay seconds
+// Requires matchzy_pause_after_restore to be enabled.
+matchzy_restore_auto_unpause false
+
+// Countdown in seconds before the automatic unpause after a round restore. Default value: 5
+// Only used when matchzy_restore_auto_unpause is enabled.
+matchzy_restore_unpause_delay 5
+
+// Whether a round restore also rolls the scoreboard back to the restored round. Default value: true
+// The game itself only restores the score, the round number and the money, so the round history at the
+// top of the scoreboard and the player kills/deaths/assists/damage keep showing the rolled back rounds.
+matchzy_restore_scoreboard_stats true
+
 // Chat prefix to show whenever a MatchZy message is sent to players. Default value: [{Green}MatchZy{Default}]
 // Available Colors: {Default}, {Darkred}, {Green}, {LightYellow}, {LightBlue}, {Olive}, {Lime}, {Red}, {Purple}, {Grey}, {Yellow}, {Gold}, {Silver}, {Blue}, {DarkBlue}
 // {BlueGrey}, {Magenta} and {LightRed}. Make sure to end your prefix with {Default} to avoid coloring the messages in your prefix color.
@@ -231,6 +276,15 @@ matchzy_match_end_auto_changelevel 1
 // can block players from connecting. Set to false to never register it.
 // The .map chat command stays available regardless of this setting.
 matchzy_map_console_command_enabled true
+
+// Only matters if you added a dot as a chat trigger in CounterStrikeSharp's configs/core.json,
+// for example: ""PublicChatTrigger"": [ ""!"", ""."" ]
+// CounterStrikeSharp then already runs the console command for a dot message (.map runs css_map)
+// before MatchZy sees the chat line, so MatchZy skips its own handling of those commands.
+// Without this, every such command runs twice and prints its reply twice.
+// Chat commands that have no console command of their own (.rdy, .knife, ...) are not affected.
+// Set to false to restore the old behaviour. Default value: true
+matchzy_dot_trigger_dedupe true
 ",
 
                 [ConfigFiles.Paths.Dryrun] =

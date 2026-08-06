@@ -16,7 +16,7 @@ namespace MatchZy
     public partial class MatchZy : BasePlugin
     {
         public override string ModuleName => "MatchZy";
-        public override string ModuleVersion => "0.8.71";
+        public override string ModuleVersion => "0.8.72";
         public override string ModuleAuthor => "WD- Edited by Miksen @ FSHOST.me";
         public override string ModuleDescription => "A plugin for running and managing CS2 practice/pugs/scrims/matches!";
         public string chatPrefix = $"{ChatColors.Green}[MatchZy]{ChatColors.Default}";
@@ -161,6 +161,17 @@ namespace MatchZy
         // Server time of the last accepted map-change request, to debounce a duplicate .map that
         // fires both the chat dispatch and css_map (on servers where '.' is a chat trigger).
         private float _lastMapChangeRequestTime = -999f;
+
+        // True when the server lists "." in PublicChatTrigger/SilentChatTrigger in CounterStrikeSharp's
+        // configs/core.json. CSS's Host_Say detour then routes ".cmd" to css_cmd BEFORE firing the
+        // player_chat event, so a dot command MatchZy also registers as css_* would run twice (the
+        // console handler, then the chat dispatch below) - two prints, two actions. Set in Load.
+        private bool _dotIsCssChatTrigger;
+
+        // Every console command name MatchZy itself registers ("css_ready", ...), collected by
+        // reflection in Load so it can never drift from the [ConsoleCommand] attributes. Used with
+        // _dotIsCssChatTrigger to decide which dot commands the chat dispatch must skip.
+        private readonly HashSet<string> _ownConsoleCommands = new(StringComparer.OrdinalIgnoreCase);
         public bool playerHasTakenDamage = false;
 
         // User command - action map
@@ -315,6 +326,7 @@ namespace MatchZy
                 // dir was e.g. "MatchZy" → execifexists skipped → config.cfg (demo_path etc.) ignored.
                 var matchzyCfgDir = configManager.GetMatchZyCfgDir();
                 var cfgFolderName = Path.GetFileName(matchzyCfgDir.TrimEnd('/'));
+                Log($"[ConfigDir] Using csgo/cfg/{cfgFolderName} for all MatchZy config files.");
                 var configPath = Path.Combine(matchzyCfgDir, ConfigFiles.Paths.Config);
                 if (File.Exists(configPath))
                 {
@@ -327,6 +339,8 @@ namespace MatchZy
                 // map change, one .map would fire TWO changelevels (MatchZy + that plugin via
                 // CSS routing .map -> css_map), disconnecting players (NETWORK_DISCONNECT_CREATE_SERVER_FAILED).
                 _conflictingMapPlugin = DetectConflictingMapPlugin();
+
+                DetectDotChatTrigger();
 
                 // Register css_map dynamically (NOT via a [ConsoleCommand] attribute) only when
                 // enabled AND no dedicated map plugin is present. Deferred so the config.cfg value
@@ -341,6 +355,9 @@ namespace MatchZy
                         return;
                     }
                     AddCommand("css_map", "Changes the map (map name or workshop id)", (p, c) => OnMapCommand(p, c));
+                    // Registered dynamically, so it carries no [ConsoleCommand] attribute for the
+                    // reflection sweep in DetectDotChatTrigger to find. Add it by hand.
+                    _ownConsoleCommands.Add("css_map");
                 });
 
                 teamSides[matchzyTeam1] = "CT";
@@ -516,6 +533,15 @@ namespace MatchZy
                 { ".exittraining", OnExitPracCommand },
                 { ".noprac", OnExitPracCommand },
                 { ".stop", OnStopCommand },
+                // Backup listing + quick restores. Without these the dot form was never dispatched
+                // (CSS only auto-routes ! and /), so .backup/.backups looked broken in game.
+                { ".backup", OnBackupMenuCommand },
+                { ".backups", OnBackupMenuCommand },
+                { ".backupmenu", OnBackupMenuCommand },
+                { ".restorelast", OnRestoreLastCommand },
+                { ".rl", OnRestoreLastCommand },
+                { ".restorecurrent", OnRestoreCurrentRoundCommand },
+                { ".rrestore", OnRestoreCurrentRoundCommand },
                 { ".help", OnHelpCommand },
                 { ".scrim", OnScrimCommand },
                 { ".playout", OnScrimCommand },
@@ -1293,6 +1319,24 @@ namespace MatchZy
                         return HookResult.Continue;
                     }
 
+                    // Duplicate-dispatch guard for servers that list "." in PublicChatTrigger /
+                    // SilentChatTrigger in CounterStrikeSharp's configs/core.json. CSS's Host_Say
+                    // detour routes ".cmd args" to "css_cmd args" and only fires player_chat
+                    // afterwards, so by the time we get here the console handler has ALREADY run.
+                    // Handling it a second time below executes the command twice and prints every
+                    // reply twice. Skip only the commands MatchZy itself registers as css_* - the
+                    // dot-only aliases (.rdy, .nr, .knife, ...) have no console twin, CSS does
+                    // nothing for those, and this dispatch stays their only handler.
+                    // See DetectDotChatTrigger (ConsoleCommands.cs).
+                    if (_dotIsCssChatTrigger && dotTriggerDedupe.Value && message.Length > 1 && message[0] == '.')
+                    {
+                        // messageCommand is the first whitespace-separated token of the ORIGINAL
+                        // (case-preserving) message, so lower it - console command names are lower.
+                        string dotWord = messageCommand.Length > 1 ? messageCommand.Substring(1).ToLower() : string.Empty;
+                        if (dotWord.Length > 0 && _ownConsoleCommands.Contains("css_" + dotWord))
+                            return HookResult.Continue;
+                    }
+
                     // Handling player commands - exact match first, then prefix-based
                     if (commandActions.TryGetValue(message, out var action))
                     {
@@ -1311,7 +1355,10 @@ namespace MatchZy
                         HandleReadyRequiredCommand(player, messageCommandArg);
                     }
 
-                    if (message.StartsWith(".restore"))
+                    // ".restore " with the space, so the argument-less aliases (.restorelast,
+                    // .restorecurrent, .rrestore) that already matched exactly above are not also
+                    // routed here and answered with "invalid value for restore command".
+                    if (message.StartsWith(".restore "))
                     {
                         HandleRestoreCommand(player, messageCommandArg);
                     }

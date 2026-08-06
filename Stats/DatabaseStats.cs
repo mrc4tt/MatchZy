@@ -838,6 +838,11 @@ namespace MatchZy
 
             // Serialize and save the default configuration to the file
             string defaultConfigJson = JsonSerializer.Serialize(defaultConfig, new JsonSerializerOptions { WriteIndented = true });
+            string? configDir = Path.GetDirectoryName(configFile);
+            if (!string.IsNullOrEmpty(configDir) && !Directory.Exists(configDir))
+            {
+                Directory.CreateDirectory(configDir);
+            }
             File.WriteAllText(configFile, defaultConfigJson);
 
             Log($"[InitializeDatabase] Default configuration file created at: {configFile}");
@@ -846,7 +851,9 @@ namespace MatchZy
         private void SetDatabaseConfig(string gameDirectory)
         {
             string fileName = "database.json";
-            string configFile = Path.Combine(gameDirectory + "/csgo/cfg/matchzy", fileName);
+            // Case-resolved like every other MatchZy file: a hardcoded lowercase path created a second
+            // cfg folder on servers whose folder is named differently, and database.json then went missing.
+            string configFile = Path.Combine(ConfigManager.ResolveMatchZyCfgDir(gameDirectory), fileName);
             if (!File.Exists(configFile))
             {
                 // Create a default configuration if the file doesn't exist

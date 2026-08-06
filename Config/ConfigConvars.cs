@@ -34,6 +34,12 @@ namespace MatchZy
 
         public FakeConVar<int> autoResumeDelay = new("matchzy_autopause_resume_delay", "Delay in seconds before auto-resuming when teams are balanced. Default: 3", 3);
 
+        public FakeConVar<bool> restoreAutoUnpause = new("matchzy_restore_auto_unpause", "Whether the match unpauses by itself after a round restore (!restore). When disabled, both teams (or an admin) must unpause. Requires matchzy_pause_after_restore. Default: false", false);
+
+        public FakeConVar<bool> restoreScoreboardStats = new("matchzy_restore_scoreboard_stats", "Whether a round restore also rolls back the scoreboard (round history and player kills/deaths/assists/damage) to the restored round. Default: true", true);
+
+        public FakeConVar<int> restoreUnpauseDelay = new("matchzy_restore_unpause_delay", "Countdown in seconds before the automatic unpause after a round restore. Only used when matchzy_restore_auto_unpause is enabled. Default: 5", 5);
+
         // Default MUST be "" so the auto "team_<playername>" naming in HandleMatchStart runs.
         // Non-empty default ("CT"/"T") always won the custom-name branch → demos/hostname
         // showed "CT" & "T" instead of team_<playername>.
@@ -91,6 +97,8 @@ namespace MatchZy
         public FakeConVar<bool> asayConsoleEnabled = new("matchzy_asay_console_enabled", "Whether MatchZy responds to the css_asay console command (!asay, all-chat). Disable if another plugin such as CS2-SimpleAdmin owns css_asay, to avoid duplicate chat output. The .asay chat command stays available regardless. Default: true", true);
 
         public FakeConVar<bool> mapConsoleCommandEnabled = new("matchzy_map_console_command_enabled", "Whether MatchZy registers the css_map console command (!map). MatchZy also auto-yields it: if a dedicated map plugin (CS2-SimpleAdmin / CS2MapChange) is installed alongside, css_map is NOT registered even when this is true, avoiding a ConCommand conflict that can block players from connecting. Set false to never register it. The .map chat command stays available regardless. Default: true", true);
+
+        public FakeConVar<bool> dotTriggerDedupe = new("matchzy_dot_trigger_dedupe", "Only has an effect when \".\" is listed in PublicChatTrigger/SilentChatTrigger in CounterStrikeSharp's configs/core.json. CSS then already runs css_<command> for a dot message before the chat event fires, so MatchZy skips its own chat dispatch for commands it registers as console commands - otherwise every such command runs twice and prints twice. Set to false to restore the old double-dispatch behaviour. Default: true", true);
 
         public FakeConVar<bool> coachDebugEnabled = new("matchzy_coach_debug", "Coach-spawn debug: logs/announces each real-player spawn reassignment, keeps coaches alive (no suicide) for inspection, and runs spawn enforcement during warmup so it can be tested with bots without starting a full match. Default: false", false);
 

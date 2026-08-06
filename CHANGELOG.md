@@ -4,6 +4,28 @@ Customized fork of [MatchZy](https://github.com/shobhit-pathak/MatchZy) by Shobh
 
 Fork version numbering is independent of upstream. Upstream changelog: <https://github.com/shobhit-pathak/MatchZy/blob/main/CHANGELOG.md>
 
+# 0.8.72
+
+#### August 5, 2026
+
+- Added matchzy_restore_auto_unpause. When enabled, the match unpauses on its own after a round restore instead of waiting for both teams to type .unpause. Default: false (unchanged behavior).
+- Added matchzy_restore_unpause_delay, the countdown in seconds used by the automatic unpause. Default: 5.
+- Fixed the match staying paused with no way to unpause when matchzy_pause_after_restore was disabled. The game already pauses itself on a backup load (mp_backup_restore_load_autopause), and MatchZy did not know about it, so .unpause did nothing.
+- Restoring a backup that holds no round data no longer reports a successful restore and pauses the match. The admin now gets a message that nothing was restored. If the server still has the round file the game itself wrote for that round, the restore now uses it instead of refusing.
+- Round backups no longer end up without round data. The backup was written at round start, at which point the game had not always finished writing its own round file yet, so the round data was missing and that round could not be restored later. The backup is now completed once the game is done.
+- A round restore is now announced only once the server has actually loaded it. If the load does not take effect, the restore is reported as failed in chat and the reason is written to the server console, instead of announcing a successful restore and pausing a match that never moved.
+- The round backup file is now rewritten from the stored backup every time before it is loaded. A leftover file from an earlier match with the same match id and round number was being loaded instead, which could make a restore do nothing.
+- Restoring the current round with !restorecurrent, !restartround, !rr or !rrestore no longer asks for a "yes" confirmation. The command is admin-only and !restore never asked for one.
+- Fixed .restorecurrent and .rrestore replying "invalid value for restore command" when typed with anything after the command name.
+- The pause after a round restore is now applied after the backup has actually been loaded, instead of before it.
+- A round restore now also rolls the scoreboard back: the round history above the scoreboard is cut to the restored round, and player kills, deaths, assists, damage, score and MVPs are set back to what they were in that round. Added matchzy_restore_scoreboard_stats to turn it off. Older backup files only get the round history rolled back, since they carry no player snapshot.
+- The chat commands .backup, .backups, .backupmenu, .restorelast, .rl, .restorecurrent and .rrestore now work. Only the !backup and /backup forms were reaching the plugin.
+- The round history above the scoreboard is now cleared when a match is ended and the server returns to warmup, instead of keeping the win icons of the finished match next to a 0-0 score.
+- Fixed MatchZy writing config files into a second cfg folder on servers that have both csgo/cfg/matchzy and csgo/cfg/MatchZy. One folder is now picked consistently (an exact lowercase "matchzy" first), and the folder in use is printed in the server log at startup. If both folders exist, a warning names the one being used so the unused folder can be deleted.
+- database.json is now read from the same cfg folder as the rest of the config files instead of a hardcoded lowercase path.
+- Fixed MatchZy commands running twice on servers that list "." as a chat trigger in CounterStrikeSharp's configs/core.json (for example "PublicChatTrigger": [ "!", "." ]). CounterStrikeSharp already turns ".map" into the css_map console command, and MatchZy handled the same chat line a second time, so the command was carried out twice and every reply was printed twice (".map junkname" answered "Invalid map name!" twice). MatchZy now detects the trigger at startup and leaves those commands to CounterStrikeSharp. Chat commands that have no console command of their own, such as .rdy and .knife, are unaffected. Servers using the default "!" and "/" triggers see no change.
+- Added matchzy_dot_trigger_dedupe to turn the above off (default: true). It only has an effect on servers that use "." as a chat trigger.
+
 # 0.8.71
 
 #### August 1, 2026

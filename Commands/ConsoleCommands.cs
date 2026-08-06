@@ -1,3 +1,4 @@
+using System.Reflection;
 using System.Text.RegularExpressions;
 using CounterStrikeSharp.API;
 using CounterStrikeSharp.API.Core;
@@ -923,7 +924,6 @@ namespace MatchZy
                 }
                 else
                 {
-                    var absolutePath = Path.Join(Server.GameDirectory + "/csgo/cfg" + "/matchzy");
                     ExecUnpracCommands();
                     CleanupAllCollisionTimers();
                     Server.PrintToChatAll($"{chatPrefix} {ChatColors.Green}Admin{ChatColors.Default} has started the warmup round!");
@@ -994,6 +994,55 @@ namespace MatchZy
             }
             catch { /* best effort - fall through to registering css_map */ }
             return null;
+        }
+
+        // Detect whether the server owner added "." to CounterStrikeSharp's chat triggers in
+        // addons/counterstrikesharp/configs/core.json, e.g.
+        //     "PublicChatTrigger": [ "!", "." ],
+        // and collect every console command MatchZy itself registers.
+        //
+        // Why this matters: CSS's Host_Say detour (chat_manager.cpp) dispatches "css_<cmd>" for a
+        // triggered message FIRST and fires the player_chat game event AFTERWARDS. MatchZy's own dot
+        // dispatch lives on that event, so with "." as a trigger a single ".ready" runs the console
+        // handler and then the chat handler - the command executes twice and every reply prints
+        // twice (".map junk" answered "Invalid map name!" twice, while "!map junk" answered once).
+        // ~170 of MatchZy's dot commands have a css_ twin, so this affects nearly all of them.
+        //
+        // The dot commands MatchZy has no console twin for (.rdy, .nr, .knife, .training, ...) are
+        // unaffected: CSS finds no css_ command for those and does nothing, so the chat dispatch
+        // stays the only handler. See the guard in the EventPlayerChat handler (Core/MatchZy.cs).
+        private void DetectDotChatTrigger()
+        {
+            try
+            {
+                _ownConsoleCommands.Clear();
+                foreach (var method in GetType().GetMethods(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance))
+                {
+                    foreach (var attr in method.GetCustomAttributes<ConsoleCommandAttribute>(false))
+                    {
+                        if (!string.IsNullOrEmpty(attr.Command))
+                            _ownConsoleCommands.Add(attr.Command);
+                    }
+                }
+
+                _dotIsCssChatTrigger = CoreConfig.PublicChatTrigger.Concat(CoreConfig.SilentChatTrigger)
+                    .Any(trigger => trigger == ".");
+
+                if (_dotIsCssChatTrigger)
+                {
+                    Log($"[ChatTrigger] '.' is configured as a CounterStrikeSharp chat trigger in core.json. "
+                        + $"CSS already runs css_<command> for a dot message, so MatchZy will skip its own chat dispatch "
+                        + $"for the {_ownConsoleCommands.Count} commands it registers as console commands (prevents duplicate output). "
+                        + $"Set matchzy_dot_trigger_dedupe 0 to disable this.");
+                }
+            }
+            catch (Exception ex)
+            {
+                // Best effort: on failure leave the flag false so behaviour matches the pre-fix
+                // plugin (duplicate output on a '.'-trigger server, but nothing else breaks).
+                _dotIsCssChatTrigger = false;
+                Log($"[ChatTrigger] Could not read CounterStrikeSharp chat triggers: {ex.Message}");
+            }
         }
 
         // NOT a [ConsoleCommand] - registered dynamically in Load() only when

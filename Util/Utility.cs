@@ -778,15 +778,7 @@ namespace MatchZy
                 {
                     try
                     {
-                        var rules = GetGameRules();
-                        var proxy = Utilities.FindAllEntitiesByDesignerName<CCSGameRulesProxy>("cs_gamerules").FirstOrDefault();
-                        if (rules != null && proxy != null)
-                        {
-                            rules.MatchStats_RoundResults.Clear();
-                            rules.MatchStats_PlayersAlive_CT.Clear();
-                            rules.MatchStats_PlayersAlive_T.Clear();
-                            Utilities.SetStateChanged(proxy, "CCSGameRulesProxy", "m_pGameRules");
-                        }
+                        ClearRoundHistory();
 
                         int startMoney = ConVar.Find("mp_startmoney")?.GetPrimitiveValue<int>() ?? 800;
 
@@ -836,10 +828,46 @@ namespace MatchZy
                 }
             );
 
+            // The round-history strip at the top of the scoreboard is not cleared by entering warmup:
+            // warmup.cfg has no mp_restartgame, so after .endmatch the icons of the played rounds stay
+            // on screen next to a 0-0 score. Clear it again once the warmup restart has settled.
+            AddTimer(5.0f, () => ClearRoundHistory());
+
             // Ensure spectator limit is properly set
             Server.ExecuteCommand("mp_spectators_max 20");
 
             ClearClanTags();
+        }
+
+        // Wipes the per-round win icons ("skulls") shown above the scoreboard, plus the round counters
+        // that decide how many of them the client draws. Only safe outside a running match, so a live
+        // round is never renumbered.
+        private void ClearRoundHistory()
+        {
+            if (matchStarted || isMatchLive)
+                return;
+            try
+            {
+                var rules = GetGameRules();
+                var proxy = Utilities.FindAllEntitiesByDesignerName<CCSGameRulesProxy>("cs_gamerules").FirstOrDefault();
+                if (rules == null || proxy == null)
+                {
+                    Log("[ClearRoundHistory] Game rules not available yet.");
+                    return;
+                }
+
+                rules.MatchStats_RoundResults.Clear();
+                rules.MatchStats_PlayersAlive_CT.Clear();
+                rules.MatchStats_PlayersAlive_T.Clear();
+                rules.TotalRoundsPlayed = 0;
+                rules.ITotalRoundsPlayed = 0;
+                rules.RoundsPlayedThisPhase = 0;
+                Utilities.SetStateChanged(proxy, "CCSGameRulesProxy", "m_pGameRules");
+            }
+            catch (Exception e)
+            {
+                Log($"[ClearRoundHistory] {e.Message}");
+            }
         }
 
         private void StartKnifeRound()
@@ -1247,9 +1275,11 @@ namespace MatchZy
             pausedStateTimer?.Kill();
             readyStatusHintTimer?.Kill();
             matchEndMapChangeTimer?.Kill();
+            restoreUnpauseTimer?.Kill();
             unreadyPlayerMessageTimer = null;
             sideSelectionMessageTimer = null;
             pausedStateTimer = null;
+            restoreUnpauseTimer = null;
             readyStatusHintTimer = null;
             matchEndMapChangeTimer = null;
         }
