@@ -931,9 +931,12 @@ sv_kick_ban_duration 0                          // How long should a kick ban fr
 sv_lan 0                                        // Server is a lan server ( no heartbeat, no authentication, no non-class C addresses )
 sv_competitive_minspec 1                        // Enable to force certain client convars to minimum/maximum values to help prevent competitive advantages.
 sv_pausable 0                                   // Is the server pausable.
+sv_pure 1
+sv_pure_kick_clients 0                          // If set to 1, the server will kick clients with mismatching files. Otherwise, it will issue a warning to the client.
+sv_pure_trace 0					// If set to 1, the server will print a message whenever a client is verifying a CR
 sv_spawn_afk_bomb_drop_time 30                 	// Players that spawn and don't move for longer than sv_spawn_afk_bomb_drop_time (default 15 seconds) will automatically drop the bomb.
 sv_steamgroup_exclusive 0                     	// If set, only members of Steam group will be able to join the server when it's empty, public people will be able to join the server only if it has players.
-sv_voiceenable 1 
+sv_voiceenable 1
 mp_starting_losses 1
 mp_teammates_are_enemies 0;
 mp_respawn_on_death_ct 0;

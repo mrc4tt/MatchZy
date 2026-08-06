@@ -4,6 +4,17 @@ Customized fork of [MatchZy](https://github.com/shobhit-pathak/MatchZy) by Shobh
 
 Fork version numbering is independent of upstream. Upstream changelog: <https://github.com/shobhit-pathak/MatchZy/blob/main/CHANGELOG.md>
 
+# 0.8.73
+
+#### August 6, 2026
+
+- A match that is stopped before it finishes now gets an end time written to the database. Stopping a match with .stopmatch, !endmatch, !forceend, !restart, !surrender or the Stop Match button in the admin menu left end_time empty in matchzy_stats_maps and matchzy_stats_matches, so the match stayed in the database looking like it was still running. The round score at the moment of the stop is stored as well.
+- A stopped match is recognisable by having an end time but no winner. The winner column is left empty on purpose, since a match that plays out always stores a team name or "Draw" there. Rows that already have an end time are never overwritten.
+- This also covers a match stopped during the knife round or side selection, which had already been given a database row at ready-up.
+- config.cfg is no longer part of the release zip. Unpacking an update over an existing server could overwrite an edited config.cfg and wipe the settings on it. Servers without a config.cfg still get a complete one written on the next plugin load, and servers that have one keep it: new cvars from an update are appended to it as before.
+- The release zip now contains database.json.example next to the config files, listing the MySQL fields. The real database.json is still never shipped, since overwriting it on an update would replace the server's MySQL login with the SQLite default and quietly stop stats from reaching the database.
+- scrim.cfg written by the plugin now includes sv_pure, sv_pure_kick_clients and sv_pure_trace, matching the scrim.cfg that ships in the release zip.
+
 # 0.8.72
 
 #### August 5, 2026

@@ -55,8 +55,19 @@ jobs:
           dotnet publish -c Release -o package/addons/counterstrikesharp/plugins/MatchZy
           # Ship cfgs under cfg/MatchZy/ so they extract to csgo/cfg/MatchZy/ - the dir the plugin
           # execs (exec matchzy/live.cfg etc).
+          #
+          # config.cfg is deliberately NOT shipped. It is the one cfg an admin is meant to edit, and
+          # extracting the zip over an existing install would overwrite their settings - which also
+          # defeats MergeMissingConfigCvars, whose whole point is to add new cvars without touching
+          # admin edits. A server that has no config.cfg still gets one: InitializeConfigs writes the
+          # full template on every plugin load when the file is missing (ConfigManager.CreateConfigFile).
           mkdir -p package/cfg/MatchZy
-          cp cfg/*.cfg package/cfg/MatchZy/
+          find cfg -maxdepth 1 -name '*.cfg' ! -name 'config.cfg' -exec cp {} package/cfg/MatchZy/ \;
+          # Reference copy of the database config. NOT shipped as database.json itself: that file
+          # holds the admin's MySQL credentials, and overwriting it on every update would silently
+          # drop the server back to local SQLite with no error anywhere. The plugin creates a real
+          # database.json (SQLite default) on first load if none exists.
+          cp database.json.example package/cfg/MatchZy/database.json.example
           # Ship MatchZy's gamedata so CounterStrikeSharp auto-loads it (it merges every *.json in
           # the gamedata dir). Provides the signatures MatchZy resolves by key - practice grenade
           # rethrow (.rt/.last/.back) and .breakrestore - so it works on stock CSS without editing
