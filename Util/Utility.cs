@@ -1840,7 +1840,7 @@ namespace MatchZy
 
             string seriesType = "BO" + matchConfig.NumMaps.ToString();
             string mapName = Server.MapName;
-            string serverIp = ConVar.Find("ip")?.StringValue ?? "0";
+            string serverIp = GetServerIpForStats();
 
             // Capture all state needed for DB init, then run async to avoid blocking game thread
             string team1Name = matchzyTeam1.teamName;
@@ -3463,7 +3463,11 @@ namespace MatchZy
 
                     stats["TeamName"] = teamName;
 
-                    playerStatsDictionary.Add(steamid64, stats);
+                    // Indexer, not Add: two playerData entries can resolve to the same SteamID
+                    // (a reconnect leaves the old userid behind for a tick). Add would throw
+                    // ArgumentException there, and the catch below wraps the whole loop, so one
+                    // duplicate discarded every remaining player's stats.
+                    playerStatsDictionary[steamid64] = stats;
 
                     // Populate PlayerStats instance
                     // Todo: Implement stats which are marked as 0 for now
@@ -3533,6 +3537,19 @@ namespace MatchZy
             catch (Exception e)
             {
                 Log($"[GetPlayerStatsDict FATAL] An error occurred: {e.Message}");
+            }
+
+            // Zero collected stats means nothing reaches matchzy_stats_players for this round.
+            // That used to be completely silent: the maps and matches tables kept filling up as
+            // normal, so the database looked healthy while every player row was missing. Name the
+            // likely cause instead - an empty playerData means GetPlayerTeam rejected every
+            // player, which is a match-config / side-mapping problem, not a database one.
+            if (playerStatsDictionary.Count == 0 && isMatchLive)
+            {
+                if (playerData.Count == 0)
+                    Log("[GetPlayerStatsDict] WARNING: playerData is empty during a live round, so no player stats will be recorded. Every connected player resolved to CsTeam.None - check the team rosters in the match config and the CT/T side mapping.");
+                else
+                    Log($"[GetPlayerStatsDict] WARNING: no player stats collected from {playerData.Count} playerData entries - none were valid or had ActionTrackingServices.");
             }
 
             return (playerStatsDictionary, playerStatsListTeam1, playerStatsListTeam2);
@@ -4064,6 +4081,25 @@ namespace MatchZy
             return false;
         }
 
+        /// <summary>
+        /// Builds the value stored in matchzy_stats_matches.server_ip, as "ip:port".
+        ///
+        /// The port matters: it is what identifies a specific server when several run on one box,
+        /// and it is what existing rows (and anything querying them) already contain. Reading only
+        /// the "ip" convar dropped it and made new rows inconsistent with the old ones.
+        ///
+        /// Must be called on the game thread - capture the result before any Task.Run.
+        /// </summary>
+        private static string GetServerIpForStats()
+        {
+            // "ip" is the BIND address, so it reads 0.0.0.0 ("all interfaces") unless the server was
+            // started with -ip. That is expected, not a bug - the port is what distinguishes servers
+            // sharing a host, and anything needing the public address can map it from the port.
+            string ip = ConVar.Find("ip")?.StringValue ?? "0";
+            int port = ConVar.Find("hostport")?.GetPrimitiveValue<int>() ?? 0;
+            return port > 0 ? $"{ip}:{port}" : ip;
+        }
+
         public void SwitchPlayerTeam(CCSPlayerController player, CsTeam team)
         {
             if (player.Team == team)
@@ -4071,6 +4107,12 @@ namespace MatchZy
 
             Server.NextFrame(() =>
             {
+                // Re-validate across the frame boundary: this runs a frame after the team event
+                // that triggered it, and the player can have disconnected in between. Calling
+                // SwitchTeam/ChangeTeam/Respawn on a freed controller takes the server down.
+                if (!IsPlayerValid(player))
+                    return;
+
                 if (team == CsTeam.Spectator)
                 {
                     player.ChangeTeam(team);

@@ -31,17 +31,11 @@ namespace MatchZy
 
         public void Dispose()
         {
-            lock (_connectionLock)
-            {
-                connection?.Close();
-                connection?.Dispose();
-                connection = null;
-            }
+            // Nothing to release: every DB operation opens and disposes its own
+            // connection (see CreateNewConnection), so no long-lived handle is held.
         }
 
-        private IDbConnection? connection;
         private string? _connectionString;
-        private readonly object _connectionLock = new();
 
         // Guards SQLitePCLRaw native initialization across plugins. The native
         // e_sqlite3 provider is not safe to initialize concurrently from multiple
@@ -105,23 +99,26 @@ namespace MatchZy
             ConnectDatabase(directory, gameDirectory);
             try
             {
-                EnsureConnectionOpen();
+                using IDbConnection conn = CreateNewConnection();
+                conn.Open();
 
                 // Log the actual connection type being used
-                string dbType = (connection is SqliteConnection) ? "SQLite" : "MySQL";
+                string dbType = (conn is SqliteConnection) ? "SQLite" : "MySQL";
                 Log($"[InitializeDatabase] Using {dbType} database");
 
                 // Create the `matchzy_stats_matches`, `matchzy_stats_players` and `matchzy_stats_maps` tables if they doesn't exist
-                if (connection is SqliteConnection)
+                if (conn is SqliteConnection)
                 {
-                    await CreateRequiredTablesSQLiteAsync();
+                    await CreateRequiredTablesSQLiteAsync(conn);
                     //Log("[InitializeDatabase] SQLite tables created successfully");
                 }
                 else
                 {
-                    await CreateRequiredTablesSQLAsync();
+                    await CreateRequiredTablesSQLAsync(conn);
                     //Log("[InitializeDatabase] MySQL tables created successfully");
                 }
+
+                await MigratePlayerColumnNamesAsync(conn);
             }
             catch (Exception ex)
             {
@@ -130,73 +127,69 @@ namespace MatchZy
             }
         }
 
-        private void EnsureConnectionOpen()
+        /// <summary>
+        /// Brings a matchzy_stats_players table created by an older build of this fork onto the
+        /// upstream column names.
+        ///
+        /// This fork briefly shipped enemies5k/4k/3k/2k where upstream (and therefore every
+        /// pre-existing database, and every web panel that reads one) uses enemy5ks/4ks/3ks/2ks.
+        /// CREATE TABLE IF NOT EXISTS does nothing to a table that already exists, so installing the
+        /// fork over an upstream database left the schema untouched and made every player INSERT
+        /// fail with "Unknown column 'enemies5k' in 'field list'". The exception was swallowed per
+        /// call, so matchzy_stats_matches and matchzy_stats_maps kept filling up normally while
+        /// matchzy_stats_players silently stayed empty for every match.
+        ///
+        /// Upstream's names are canonical here: they are what existing data and external tooling
+        /// already use. Only a database written by the affected fork builds needs renaming.
+        /// </summary>
+        private async Task MigratePlayerColumnNamesAsync(IDbConnection conn)
         {
-            lock (_connectionLock)
-            {
-                EnsureConnectionOpenLocked();
-            }
-        }
+            (string From, string To)[] renames =
+            [
+                ("enemies5k", "enemy5ks"),
+                ("enemies4k", "enemy4ks"),
+                ("enemies3k", "enemy3ks"),
+                ("enemies2k", "enemy2ks"),
+            ];
 
-        private void EnsureConnectionOpenLocked()
-        {
-            if (connection == null)
+            try
             {
-                throw new InvalidOperationException("Database connection is not initialized");
-            }
+                HashSet<string> columns = new(StringComparer.OrdinalIgnoreCase);
+                if (conn is SqliteConnection)
+                {
+                    foreach (var name in await conn.QueryAsync<string>("SELECT name FROM pragma_table_info('matchzy_stats_players')"))
+                        columns.Add(name);
+                }
+                else
+                {
+                    foreach (var name in await conn.QueryAsync<string>("SELECT COLUMN_NAME FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'matchzy_stats_players'"))
+                        columns.Add(name);
+                }
 
-            if (connection.State != ConnectionState.Open)
-            {
-                try
+                if (columns.Count == 0)
+                    return;
+
+                foreach (var (from, to) in renames)
                 {
-                    connection.Open();
-                }
-                catch (Exception ex)
-                {
-                    Log($"[EnsureConnectionOpen] Failed to open connection: {ex.Message}, attempting reconnect...");
-                    // For MySQL, try closing and reopening to handle stale connections
-                    if (connection is MySqlConnection mysqlConn)
-                    {
-                        try
-                        {
-                            mysqlConn.Close();
-                            mysqlConn.Open();
-                            Log("[EnsureConnectionOpen] MySQL reconnection successful");
-                        }
-                        catch (Exception reconnectEx)
-                        {
-                            Log($"[EnsureConnectionOpen - FATAL] Reconnect failed: {reconnectEx.Message}");
-                            throw;
-                        }
-                    }
-                    else
-                    {
-                        throw;
-                    }
+                    // Nothing to do when the column already carries the upstream name, and never
+                    // rename onto a name that is somehow already taken.
+                    if (!columns.Contains(from) || columns.Contains(to))
+                        continue;
+
+                    // MySQL 5.7 has no RENAME COLUMN, so use CHANGE (which needs the type restated).
+                    string sql = conn is SqliteConnection
+                        ? $"ALTER TABLE matchzy_stats_players RENAME COLUMN {from} TO {to}"
+                        : $"ALTER TABLE matchzy_stats_players CHANGE {from} {to} INT NOT NULL DEFAULT 0";
+
+                    await conn.ExecuteAsync(sql);
+                    Log($"[MigratePlayerColumnNames] Renamed matchzy_stats_players.{from} to {to}.");
                 }
             }
-            else if (connection is MySqlConnection)
+            catch (Exception ex)
             {
-                try
-                {
-                    // Validate the connection is still alive (server may have closed it due to wait_timeout)
-                    connection.ExecuteScalar<int>("SELECT 1");
-                }
-                catch (Exception ex)
-                {
-                    Log($"[EnsureConnectionOpen] MySQL stale connection detected: {ex.Message}, reconnecting...");
-                    try
-                    {
-                        connection.Close();
-                        connection.Open();
-                        Log("[EnsureConnectionOpen] MySQL reconnection successful");
-                    }
-                    catch (Exception reconnectEx)
-                    {
-                        Log($"[EnsureConnectionOpen - FATAL] Reconnect failed: {reconnectEx.Message}");
-                        throw;
-                    }
-                }
+                // Not fatal on its own, but it does mean player stats will keep failing to write,
+                // so say so plainly rather than leaving an empty table as the only symptom.
+                Log($"[MigratePlayerColumnNames - ERROR] Could not check or fix the player stats columns: {DescribeException(ex)}");
             }
         }
 
@@ -206,37 +199,43 @@ namespace MatchZy
             {
                 SetDatabaseConfig(gameDirectory);
 
-                if (databaseType == DatabaseType.SQLite)
-                {
-                    _connectionString = $"Data Source={Path.Join(directory, "matchzy.db")}";
-                    connection = new SqliteConnection(_connectionString);
-                    Log("[ConnectDatabase] SQLite connection created");
-                }
-                else if (config != null && databaseType == DatabaseType.MySQL)
+                if (config != null && databaseType == DatabaseType.MySQL)
                 {
                     _connectionString = $"Server={config.MySqlHost};Port={config.MySqlPort};Database={config.MySqlDatabase};User Id={config.MySqlUsername};Password={config.MySqlPassword};";
-                    connection = new MySqlConnection(_connectionString);
-                    Log("[ConnectDatabase] MySQL connection created");
+                    Log("[ConnectDatabase] MySQL connection string configured");
                 }
                 else
                 {
-                    _connectionString = $"Data Source={Path.Join(directory, "matchzy.db")}";
-                    connection = new SqliteConnection(_connectionString);
+                    // "Default Timeout" is how long a command waits out a SQLITE_BUSY before
+                    // giving up. It matters now that operations no longer share one handle:
+                    // two writers can briefly contend on the file lock.
+                    _connectionString = $"Data Source={Path.Join(directory, "matchzy.db")};Default Timeout=30";
                     databaseType = DatabaseType.SQLite;
-                    Log("[ConnectDatabase] Fallback to SQLite connection created");
+                    Log("[ConnectDatabase] SQLite connection string configured");
                 }
             }
             catch (Exception ex)
             {
-                Log($"[ConnectDatabase - ERROR] Failed to create connection: {ex.Message}");
+                Log($"[ConnectDatabase - ERROR] Failed to configure connection: {ex.Message}");
                 throw;
             }
         }
 
-        // Creates a fresh, dedicated DB connection from the pool. Used by
-        // operations that must not interleave with other DB work on the shared
-        // `connection` - notably matchid allocation, where LAST_INSERT_ID() /
-        // last_insert_rowid() are connection-scoped and corrupt under concurrency.
+        /// <summary>
+        /// Creates a fresh, dedicated DB connection. EVERY database operation must use one of
+        /// these and dispose it - never a shared field.
+        ///
+        /// Neither MySqlConnection nor SqliteConnection is thread-safe, and MatchZy issues DB work
+        /// from Task.Run on pool threads: round-end player stats, map-end data and the series-end
+        /// write all overlap at the end of the last round. Sharing one connection across those threw
+        /// "there is already an open DataReader" / connection-in-use, which the per-method catch
+        /// swallowed - so a whole match of player stats could vanish behind one log line. Per-call
+        /// connections make the overlap harmless; the pool (on by default for both providers) keeps
+        /// the open cost negligible.
+        ///
+        /// It also keeps LAST_INSERT_ID() / last_insert_rowid() honest - both are connection scoped,
+        /// so a shared handle can hand back another operation's id.
+        /// </summary>
         private IDbConnection CreateNewConnection()
         {
             if (_connectionString == null)
@@ -245,9 +244,9 @@ namespace MatchZy
             return databaseType == DatabaseType.MySQL ? new MySqlConnection(_connectionString) : new SqliteConnection(_connectionString);
         }
 
-        private async Task CreateRequiredTablesSQLiteAsync()
+        private async Task CreateRequiredTablesSQLiteAsync(IDbConnection conn)
         {
-            await connection!.ExecuteAsync(
+            await conn.ExecuteAsync(
                 $@"
             CREATE TABLE IF NOT EXISTS matchzy_stats_matches (
                 matchid INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -263,7 +262,7 @@ namespace MatchZy
             )"
             );
 
-            await connection!.ExecuteAsync(
+            await conn.ExecuteAsync(
                 @"
                 CREATE TABLE IF NOT EXISTS matchzy_stats_maps (
                     matchid INTEGER NOT NULL,
@@ -279,7 +278,7 @@ namespace MatchZy
                 )"
             );
 
-            await connection!.ExecuteAsync(
+            await conn.ExecuteAsync(
                 @"
                 CREATE TABLE IF NOT EXISTS matchzy_stats_players (
                     matchid INTEGER NOT NULL,
@@ -291,10 +290,10 @@ namespace MatchZy
                     deaths INTEGER NOT NULL DEFAULT 0,
                     assists INTEGER NOT NULL DEFAULT 0,
                     damage INTEGER NOT NULL DEFAULT 0,
-                    enemies5k INTEGER NOT NULL DEFAULT 0,
-                    enemies4k INTEGER NOT NULL DEFAULT 0,
-                    enemies3k INTEGER NOT NULL DEFAULT 0,
-                    enemies2k INTEGER NOT NULL DEFAULT 0,
+                    enemy5ks INTEGER NOT NULL DEFAULT 0,
+                    enemy4ks INTEGER NOT NULL DEFAULT 0,
+                    enemy3ks INTEGER NOT NULL DEFAULT 0,
+                    enemy2ks INTEGER NOT NULL DEFAULT 0,
                     utility_count INTEGER NOT NULL DEFAULT 0,
                     utility_damage INTEGER NOT NULL DEFAULT 0,
                     utility_successes INTEGER NOT NULL DEFAULT 0,
@@ -324,9 +323,9 @@ namespace MatchZy
             );
         }
 
-        private async Task CreateRequiredTablesSQLAsync()
+        private async Task CreateRequiredTablesSQLAsync(IDbConnection conn)
         {
-            await connection!.ExecuteAsync(
+            await conn.ExecuteAsync(
                 $@"
                 CREATE TABLE IF NOT EXISTS matchzy_stats_matches (
                     matchid BIGINT AUTO_INCREMENT PRIMARY KEY,
@@ -342,7 +341,7 @@ namespace MatchZy
                 )"
             );
 
-            await connection!.ExecuteAsync(
+            await conn.ExecuteAsync(
                 @"
                 CREATE TABLE IF NOT EXISTS matchzy_stats_maps (
                     matchid BIGINT NOT NULL,
@@ -358,7 +357,7 @@ namespace MatchZy
                 )"
             );
 
-            await connection!.ExecuteAsync(
+            await conn.ExecuteAsync(
                 @"
                 CREATE TABLE IF NOT EXISTS matchzy_stats_players (
                     matchid BIGINT NOT NULL,
@@ -370,10 +369,10 @@ namespace MatchZy
                     deaths INT NOT NULL DEFAULT 0,
                     assists INT NOT NULL DEFAULT 0,
                     damage INT NOT NULL DEFAULT 0,
-                    enemies5k INT NOT NULL DEFAULT 0,
-                    enemies4k INT NOT NULL DEFAULT 0,
-                    enemies3k INT NOT NULL DEFAULT 0,
-                    enemies2k INT NOT NULL DEFAULT 0,
+                    enemy5ks INT NOT NULL DEFAULT 0,
+                    enemy4ks INT NOT NULL DEFAULT 0,
+                    enemy3ks INT NOT NULL DEFAULT 0,
+                    enemy2ks INT NOT NULL DEFAULT 0,
                     utility_count INT NOT NULL DEFAULT 0,
                     utility_damage INT NOT NULL DEFAULT 0,
                     utility_successes INT NOT NULL DEFAULT 0,
@@ -419,11 +418,34 @@ namespace MatchZy
                     // Reuse existing match
                     matchId = currentMatchId;
 
-                    // Insert new map data
+                    // The matchid came from outside (match JSON "matchid", a backup file, G5), so
+                    // the parent matchzy_stats_matches row may not exist. matchzy_stats_maps has
+                    // FOREIGN KEY (matchid) REFERENCES matchzy_stats_matches (matchid), which
+                    // InnoDB enforces - inserting the map row first threw, InitMatch returned -1,
+                    // and every later write bailed on "Invalid matchId: -1", losing the whole
+                    // match's player stats. SQLite never enforced the FK, so this only ever showed
+                    // up on MySQL. Make the parent exist first, idempotently.
+                    await EnsureMatchRowAsync(conn, matchId, team1Name, team2Name, winner, seriesType, serverIp);
+
+                    // Insert new map data. Upsert rather than plain INSERT: reloading the same
+                    // matchid (e.g. restarting a match after a bad setup) otherwise violates
+                    // PRIMARY KEY (matchid, mapnumber) and fails the same way. Result columns
+                    // (winner/scores/end_time) are deliberately left alone - SetMatchEndData owns
+                    // those, and a series' earlier maps must not be reset by a later map's start.
                     await conn.ExecuteAsync(
-                        @"
-                        INSERT INTO matchzy_stats_maps (matchid, mapnumber, start_time, mapname)
-                        VALUES (@MatchId, @MapNumber, @StartTime, @MapName)",
+                        conn is SqliteConnection
+                            ? @"
+                            INSERT INTO matchzy_stats_maps (matchid, mapnumber, start_time, mapname)
+                            VALUES (@MatchId, @MapNumber, @StartTime, @MapName)
+                            ON CONFLICT(matchid, mapnumber) DO UPDATE SET
+                                start_time = excluded.start_time,
+                                mapname = excluded.mapname"
+                            : @"
+                            INSERT INTO matchzy_stats_maps (matchid, mapnumber, start_time, mapname)
+                            VALUES (@MatchId, @MapNumber, @StartTime, @MapName)
+                            ON DUPLICATE KEY UPDATE
+                                start_time = VALUES(start_time),
+                                mapname = VALUES(mapname)",
                         new
                         {
                             MatchId = matchId,
@@ -500,6 +522,68 @@ namespace MatchZy
             }
         }
 
+        /// <summary>
+        /// Makes sure matchzy_stats_matches holds a row for an externally supplied matchid, so the
+        /// child rows in matchzy_stats_maps / matchzy_stats_players satisfy their foreign key.
+        /// Idempotent: an existing row keeps its start_time, winner and end_time, and only the
+        /// descriptive columns are refreshed.
+        /// </summary>
+        private static async Task EnsureMatchRowAsync(IDbConnection conn, long matchId, string team1Name, string team2Name, string winner, string seriesType, string serverIp)
+        {
+            await conn.ExecuteAsync(
+                conn is SqliteConnection
+                    ? @"
+                    INSERT INTO matchzy_stats_matches (matchid, start_time, team1_name, team2_name, winner, series_type, server_ip)
+                    VALUES (@MatchId, @StartTime, @Team1Name, @Team2Name, @Winner, @SeriesType, @ServerIp)
+                    ON CONFLICT(matchid) DO UPDATE SET
+                        team1_name = excluded.team1_name,
+                        team2_name = excluded.team2_name,
+                        series_type = excluded.series_type,
+                        server_ip = excluded.server_ip"
+                    : @"
+                    INSERT INTO matchzy_stats_matches (matchid, start_time, team1_name, team2_name, winner, series_type, server_ip)
+                    VALUES (@MatchId, @StartTime, @Team1Name, @Team2Name, @Winner, @SeriesType, @ServerIp)
+                    ON DUPLICATE KEY UPDATE
+                        team1_name = VALUES(team1_name),
+                        team2_name = VALUES(team2_name),
+                        series_type = VALUES(series_type),
+                        server_ip = VALUES(server_ip)",
+                new
+                {
+                    MatchId = matchId,
+                    StartTime = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"),
+                    Team1Name = team1Name,
+                    Team2Name = team2Name,
+                    Winner = winner,
+                    SeriesType = seriesType,
+                    ServerIp = serverIp,
+                }
+            );
+        }
+
+        /// <summary>
+        /// Public entry point for the above, used when a match config supplies its own matchid.
+        /// Creating the parent row at load time (rather than at the first map insert) means a match
+        /// stopped during warmup or veto still has a row for SetMatchCancelled to close.
+        /// </summary>
+        public async Task<bool> EnsureMatchRowAsync(long matchId, string team1Name, string team2Name, string seriesType, string serverIp)
+        {
+            if (matchId <= 0)
+                return false;
+            try
+            {
+                using IDbConnection conn = CreateNewConnection();
+                conn.Open();
+                await EnsureMatchRowAsync(conn, matchId, team1Name, team2Name, "-", seriesType, serverIp);
+                return true;
+            }
+            catch (Exception ex)
+            {
+                Log($"[EnsureMatchRow - FATAL] Error: {DescribeException(ex)}");
+                return false;
+            }
+        }
+
         public async Task SetMatchEndDataAsync(long matchId, int mapNumber, string mapWinner, int team1Score, int team2Score, string matchWinner, int matchTeam1Score, int matchTeam2Score)
         {
             if (matchId == -1)
@@ -510,10 +594,11 @@ namespace MatchZy
 
             try
             {
-                EnsureConnectionOpen();
+                using IDbConnection conn = CreateNewConnection();
+                conn.Open();
 
                 // Update map data
-                await connection!.ExecuteAsync(
+                await conn.ExecuteAsync(
                     @"
                     UPDATE matchzy_stats_maps
                     SET end_time = @EndTime,
@@ -533,7 +618,7 @@ namespace MatchZy
                 );
 
                 // Update match data
-                await connection!.ExecuteAsync(
+                await conn.ExecuteAsync(
                     @"
                     UPDATE matchzy_stats_matches
                     SET end_time = @EndTime,
@@ -582,11 +667,12 @@ namespace MatchZy
 
             try
             {
-                EnsureConnectionOpen();
+                using IDbConnection conn = CreateNewConnection();
+                conn.Open();
 
                 string endTime = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss");
 
-                int mapRows = await connection!.ExecuteAsync(
+                int mapRows = await conn.ExecuteAsync(
                     @"
                     UPDATE matchzy_stats_maps
                     SET end_time = @EndTime,
@@ -603,7 +689,7 @@ namespace MatchZy
                     }
                 );
 
-                await connection!.ExecuteAsync(
+                await conn.ExecuteAsync(
                     @"
                     UPDATE matchzy_stats_matches
                     SET end_time = @EndTime,
@@ -640,8 +726,9 @@ namespace MatchZy
                 return;
             try
             {
-                EnsureConnectionOpen();
-                await connection!.ExecuteAsync(
+                using IDbConnection conn = CreateNewConnection();
+                conn.Open();
+                await conn.ExecuteAsync(
                     @"UPDATE matchzy_stats_matches
                       SET team1_name = @Team1Name, team2_name = @Team2Name
                       WHERE matchid = @MatchId",
@@ -667,9 +754,18 @@ namespace MatchZy
                 return;
             }
 
+            if (playerStatsDictionary.Count == 0)
+            {
+                Log($"[UpdatePlayerStats] Nothing to write for match {matchId} map {mapNumber}: the caller collected no player stats.");
+                return;
+            }
+
+            int written = 0;
+
             try
             {
-                EnsureConnectionOpen();
+                using IDbConnection conn = CreateNewConnection();
+                conn.Open();
 
                 foreach (var kvp in playerStatsDictionary)
                 {
@@ -677,13 +773,13 @@ namespace MatchZy
                     var playerStats = kvp.Value;
 
                     string sqlQuery;
-                    if (connection is SqliteConnection)
+                    if (conn is SqliteConnection)
                     {
                         sqlQuery =
                             @"
                             INSERT INTO matchzy_stats_players (
                                 matchid, mapnumber, steamid64, team, name, kills, deaths, assists, damage,
-                                enemies5k, enemies4k, enemies3k, enemies2k, utility_count, utility_damage,
+                                enemy5ks, enemy4ks, enemy3ks, enemy2ks, utility_count, utility_damage,
                                 utility_successes, utility_enemies, flash_count, flash_successes,
                                 health_points_removed_total, health_points_dealt_total, shots_fired_total,
                                 shots_on_target_total, v1_count, v1_wins, v2_count, v2_wins, entry_count,
@@ -706,10 +802,10 @@ namespace MatchZy
                                 deaths = excluded.deaths,
                                 assists = excluded.assists,
                                 damage = excluded.damage,
-                                enemies5k = excluded.enemies5k,
-                                enemies4k = excluded.enemies4k,
-                                enemies3k = excluded.enemies3k,
-                                enemies2k = excluded.enemies2k,
+                                enemy5ks = excluded.enemy5ks,
+                                enemy4ks = excluded.enemy4ks,
+                                enemy3ks = excluded.enemy3ks,
+                                enemy2ks = excluded.enemy2ks,
                                 utility_count = excluded.utility_count,
                                 utility_damage = excluded.utility_damage,
                                 utility_successes = excluded.utility_successes,
@@ -740,7 +836,7 @@ namespace MatchZy
                             @"
                             INSERT INTO matchzy_stats_players (
                                 matchid, mapnumber, steamid64, team, name, kills, deaths, assists, damage,
-                                enemies5k, enemies4k, enemies3k, enemies2k, utility_count, utility_damage,
+                                enemy5ks, enemy4ks, enemy3ks, enemy2ks, utility_count, utility_damage,
                                 utility_successes, utility_enemies, flash_count, flash_successes,
                                 health_points_removed_total, health_points_dealt_total, shots_fired_total,
                                 shots_on_target_total, v1_count, v1_wins, v2_count, v2_wins, entry_count,
@@ -763,10 +859,10 @@ namespace MatchZy
                                 deaths = VALUES(deaths),
                                 assists = VALUES(assists),
                                 damage = VALUES(damage),
-                                enemies5k = VALUES(enemies5k),
-                                enemies4k = VALUES(enemies4k),
-                                enemies3k = VALUES(enemies3k),
-                                enemies2k = VALUES(enemies2k),
+                                enemy5ks = VALUES(enemy5ks),
+                                enemy4ks = VALUES(enemy4ks),
+                                enemy3ks = VALUES(enemy3ks),
+                                enemy2ks = VALUES(enemy2ks),
                                 utility_count = VALUES(utility_count),
                                 utility_damage = VALUES(utility_damage),
                                 utility_successes = VALUES(utility_successes),
@@ -792,53 +888,70 @@ namespace MatchZy
                                 enemies_flashed = VALUES(enemies_flashed)";
                     }
 
-                    await connection!.ExecuteAsync(
-                        sqlQuery,
-                        new
-                        {
-                            matchId,
-                            mapNumber,
-                            steamid64,
-                            team = playerStats["TeamName"],
-                            name = playerStats["PlayerName"],
-                            kills = playerStats["Kills"],
-                            deaths = playerStats["Deaths"],
-                            damage = playerStats["Damage"],
-                            assists = playerStats["Assists"],
-                            enemy5ks = playerStats["Enemy5Ks"],
-                            enemy4ks = playerStats["Enemy4Ks"],
-                            enemy3ks = playerStats["Enemy3Ks"],
-                            enemy2ks = playerStats["Enemy2Ks"],
-                            utility_count = playerStats["UtilityCount"],
-                            utility_damage = playerStats["UtilityDamage"],
-                            utility_successes = playerStats["UtilitySuccess"],
-                            utility_enemies = playerStats["UtilityEnemies"],
-                            flash_count = playerStats["FlashCount"],
-                            flash_successes = playerStats["FlashSuccess"],
-                            health_points_removed_total = playerStats["HealthPointsRemovedTotal"],
-                            health_points_dealt_total = playerStats["HealthPointsDealtTotal"],
-                            shots_fired_total = playerStats["ShotsFiredTotal"],
-                            shots_on_target_total = playerStats["ShotsOnTargetTotal"],
-                            v1_count = playerStats["1v1Count"],
-                            v1_wins = playerStats["1v1Wins"],
-                            v2_count = playerStats["1v2Count"],
-                            v2_wins = playerStats["1v2Wins"],
-                            entry_count = playerStats["EntryCount"],
-                            entry_wins = playerStats["EntryWins"],
-                            equipment_value = playerStats["EquipmentValue"],
-                            money_saved = playerStats["MoneySaved"],
-                            kill_reward = playerStats["KillReward"],
-                            live_time = playerStats["LiveTime"],
-                            head_shot_kills = playerStats["HeadShotKills"],
-                            cash_earned = playerStats["CashEarned"],
-                            enemies_flashed = playerStats["EnemiesFlashed"],
-                        }
-                    );
+                    // Per-player try/catch: one row the server rejects (an unrepresentable
+                    // character in a name under a legacy column charset, a stray value) used to
+                    // abort the whole loop from the outer catch, so a single bad player discarded
+                    // every other player's stats for that round.
+                    try
+                    {
+                        await conn.ExecuteAsync(
+                            sqlQuery,
+                            new
+                            {
+                                matchId,
+                                mapNumber,
+                                steamid64,
+                                team = playerStats["TeamName"],
+                                name = playerStats["PlayerName"],
+                                kills = playerStats["Kills"],
+                                deaths = playerStats["Deaths"],
+                                damage = playerStats["Damage"],
+                                assists = playerStats["Assists"],
+                                enemy5ks = playerStats["Enemy5Ks"],
+                                enemy4ks = playerStats["Enemy4Ks"],
+                                enemy3ks = playerStats["Enemy3Ks"],
+                                enemy2ks = playerStats["Enemy2Ks"],
+                                utility_count = playerStats["UtilityCount"],
+                                utility_damage = playerStats["UtilityDamage"],
+                                utility_successes = playerStats["UtilitySuccess"],
+                                utility_enemies = playerStats["UtilityEnemies"],
+                                flash_count = playerStats["FlashCount"],
+                                flash_successes = playerStats["FlashSuccess"],
+                                health_points_removed_total = playerStats["HealthPointsRemovedTotal"],
+                                health_points_dealt_total = playerStats["HealthPointsDealtTotal"],
+                                shots_fired_total = playerStats["ShotsFiredTotal"],
+                                shots_on_target_total = playerStats["ShotsOnTargetTotal"],
+                                v1_count = playerStats["1v1Count"],
+                                v1_wins = playerStats["1v1Wins"],
+                                v2_count = playerStats["1v2Count"],
+                                v2_wins = playerStats["1v2Wins"],
+                                entry_count = playerStats["EntryCount"],
+                                entry_wins = playerStats["EntryWins"],
+                                equipment_value = playerStats["EquipmentValue"],
+                                money_saved = playerStats["MoneySaved"],
+                                kill_reward = playerStats["KillReward"],
+                                live_time = playerStats["LiveTime"],
+                                head_shot_kills = playerStats["HeadShotKills"],
+                                cash_earned = playerStats["CashEarned"],
+                                enemies_flashed = playerStats["EnemiesFlashed"],
+                            }
+                        );
+                        written++;
+                    }
+                    catch (Exception rowEx)
+                    {
+                        Log($"[UpdatePlayerStats - ERROR] Skipped steamid {steamid64} (name '{playerStats["PlayerName"]}'): {DescribeException(rowEx)}");
+                    }
+                }
+
+                if (written != playerStatsDictionary.Count)
+                {
+                    Log($"[UpdatePlayerStats] Wrote {written}/{playerStatsDictionary.Count} player rows for match {matchId} map {mapNumber}.");
                 }
             }
             catch (Exception ex)
             {
-                Log($"[UpdatePlayerStats - FATAL] Error inserting/updating data: {ex.Message}");
+                Log($"[UpdatePlayerStats - FATAL] Error inserting/updating data after {written} rows: {DescribeException(ex)}");
             }
         }
 
@@ -852,7 +965,8 @@ namespace MatchZy
 
             try
             {
-                EnsureConnectionOpen();
+                using IDbConnection conn = CreateNewConnection();
+                conn.Open();
 
                 string csvFilePath = $"{filePath}/match_data_map{mapNumber}_{matchId}.csv";
                 string? directoryPath = Path.GetDirectoryName(csvFilePath);
@@ -867,7 +981,7 @@ namespace MatchZy
                 using (var writer = new StreamWriter(csvFilePath))
                 using (var csv = new CsvWriter(writer, new CsvConfiguration(CultureInfo.InvariantCulture)))
                 {
-                    IEnumerable<dynamic> playerStatsData = await connection!.QueryAsync("SELECT * FROM matchzy_stats_players WHERE matchid = @MatchId AND mapnumber = @MapNumber ORDER BY team, kills DESC", new { MatchId = matchId, MapNumber = mapNumber });
+                    IEnumerable<dynamic> playerStatsData = await conn.QueryAsync("SELECT * FROM matchzy_stats_players WHERE matchid = @MatchId AND mapnumber = @MapNumber ORDER BY team, kills DESC", new { MatchId = matchId, MapNumber = mapNumber });
 
                     // Use the first data row to get the column names
                     dynamic? firstDataRow = playerStatsData.FirstOrDefault();

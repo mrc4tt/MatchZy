@@ -171,13 +171,32 @@ namespace MatchZy
             }
         }
 
+        /// <summary>
+        /// Copies the serialized fields of <paramref name="source"/> onto <paramref name="target"/>,
+        /// keeping the target's object identity. Required because teamSides is keyed by Team
+        /// reference; see the call site in RestoreRoundBackup. The runtime-only `coach` set is
+        /// intentionally not copied - it holds live controllers and is JsonIgnore'd.
+        /// </summary>
+        private static void CopyTeamData(Team source, Team target)
+        {
+            target.id = source.id;
+            target.teamName = source.teamName;
+            target.teamFlag = source.teamFlag;
+            target.teamTag = source.teamTag;
+            target.teamPlayers = source.teamPlayers;
+            target.seriesScore = source.seriesScore;
+        }
+
         public bool AddPlayerToTeam(string steamId, string name, JToken? team)
         {
-            if (matchzyTeam1.teamPlayers != null && matchzyTeam1.teamPlayers[steamId] != null)
+            // Shape-agnostic lookups: indexing a JArray roster with a string key throws.
+            if (!ulong.TryParse(steamId, out ulong parsedSteamId))
                 return false;
-            if (matchzyTeam2.teamPlayers != null && matchzyTeam2.teamPlayers[steamId] != null)
+            if (LookupRosterEntry(matchzyTeam1.teamPlayers, parsedSteamId))
                 return false;
-            if (matchConfig.Spectators != null && matchConfig.Spectators[steamId] != null)
+            if (LookupRosterEntry(matchzyTeam2.teamPlayers, parsedSteamId))
+                return false;
+            if (LookupRosterEntry(matchConfig.Spectators, parsedSteamId))
                 return false;
 
             if (team is JObject jObjectTeam)

@@ -450,11 +450,19 @@ namespace MatchZy
                     matchConfig = Newtonsoft.Json.JsonConvert.DeserializeObject<MatchConfig>(matchConfigValue)!;
                     SetupRoundBackupFile();
                 }
+                // Copy the restored values INTO the existing Team objects rather than replacing the
+                // references. teamSides is a Dictionary<Team, string> and Team has no Equals /
+                // GetHashCode override, so it is keyed by reference: swapping in fresh instances
+                // orphaned every teamSides entry, and the only place that re-registered them was
+                // the optional "team1_side" block below. A backup without that key left every
+                // teamSides[matchzyTeam1] lookup throwing KeyNotFound for the rest of the session,
+                // which made GetPlayerTeam return None for everyone. It also preserves the runtime
+                // `coach` set, which is JsonIgnore'd and would otherwise be silently emptied.
                 if (backupData.TryGetValue("team1", out var team1config))
                 {
                     var _t1 = Newtonsoft.Json.JsonConvert.DeserializeObject<Team>(team1config);
                     if (_t1 != null)
-                        matchzyTeam1 = _t1;
+                        CopyTeamData(_t1, matchzyTeam1);
                     else
                         Console.WriteLine("[MatchZy] [RestoreRoundBackup] team1 deserialization returned null.");
                 }
@@ -462,7 +470,7 @@ namespace MatchZy
                 {
                     var _t2 = Newtonsoft.Json.JsonConvert.DeserializeObject<Team>(team2config);
                     if (_t2 != null)
-                        matchzyTeam2 = _t2;
+                        CopyTeamData(_t2, matchzyTeam2);
                     else
                         Console.WriteLine("[MatchZy] [RestoreRoundBackup] team2 deserialization returned null.");
                 }
@@ -505,6 +513,13 @@ namespace MatchZy
                         isRoundRestorePending = true;
                         pendingRestoreFileName = fileName;
                         PrintToAllChat(Localizer["matchzy.restore.loadedsuccessfully", fileName]);
+                        // Nothing has been restored yet. In warmup the backup is only QUEUED here and
+                        // applied by HandleMatchStart once the match goes live. The line above reads
+                        // like the round is already back, so people ran the command a second time -
+                        // which takes the else branch and forces the restore immediately, making it
+                        // look like the command "only works if you type it twice". Spell out both.
+                        PrintToAllChat($"{ChatColors.Green}The backup is queued{ChatColors.Default} and will be restored when the match goes live. Ready up, or run the command again to restore right now.");
+                        Log($"[RestoreRoundBackup] Queued {fileName} during warmup; it will be applied when the match starts. Repeat the command to restore immediately.");
                         return;
                     }
                     else
@@ -535,42 +550,75 @@ namespace MatchZy
                     }
                     string tempFilePath = Path.Combine(csgoDir, tempFileName);
 
+                    // Two candidates can feed mp_backup_restore_load_file: the copy embedded in the
+                    // JSON snapshot, and the .txt the engine wrote itself. Pick between them on
+                    // COMPLETENESS, never blindly.
+                    //
+                    // The embedded copy is preferred when it is complete, because it definitely
+                    // belongs to this match: a .txt left in csgo/ by an earlier match with the same
+                    // match id and round number would otherwise be loaded instead.
+                    //
+                    // But it must not be preferred blindly. The snapshot is taken on round_start
+                    // (CreateMatchZyRoundDataBackup), the same tick the engine writes its own round
+                    // file, so ReadAllText can catch that file mid-write and store a TRUNCATED copy.
+                    // Overwriting the engine's now-complete .txt with that truncated copy made
+                    // mp_backup_restore_load_file fail silently - which looked exactly like ".restore
+                    // does nothing while a manual mp_backup_restore_load_file works", because the
+                    // manual path loads the intact engine file that .restore had clobbered.
                     var safeScript = SanitizeValveBackup(valveBackup);
-                    if (!string.IsNullOrWhiteSpace(safeScript))
+                    bool embeddedUsable = IsCompleteValveBackup(safeScript);
+
+                    string? diskContent = null;
+                    if (File.Exists(tempFilePath))
                     {
-                        // Always write the copy carried by the JSON backup. Only writing when the file is
-                        // absent means a stale or truncated .txt left in csgo/ by an earlier match with the
-                        // same match id and round number gets loaded instead, and the engine fails silently.
-                        if (File.Exists(tempFilePath))
+                        try
                         {
-                            long existingLength = new FileInfo(tempFilePath).Length;
-                            if (existingLength != safeScript.Length)
-                            {
-                                Log($"[RestoreRoundBackup] {tempFileName} on disk is {existingLength} bytes, backup carries {safeScript.Length}. Overwriting with the backup copy.");
-                            }
+                            diskContent = File.ReadAllText(tempFilePath);
+                        }
+                        catch (Exception ex)
+                        {
+                            Log($"[RestoreRoundBackup] Could not read {tempFileName}: {ex.Message}");
+                        }
+                    }
+                    bool diskUsable = IsCompleteValveBackup(diskContent);
+
+                    if (embeddedUsable)
+                    {
+                        if (diskUsable && diskContent!.Length != safeScript.Length)
+                        {
+                            Log($"[RestoreRoundBackup] {tempFileName} on disk is {diskContent.Length} chars, backup carries {safeScript.Length}. Both parse as complete; using the backup copy (it is known to belong to this match).");
                         }
                         File.WriteAllText(tempFilePath, safeScript);
-                        Log($"[RestoreRoundBackup] Wrote {tempFilePath} ({safeScript.Length} bytes) for restore of {fileName}.");
+                        Log($"[RestoreRoundBackup] Wrote {tempFilePath} ({safeScript.Length} chars) for restore of {fileName}.");
+                    }
+                    else if (diskUsable)
+                    {
+                        // The embedded copy is missing or truncated but the engine's own file is
+                        // intact. Load that and leave it alone - overwriting it here is what broke
+                        // the restore.
+                        Log(
+                            string.IsNullOrWhiteSpace(safeScript)
+                                ? $"[RestoreRoundBackup] {fileName} carries no valve_backup; loading the engine's own {tempFileName} ({diskContent!.Length} chars) instead."
+                                : $"[RestoreRoundBackup] valve_backup in {fileName} is incomplete ({safeScript.Length} chars, unbalanced); keeping the engine's own {tempFileName} ({diskContent!.Length} chars) instead."
+                        );
                     }
                     else
                     {
-                        // The JSON snapshot has no embedded copy: the engine had not written its own round
-                        // file yet when the snapshot was taken (round_start races mp_backup_round_auto).
-                        // The engine file usually lands a moment later and is still on disk, so load that
-                        // one instead of refusing the restore.
+                        // Neither candidate is usable under the expected name. Widen the search to the
+                        // other name this round can be stored under before giving up.
                         string? diskBackup = FindValveRoundBackupOnDisk(csgoDir, tempFileName, fileName);
                         if (diskBackup == null)
                         {
                             // Nothing to load: the round would stay exactly as it is while we announce a
                             // successful restore and pause the match. Report it instead.
-                            Log($"[RestoreRoundBackup] {fileName} has no valve_backup data and no matching .txt in csgo/, nothing to restore.");
-                            ReplyToUserCommand(player, $"Backup {fileName} contains no round data, nothing was restored.");
+                            Log($"[RestoreRoundBackup] {fileName} has no usable valve_backup data and no complete .txt in csgo/, nothing to restore.");
+                            ReplyToUserCommand(player, $"Backup {fileName} contains no usable round data, nothing was restored.");
                             return;
                         }
 
                         tempFilePath = diskBackup;
                         tempFileName = Path.GetFileName(tempFilePath);
-                        Log($"[RestoreRoundBackup] {fileName} carries no valve_backup, falling back to {tempFileName} ({new FileInfo(tempFilePath).Length} bytes) on disk.");
+                        Log($"[RestoreRoundBackup] Falling back to {tempFileName} ({new FileInfo(tempFilePath).Length} bytes) on disk.");
                     }
 
                     int restoreTimer = liveSetupRequired ? 2 : 0;
@@ -635,19 +683,83 @@ namespace MatchZy
         // that carries no embedded copy. Two names can point at the same round: the one built from the
         // current match id and map number, and the JSON backup's own name with a .txt extension. Both are
         // checked, and an empty file counts as not found.
-        private static string? FindValveRoundBackupOnDisk(string csgoDir, params string[] candidateNames)
+        private string? FindValveRoundBackupOnDisk(string csgoDir, params string[] candidateNames)
         {
             foreach (var name in candidateNames)
             {
                 if (string.IsNullOrWhiteSpace(name))
                     continue;
                 string candidate = Path.Combine(csgoDir, Path.GetFileNameWithoutExtension(name) + ".txt");
-                if (File.Exists(candidate) && new FileInfo(candidate).Length > 0)
+                if (!File.Exists(candidate))
+                    continue;
+                try
                 {
-                    return candidate;
+                    // Non-empty is not enough: a file caught mid-write by the engine parses as
+                    // nothing and makes mp_backup_restore_load_file fail without a word.
+                    if (IsCompleteValveBackup(File.ReadAllText(candidate)))
+                        return candidate;
+                }
+                catch (Exception ex)
+                {
+                    Log($"[FindValveRoundBackupOnDisk] Could not read {candidate}: {ex.Message}");
                 }
             }
             return null;
+        }
+
+        /// <summary>
+        /// Cheap completeness test for a Valve round backup. The file is KeyValues, so a complete
+        /// one has at least one block and balanced braces; a truncated write (the engine is still
+        /// flushing it when a round_start snapshot reads it) leaves them unbalanced. Braces inside
+        /// quoted values, and \" escapes, are ignored so map names and cvar values cannot skew it.
+        ///
+        /// This deliberately checks structure only, not schema - it has to stay correct across CS2
+        /// updates that add or rename keys.
+        /// </summary>
+        private static bool IsCompleteValveBackup(string? content)
+        {
+            if (string.IsNullOrWhiteSpace(content))
+                return false;
+
+            int depth = 0;
+            bool sawBlock = false;
+            bool inQuotes = false;
+            bool escaped = false;
+
+            foreach (char c in content)
+            {
+                if (escaped)
+                {
+                    escaped = false;
+                    continue;
+                }
+                if (c == '\\')
+                {
+                    escaped = true;
+                    continue;
+                }
+                if (c == '"')
+                {
+                    inQuotes = !inQuotes;
+                    continue;
+                }
+                if (inQuotes)
+                    continue;
+
+                if (c == '{')
+                {
+                    depth++;
+                    sawBlock = true;
+                }
+                else if (c == '}')
+                {
+                    depth--;
+                    if (depth < 0)
+                        return false;
+                }
+            }
+
+            return sawBlock && depth == 0 && !inQuotes;
         }
 
         // mp_backup_restore_load_file fails silently. A missing, stale or malformed .txt leaves the round
@@ -928,7 +1040,24 @@ namespace MatchZy
                 bool lastBackupExists = File.Exists(Path.Combine(Server.GameDirectory, "csgo", lastBackupFilePath));
                 lastBackupFilePath = Path.Combine(Server.GameDirectory, "csgo", lastBackupFilePath);
 
-                string valveBackupContent = lastBackupExists ? File.ReadAllText(lastBackupFilePath) : "";
+                // This runs on round_start, the same tick the engine writes its own round file, so the
+                // read can catch that file mid-write. A truncated copy stored here is permanent (the
+                // fill-in below only repairs an EMPTY valve_backup) and made the later restore load a
+                // corrupt file. Treat an incomplete read as "not there yet" so the fill-in handles it.
+                string valveBackupContent = "";
+                if (lastBackupExists)
+                {
+                    string rawValveBackup = File.ReadAllText(lastBackupFilePath);
+                    if (IsCompleteValveBackup(rawValveBackup))
+                    {
+                        valveBackupContent = rawValveBackup;
+                    }
+                    else
+                    {
+                        lastBackupExists = false;
+                        Log($"[CreateMatchZyRoundDataBackup] {Path.GetFileName(lastBackupFilePath)} is still being written ({rawValveBackup.Length} chars, unbalanced); leaving valve_backup empty for the fill-in pass.");
+                    }
+                }
 
                 Dictionary<string, string> roundData = new()
                 {
@@ -982,10 +1111,13 @@ namespace MatchZy
                                 if (!File.Exists(pendingValvePath) || !File.Exists(pendingJsonPath))
                                     return;
                                 string valveContent = SanitizeValveBackup(File.ReadAllText(pendingValvePath));
-                                if (string.IsNullOrWhiteSpace(valveContent))
+                                if (!IsCompleteValveBackup(valveContent))
                                     return;
                                 var stored = JsonSerializer.Deserialize<Dictionary<string, string>>(File.ReadAllText(pendingJsonPath));
-                                if (stored == null || !string.IsNullOrWhiteSpace(stored.GetValueOrDefault("valve_backup", "")))
+                                // Repair an incomplete stored copy too, not just an empty one: a
+                                // truncated valve_backup is what silently breaks the restore, and
+                                // "non-empty" used to be treated as good enough.
+                                if (stored == null || IsCompleteValveBackup(stored.GetValueOrDefault("valve_backup", "")))
                                     return;
                                 stored["valve_backup"] = valveContent;
                                 File.WriteAllText(pendingJsonPath, JsonSerializer.Serialize(stored, new JsonSerializerOptions { WriteIndented = true }));
@@ -1085,15 +1217,35 @@ namespace MatchZy
         [CommandHelper(minArgs: 1, usage: "<backup_file_name>")]
         public void OnLoadBackupCommand(CCSPlayerController? player, CommandInfo command)
         {
+            // Every reply below reaches the caller only. Invoked from chat that means one player's
+            // chat window and nothing in the server log, which is why "!loadbackup did nothing"
+            // could not be told apart from "!loadbackup was never dispatched". Log the entry so the
+            // server console shows what actually arrived.
+            string rawArgs = command.ArgString;
+            string callerName = player == null ? "server console" : player.PlayerName;
+            Log($"[OnLoadBackupCommand] Invoked by {callerName}, argc={command.ArgCount}, args='{rawArgs}'");
+
             if (!IsPlayerAdmin(player, "css_restore", "@css/config"))
             {
+                Log($"[OnLoadBackupCommand] Rejected: {callerName} is not an admin.");
                 SendPlayerNotAdminMessage(player);
                 return;
             }
 
             // var fileName = command.GetArg(1);
-            var fileName = ExtractJsonFileName(command.ArgString);
+            var fileName = ExtractJsonFileName(rawArgs);
 
+            // ExtractJsonFileName returns "" when it cannot find a .json name in the argument.
+            // Passing that on produced a "backup does not exist" reply naming an empty file, which
+            // reads like the command did nothing at all.
+            if (string.IsNullOrWhiteSpace(fileName))
+            {
+                Log($"[OnLoadBackupCommand] No .json file name could be read from '{rawArgs}'.");
+                ReplyToUserCommand(player, $"Could not read a backup file name from '{rawArgs}'. Usage: !loadbackup <backup_file_name>");
+                return;
+            }
+
+            Log($"[OnLoadBackupCommand] Restoring '{fileName}' for {callerName}.");
             RestoreRoundBackup(player, fileName);
         }
 

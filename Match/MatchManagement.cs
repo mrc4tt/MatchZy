@@ -437,7 +437,7 @@ namespace MatchZy
             // If JSON already supplied a valid matchid (positive), skip alloc.
             string seriesType = "BO" + matchConfig.NumMaps.ToString();
             string mapNameForInit = Server.MapName;
-            string serverIpForInit = ConVar.Find("ip")?.StringValue ?? "0";
+            string serverIpForInit = GetServerIpForStats();
             string team1NameForInit = matchzyTeam1.teamName;
             string team2NameForInit = matchzyTeam2.teamName;
             int currentMapNumForInit = matchConfig.CurrentMapNumber;
@@ -464,6 +464,14 @@ namespace MatchZy
                             break;
                         Log($"[LoadMatchFromJSON] eager alloc attempt {attempt + 1}/{backoffMs.Length} returned {allocatedId}, retrying...");
                     }
+                }
+                else
+                {
+                    // The JSON supplied the matchid, so nothing has allocated a parent row for it.
+                    // Create it now: matchzy_stats_maps/_players carry a foreign key to
+                    // matchzy_stats_matches, and it also gives .stopmatch during warmup/veto a row
+                    // to close out.
+                    await database.EnsureMatchRowAsync(allocatedId, team1NameForInit, team2NameForInit, seriesType, serverIpForInit);
                 }
 
                 Server.NextFrame(() =>
@@ -631,6 +639,19 @@ namespace MatchZy
             }
             else if (matchConfig.MapSides[mapNumber] == "knife")
             {
+                // The knife round decides who plays which side, but teamSides/reverseTeamSides
+                // still have to be seeded here. They are session-persistent dictionaries, so the
+                // branch that used to only set isKnifeRequired left the PREVIOUS match's mapping
+                // in place: after a halftime or a knife .switch that mapping is inverted, and
+                // after a round restore its keys can point at Team objects that no longer exist.
+                // GetPlayerTeam reads them to place every single player, so a carry-over either
+                // puts both teams on the wrong side or (on a stale key) resolves everyone to
+                // CsTeam.None, which drops them from playerData and leaves the server unlocked.
+                // Seed the canonical pre-knife layout; the .stay/.switch handlers swap from here.
+                teamSides[matchzyTeam1] = "CT";
+                teamSides[matchzyTeam2] = "TERRORIST";
+                reverseTeamSides["CT"] = matchzyTeam1;
+                reverseTeamSides["TERRORIST"] = matchzyTeam2;
                 isKnifeRequired = true;
             }
 
@@ -843,50 +864,85 @@ namespace MatchZy
         // so players can freely choose T/CT without being forced back to spectator.
         private bool IsTeamWhitelistConfigured()
         {
-            int t1Count = matchzyTeam1.teamPlayers is JObject t1Obj ? t1Obj.Count : 0;
-            int t2Count = matchzyTeam2.teamPlayers is JObject t2Obj ? t2Obj.Count : 0;
-            return t1Count > 0 || t2Count > 0;
+            return RosterSize(matchzyTeam1.teamPlayers) > 0 || RosterSize(matchzyTeam2.teamPlayers) > 0;
         }
 
+        // Counts a roster token in either supported shape. Counting only JObject meant an
+        // array-form roster read as "no whitelist" and quietly disabled team locking.
+        private static int RosterSize(JToken? roster)
+        {
+            return roster switch
+            {
+                JObject rosterObject => rosterObject.Count,
+                JArray rosterArray => rosterArray.Count,
+                _ => 0,
+            };
+        }
+
+        /// <summary>
+        /// Resolves the side a rostered player belongs on. Returns CsTeam.None when the player is
+        /// not in the match config - callers treat that as "not part of this match".
+        ///
+        /// None is also what a lookup failure degrades to, and that is expensive: every caller
+        /// (EventPlayerConnectFull, UpdatePlayersMap, the jointeam listener) skips a None player,
+        /// so a systematic failure here empties playerData, silently un-enforces team locking for
+        /// the whole server and leaves matchzy_stats_players empty for the match. Hence TryGetValue
+        /// plus a loud log rather than a bare indexer inside a catch-all.
+        /// </summary>
         private CsTeam GetPlayerTeam(CCSPlayerController player)
         {
-            CsTeam playerTeam = CsTeam.None;
             var steamId = player.SteamID;
             try
             {
-                if (matchzyTeam1.teamPlayers != null && matchzyTeam1.teamPlayers[steamId.ToString()] != null)
+                Team? rosteredTeam = null;
+                if (LookupRosterEntry(matchzyTeam1.teamPlayers, steamId))
+                    rosteredTeam = matchzyTeam1;
+                else if (LookupRosterEntry(matchzyTeam2.teamPlayers, steamId))
+                    rosteredTeam = matchzyTeam2;
+                else if (LookupRosterEntry(matchConfig.Spectators, steamId))
+                    return CsTeam.Spectator;
+
+                if (rosteredTeam == null)
+                    return CsTeam.None;
+
+                if (!teamSides.TryGetValue(rosteredTeam, out string? side))
                 {
-                    if (teamSides[matchzyTeam1] == "CT")
-                    {
-                        playerTeam = CsTeam.CounterTerrorist;
-                    }
-                    else if (teamSides[matchzyTeam1] == "TERRORIST")
-                    {
-                        playerTeam = CsTeam.Terrorist;
-                    }
+                    // teamSides is keyed by Team reference and has no entry for this object: the
+                    // side mapping was never seeded for this match, or the Team instances were
+                    // replaced (round restore) without re-registering them. Recover with the
+                    // canonical layout instead of dropping every player out of the match.
+                    Log($"[GetPlayerTeam - ERROR] No side registered for team '{rosteredTeam.teamName}'; reseeding default sides (team1=CT, team2=T).");
+                    teamSides[matchzyTeam1] = "CT";
+                    teamSides[matchzyTeam2] = "TERRORIST";
+                    reverseTeamSides["CT"] = matchzyTeam1;
+                    reverseTeamSides["TERRORIST"] = matchzyTeam2;
+                    side = teamSides[rosteredTeam];
                 }
-                else if (matchzyTeam2.teamPlayers != null && matchzyTeam2.teamPlayers[steamId.ToString()] != null)
-                {
-                    if (teamSides[matchzyTeam2] == "CT")
-                    {
-                        playerTeam = CsTeam.CounterTerrorist;
-                    }
-                    else if (teamSides[matchzyTeam2] == "TERRORIST")
-                    {
-                        playerTeam = CsTeam.Terrorist;
-                    }
-                }
-                else if (matchConfig.Spectators != null && matchConfig.Spectators[steamId.ToString()] != null)
-                {
-                    playerTeam = CsTeam.Spectator;
-                }
+
+                return side == "CT" ? CsTeam.CounterTerrorist : CsTeam.Terrorist;
             }
             catch (Exception ex)
             {
-                Log($"[GetPlayerTeam - FATAL] Exception occurred: {ex.Message}");
+                Log($"[GetPlayerTeam - FATAL] Exception occurred for {steamId}: {ex.Message}");
+                return CsTeam.None;
             }
+        }
 
-            return playerTeam;
+        /// <summary>
+        /// True when the steamid appears in a roster token. Accepts both shapes MatchZy match
+        /// configs use: a JObject keyed by steamid ({"765...": "Name"}) and a plain JArray of
+        /// steamids. A JArray indexed with a string key throws, which took the whole lookup down.
+        /// </summary>
+        private static bool LookupRosterEntry(JToken? roster, ulong steamId)
+        {
+            if (roster == null)
+                return false;
+            string key = steamId.ToString();
+            if (roster is JObject rosterObject)
+                return rosterObject[key] != null;
+            if (roster is JArray rosterArray)
+                return rosterArray.Any(entry => entry.Type == JTokenType.String && entry.ToString() == key);
+            return false;
         }
 
         public void EndSeries(string? winnerName, int restartDelay, int t1score, int t2score, bool writeEndData = true)
