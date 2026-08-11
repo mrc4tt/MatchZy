@@ -284,6 +284,12 @@ namespace MatchZy
             // cfg branch ran above.
             Server.ExecuteCommand("mp_autokick 0; mp_spawnprotectiontime 0; mp_td_dmgtokick 0; mp_td_dmgtowarn 0; mp_td_spawndmgthreshold 0; mp_tkpunish 0");
 
+            // prac.cfg runs mp_warmup_start, not a full mp_restartgame, so the round-history icons
+            // ("skulls") above the scoreboard survive whatever was played before - most visibly when
+            // going dryrun -> .prac, where the dryrun rounds stay on screen. Practice never wants a
+            // round history, so wipe it on entry (and again per round below).
+            ScheduleRoundHistoryWipe();
+
             GetSpawns();
             Server.PrintToChatAll($" {ChatColors.Green}Spawns: {ChatColors.Default}.spawn, .ctspawn, .tspawn, .bestspawn, .worstspawn");
             Server.PrintToChatAll($" {ChatColors.Green}Bots: {ChatColors.Default}.bot, .ctbot, .tbot, .nobots, .crouchbot, .boost, .crouchboost");
@@ -1099,6 +1105,7 @@ namespace MatchZy
             if (isDryRun)
             {
                 Server.ExecuteCommand("mp_restartgame 1");
+                ScheduleRoundHistoryWipe();
                 PrintToAllChat($"{ChatColors.Green}Dryrun restarted!");
                 return;
             }
@@ -1115,6 +1122,10 @@ namespace MatchZy
 
             isPractice = false;
             isDryRun = true;
+
+            // Start dryrun from an empty round-history strip - whatever practice/warmup left behind is
+            // not part of this dryrun. The rounds played during the dryrun then build up normally.
+            ScheduleRoundHistoryWipe();
         }
 
         [ConsoleCommand("css_exitdryrun", "Exit Dryrun (back to match warmup)")]
@@ -1142,6 +1153,9 @@ namespace MatchZy
             isDryRun = false;
             StartMatchMode();
             HandlePlayoutConfig();
+            // ExecExitDryCFG's mp_restartgame lands a few frames later and can re-stamp the round
+            // counters after StartMatchMode's wipe, leaving the dryrun icons on the warmup scoreboard.
+            ScheduleRoundHistoryWipe();
             ReplyToUserCommand(player, Localizer.ForPlayer(player, "matchzy.pm.exitdry"));
         }
 

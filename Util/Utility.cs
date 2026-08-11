@@ -831,7 +831,7 @@ namespace MatchZy
             // The round-history strip at the top of the scoreboard is not cleared by entering warmup:
             // warmup.cfg has no mp_restartgame, so after .endmatch the icons of the played rounds stay
             // on screen next to a 0-0 score. Clear it again once the warmup restart has settled.
-            AddTimer(5.0f, () => ClearRoundHistory());
+            ScheduleRoundHistoryWipe();
 
             // Ensure spectator limit is properly set
             Server.ExecuteCommand("mp_spectators_max 20");
@@ -868,6 +868,18 @@ namespace MatchZy
             {
                 Log($"[ClearRoundHistory] {e.Message}");
             }
+        }
+
+        // A single ClearRoundHistory() call loses a race against the mode-change cfg: mp_restartgame /
+        // mp_warmup_start finish on a later frame and stamp the round counters again, so the icons come
+        // back after the wipe. Retry over the window in which those settle. The wipe is idempotent and
+        // self-guarded (no-op once a match is live), so extra ticks are free.
+        private void ScheduleRoundHistoryWipe()
+        {
+            ClearRoundHistory();
+            AddTimer(2.0f, () => ClearRoundHistory());
+            AddTimer(5.0f, () => ClearRoundHistory());
+            AddTimer(8.0f, () => ClearRoundHistory());
         }
 
         private void StartKnifeRound()
@@ -948,8 +960,9 @@ namespace MatchZy
                 PrintToAllChat($"{ChatColors.Green}.tac {ChatColors.Default} - Tactical pause (4 x 30 seconds per team)");
                 PrintToAllChat($"{ChatColors.Green}.tech/.pause {ChatColors.Default} - Technical pause (indefinite)");
 
-                var tvEnableConVar = _cvTvEnable;
-                if (tvEnableConVar != null && tvEnableConVar.GetPrimitiveValue<bool>() == true)
+                // Re-announcing LIVE (unpause / resume): report the ACTUAL recording state rather than
+                // tv_enable, which only says GOTV exists on this server.
+                if (isDemoRecording)
                 {
                     PrintToAllChat($"{ChatColors.Green}CSTV Recording...");
                 }
@@ -1053,7 +1066,6 @@ namespace MatchZy
                             var clinch = ConVar.Find("mp_match_can_clinch")?.GetPrimitiveValue<bool>();
                             var maxr = ConVar.Find("mp_maxrounds")?.GetPrimitiveValue<int>();
                             var ot = ConVar.Find("mp_overtime_enable")?.GetPrimitiveValue<bool>();
-                            Log($"[MatchDebug] clinch={clinch} maxrounds={maxr} overtime={ot}");
                         }
                     );
                 }
@@ -1088,7 +1100,6 @@ namespace MatchZy
                             var clinch = ConVar.Find("mp_match_can_clinch")?.GetPrimitiveValue<bool>();
                             var maxr = ConVar.Find("mp_maxrounds")?.GetPrimitiveValue<int>();
                             var ot = ConVar.Find("mp_overtime_enable")?.GetPrimitiveValue<bool>();
-                            Log($"[ScrimDebug] clinch={clinch} maxrounds={maxr} overtime={ot}");
                         }
                     );
                 }
@@ -1125,10 +1136,10 @@ namespace MatchZy
             // Early clinch/overtime apply from live.cfg → forces UI to refresh trophy
             // icons when transitioning from scrim/hill back to match mode.
             Server.NextFrame(() => HandlePlayoutConfig());
-            // mp_restartgame in live.cfg fires ~1s after exec; calling tv_record
-            // synchronously here gets clobbered by the restart, producing empty
-            // demos. Defer past the restart so tv_record sticks.
-            AddTimer(2.0f, () => StartDemoRecording());
+            // live.cfg is followed by mp_restartgame (1s with a cfg file, 3s on the inline fallback),
+            // and that restart wipes an in-flight tv_record. ArmDemoStart waits for the restart to
+            // land, starts on the first round_start after it, and verifies the file afterwards.
+            ArmDemoStart();
             ClearClanTags();
 
             // Storing 0-0 score backup file as lastBackupFileName, so that .stop functions properly in first round.
@@ -1148,11 +1159,9 @@ namespace MatchZy
                 PrintToAllChat($"{ChatColors.Green}Please be aware that this match has overtime enabled, there is no tie.");
             }
 
-            var tvEnableConVar = _cvTvEnable;
-            if (tvEnableConVar != null && tvEnableConVar.GetPrimitiveValue<bool>() == true)
-            {
-                PrintToAllChat($"{ChatColors.Green}CSTV Recording...");
-            }
+            // "CSTV Recording..." is no longer printed here. tv_enable being 1 only means GOTV exists,
+            // not that the demo survived the cfg's mp_restartgame - the announcement now comes from
+            // the demo pipeline once the .dem is confirmed on disk (AnnounceDemoStatus).
 
             var goingLiveEvent = new GoingLiveEvent { MatchId = liveMatchId, MapNumber = matchConfig.CurrentMapNumber };
 
@@ -1172,11 +1181,10 @@ namespace MatchZy
                 HandlePlayoutConfig();
                 ForceScoreboardRefresh();
             });
-            // scrim.cfg does mp_restartgame, which clobbers a tv_record fired on a fixed timer
-            // (empty demos). Start the demo on the first live round_start AFTER the restart settles
-            // (HandlePostRoundStartEvent), immune to restart timing. Fallback timer if that never comes.
-            demoStartPending = true;
-            AddTimer(6.0f, () => { if (demoStartPending) StartDemoRecording(); });
+            // scrim.cfg is followed by mp_restartgame, which clobbers a tv_record fired before it.
+            // ArmDemoStart waits for the restart to land, starts on the first round_start after it,
+            // and verifies the file afterwards.
+            ArmDemoStart();
             ClearClanTags();
 
             // Storing 0-0 score backup file as lastBackupFileName, so that .stop functions properly in first round.
@@ -1190,11 +1198,9 @@ namespace MatchZy
             PrintToAllChat($"{ChatColors.Green}.tac {ChatColors.Default} - Tactical pause (4 x 30 seconds per team)");
             PrintToAllChat($"{ChatColors.Green}.tech/.pause {ChatColors.Default} - Technical pause (indefinite)");
 
-            var tvEnableConVar = _cvTvEnable;
-            if (tvEnableConVar != null && tvEnableConVar.GetPrimitiveValue<bool>() == true)
-            {
-                PrintToAllChat($"{ChatColors.Green}CSTV Recording...");
-            }
+            // "CSTV Recording..." is no longer printed here. tv_enable being 1 only means GOTV exists,
+            // not that the demo survived the cfg's mp_restartgame - the announcement now comes from
+            // the demo pipeline once the .dem is confirmed on disk (AnnounceDemoStatus).
 
             var goingLiveEvent = new GoingLiveEvent { MatchId = liveMatchId, MapNumber = matchConfig.CurrentMapNumber };
 
@@ -1213,11 +1219,10 @@ namespace MatchZy
                 HandlePlayoutConfig();
                 ForceScoreboardRefresh();
             });
-            // hill.cfg does mp_restartgame, which clobbers a tv_record fired on a fixed timer (empty
-            // demos). Start the demo on the first live round_start AFTER the restart settles
-            // (HandlePostRoundStartEvent), immune to restart timing. Fallback timer if that never comes.
-            demoStartPending = true;
-            AddTimer(6.0f, () => { if (demoStartPending) StartDemoRecording(); });
+            // hill.cfg is followed by mp_restartgame, which clobbers a tv_record fired before it.
+            // ArmDemoStart waits for the restart to land, starts on the first round_start after it,
+            // and verifies the file afterwards.
+            ArmDemoStart();
             ClearClanTags();
 
             // Storing 0-0 score backup file as lastBackupFileName, so that .stop functions properly in first round.
@@ -1231,11 +1236,9 @@ namespace MatchZy
             PrintToAllChat($"{ChatColors.Green}.tac {ChatColors.Default} - Tactical pause (4 x 30 seconds per team)");
             PrintToAllChat($"{ChatColors.Green}.tech/.pause {ChatColors.Default} - Technical pause (indefinite)");
 
-            var tvEnableConVar = _cvTvEnable;
-            if (tvEnableConVar != null && tvEnableConVar.GetPrimitiveValue<bool>() == true)
-            {
-                PrintToAllChat($"{ChatColors.Green}CSTV Recording...");
-            }
+            // "CSTV Recording..." is no longer printed here. tv_enable being 1 only means GOTV exists,
+            // not that the demo survived the cfg's mp_restartgame - the announcement now comes from
+            // the demo pipeline once the .dem is confirmed on disk (AnnounceDemoStatus).
 
             var goingLiveEvent = new GoingLiveEvent { MatchId = liveMatchId, MapNumber = matchConfig.CurrentMapNumber };
 
@@ -1260,7 +1263,6 @@ namespace MatchZy
                 // m_nRoundEndCount is nested under m_pGameRules pointer in proxy → can't
                 // resolve direct offset. Mark parent pointer dirty → full re-replicate.
                 Utilities.SetStateChanged(proxy, "CCSGameRulesProxy", "m_pGameRules");
-                Log($"[ForceScoreboardRefresh] m_nRoundEndCount={rules.RoundEndCount}");
             }
             catch (Exception ex)
             {
@@ -1552,7 +1554,6 @@ namespace MatchZy
             // Knife Round code referred from Get5, thanks to the Get5 team for their amazing job!
             (int tAlive, int tHealth) = GetAlivePlayers(2);
             (int ctAlive, int ctHealth) = GetAlivePlayers(3);
-            Log($"[KNIFE OVER] CT Alive: {ctAlive} with Total Health: {ctHealth}, T Alive: {tAlive} with Total Health: {tHealth}");
             if (ctAlive > tAlive)
             {
                 knifeWinner = 3;
@@ -1670,7 +1671,6 @@ namespace MatchZy
             }
             Server.ExecuteCommand("bot_kick");
 
-            Log($"[MapChange] Changing map to '{targetMap}' (workshop={isWorkshopId})");
             PrintToAllChat(Localizer["matchzy.utility.changingmap", targetMap]);
 
             // Capture for lambda
@@ -2325,10 +2325,13 @@ namespace MatchZy
 
             playerHasTakenDamage = false;
 
-            // Scrim/hill demo start: their cfg mp_restartgame clobbers a fixed-timer tv_record, so the
-            // start is deferred to here - the first live round_start after the restart settles. Only
-            // fires once (StartDemoRecording clears the flag).
-            if (demoStartPending && isMatchLive)
+            // Demo start: the going-live cfgs run mp_restartgame after their exec and that restart
+            // clobbers a tv_record issued before it, so the start is deferred to here - the first live
+            // round_start once demoStartArmTime has passed. Without the arm-time floor the pending flag
+            // was consumed by the mp_warmup_end round_start that fires just BEFORE the restart, which is
+            // exactly the case the deferral was meant to avoid. Only fires once (StartDemoRecording
+            // clears the flag).
+            if (demoStartPending && isMatchLive && Server.CurrentTime >= demoStartArmTime)
                 StartDemoRecording();
 
             HandleCoaches();
@@ -2731,6 +2734,7 @@ namespace MatchZy
             isPlayOutEnabled = true;
             isKnifeRound = false;
             isKnifeRequired = false;
+            ScheduleRoundHistoryWipe();
         }
 
         private void StartScrimMode()
@@ -2749,6 +2753,7 @@ namespace MatchZy
             isPlayOutEnabled = true;
             isKnifeRound = false;
             isKnifeRequired = false;
+            ScheduleRoundHistoryWipe();
         }
 
         private void StartMatchMode()
@@ -2766,6 +2771,7 @@ namespace MatchZy
             RemoveSpawnBeams();
             isMatchModeEnabled = true;
             isPractice = false; // Set it here to be safe
+            ScheduleRoundHistoryWipe();
         }
 
         private void ExecHillCFG()

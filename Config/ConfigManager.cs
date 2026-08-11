@@ -54,13 +54,6 @@ namespace MatchZy
                         var exact = matches.Find(d => Path.GetFileName(d) == name);
                         var lower = matches.Find(d => Path.GetFileName(d) == Path.GetFileName(d).ToLowerInvariant());
                         var chosen = exact ?? lower ?? matches[0];
-                        if (matches.Count > 1)
-                        {
-                            Console.WriteLine(
-                                $"[MatchZy] [ConfigDir] csgo/cfg holds several MatchZy folders ({string.Join(", ", matches.ConvertAll(Path.GetFileName))}). "
-                                    + $"Using '{Path.GetFileName(chosen)}'. Delete the unused one so all settings live in a single folder."
-                            );
-                        }
                         return chosen;
                     }
                 }

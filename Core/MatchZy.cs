@@ -856,6 +856,17 @@ namespace MatchZy
                 {
                     try
                     {
+                        // Practice rounds still tick (mp_roundtime 60), so the round-history strip
+                        // refills with icons nobody wants in practice. Wipe it again after each round
+                        // end; the engine bumps the counters during/just after the event, so a delayed
+                        // pass is needed on top of the next-frame one. Dryrun is excluded on purpose -
+                        // it plays real rounds and its history is meaningful until .exitdry.
+                        if (isPractice && !isDryRun && !matchStarted)
+                        {
+                            Server.NextFrame(() => ClearRoundHistory());
+                            AddTimer(2.0f, () => ClearRoundHistory());
+                        }
+
                         // Dryrun does NOT auto-end on round end: it keeps playing rounds (add bots, play
                         // with friends, run multiple rounds) until an admin explicitly runs .exitdry.
                         // So no special dryrun handling here - it simply falls through the !isMatchLive
@@ -878,6 +889,12 @@ namespace MatchZy
             {
                 // Re-arm AutoStart latch: allow exactly one AutoStart for this new map.
                 autoStartLatched = false;
+
+                // A map change stops GOTV recording engine-side. Map changes we do not drive ourselves
+                // (CS2-SimpleAdmin css_map, an RTV plugin, a plain changelevel) skip our teardown, so
+                // without this isDemoRecording stayed true and every later match silently refused to
+                // start a demo on the "already recording" guard.
+                ResetDemoStateOnMapStart();
 
                 // Coach-spawn markers: the beams/labels are destroyed by the map change but the toggle
                 // stayed "on" (stale entity handles). Refresh so .showcoachspawns keeps working across

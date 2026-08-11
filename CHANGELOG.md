@@ -8,6 +8,13 @@ Fork version numbering is independent of upstream. Upstream changelog: <https://
 
 #### August 6, 2026
 
+- Fixed GOTV/CSTV demos not being recorded on .match, .scrim and .hill. The cfg for each of those modes is followed by mp_restartgame, and that restart kills a recording started before it. The demo was started on the round change that the cfg itself causes, which happens just before the restart, so the recording was thrown away a second later and no .dem was ever written. The plugin now waits for the restart to finish before starting the demo.
+- The plugin now checks a few seconds after starting a demo that the file really exists on disk, and starts it again if it does not (up to three attempts). A dropped recording used to go unnoticed until the end of the map, when the demo turned out to be missing.
+- GOTV recording now also works on servers that enable GOTV from a config file. Only the tv_enable launch option was checked, so a server that set tv_enable 1 in autoexec.cfg, server.cfg or a hosting provider's own CSTV config recorded nothing and said nothing about it.
+- Fixed no demo being recorded for the rest of the session after a map change made by another plugin. A map change done through CS2-SimpleAdmin, an RTV plugin or the changelevel command did not go through MatchZy, so the plugin still believed a recording was running and refused to start a new one on every following match.
+- The "CSTV Recording..." message in chat is now only shown once the demo file has actually been created, and it is shown once per match. Previously it was printed at go-live whenever tv_enable was 1, which said the match was being recorded even when the recording had already been dropped. If no demo could be started, the server now says that in chat instead of staying silent.
+- Demos are now written continuously (tv_record_immediate) instead of being held in memory, so a demo of a match that ends in a server crash is no longer lost.
+- Demo recording now reports itself in the server log: when it starts, when it is confirmed on disk, when it is retried, when it stops, and the reason when it is not started at all.
 - A match that is stopped before it finishes now gets an end time written to the database. Stopping a match with .stopmatch, !endmatch, !forceend, !restart, !surrender or the Stop Match button in the admin menu left end_time empty in matchzy_stats_maps and matchzy_stats_matches, so the match stayed in the database looking like it was still running. The round score at the moment of the stop is stored as well.
 - A stopped match is recognisable by having an end time but no winner. The winner column is left empty on purpose, since a match that plays out always stores a team name or "Draw" there. Rows that already have an end time are never overwritten.
 - This also covers a match stopped during the knife round or side selection, which had already been given a database row at ready-up.
@@ -31,6 +38,8 @@ Fork version numbering is independent of upstream. Upstream changelog: <https://
 - Fixed a possible server crash when a player leaves in the same moment they are moved to their assigned team during match setup or veto. The team move is applied one frame later and the player was not re-checked in between.
 - !loadbackup now says when it cannot read a file name from what was typed, instead of reporting that a backup with an empty name does not exist. Every use of the command is also written to the server log with the file name it received, since its replies otherwise only reach the player who typed it.
 - Loading a backup during warmup now states that the backup is queued and will be restored once the match goes live. It previously reported that the backup had loaded successfully even though nothing had been restored yet, which is why running the command a second time appeared to be required: the second run forces the restore immediately. Both options are now named in the message.
+- The round icons above the scoreboard are now cleared when switching game mode. Rounds played in dryrun stayed on screen after .prac, .exitdry, .scrim or .hill, so practice or warmup started with a row of icons from a game that was already over. Entering and restarting a dryrun clears them as well, so a dryrun always starts from an empty row.
+- Practice mode keeps the row of round icons empty. Practice rounds still end and used to add an icon each time, filling the top of the scoreboard over a long session. Dryrun is unaffected and still builds up its round icons normally until .exitdry.
 
 # 0.8.72
 
