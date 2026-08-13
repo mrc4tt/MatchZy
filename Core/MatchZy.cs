@@ -16,7 +16,7 @@ namespace MatchZy
     public partial class MatchZy : BasePlugin
     {
         public override string ModuleName => "MatchZy";
-        public override string ModuleVersion => "0.8.73";
+        public override string ModuleVersion => "0.8.74";
         public override string ModuleAuthor => "WD- Edited by Miksen @ FSHOST.me";
         public override string ModuleDescription => "A plugin for running and managing CS2 practice/pugs/scrims/matches!";
         public string chatPrefix = $"{ChatColors.Green}[MatchZy]{ChatColors.Default}";
@@ -97,6 +97,7 @@ namespace MatchZy
 
         // Cached ConVar references - looked up once, avoid per-frame string lookups
         private ConVar? _cvTvEnable = null;
+        private ConVar? _cvTvDelay = null;
         private ConVar? _cvMatchRestartDelay = null;
         private ConVar? _cvMatchEndChangelevel = null;
         private ConVar? _cvMatchEndRestart = null;
@@ -633,6 +634,7 @@ namespace MatchZy
             });
 
             RegisterListener<Listeners.OnEntitySpawned>(OnEntitySpawnedHandler);
+            RegisterListener<Listeners.OnEntityDeleted>(OnEntityDeletedHandler);
             // Ready-panel HTML render: runs every tick but early-outs cheaply unless the ready
             // phase is active (matchzy_ready_hint_style = 1). Per-tick re-send keeps the panel
             // solid. NOTE: a ClientPrint suppression hook to hide the native "WARMUP" HUD was

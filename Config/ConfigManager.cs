@@ -155,13 +155,19 @@ matchzy_autopause_minplayers 5
 // Default value: 3
 matchzy_autopause_resume_delay 3
 
-// Set Custom Teamname for CT
-// Set to """" to disable/use default
+// Set a fixed scoreboard teamname for the CT starting side in scrim mode.
+// """" does NOT keep the game's own names: it falls back to automatic team_<playername> naming.
+// To keep the vanilla scoreboard names, set matchzy_auto_team_names_enabled 0 below.
 matchzy_ct_name """"
 
-// Set Custom Teamname for T.
-// Set to """" to disable/use default
+// Set a fixed scoreboard teamname for the T starting side in scrim mode.
+// """" does NOT keep the game's own names: it falls back to automatic team_<playername> naming.
 matchzy_t_name """"
+
+// Whether MatchZy sets scoreboard team names in scrim mode (team_<playername>, or the two cvars
+// above). 0 = MatchZy never touches team names in scrims and the game's own names stay.
+// Team names from a match config (Get5/JSON, .match) are always applied regardless. Default: 1
+matchzy_auto_team_names_enabled 1
 
 // Whether to pause the match after round restore or not. Default value: true
 // Players/admins can unpause the match using !unpause/.unpause. (For players, both the teams will have to use unpause command)
@@ -774,7 +780,6 @@ sv_hide_roundtime_until_seconds 0
                     @"
 mp_team_intro_time 0
 mp_freezetime 0
-bot_kick
 bot_quota 0
 mp_give_player_c4 0
 sv_cheats                           ""true"" 
@@ -1081,7 +1086,6 @@ sv_hide_roundtime_until_seconds 0
 
                 [ConfigFiles.Paths.Warmup] =
                     @"
-bot_kick
 bot_quota 0
 mp_autokick 0
 mp_autoteambalance 0

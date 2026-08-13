@@ -47,6 +47,11 @@ namespace MatchZy
 
         public FakeConVar<string> teamNameT = new("matchzy_t_name", "Set teamname for Terrorist. Set to \"\" to disable/use default.", "");
 
+        // When false, scrim mode leaves scoreboard team names alone: no team_<playername> auto-naming,
+        // no matchzy_ct_name/matchzy_t_name, mp_teamname_1/2 kept empty (vanilla names). Match mode
+        // (Get5/JSON setups) is unaffected - explicit team1/team2 names from the config still apply.
+        public FakeConVar<bool> autoTeamNamesEnabled = new("matchzy_auto_team_names_enabled", "Whether MatchZy sets scoreboard team names in scrim mode (team_<player> or matchzy_ct_name/matchzy_t_name). false = keep vanilla names. Match/JSON team names are unaffected. Default: true", true);
+
         public FakeConVar<bool> enableDamageReport = new("matchzy_enable_damage_report", "Whether to show damage report after each round or not. Default: true", true);
 
         // One convar picks the ready-status display mode:

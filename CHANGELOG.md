@@ -4,6 +4,19 @@ Customized fork of [MatchZy](https://github.com/shobhit-pathak/MatchZy) by Shobh
 
 Fork version numbering is independent of upstream. Upstream changelog: <https://github.com/shobhit-pathak/MatchZy/blob/main/CHANGELOG.md>
 
+# 0.8.74
+
+#### August 11, 2026
+
+- Demo recording is now verified by the file actually growing on disk, not only by the file existing. GOTV's demo writer buffers tv_delay seconds of frames in memory before anything past the header reaches disk, so the check waits out the configured GOTV delay plus a margin before it treats a static file as a dead recording. A dead recording is stopped and started again into a new file, up to three attempts.
+- The demo file is watched for the whole match, not only at the start. The file size is sampled once a minute; a recording whose file stops growing for several minutes in a row (scaled to the GOTV delay) is restarted into a new demo file. The restart is silent in chat and only reported in the server log.
+- A failed demo start runs tv_stoprecord before retrying, so a recording the engine considers open but stalled cannot make every retry fail with "already recording".
+- The plugin now sets tv_enable_dynamic 0 when a demo recording starts and when practice mode is set up. Dynamic CSTV (a +tv_enable_dynamic 1 launch option used by some hosts) removes the CSTV bot whenever nobody is spectating, which looks like the bot being kicked and can stall a running recording.
+- Practice bot commands (.bot and friends) no longer add a bot when the server has no free slot. bot_add on a full server takes the CSTV bot's slot, kicking CSTV and killing GOTV and the demo recording. The player gets a chat message that the server is full instead.
+- Bots are now kicked one by one by name instead of with a bare bot_kick (practice start and end, dryrun start, match reset, and the warmup and practice cfg templates). The bare bot_kick could also take out the CSTV bot, which killed GOTV and the demo recording.
+- Molotov and incendiary detonation times in practice are now tracked per projectile instead of per player, so throwing two mollies in a row prints a correct time for each. The molotov/incendiary label now comes from the grenade itself instead of the thrower's team, which mislabeled picked-up nades.
+- Added matchzy_auto_team_names_enabled. Set to 0 to stop MatchZy from renaming scoreboard teams in scrim mode (the automatic team_<playername> naming at knife/match start), keeping the game's own team names. Team names from a Get5/JSON match config are always applied regardless. Setting matchzy_ct_name or matchzy_t_name to "" never disabled the renaming, it only switched to the player-based naming; the config.cfg comments now say so.
+
 # 0.8.73
 
 #### August 6, 2026

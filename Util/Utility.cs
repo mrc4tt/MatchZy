@@ -1444,8 +1444,15 @@ namespace MatchZy
                 matchzyTeam1.seriesScore = 0;
                 matchzyTeam2.seriesScore = 0;
 
-                Server.ExecuteCommand($"mp_teamname_1 {matchzyTeam1.teamName}");
-                Server.ExecuteCommand($"mp_teamname_2 {matchzyTeam2.teamName}");
+                if (autoTeamNamesEnabled.Value)
+                {
+                    Server.ExecuteCommand($"mp_teamname_1 {matchzyTeam1.teamName}");
+                    Server.ExecuteCommand($"mp_teamname_2 {matchzyTeam2.teamName}");
+                }
+                else
+                {
+                    Server.ExecuteCommand("mp_teamname_1 \"\"; mp_teamname_2 \"\"");
+                }
 
                 teamSides[matchzyTeam1] = "CT";
                 teamSides[matchzyTeam2] = "TERRORIST";
@@ -1767,12 +1774,26 @@ namespace MatchZy
                 return;
             }
 
+            // Auto-naming disabled and both teams still on the scrim defaults (a Get5/JSON match has
+            // explicit names by now and never enters the rename branches below): record the side
+            // mapping (pauses/stats/side-swap depend on it) but keep the scoreboard vanilla by
+            // leaving mp_teamname_1/2 empty and skipping the rename branches.
+            bool vanillaTeamNames = !autoTeamNamesEnabled.Value && matchzyTeam1.teamName == "COUNTER-TERRORISTS" && matchzyTeam2.teamName == "TERRORISTS";
+            if (vanillaTeamNames)
+            {
+                teamSides[matchzyTeam1] = "CT";
+                reverseTeamSides["CT"] = matchzyTeam1;
+                teamSides[matchzyTeam2] = "TERRORIST";
+                reverseTeamSides["TERRORIST"] = matchzyTeam2;
+                Server.ExecuteCommand("mp_teamname_1 \"\"; mp_teamname_2 \"\"");
+            }
+
             // Get custom team names from config
             string customCTName = teamNameCt.Value?.Trim() ?? "";
             string customTName = teamNameT.Value?.Trim() ?? "";
 
             // Handle CT team naming
-            if (matchzyTeam1.teamName == "COUNTER-TERRORISTS")
+            if (!vanillaTeamNames && matchzyTeam1.teamName == "COUNTER-TERRORISTS")
             {
                 teamSides[matchzyTeam1] = "CT";
                 reverseTeamSides["CT"] = matchzyTeam1;
@@ -1803,7 +1824,7 @@ namespace MatchZy
             }
 
             // Handle T team naming
-            if (matchzyTeam2.teamName == "TERRORISTS")
+            if (!vanillaTeamNames && matchzyTeam2.teamName == "TERRORISTS")
             {
                 teamSides[matchzyTeam2] = "TERRORIST";
                 reverseTeamSides["TERRORIST"] = matchzyTeam2;
@@ -1833,8 +1854,11 @@ namespace MatchZy
                 }
             }
 
-            Server.ExecuteCommand($"mp_teamname_1 {reverseTeamSides["CT"].teamName}");
-            Server.ExecuteCommand($"mp_teamname_2 {reverseTeamSides["TERRORIST"].teamName}");
+            if (!vanillaTeamNames)
+            {
+                Server.ExecuteCommand($"mp_teamname_1 {reverseTeamSides["CT"].teamName}");
+                Server.ExecuteCommand($"mp_teamname_2 {reverseTeamSides["TERRORIST"].teamName}");
+            }
 
             HandleClanTags();
 

@@ -148,10 +148,16 @@ namespace MatchZy
         const float spawnMarkerStandHeight = 90.0f;     // vertical band for the standing-on check
         Dictionary<int, Dictionary<string, GrenadeThrownData>> nadeSpecificLastGrenadeData = new();
         Dictionary<int, DateTime> lastGrenadeThrownTime = new();
-        // Molotov/incendiary detonation time is keyed by PLAYER userid, not entity id: EventMolotovDetonate
-        // carries no usable entityid (never matched lastGrenadeThrownTime -> no message / absurd times), and
-        // the fire time is read on EventInfernoStartburn (ground burn) so a mid-air burst prints nothing.
-        Dictionary<int, DateTime> lastMolotovThrownTime = new();
+        // Molotov/incendiary detonation time is tracked PER PROJECTILE (entity index -> throw time +
+        // thrower), because a per-player slot made a second molotov overwrite the first (double-lineup
+        // practice printed wrong/missing times). EventMolotovDetonate carries no usable entityid, so the
+        // print happens when the PROJECTILE entity is deleted: the projectile dies the moment its fire
+        // starts, and OnEntityDeletedHandler pairs it with an EventInfernoStartburn seen for the same
+        // thrower within 0.2s (infernoStartTimes). A mid-air burst deletes the projectile with no
+        // startburn, so it correctly prints nothing. The startburn also records whether the fire came
+        // from an incendiary (SourceItemDefIndex 48) - the old TeamNum label lied for picked-up nades.
+        Dictionary<int, (DateTime Time, int Client)> molotovProjectileThrows = new();
+        Dictionary<int, (DateTime Time, bool IsIncendiary)> infernoStartTimes = new();
         Dictionary<int, PlayerPracticeTimer> playerTimers = new();
         Dictionary<int, PlayerLocationData> savedPlayerLocationData = new();
         // Named position slots (#2): .savepos <name> / .loadpos <name> / .listpos / .delpos <name>.
@@ -283,6 +289,10 @@ namespace MatchZy
             // round's team-damage penalties (kick / warn). Disable them in practice regardless of which
             // cfg branch ran above.
             Server.ExecuteCommand("mp_autokick 0; mp_spawnprotectiontime 0; mp_td_dmgtokick 0; mp_td_dmgtowarn 0; mp_td_spawndmgthreshold 0; mp_tkpunish 0");
+
+            // Clear leftover bots ourselves (by name, CSTV-safe) - the cfg templates no longer run a
+            // bare bot_kick, which could also take out the CSTV bot and kill GOTV.
+            KickAllBotsProtectCSTV();
 
             // prac.cfg runs mp_warmup_start, not a full mp_restartgame, so the round-history icons
             // ("skulls") above the scoreboard survive whatever was played before - most visibly when
@@ -1110,7 +1120,7 @@ namespace MatchZy
                 return;
             }
 
-            Server.ExecuteCommand("bot_kick");
+            KickAllBotsProtectCSTV();
             pracUsedBots = new Dictionary<int, Dictionary<string, object>>();
             noFlashList = new();
 
@@ -1249,6 +1259,22 @@ namespace MatchZy
             return args.Any(a => a.Equals("-nobots", StringComparison.OrdinalIgnoreCase) || a.Equals("+nobots", StringComparison.OrdinalIgnoreCase) || a.Equals("nobots", StringComparison.OrdinalIgnoreCase));
         }
 
+        /// <summary>
+        /// Kick every quota/practice bot by name instead of running a bare bot_kick. The bare form
+        /// (and the quota housekeeping of bot_quota_mode normal) can also take out the CSTV bot,
+        /// which kills GOTV and any running demo recording. Kicking by name skips the HLTV client
+        /// entirely. The quota is dropped to 0 first, else bot_quota_mode normal refills the bots.
+        /// </summary>
+        public void KickAllBotsProtectCSTV()
+        {
+            Server.ExecuteCommand("bot_quota 0");
+            foreach (var p in Utilities.GetPlayers())
+            {
+                if (p?.IsValid != true || !p.IsBot || p.IsHLTV) continue;
+                Server.ExecuteCommand($"bot_kick \"{p.PlayerName}\"");
+            }
+        }
+
         private bool CanSpawnAnotherBot(CCSPlayerController? player)
         {
             // Count current bots
@@ -1256,6 +1282,18 @@ namespace MatchZy
             if (currentBotCount >= MaxPracticeBots)
             {
                 player?.PrintToChat($" {ChatColors.Green}[MatchZy] {ChatColors.White}Maximum number of bots ({MaxPracticeBots}) already reached!");
+                return false;
+            }
+
+            // Protect the CSTV bot: bot_add on a full server makes the engine free a slot, and the
+            // slot it takes is the CSTV bot's - which kicks CSTV and kills GOTV/demo recording. Count
+            // every occupied slot (humans, bots AND CSTV) and refuse the spawn when there is no free
+            // slot left for the new bot.
+            int occupiedSlots = Utilities.GetPlayers().Count(p => p?.IsValid == true && p.Connected == PlayerConnectedState.Connected);
+            if (occupiedSlots + 1 > Server.MaxPlayers)
+            {
+                player?.PrintToChat($" {ChatColors.Green}[MatchZy] {ChatColors.White}Server is full ({occupiedSlots}/{Server.MaxPlayers} slots) - not adding a bot, it would kick the CSTV bot.");
+                Log($"[CanSpawnAnotherBot] Refused bot spawn: {occupiedSlots}/{Server.MaxPlayers} slots occupied, a bot_add would displace the CSTV bot.");
                 return false;
             }
             return true;
@@ -1944,7 +1982,7 @@ namespace MatchZy
                         if (!isPractice)
                             return;
 
-                        Server.ExecuteCommand("bot_kick");
+                        KickAllBotsProtectCSTV();
                     }
                     catch (Exception ex)
                     {
@@ -2447,7 +2485,7 @@ namespace MatchZy
             if (!isPractice || player == null)
                 return;
             // Drop the quota to 0 BEFORE kicking, else bot_quota_mode normal refills the kicked bots.
-            Server.ExecuteCommand("bot_quota 0; bot_kick");
+            KickAllBotsProtectCSTV();
             pracUsedBots = new Dictionary<int, Dictionary<string, object>>();
             CleanupAllCollisionTimers();
         }
@@ -3084,7 +3122,8 @@ namespace MatchZy
             // Drop pending detonation times: .clear before utility lands left stale entries that made a
             // later .rt print absurd flight times.
             lastGrenadeThrownTime.Clear();
-            lastMolotovThrownTime.Clear();
+            molotovProjectileThrows.Clear();
+            infernoStartTimes.Clear();
 
             var unique = GatherUtilityEntities();
             // Defer actual removal to next frame to avoid touching entities mid-update

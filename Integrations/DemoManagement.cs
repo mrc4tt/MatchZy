@@ -38,6 +38,16 @@ namespace MatchZy
         private int demoStartAttempts = 0;
         private const int DemoStartMaxAttempts = 3;
 
+        // Mid-match recording watchdog: the start-time growth check only proves the demo was alive
+        // during its first seconds. GOTV can stall later (tv_enable_dynamic spinning the bot down),
+        // so a repeating timer keeps sampling the file size for the whole match and restarts the
+        // recording if it stops growing.
+        private CounterStrikeSharp.API.Modules.Timers.Timer? demoWatchdogTimer;
+        private long demoWatchdogLastSize = 0;
+        private int demoWatchdogStalledChecks = 0;
+        private int demoWatchdogRequiredStrikes = 3;
+        private const float DemoWatchdogIntervalSeconds = 60.0f;
+
         // "CSTV Recording..." is announced once per demo and only once the file is confirmed on disk.
         // The going-live paths used to print it from tv_enable alone, so players were told the match
         // was being recorded even when the recording had already been thrown away.
@@ -78,6 +88,8 @@ namespace MatchZy
             demoStartAttempts = 0;
             demoAnnounced = false;
             activeDemoFile = "";
+            demoWatchdogTimer?.Kill();
+            demoWatchdogTimer = null;
         }
 
         private bool IsGOTVEnabled()
@@ -162,10 +174,18 @@ namespace MatchZy
         }
 
         /// <summary>
-        /// Confirm a short while later that GOTV actually produced the demo file, and retry if it did
-        /// not. A tv_record that the engine drops (an mp_restartgame landing right after it is the
-        /// usual cause) reports nothing at all, so without this the plugin believed it was recording
-        /// for the whole match and only the missing file at the end gave it away.
+        /// Confirm a short while later that GOTV is actually recording, and retry if it is not. A
+        /// tv_record that the engine drops (an mp_restartgame landing right after it is the usual
+        /// cause) reports nothing at all, so without this the plugin believed it was recording for
+        /// the whole match and only the missing file at the end gave it away.
+        ///
+        /// The existence check (6s) is what gates the retry and the "CSTV Recording..." announce:
+        /// the engine creates the .dem the moment it accepts tv_record, so a missing file means the
+        /// command was dropped. File GROWTH cannot be checked that early: GOTV's async demo writer
+        /// (HLTVServerAsync) holds tv_delay seconds of frames in memory before anything past the
+        /// header reaches disk, so the file legitimately sits at header size (~75 KB) for the whole
+        /// delay window. The growth probe therefore waits tv_delay plus a margin, and only then
+        /// treats a static file as a dead recording.
         /// </summary>
         private void VerifyDemoRecording(string expectedDemoFile)
         {
@@ -175,24 +195,135 @@ namespace MatchZy
                 if (!isDemoRecording || activeDemoFile != expectedDemoFile) return;
 
                 string fullPath = Path.Join(Server.GameDirectory + "/csgo/" + expectedDemoFile);
-                if (File.Exists(fullPath))
+                if (!File.Exists(fullPath))
                 {
-                    Log($"[Demo] Recording confirmed on disk: {expectedDemoFile}");
-                    AnnounceDemoStatus(true, "CSTV Recording...");
+                    HandleDemoStartFailure(expectedDemoFile, "never appeared on disk");
                     return;
                 }
 
-                // Clear the flag first, otherwise the retry is swallowed by the idempotency guard.
-                isDemoRecording = false;
-                if (demoStartAttempts >= DemoStartMaxAttempts)
+                Log($"[Demo] Recording confirmed on disk: {expectedDemoFile}");
+                AnnounceDemoStatus(true, "CSTV Recording...");
+
+                long sizeAtFirstCheck = 0;
+                try { sizeAtFirstCheck = new FileInfo(fullPath).Length; } catch { }
+
+                float growthGrace = DemoGrowthGraceSeconds();
+                AddTimer(growthGrace, () =>
                 {
-                    Log($"[Demo] GOTV demo {expectedDemoFile} never appeared on disk after {demoStartAttempts} attempts - giving up for this map.");
-                    AnnounceDemoStatus(false, "CSTV demo could not be started - this match is NOT being recorded.");
+                    if (!isDemoRecording || activeDemoFile != expectedDemoFile) return;
+
+                    long sizeNow = -1;
+                    try { if (File.Exists(fullPath)) sizeNow = new FileInfo(fullPath).Length; } catch { }
+
+                    if (sizeNow > sizeAtFirstCheck)
+                    {
+                        Log($"[Demo] Recording verified: {expectedDemoFile} is growing on disk ({sizeAtFirstCheck} -> {sizeNow} bytes).");
+                        StartDemoWatchdog(expectedDemoFile, sizeNow);
+                        return;
+                    }
+                    HandleDemoStartFailure(expectedDemoFile, $"is on disk but not growing {growthGrace:F0}s after the start ({sizeAtFirstCheck} -> {sizeNow} bytes)");
+                });
+            });
+        }
+
+        /// <summary>
+        /// How long after tv_record the .dem may legitimately stay at header size: the GOTV delay
+        /// (nothing hits disk before delayed frames exist) plus a small flush margin. The margin
+        /// cannot be zero - with tv_delay 0 the file still needs a moment to get past the header.
+        /// </summary>
+        private float DemoGrowthGraceSeconds()
+        {
+            return Math.Max(30.0f, GetTvDelaySeconds() + 30.0f);
+        }
+
+        private int GetTvDelaySeconds()
+        {
+            try
+            {
+                ConVar? tvDelay = _cvTvDelay ??= ConVar.Find("tv_delay");
+                if (tvDelay != null) return Math.Max(0, tvDelay.GetPrimitiveValue<int>());
+            }
+            catch { }
+            return 0;
+        }
+
+        /// <summary>
+        /// Keep watching the demo for the rest of the match. Every interval the file size is
+        /// sampled; only after enough consecutive samples with no growth is the recording declared
+        /// dead and restarted into a fresh file. The strike count is derived from tv_delay: the
+        /// async demo writer buffers the GOTV delay in memory, so a healthy recording can go a
+        /// delay's worth of seconds without the file moving, and restarting on a shorter stall
+        /// would kill a live recording (which is exactly what an early version of this did).
+        /// </summary>
+        private void StartDemoWatchdog(string expectedDemoFile, long knownSize)
+        {
+            demoWatchdogTimer?.Kill();
+            demoWatchdogTimer = null;
+            demoWatchdogLastSize = knownSize;
+            demoWatchdogStalledChecks = 0;
+
+            // Stall window: at least 2 minutes, and always past the GOTV delay.
+            float stallWindowSeconds = Math.Max(120.0f, GetTvDelaySeconds() + 60.0f);
+            demoWatchdogRequiredStrikes = (int)Math.Ceiling(stallWindowSeconds / DemoWatchdogIntervalSeconds);
+
+            demoWatchdogTimer = AddTimer(DemoWatchdogIntervalSeconds, () =>
+            {
+                // Recording stopped or replaced through the normal paths - watchdog is done.
+                if (!isDemoRecording || activeDemoFile != expectedDemoFile)
+                {
+                    demoWatchdogTimer?.Kill();
+                    demoWatchdogTimer = null;
                     return;
                 }
-                Log($"[Demo] GOTV demo {expectedDemoFile} not on disk - retrying tv_record.");
+
+                string fullPath = Path.Join(Server.GameDirectory + "/csgo/" + expectedDemoFile);
+                long sizeNow = -1;
+                try { if (File.Exists(fullPath)) sizeNow = new FileInfo(fullPath).Length; } catch { }
+
+                if (sizeNow > demoWatchdogLastSize)
+                {
+                    demoWatchdogLastSize = sizeNow;
+                    demoWatchdogStalledChecks = 0;
+                    return;
+                }
+
+                demoWatchdogStalledChecks++;
+                Log($"[Demo] Watchdog: {expectedDemoFile} has not grown for {demoWatchdogStalledChecks}/{demoWatchdogRequiredStrikes} check(s) (size {sizeNow} bytes).");
+                if (demoWatchdogStalledChecks < demoWatchdogRequiredStrikes) return;
+
+                // Dead mid-match. Restart into a fresh file and let the whole verify chain
+                // (existence + growth + this watchdog) run again on the new recording.
+                demoWatchdogTimer?.Kill();
+                demoWatchdogTimer = null;
+                Log($"[Demo] Watchdog: recording {expectedDemoFile} stalled mid-match - restarting into a new demo.");
+                isDemoRecording = false;
+                demoStartAttempts = 0;
+                Server.ExecuteCommand("tv_stoprecord");
                 StartDemoRecording();
-            });
+            }, TimerFlags.REPEAT | TimerFlags.STOP_ON_MAPCHANGE);
+        }
+
+        /// <summary>
+        /// A demo start attempt turned out dead (file missing or not growing): stop whatever GOTV
+        /// thinks it is doing and retry with a fresh tv_record, up to DemoStartMaxAttempts.
+        /// </summary>
+        private void HandleDemoStartFailure(string expectedDemoFile, string reason)
+        {
+            // Clear the flag first, otherwise the retry is swallowed by the idempotency guard.
+            isDemoRecording = false;
+
+            // If the engine is half-recording (stalled file open), a bare tv_record would be
+            // rejected with "already recording" - clear it so the retry starts clean.
+            Server.ExecuteCommand("tv_stoprecord");
+
+            if (demoStartAttempts >= DemoStartMaxAttempts)
+            {
+                Log($"[Demo] GOTV demo {expectedDemoFile} {reason} after {demoStartAttempts} attempts - giving up for this map.");
+                AnnounceDemoStatus(false, "CSTV demo could not be started - this match is NOT being recorded.");
+                return;
+            }
+            Log($"[Demo] GOTV demo {expectedDemoFile} {reason} - retrying tv_record.");
+            StartDemoRecording();
         }
 
         /// <summary>
@@ -217,6 +348,8 @@ namespace MatchZy
                 Server.ExecuteCommand("tv_stoprecord");
                 isDemoRecording = false;
                 demoStartPending = false;
+                demoWatchdogTimer?.Kill();
+                demoWatchdogTimer = null;
                 Log($"[StopDemoRecording] tv_stoprecord - {activeDemoFile}");
                 AddTimer(15, () =>
                 {

@@ -132,6 +132,7 @@ public partial class MatchZy
             _readyStatusDirty = true;
 
             playerData.Remove(userId);
+            infernoStartTimes.Remove(userId);
 
             if (matchzyTeam1.coach.Remove(player) || matchzyTeam2.coach.Remove(player))
             {
@@ -339,9 +340,9 @@ public partial class MatchZy
                     uint projIndex = projectile.Index;
 
                     lastGrenadeThrownTime[(int)projIndex] = DateTime.Now;
-                    // Molotov/incendiary: also key the throw time by PLAYER (see EventInfernoStartburnHandler).
+                    // Molotov/incendiary: track throw time + thrower per PROJECTILE (see OnEntityDeletedHandler).
                     if (nadeType == "molotov" || nadeType == "incendiary")
-                        lastMolotovThrownTime[client] = DateTime.Now;
+                        molotovProjectileThrows[(int)projIndex] = (DateTime.Now, client);
                     RegisterArcTrace(projIndex);
                     if (smokeColorEnabled.Value && nadeType == "smoke")
                     {
@@ -498,9 +499,10 @@ public partial class MatchZy
         return HookResult.Continue;
     }
 
-    // Fire started on the ground: read the molotov/incendiary flight time by the OWNER player. This
-    // is the reliable source (molotov_detonate carries no entityid) and a mid-air burst never starts
-    // a fire, so it correctly stays silent.
+    // Fire started on the ground: remember WHEN and by WHOM, and whether the fire came from an
+    // incendiary (SourceItemDefIndex 48 - the TeamNum guess lied for picked-up nades). The print
+    // itself happens in OnEntityDeletedHandler, which pairs this record with the projectile whose
+    // deletion accompanies the burn - that is what makes overlapping double-molly times correct.
     public HookResult EventInfernoStartburnHandler(EventInfernoStartburn @event, GameEventInfo info)
     {
         if (!isPractice || isDryRun)
@@ -514,20 +516,50 @@ public partial class MatchZy
             var player = new CCSPlayerPawn(owner.Handle).OriginalController?.Value;
             if (!IsHumanPlayerValid(player) || !player!.UserId.HasValue)
                 return HookResult.Continue;
-            int client = player.UserId.Value;
-            if (lastMolotovThrownTime.TryGetValue(client, out var thrownTime))
-            {
-                // CT throws incendiary, T throws molotov - label accordingly.
-                string key = player.TeamNum == (byte)CsTeam.CounterTerrorist ? "matchzy.pracc.incendiary" : "matchzy.pracc.molotov";
-                PrintToPlayerChat(player, Localizer.ForPlayer(player, key, player.PlayerName, $"{(DateTime.Now - thrownTime).TotalSeconds:0.00}"));
-                lastMolotovThrownTime.Remove(client);
-            }
+            infernoStartTimes[player.UserId.Value] = (DateTime.Now, inferno!.SourceItemDefIndex == 48);
         }
         catch (Exception e)
         {
             Log($"[InfernoStartburn] {e.Message}");
         }
         return HookResult.Continue;
+    }
+
+    // A molotov/incendiary projectile entity dies the moment its fire starts (or when it fizzles in
+    // the air). If its thrower had an inferno start within the last 0.2s, that fire belongs to this
+    // projectile: print the flight time recorded at the throw. The check is deferred one frame
+    // because the deletion can land before the startburn event of the same tick is processed.
+    public void OnEntityDeletedHandler(CEntityInstance entity)
+    {
+        if (!isPractice || isDryRun)
+            return;
+        try
+        {
+            if (entity == null || !entity.IsValid)
+                return;
+            string designerName = entity.DesignerName;
+            if (designerName != "molotov_projectile" && designerName != "incendiary_projectile")
+                return;
+            if (!molotovProjectileThrows.TryGetValue((int)entity.Index, out var thrown))
+                return;
+            molotovProjectileThrows.Remove((int)entity.Index);
+
+            Server.NextFrame(() =>
+            {
+                var player = Utilities.GetPlayerFromUserid(thrown.Client);
+                if (!IsHumanPlayerValid(player))
+                    return;
+                if (infernoStartTimes.TryGetValue(thrown.Client, out var burn) && (DateTime.Now - burn.Time).TotalSeconds < 0.2)
+                {
+                    string key = burn.IsIncendiary ? "matchzy.pracc.incendiary" : "matchzy.pracc.molotov";
+                    PrintToPlayerChat(player!, Localizer.ForPlayer(player, key, player!.PlayerName, $"{(DateTime.Now - thrown.Time).TotalSeconds:0.00}"));
+                }
+            });
+        }
+        catch (Exception e)
+        {
+            Log($"[OnEntityDeleted] {e.Message}");
+        }
     }
 
     public HookResult EventDecoyDetonateHandler(EventDecoyStarted @event, GameEventInfo info)

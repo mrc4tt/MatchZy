@@ -663,6 +663,15 @@ namespace MatchZy
             string ctName = reverseTeamSides["CT"].teamName;
             string tName = reverseTeamSides["TERRORIST"].teamName;
 
+            // Vanilla mode: auto-naming disabled and the teams still carry the scrim defaults (a
+            // Get5/JSON match has explicit names and skips this) - keep mp_teamname_1/2 empty so the
+            // scoreboard shows the game's own names, incl. on halftime/knife-swap re-applies.
+            if (!autoTeamNamesEnabled.Value && ctName == "COUNTER-TERRORISTS" && tName == "TERRORISTS")
+            {
+                Server.ExecuteCommand("mp_teamname_1 \"\"; mp_teamname_2 \"\"");
+                return;
+            }
+
             // The engine swaps what mp_teamname_1/mp_teamname_2 display on the scoreboard
             // each time sides switch (halftime, knife swap, OT halftime).
             // Default: mp_teamname_1 → CT scoreboard, mp_teamname_2 → T scoreboard

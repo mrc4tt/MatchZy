@@ -844,7 +844,7 @@ namespace MatchZy
                 Server.ExecuteCommand("tv_stoprecord");
                 isDemoRecording = false;
             }
-            Server.ExecuteCommand("bot_kick");
+            KickAllBotsProtectCSTV();
 
             Server.NextFrame(() =>
             {
