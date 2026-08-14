@@ -4,6 +4,14 @@ Customized fork of [MatchZy](https://github.com/shobhit-pathak/MatchZy) by Shobh
 
 Fork version numbering is independent of upstream. Upstream changelog: <https://github.com/shobhit-pathak/MatchZy/blob/main/CHANGELOG.md>
 
+# 0.8.75
+
+#### August 15, 2026
+
+- matchzy_kick_when_no_match_loaded works again. The kick was lost in an earlier fork revision, so the convar let anyone join: with it enabled, players who are not on the loaded match's roster (or anyone at all when no match is loaded) are now kicked on connect. Admins are exempt so they can join to manage the server.
+- The css_whitelist player whitelist is enforced again: with whitelisting enabled, players whose SteamID is not in whitelist.cfg are kicked on connect. The check existed but was never called, so it did nothing.
+- Fixed a server crash when a player who was not part of a set-up match joined a team or spectate: the plugin tried to move them to team "None" and respawn them there, which can take the server down.
+
 # 0.8.74
 
 #### August 11, 2026

@@ -18,13 +18,32 @@ public partial class MatchZy
                 return HookResult.Continue;
 
             int userId = player.UserId.Value;
+            string steamId = player.SteamID.ToString();
 
-            // Whitelist/match validation
+            // Whitelist gate (css_whitelist): non-whitelisted players are kicked.
+            if (HandlePlayerWhitelist(player, steamId))
+            {
+                KickPlayerDeferred(player);
+                return HookResult.Continue;
+            }
+
+            // Match roster validation. matchModeOnly (matchzy_kick_when_no_match_loaded) kicks
+            // anyone who is not on a loaded match's roster - with no match loaded that is
+            // everyone, matching the convar's description. Admins are exempt so they can join
+            // to manage the server. During plain match setup (convar off) a non-roster player
+            // is left connected but untracked; team locking is enforced by the jointeam
+            // listener and the EventPlayerTeam handler.
             if (isMatchSetup || matchModeOnly)
             {
                 CsTeam team = GetPlayerTeam(player);
                 if (team == CsTeam.None)
                 {
+                    if (matchModeOnly && !IsPlayerAdmin(player, "", "@css/config"))
+                    {
+                        Log($"[EventPlayerConnectFull] KICKING PLAYER STEAMID: {steamId}, Name: {player.PlayerName} (NOT ALLOWED!)");
+                        PrintToAllChat($"Kicking player {player.PlayerName} - Not a player in this game.");
+                        KickPlayerDeferred(player);
+                    }
                     return HookResult.Continue;
                 }
             }

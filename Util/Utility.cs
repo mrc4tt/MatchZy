@@ -4130,8 +4130,25 @@ namespace MatchZy
             return port > 0 ? $"{ip}:{port}" : ip;
         }
 
+        // Kicks on the next frame, off the event/command dispatch stack. Re-validates across
+        // the frame boundary: the player may already have disconnected.
+        public void KickPlayerDeferred(CCSPlayerController player)
+        {
+            Server.NextFrame(() =>
+            {
+                if (!IsPlayerValid(player) || !player.UserId.HasValue)
+                    return;
+                Server.ExecuteCommand($"kickid {player.UserId.Value}");
+            });
+        }
+
         public void SwitchPlayerTeam(CCSPlayerController player, CsTeam team)
         {
+            // None is what GetPlayerTeam returns for a player who is not part of the match.
+            // SwitchTeam(None) followed by the warmup Respawn below on an unassigned player is
+            // the respawn-a-non-T/CT crash class - never move anyone to None.
+            if (team == CsTeam.None)
+                return;
             if (player.Team == team)
                 return;
 
