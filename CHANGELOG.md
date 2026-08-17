@@ -4,6 +4,12 @@ Customized fork of [MatchZy](https://github.com/shobhit-pathak/MatchZy) by Shobh
 
 Fork version numbering is independent of upstream. Upstream changelog: <https://github.com/shobhit-pathak/MatchZy/blob/main/CHANGELOG.md>
 
+# 0.8.76
+
+#### August 17, 2026
+
+- Practice .bot no longer refuses to spawn a bot when CSTV is disabled. The full-server guard that protects the CSTV bot from being displaced now only applies while a CSTV client is actually connected; with tv_enable 0 (common on listen servers, which can also report a wrong max player count) bots spawn normally again.
+
 # 0.8.75
 
 #### August 15, 2026

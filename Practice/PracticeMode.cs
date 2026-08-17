@@ -1288,9 +1288,12 @@ namespace MatchZy
             // Protect the CSTV bot: bot_add on a full server makes the engine free a slot, and the
             // slot it takes is the CSTV bot's - which kicks CSTV and kills GOTV/demo recording. Count
             // every occupied slot (humans, bots AND CSTV) and refuse the spawn when there is no free
-            // slot left for the new bot.
+            // slot left for the new bot. Only enforced while a CSTV client is actually connected:
+            // with tv_enable 0 there is nothing to protect, and listen servers can report a bogus
+            // Server.MaxPlayers (1), which made this guard refuse every bot spawn there.
+            bool cstvConnected = Utilities.GetPlayers().Any(p => p?.IsValid == true && p.IsHLTV);
             int occupiedSlots = Utilities.GetPlayers().Count(p => p?.IsValid == true && p.Connected == PlayerConnectedState.Connected);
-            if (occupiedSlots + 1 > Server.MaxPlayers)
+            if (cstvConnected && occupiedSlots + 1 > Server.MaxPlayers)
             {
                 player?.PrintToChat($" {ChatColors.Green}[MatchZy] {ChatColors.White}Server is full ({occupiedSlots}/{Server.MaxPlayers} slots) - not adding a bot, it would kick the CSTV bot.");
                 Log($"[CanSpawnAnotherBot] Refused bot spawn: {occupiedSlots}/{Server.MaxPlayers} slots occupied, a bot_add would displace the CSTV bot.");
