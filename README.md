@@ -42,10 +42,12 @@ Type in chat with a dot prefix (the `!` / `css_` prefixes work too, e.g. `!ready
 
 ## Gamedata
 
-MatchZy resolves a few game functions by key from CounterStrikeSharp's gamedata (CounterStrikeSharp merges every `*.json` in its `gamedata/` directory). The shipped `gamedata/matchzy.json` provides them, so nothing needs to be added to the core `gamedata.json`. The required keys (linux + windows signatures) are:
+MatchZy resolves a few game functions by key from CounterStrikeSharp's gamedata (CounterStrikeSharp merges every `*.json` in its `gamedata/` directory). The shipped `gamedata/matchzy.json` provides them, so nothing needs to be added to the core `gamedata.json`, and the plugin works on both stock upstream CounterStrikeSharp and the fork. The required keys are:
 
 - `CCSGameRules_PostCleanUp` - `.breakrestore` (respawn breakable props in practice).
 - `CSmokeGrenadeProjectile_Create`, `CHEGrenadeProjectile_Create`, `CMolotovProjectile_Create`, `CDecoyProjectile_Create` - practice grenade rethrow (`.rt` / `.last` / `.back`).
+- `CCSPlayerController_HandleCommandJoinTeam` - spectator-to-team switch in practice (`.t` / `.ct` from spec).
+- `CCSPlayer_WeaponServices_SelectItem` (vtable offset) - putting a restored grenade or weapon in hand (`.last` / `.back` / `.ln`).
 
 Signatures shift when Valve updates CS2. If a rethrow or `.breakrestore` stops working after a game update, regenerate the signatures for the new `libserver.so` (Linux) / `server.dll` (Windows) and update `gamedata/matchzy.json`. Missing or stale keys degrade gracefully (the feature no-ops), they do not crash the plugin.
 

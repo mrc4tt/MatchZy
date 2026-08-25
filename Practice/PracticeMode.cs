@@ -192,10 +192,10 @@ namespace MatchZy
         public string practiceCfgPath => MatchZyCfgRel("prac.cfg");
         public string dryrunCfgPath => MatchZyCfgRel("dryrun.cfg");
 
-        // Resolved by key from the fork's gamedata.json (single source of truth) - the byte
-        // signature lives ONLY in gamedata.json, never in this source, so it self-heals on a CS2
-        // update by regenerating the gamedata entry (no code change / rebuild of MatchZy). The
-        // fork ships its own gamedata.json, so every server running it carries the key.
+        // Resolved by key from the plugin's own gamedata/matchzy.json (single source of truth) -
+        // the byte signature lives ONLY in gamedata, never in this source, so it self-heals on a
+        // CS2 update by regenerating the gamedata entry (no code change / rebuild of MatchZy).
+        // Ships with the plugin, so it resolves on fork and stock upstream CounterStrikeSharp.
         //
         // Lazy + guarded so the lookup runs on first practice use, NOT during MatchZy's static
         // initialization. A throwing resolve in a static field initializer surfaces as a
@@ -2901,7 +2901,7 @@ namespace MatchZy
                                 //    exactly what the engine's spectate/jointeam commands invoke
                                 //    (see handleCommandJoinTeam). Falls back to ChangeTeam (team
                                 //    applies, player stays dead, helper nags the team menu) if the
-                                //    fork gamedata key is missing.
+                                //    gamedata key is missing (gamedata/matchzy.json not deployed).
                                 bool fromSpectator = player.TeamNum <= (byte)CsTeam.Spectator;
                                 if (team == CsTeam.Spectator)
                                 {
@@ -3011,11 +3011,13 @@ namespace MatchZy
         // join flow (leave observer mode, set up the pawn) that no CSS-callable API
         // reaches: ChangeTeam leaves the controller observing, and both
         // ExecuteClientCommand variants fail to deliver "jointeam" (see the comment at
-        // the call site). Resolved from the FORK's gamedata key
-        // "CCSPlayerController_HandleCommandJoinTeam" (linux signature; regenerate via
-        // the CS2SigMaker/ida-pro-mcp tooling if a CS2 update breaks it). On stock CSS
-        // gamedata the key is missing - GetSignature throws, the caller catches and
-        // falls back to ChangeTeam + the team-menu hint.
+        // the call site). Resolved from the gamedata key
+        // "CCSPlayerController_HandleCommandJoinTeam", shipped in the plugin's own
+        // gamedata/matchzy.json so it resolves on both the fork and stock upstream
+        // CounterStrikeSharp (regenerate via the CS2SigMaker/ida-pro-mcp tooling if a
+        // CS2 update breaks it). If the file is not deployed the key is missing -
+        // GetSignature throws, the caller catches and falls back to ChangeTeam + the
+        // team-menu hint.
         private static readonly Lazy<MemoryFunctionVoid<CCSPlayerController, int, int, float>> handleCommandJoinTeam =
             new(() => new MemoryFunctionVoid<CCSPlayerController, int, int, float>(
                 GameData.GetSignature("CCSPlayerController_HandleCommandJoinTeam")));

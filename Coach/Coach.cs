@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.Runtime.CompilerServices;
 using System.Text.Json;
 using CounterStrikeSharp.API;
 using CounterStrikeSharp.API.Core;
@@ -780,84 +781,99 @@ public partial class MatchZy
         var rear = new Vector(cx + fx * minProj + rx * spread, cy + fy * minProj + ry * spread, cz + 64.0f);
 
 #if HAS_CSS_TRACE
-        // The naive "220u behind" can land OUTSIDE the world on maps whose spawn backs onto the map
-        // edge (Mirage T: coach fell into the void with a black screen). Validate each candidate:
-        // the path from the rear spawn to it must be clear (not through a wall), and there must be a
-        // floor under it. Shrink the margin until a valid spot is found; give up -> caller falls back.
-        try
+        // Runtime-probed: the Trace API only exists in the forked CounterStrikeSharp build. The
+        // trace body lives in its own NoInlining method so stock servers never JIT a reference to
+        // the missing types (TypeLoadException otherwise). Stock falls to the short hover below.
+        if (HasCssTraceApi)
         {
-            var opts = new TraceOptions { InteractsWith = Masks.Solid };
-            // Spawn-cluster eye point the coach must be able to SEE (LOS requirement below).
-            var clusterEye = new Vector(cx, cy, cz + 64.0f);
-            // Only meaningful stand-back distances: a 40-70u "behind" spot puts the coach nose-to-back
-            // with the rear player (Ancient CT). If nothing >= 110u is clear, use the overhead camera.
-            foreach (float margin in new[] { 220.0f, 160.0f, 110.0f })
+            try
             {
-                var cand = new Vector(rear.X - fx * margin, rear.Y - fy * margin, rear.Z);
-                // Wall probe: rear spawn -> candidate must not pass through solid.
-                var wall = Trace.TraceEndShape(rear, cand, null, opts);
-                if (wall.DidHit())
-                    continue;
-                // Floor probe: there must be ground beneath (void = no hit = outside the map).
-                var floor = Trace.TraceEndShape(cand, new Vector(cand.X, cand.Y, cand.Z - 600.0f), null, opts);
-                if (!floor.DidHit())
-                    continue;
-                // The floor behind can be a DIFFERENT level (Inferno: a terrace below the spawn with a
-                // wall in between - the coach ended up staring at bricks). Require (a) the candidate
-                // eye to be at least at the team's eye height (a spot on a LOWER level gives a view
-                // through railings/over walls at best), and (b) clear line of sight back to the
-                // cluster; otherwise try a shorter margin.
-                var eyePos = new Vector(cand.X, cand.Y, floor.HitPoint.Z + up);
-                if (eyePos.Z < clusterEye.Z - 16.0f)
-                    continue;
-                // Must stand CLEAR of the spawn cluster: on maps with radial spawn facings the
-                // averaged "behind" direction can point back INTO the cluster (Ancient CT put the
-                // coach at ground level nose-to-back with a bot). Require distance to the nearest
-                // spawn; too close -> shorter margin won't help either, but the loop falls through
-                // to the overhead fallback.
-                bool insideCluster = false;
-                foreach (var s in spawns)
-                {
-                    float ddx = cand.X - s.PlayerPosition.X, ddy = cand.Y - s.PlayerPosition.Y;
-                    if (ddx * ddx + ddy * ddy < 90.0f * 90.0f)
-                    {
-                        insideCluster = true;
-                        break;
-                    }
-                }
-                if (insideCluster)
-                    continue;
-                var los = Trace.TraceEndShape(eyePos, clusterEye, null, opts);
-                if (los.DidHit())
-                    continue;
-                if (coachDebugEnabled.Value)
-                    Log($"[CoachPlace] team {teamNum}: BEHIND margin={margin:0} pos=({eyePos.X:0},{eyePos.Y:0},{eyePos.Z:0}) spawns={spawns.Count}");
-                result = new Position(eyePos, new QAngle(pitch, yawDeg, 0.0f));
-                return true;
+                if (TryCoachSpotViaTrace(teamNum, spawns, cx, cy, cz, fx, fy, rear, up, pitch, yawDeg, out result))
+                    return true;
             }
-
-            // No behind-spot with a clear view: hover ABOVE the rear spawn looking down instead - the
-            // rear spawn itself is guaranteed inside the world and has line of sight to the team.
-            // A ceiling probe keeps the hover under covered spawns.
-            float topZ = cz + 150.0f;
-            var ceil = Trace.TraceEndShape(rear, new Vector(rear.X, rear.Y, cz + 200.0f), null, opts);
-            if (ceil.DidHit())
-                topZ = Math.Min(topZ, ceil.HitPoint.Z - 30.0f);
-            var overheadPos = new Vector(rear.X, rear.Y, Math.Max(topZ, cz + 80.0f));
-            if (coachDebugEnabled.Value)
-                Log($"[CoachPlace] team {teamNum}: OVERHEAD pos=({overheadPos.X:0},{overheadPos.Y:0},{overheadPos.Z:0}) spawns={spawns.Count}");
-            result = new Position(overheadPos, new QAngle(40.0f, yawDeg, 0.0f));
-            return true;
-        }
-        catch
-        {
-            // Trace failure - fall through to the unvalidated fallback below.
+            catch
+            {
+                // Trace failure - fall through to the unvalidated fallback below.
+            }
         }
 #endif
         // No trace API (or it failed): a short, safe hover just behind and above the rear spawn.
         result = new Position(new Vector(rear.X - fx * 40.0f, rear.Y - fy * 40.0f, cz + up), new QAngle(pitch, yawDeg, 0.0f));
         return true;
     }
+
+#if HAS_CSS_TRACE
+    // The naive "220u behind" can land OUTSIDE the world on maps whose spawn backs onto the map
+    // edge (Mirage T: coach fell into the void with a black screen). Validate each candidate:
+    // the path from the rear spawn to it must be clear (not through a wall), and there must be a
+    // floor under it. Shrink the margin until a valid spot is found; give up -> caller falls back.
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    private bool TryCoachSpotViaTrace(byte teamNum, List<Position> spawns, float cx, float cy, float cz, float fx, float fy, Vector rear, float up, float pitch, float yawDeg, out Position result)
+    {
+        var opts = new TraceOptions { InteractsWith = Masks.Solid };
+        // Spawn-cluster eye point the coach must be able to SEE (LOS requirement below).
+        var clusterEye = new Vector(cx, cy, cz + 64.0f);
+        // Only meaningful stand-back distances: a 40-70u "behind" spot puts the coach nose-to-back
+        // with the rear player (Ancient CT). If nothing >= 110u is clear, use the overhead camera.
+        foreach (float margin in new[] { 220.0f, 160.0f, 110.0f })
+        {
+            var cand = new Vector(rear.X - fx * margin, rear.Y - fy * margin, rear.Z);
+            // Wall probe: rear spawn -> candidate must not pass through solid.
+            var wall = Trace.TraceEndShape(rear, cand, null, opts);
+            if (wall.DidHit())
+                continue;
+            // Floor probe: there must be ground beneath (void = no hit = outside the map).
+            var floor = Trace.TraceEndShape(cand, new Vector(cand.X, cand.Y, cand.Z - 600.0f), null, opts);
+            if (!floor.DidHit())
+                continue;
+            // The floor behind can be a DIFFERENT level (Inferno: a terrace below the spawn with a
+            // wall in between - the coach ended up staring at bricks). Require (a) the candidate
+            // eye to be at least at the team's eye height (a spot on a LOWER level gives a view
+            // through railings/over walls at best), and (b) clear line of sight back to the
+            // cluster; otherwise try a shorter margin.
+            var eyePos = new Vector(cand.X, cand.Y, floor.HitPoint.Z + up);
+            if (eyePos.Z < clusterEye.Z - 16.0f)
+                continue;
+            // Must stand CLEAR of the spawn cluster: on maps with radial spawn facings the
+            // averaged "behind" direction can point back INTO the cluster (Ancient CT put the
+            // coach at ground level nose-to-back with a bot). Require distance to the nearest
+            // spawn; too close -> shorter margin won't help either, but the loop falls through
+            // to the overhead fallback.
+            bool insideCluster = false;
+            foreach (var s in spawns)
+            {
+                float ddx = cand.X - s.PlayerPosition.X, ddy = cand.Y - s.PlayerPosition.Y;
+                if (ddx * ddx + ddy * ddy < 90.0f * 90.0f)
+                {
+                    insideCluster = true;
+                    break;
+                }
+            }
+            if (insideCluster)
+                continue;
+            var los = Trace.TraceEndShape(eyePos, clusterEye, null, opts);
+            if (los.DidHit())
+                continue;
+            if (coachDebugEnabled.Value)
+                Log($"[CoachPlace] team {teamNum}: BEHIND margin={margin:0} pos=({eyePos.X:0},{eyePos.Y:0},{eyePos.Z:0}) spawns={spawns.Count}");
+            result = new Position(eyePos, new QAngle(pitch, yawDeg, 0.0f));
+            return true;
+        }
+
+        // No behind-spot with a clear view: hover ABOVE the rear spawn looking down instead - the
+        // rear spawn itself is guaranteed inside the world and has line of sight to the team.
+        // A ceiling probe keeps the hover under covered spawns.
+        float topZ = cz + 150.0f;
+        var ceil = Trace.TraceEndShape(rear, new Vector(rear.X, rear.Y, cz + 200.0f), null, opts);
+        if (ceil.DidHit())
+            topZ = Math.Min(topZ, ceil.HitPoint.Z - 30.0f);
+        var overheadPos = new Vector(rear.X, rear.Y, Math.Max(topZ, cz + 80.0f));
+        if (coachDebugEnabled.Value)
+            Log($"[CoachPlace] team {teamNum}: OVERHEAD pos=({overheadPos.X:0},{overheadPos.Y:0},{overheadPos.Z:0}) spawns={spawns.Count}");
+        result = new Position(overheadPos, new QAngle(40.0f, yawDeg, 0.0f));
+        return true;
+    }
+#endif
 
     // ── .coachtest : solo debug of the coach placement ─────────────────────────────────────────
     // The real coach flow only runs on a SPAWN event (so .coach during warmup does nothing until a

@@ -3869,10 +3869,11 @@ namespace MatchZy
         // deploy an already-owned weapon: it holsters the current weapon and
         // deploys the target (redraws viewmodel + plays the deploy anim, which
         // clears the frozen throw pose), with no GiveNamedItem (no-op when owned)
-        // and no entity deletion (crashes). The vtable index comes from the forked
-        // CounterStrikeSharp's gamedata.json key "CCSPlayer_WeaponServices_SelectItem"
-        // (offset entry). Cached lazily; -1 = unavailable -> caller falls back to a
-        // pointer switch (e.g. on stock CSS without the entry).
+        // and no entity deletion (crashes). The vtable index comes from the gamedata
+        // key "CCSPlayer_WeaponServices_SelectItem" (offset entry), shipped both in
+        // the fork's gamedata.json and in the plugin's own gamedata/matchzy.json so
+        // stock upstream CounterStrikeSharp resolves it too. Cached lazily; -1 =
+        // unavailable -> caller falls back to a pointer switch.
         private const int SelectItemOffsetUntried = -2;
         private const int SelectItemOffsetUnavailable = -1;
         private static int _selectItemOffset = SelectItemOffsetUntried;

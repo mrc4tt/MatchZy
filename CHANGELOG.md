@@ -4,6 +4,13 @@ Customized fork of [MatchZy](https://github.com/shobhit-pathak/MatchZy) by Shobh
 
 Fork version numbering is independent of upstream. Upstream changelog: <https://github.com/shobhit-pathak/MatchZy/blob/main/CHANGELOG.md>
 
+# 0.8.77
+
+#### August 25, 2026
+
+- MatchZy now also runs on stock upstream CounterStrikeSharp (roflmuffin), not only the forked build. On stock servers, css_scrim / css_match and demo recording no longer fail with a TypeLoadException: the CSTV enabled check reads the process command line instead of the fork-only CommandLine helper, and the coach auto-placement and grenade library label positioning detect the fork's Trace API at runtime and fall back cleanly when it is absent (coach uses a simple hover spot, labels keep their saved position).
+- gamedata/matchzy.json now includes the CCSPlayer_WeaponServices_SelectItem vtable offset, so putting a restored grenade or weapon in hand (.last / .back / .ln) also works on stock CounterStrikeSharp, whose core gamedata does not carry that key.
+
 # 0.8.76
 
 #### August 17, 2026

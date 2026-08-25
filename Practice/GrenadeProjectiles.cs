@@ -6,9 +6,10 @@ namespace MatchZy;
 
 public static class GrenadeFunctions
 {
-    // Grenade projectile Create factories, resolved by key from the fork's gamedata.json (single
-    // source of truth - byte signatures live only in gamedata.json, never in this source, so they
-    // self-heal on a CS2 update by regenerating the entry with no MatchZy rebuild). Guard() keeps
+    // Grenade projectile Create factories, resolved by key from the plugin's own
+    // gamedata/matchzy.json (single source of truth - byte signatures live only in gamedata, never
+    // in this source, so they self-heal on a CS2 update by regenerating the entry with no MatchZy
+    // rebuild; works on fork and stock upstream CounterStrikeSharp alike). Guard() keeps
     // resolution off the crash path: a throw in a static field initializer surfaces as a
     // TypeInitializationException before Load() and makes CSS skip the whole plugin, so a missing
     // key degrades a factory to null (the caller skips the rethrow) instead of taking MatchZy down.

@@ -94,10 +94,11 @@ namespace MatchZy
 
         private bool IsGOTVEnabled()
         {
-            // -nohltv is a bare flag with no value, so it has to be probed with FindParm. The old
-            // ParmValue("-nohltv", -1) read whatever token happened to follow it, which both missed a
-            // real -nohltv and could misread an unrelated launch option.
-            if (CommandLine.HasParam("-nohltv"))
+            // -nohltv is a bare flag with no value, so probe the raw process command line for it.
+            // Deliberately NOT CounterStrikeSharp.API.CommandLine: that class only exists in the
+            // forked CounterStrikeSharp build, and touching it on a stock upstream server throws
+            // TypeLoadException the moment this method is JIT-compiled.
+            if (HasLaunchOption("-nohltv"))
             {
                 Log("[Demo] Not recording: server was started with -nohltv.");
                 return false;

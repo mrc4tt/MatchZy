@@ -1,5 +1,6 @@
 using System.Drawing;
 using System.Globalization;
+using System.Runtime.CompilerServices;
 using System.Text.Json;
 using CounterStrikeSharp.API;
 using CounterStrikeSharp.API.Core;
@@ -351,33 +352,47 @@ namespace MatchZy
         private static Vector DeclipLabelPosition(Vector c)
         {
 #if HAS_CSS_TRACE
+            // Runtime-probed: the Trace API only exists in the forked CounterStrikeSharp build.
+            // The trace body lives in its own NoInlining method so stock servers never JIT a
+            // reference to the missing types (that would throw TypeLoadException here).
+            if (HasCssTraceApi)
+            {
+                try
+                {
+                    return DeclipLabelPositionViaTrace(c);
+                }
+                catch
+                {
+                    // Trace failed - keep the original spot.
+                }
+            }
+#endif
+            return c;
+        }
+
+#if HAS_CSS_TRACE
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        private static Vector DeclipLabelPositionViaTrace(Vector c)
+        {
             const float clear = 56.0f;   // desired free space around the label center
             const float maxPush = 80.0f;
             float pushX = 0, pushY = 0;
-            try
+            var opts = new TraceOptions { InteractsWith = Masks.Solid };
+            for (int i = 0; i < 8; i++)
             {
-                var opts = new TraceOptions { InteractsWith = Masks.Solid };
-                for (int i = 0; i < 8; i++)
+                double a = Math.PI * i / 4.0;
+                float dx = (float)Math.Cos(a), dy = (float)Math.Sin(a);
+                var tr = Trace.TraceEndShape(c, new Vector(c.X + dx * clear, c.Y + dy * clear, c.Z), null, opts);
+                if (!tr.DidHit())
+                    continue;
+                float hx = tr.HitPoint.X - c.X, hy = tr.HitPoint.Y - c.Y;
+                float dist = (float)Math.Sqrt(hx * hx + hy * hy);
+                float deficit = clear - dist;
+                if (deficit > 0)
                 {
-                    double a = Math.PI * i / 4.0;
-                    float dx = (float)Math.Cos(a), dy = (float)Math.Sin(a);
-                    var tr = Trace.TraceEndShape(c, new Vector(c.X + dx * clear, c.Y + dy * clear, c.Z), null, opts);
-                    if (!tr.DidHit())
-                        continue;
-                    float hx = tr.HitPoint.X - c.X, hy = tr.HitPoint.Y - c.Y;
-                    float dist = (float)Math.Sqrt(hx * hx + hy * hy);
-                    float deficit = clear - dist;
-                    if (deficit > 0)
-                    {
-                        pushX -= dx * deficit;
-                        pushY -= dy * deficit;
-                    }
+                    pushX -= dx * deficit;
+                    pushY -= dy * deficit;
                 }
-            }
-            catch
-            {
-                // Trace unavailable/failed - keep the original spot.
-                return c;
             }
             float mag = (float)Math.Sqrt(pushX * pushX + pushY * pushY);
             if (mag > maxPush)
@@ -386,10 +401,8 @@ namespace MatchZy
                 pushY *= maxPush / mag;
             }
             return new Vector(c.X + pushX, c.Y + pushY, c.Z);
-#else
-            return c;
-#endif
         }
+#endif
 
         // ── data loading (private savednades + global pack), current map only ────────────
         private List<NadeLineup> LoadLineupsForCurrentMap(CCSPlayerController player)

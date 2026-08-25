@@ -14,7 +14,9 @@
          it carries the 1.0.39x surface + the Trace natives that nuget.org's build (<=1.0.371) lacks.
          Bump CssApiVersion when a newer fork package is published; override with -p:CssApiVersion=...
          HAS_CSS_TRACE is always on now (the fork package has Trace), so the predictor uses real
-         world-collision bounces everywhere, CI included. -->
+         world-collision bounces everywhere, CI included. At RUNTIME the Trace touch points are
+         additionally gated on MatchZy.HasCssTraceApi (Util/CssApiCompat.cs), so the same DLL also
+         runs on stock upstream CounterStrikeSharp, which lacks the Trace types. -->
     <CssApiVersion Condition="'$(CssApiVersion)' == ''">1.0.398</CssApiVersion>
     <DefineConstants>$(DefineConstants);HAS_CSS_TRACE</DefineConstants>
   </PropertyGroup>
