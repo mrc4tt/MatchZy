@@ -844,6 +844,7 @@ namespace MatchZy
                 Server.ExecuteCommand("tv_stoprecord");
                 isDemoRecording = false;
             }
+
             KickAllBotsProtectCSTV();
 
             Server.NextFrame(() =>
@@ -1221,7 +1222,8 @@ namespace MatchZy
         [ConsoleCommand("css_mhelp", "Shows all available commands for each mode (admin only)")]
         public void OnAdminHelpCommand(CCSPlayerController? player, CommandInfo? command)
         {
-            if (IsPlayerAdmin(player, "css_adminhelp", "@css/config"))
+            // Any admin may open the guide; it only lists what that player can actually run.
+            if (HasAnyAdminCommand(player))
             {
                 SendAdminCommandsGuide(player);
             }

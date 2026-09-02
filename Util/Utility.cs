@@ -1630,15 +1630,39 @@ namespace MatchZy
             mapName = (mapName ?? string.Empty).Trim();
             if (string.IsNullOrEmpty(mapName))
             {
-                ReplyToUserCommand(player, Localizer.ForPlayer(player, "matchzy.cc.usage", ".map <map name/id>"));
+                ReplyToUserCommand(player, Localizer.ForPlayer(player, "matchzy.cc.usage", ".map <map name/id/ws:name>"));
                 return;
             }
 
             // A purely numeric argument is a Steam Workshop published-file id.
             bool isWorkshopId = long.TryParse(mapName, out _);
 
-            string targetMap = mapName.ToLower();
-            if (!isWorkshopId)
+            // "ws/<id>" is an explicit workshop-id form; strip the prefix and treat as id.
+            if (!isWorkshopId && mapName.StartsWith("ws/", StringComparison.OrdinalIgnoreCase))
+            {
+                string idPart = mapName["ws/".Length..];
+                if (!long.TryParse(idPart, out _))
+                {
+                    ReplyToUserCommand(player, Localizer["matchzy.cc.invalidmap"]);
+                    return;
+                }
+                mapName = idPart;
+                isWorkshopId = true;
+            }
+
+            // "ws:<name>" targets a map from the server's hosted workshop collection via
+            // ds_workshop_changelevel. It cannot be validated with IsMapValid (workshop maps
+            // are not mounted until loaded), and the name is kept as typed (case may matter).
+            bool isWorkshopName = !isWorkshopId && mapName.StartsWith("ws:", StringComparison.OrdinalIgnoreCase);
+
+            string targetMap = isWorkshopName ? mapName["ws:".Length..].Trim() : mapName.ToLower();
+            if (isWorkshopName && string.IsNullOrEmpty(targetMap))
+            {
+                ReplyToUserCommand(player, Localizer["matchzy.cc.invalidmap"]);
+                return;
+            }
+
+            if (!isWorkshopId && !isWorkshopName)
             {
                 // Resolve a NAMED map to one the server actually has BEFORE any teardown:
                 // try the name as given, then a "de_" prefix so a bare "mirage" -> "de_mirage"
@@ -1683,10 +1707,13 @@ namespace MatchZy
             // Capture for lambda
             string finalMap = targetMap;
             bool finalIsWorkshop = isWorkshopId;
+            bool finalIsWorkshopName = isWorkshopName;
             Server.NextFrame(() =>
             {
                 if (finalIsWorkshop)
                     Server.ExecuteCommand($"host_workshop_map \"{finalMap}\"");
+                else if (finalIsWorkshopName)
+                    Server.ExecuteCommand($"ds_workshop_changelevel \"{finalMap}\"");
                 else
                     Server.ExecuteCommand($"changelevel \"{finalMap}\"");
             });
@@ -2226,6 +2253,25 @@ namespace MatchZy
                         if (long.TryParse(mapName, out _))
                         {
                             Server.ExecuteCommand($"host_workshop_map \"{mapName}\"");
+                        }
+                        else if (mapName.StartsWith("workshop/", StringComparison.OrdinalIgnoreCase)
+                                 && mapName.Split('/') is { Length: >= 2 } workshopParts
+                                 && long.TryParse(workshopParts[1], out _))
+                        {
+                            // "workshop/<id>" or "workshop/<id>/<name>" - the format the map-rotation
+                            // file documents (see ChangeMapFromRotation); only the id matters.
+                            Server.ExecuteCommand($"host_workshop_map \"{workshopParts[1]}\"");
+                        }
+                        else if (mapName.StartsWith("ws/", StringComparison.OrdinalIgnoreCase)
+                                 && long.TryParse(mapName["ws/".Length..], out _))
+                        {
+                            Server.ExecuteCommand($"host_workshop_map \"{mapName["ws/".Length..]}\"");
+                        }
+                        else if (mapName.StartsWith("ws:", StringComparison.OrdinalIgnoreCase))
+                        {
+                            // Workshop-collection map by name; cannot be validated with IsMapValid
+                            // (workshop maps are not mounted until loaded).
+                            Server.ExecuteCommand($"ds_workshop_changelevel \"{mapName["ws:".Length..]}\"");
                         }
                         else if (Server.IsMapValid(mapName))
                         {
@@ -3066,130 +3112,6 @@ namespace MatchZy
 
             // ── FALLBACK ──
             player!.PrintToChat($"{chatPrefix} No commands available in current state.");
-        }
-
-        private void SendAdminCommandsGuide(CCSPlayerController? player)
-        {
-            if (!IsPlayerValid(player))
-                return;
-
-            // Concise categorized summary in CHAT (admins rarely open console). The full
-            // detailed reference still goes to console below.
-            player!.PrintToChat($"{chatPrefix} {ChatColors.Gold}Admin Commands");
-            player.PrintToChat($" {ChatColors.Green}Modes:{ChatColors.Default} .match  .scrim  .prac  .dry  .warmup");
-            player.PrintToChat($" {ChatColors.Green}Setup:{ChatColors.Default} .ma (menu)  .matchsetup  .map <name>  .teamsize <n>  .knife");
-            player.PrintToChat($" {ChatColors.Green}Control:{ChatColors.Default} .start  .restart  .stop  .end  .restore <round>  .backupmenu");
-            player.PrintToChat($" {ChatColors.Green}Pause:{ChatColors.Default} .fp (force pause)  .fup (force unpause)  .tac  .tech");
-            player.PrintToChat($" {ChatColors.Grey}Full detailed list in console (press ` and scroll up).");
-
-            // Send to console for detailed view
-            player.PrintToConsole("\n" + new string('=', 50));
-            player.PrintToConsole("MATCHZY ADMIN COMMANDS GUIDE");
-            player.PrintToConsole(new string('=', 50) + "\n");
-
-            // GENERAL/CONFIG COMMANDS
-            player.PrintToConsole($"\n{ChatColors.Green}【GENERAL/CONFIG COMMANDS】{ChatColors.Default}");
-            player.PrintToConsole("css_roundknife / css_rk / css_kr / css_kniferound - Toggle knife round requirement");
-            player.PrintToConsole("css_teamsize - Set number of players required to ready (default: 10)");
-            player.PrintToConsole("css_options / css_settings / css_configs - Show current match configuration");
-            player.PrintToConsole("css_autopause / css_autopause_minplayers / css_autopause_delay - Configure auto-pause");
-            player.PrintToConsole("css_autopause_status / css_autopause_check - Check auto-pause settings");
-            player.PrintToConsole("css_version / css_matchzy_version - Display MatchZy version");
-
-            // MATCH MODE COMMANDS
-            player.PrintToConsole($"\n{ChatColors.Green}【MATCH MODE COMMANDS】{ChatColors.Default}");
-            player.PrintToConsole("css_match - Start match mode");
-            player.PrintToConsole("css_scrim / css_playout / css_po - Start scrim/playout mode (all rounds)");
-            player.PrintToConsole("css_warmup - Start warmup mode");
-            player.PrintToConsole("css_prac / css_tactics - Start practice mode");
-            player.PrintToConsole("css_dry / css_dryrun - Start dryrun mode");
-            player.PrintToConsole("css_exitprac / css_noprac - Exit practice mode to warmup");
-            player.PrintToConsole("css_exitdry / css_exitdryrun / css_stopdry / css_enddry - Exit dryrun mode");
-
-            // READY & SIDE SELECTION
-            player.PrintToConsole($"\n{ChatColors.Green}【READY & SIDE SELECTION】{ChatColors.Default}");
-            player.PrintToConsole("css_rc / css_rcheck / css_readycheck - Check ready player count");
-            player.PrintToConsole("css_forceready - Force a team to be ready");
-            player.PrintToConsole("css_ready / css_gaben / .ready - Mark yourself ready");
-            player.PrintToConsole("css_unready / css_ur / css_notready - Mark yourself unready");
-            player.PrintToConsole("css_ct / .ct - Choose CT side after knife round");
-            player.PrintToConsole("css_t / .t - Choose T side after knife round");
-            player.PrintToConsole("css_stay - Stay on current side after knife round");
-            player.PrintToConsole("css_switch / css_swap - Switch sides after knife round");
-
-            // PAUSE & UNPAUSE
-            player.PrintToConsole($"\n{ChatColors.Green}【PAUSE/UNPAUSE COMMANDS】{ChatColors.Default}");
-            player.PrintToConsole("css_pause / css_p - Team pause (both teams must unpause)");
-            player.PrintToConsole("css_tech - Technical pause (consumes technical pause timeout)");
-            player.PrintToConsole("css_unpause / css_up / css_r - Request unpause");
-            player.PrintToConsole("css_fp / css_forcepause - Admin: Force pause match");
-            player.PrintToConsole("css_fup / css_forceunpause - Admin: Force unpause match");
-            player.PrintToConsole("css_tac - Tactical timeout for requested team");
-
-            // MATCH CONTROL
-            player.PrintToConsole($"\n{ChatColors.Green}【MATCH CONTROL】{ChatColors.Default}");
-            player.PrintToConsole("css_start / css_force / css_forcestart - Force start the match");
-            player.PrintToConsole("css_r - Ready up before match or unpause during match");
-            player.PrintToConsole("css_restart / css_abort - Restart the match");
-            player.PrintToConsole("css_stop - Request round restore (restores to beginning of round)");
-            player.PrintToConsole("css_stopgame / css_stopmatch / css_endgame / css_forcestop / css_endmatch / css_forceend / css_end / css_exitscrim - End and reset match");
-            player.PrintToConsole("css_asay - Say message as admin");
-
-            // PRACTICE MODE SPECIFIC
-            player.PrintToConsole($"\n{ChatColors.Green}【PRACTICE MODE COMMANDS】{ChatColors.Default}");
-            player.PrintToConsole("📍 SPAWN OPERATIONS:");
-            player.PrintToConsole("   .spawn <#> / .ctspawn <#> / .tspawn <#> - Teleport to spawn");
-            player.PrintToConsole("   .bestspawn / .worstspawn - Teleport to nearest/farthest spawn");
-            player.PrintToConsole("   .bestctspawn / .worstctspawn / .besttspawn / .worsttspawn");
-            player.PrintToConsole("   .showspawns / .hidespawns - Show/hide spawn highlights");
-            player.PrintToConsole("🤖 BOT CONTROL:");
-            player.PrintToConsole("   .bot / .cbot / .crouchbot - Add bots");
-            player.PrintToConsole("   .boost / .crouchboost - Add bot and boost player");
-            player.PrintToConsole("   .nobot / .clearbots - Remove bots");
-            player.PrintToConsole("📌 BOT POSITIONS:");
-            player.PrintToConsole("   .savebotpos / .sbp <name> - Save named bot placement");
-            player.PrintToConsole("   .loadbotpos / .lbp <name> - Spawn bot at saved spot (no name = all)");
-            player.PrintToConsole("   .listbotpos / .listbp - List saved placements this map");
-            player.PrintToConsole("   .delbotpos / .dbp <name> - Delete a saved placement");
-            player.PrintToConsole("   .showbotpos / .showbp - Toggle in-world markers");
-            player.PrintToConsole("   .botjiggle - Toggle bots strafing side-to-side");
-            player.PrintToConsole("💣 GRENADE MANAGEMENT:");
-            player.PrintToConsole("   .savenade / .sn - Save grenade crosshair");
-            player.PrintToConsole("   .loadnade / .ln - Load grenade crosshair");
-            player.PrintToConsole("   .deletenade / .dn - Delete saved grenade");
-            player.PrintToConsole("   .importnade / .in - Import grenade from code");
-            player.PrintToConsole("   .listnades / .lin - List all saved grenades");
-            player.PrintToConsole("📍 GRENADE THROWING:");
-            player.PrintToConsole("   .rethrow / .rt - Re-throw last grenade");
-            player.PrintToConsole("   .last / .back <#> - Teleport to grenade location");
-            player.PrintToConsole("   .throwindex <#> / .lastindex - Throw specific grenade");
-            player.PrintToConsole("   .delay <seconds> - Set grenade throw delay");
-            player.PrintToConsole("   .rethrowsmoke / .rethrownade / .rethrowflash / .rethrowmolotov / .rethrowdecoy");
-            player.PrintToConsole("🔧 UTILITIES:");
-            player.PrintToConsole("   .clear - Clear all smokes/molotovs");
-            player.PrintToConsole("   .fastforward / .ff - Jump to 20 seconds");
-            player.PrintToConsole("   .noflash / .noblind - Toggle flash immunity");
-            player.PrintToConsole("   .timer - Start/stop timer");
-            player.PrintToConsole("   .break / .nobreak - Break/restore breakables");
-            player.PrintToConsole("🎮 TOGGLES & SIDES:");
-            player.PrintToConsole("   .solid - Toggle teammate collision");
-            player.PrintToConsole("   .impacts - Toggle bullet impacts");
-            player.PrintToConsole("   .traj - Toggle grenade trajectory");
-            player.PrintToConsole("   .savepos / .loadpos - Save/load position");
-            player.PrintToConsole("   .ct / .t / .spec - Switch teams");
-            player.PrintToConsole("   .fas / .watchme - Force all spectators");
-            player.PrintToConsole("   .god - Enable god mode");
-
-            // MODE-SPECIFIC AVAILABILITY
-            player.PrintToConsole($"\n{ChatColors.Green}【MODE AVAILABILITY】{ChatColors.Default}");
-            player.PrintToConsole("Practice Mode: Full command access including spawns, bots, nades, etc.");
-            player.PrintToConsole("Warmup Mode: .match, .scrim, .prac, .dry, knife round toggle");
-            player.PrintToConsole("Ready Phase: .ready, .unready");
-            player.PrintToConsole("Knife Round: .stay, .switch, .ct, .t (side selection)");
-            player.PrintToConsole("Live Match: .pause, .unpause, .tac, .tech, .stop (if enabled)");
-            player.PrintToConsole("Dryrun Mode: .exitdry, .stopdry, .enddry");
-
-            player.PrintToConsole("\n" + new string('=', 50) + "\n");
         }
 
         public void LoadClientNames()

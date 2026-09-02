@@ -4,6 +4,21 @@ Customized fork of [MatchZy](https://github.com/shobhit-pathak/MatchZy) by Shobh
 
 Fork version numbering is independent of upstream. Upstream changelog: <https://github.com/shobhit-pathak/MatchZy/blob/main/CHANGELOG.md>
 
+# 0.8.79
+
+#### September 2, 2026
+
+- .mhelp now shows each admin the commands they can actually run. The chat summary is built from the same permission checks the commands use, grouped by category, so an admin with only the map/practice flag (SourceMod "g") sees .match, .scrim, .prac, .map and the like, while .start, .endmatch, .restore and other match-control commands are left out. The console copy lists every admin command with a check mark or a blank box and, for each command the player cannot use, the permission it needs (for example "needs: @css/config"), followed by a short flag legend.
+- .mhelp is no longer restricted to admins holding @css/config. Any player who passes at least one admin command's permission check can open it; before, a map/practice-only admin was told they were not an admin and got no guide at all.
+- The admin command list is now a single table in the plugin (Util/AdminCommandCatalog.cs) that records, per command, the exact permission key and flags its handler checks. Per-player command_overrides from admins.json are honored by the guide the same way the commands honor them. New admin commands must be added to this table to appear in .mhelp.
+
+# 0.8.78
+
+#### September 1, 2026
+
+- The .map command and match-config map changes now accept workshop maps by name with a "ws:" prefix (for example "ws:cs_alpine"), changed via ds_workshop_changelevel. The map must be part of the workshop collection the server hosts. Workshop ids keep working as before, and can also be given as "ws/<id>".
+- Match-config maplists, the veto flow and the next map in a series now accept the "workshop/<id>" and "workshop/<id>/<name>" map formats (the same formats the map-rotation file documents). Previously these formats only worked in the map rotation; a match config using them logged "Map not valid, cannot change" and the match never changed map.
+
 # 0.8.77
 
 #### August 25, 2026
