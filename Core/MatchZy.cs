@@ -16,7 +16,7 @@ namespace MatchZy
     public partial class MatchZy : BasePlugin
     {
         public override string ModuleName => "MatchZy";
-        public override string ModuleVersion => "0.8.79";
+        public override string ModuleVersion => "0.8.80";
         public override string ModuleAuthor => "WD- Edited by Miksen @ FSHOST.me";
         public override string ModuleDescription => "A plugin for running and managing CS2 practice/pugs/scrims/matches!";
         public string chatPrefix = $"{ChatColors.Green}[MatchZy]{ChatColors.Default}";
@@ -39,6 +39,14 @@ namespace MatchZy
         public long liveMatchId = -1;
         public int autoStartMode = 1;
         private bool autoStartLatched = false;
+        // Mode chosen by an explicit mode command (SetExplicitMode), applied by the next AutoStart in
+        // preference to matchzy_autostart_mode. Survives the config.cfg exec that Load() queues, which
+        // lands AFTER a loading script's own `matchzy_autostart_mode N` and overwrites it.
+        private int? explicitAutoStartMode = null;
+        // True when practice runs inside a paused warmup (StartPracticeMode's built-in fallback,
+        // mp_warmup_start). False when prac.cfg drives it (mp_warmup_end -> live 60 min round).
+        private bool practiceUsesWarmup = false;
+        private int explicitAutoStartModeGraceTick = -1;
         public bool mapReloadRequired = false;
 
         // Carries a just-loaded match across the changelevel it triggers. When a match config's
@@ -371,6 +379,8 @@ namespace MatchZy
                 _cvMatchRestartDelay = ConVar.Find("mp_match_restart_delay");
                 _cvMatchEndChangelevel = ConVar.Find("mp_match_end_changelevel");
                 _cvMatchEndRestart = ConVar.Find("mp_match_end_restart");
+
+                autoStartModeCvar.ValueChanged += OnAutoStartModeCvarChanged;
 
                 if (!hotReload)
                 {

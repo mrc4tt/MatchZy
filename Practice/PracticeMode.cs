@@ -271,13 +271,15 @@ namespace MatchZy
 
             if (File.Exists(Path.Join(Server.GameDirectory + "/csgo/cfg", practiceCfgPath)))
             {
+                practiceUsesWarmup = false;
                 Server.ExecuteCommand($"execifexists {practiceCfgPath};mp_roundtime 60;mp_roundtime_defuse 60");
             }
             else
             {
+                practiceUsesWarmup = true;
                 Server.ExecuteCommand("""sv_cheats "true"; mp_force_pick_time "0"; bot_quota "0"; sv_showimpacts "1"; mp_limitteams "0"; sv_deadtalk "true"; sv_full_alltalk "true"; sv_ignoregrenaderadio "false"; mp_forcecamera "0"; sv_grenade_trajectory_prac_pipreview "true"; sv_grenade_trajectory_prac_trailtime "3"; sv_infinite_ammo "1"; weapon_auto_cleanup_time "15"; weapon_max_before_cleanup "30"; mp_buy_anywhere "1"; mp_maxmoney "9999999"; mp_startmoney "9999999";""");
                 Server.ExecuteCommand("""mp_weapons_allow_typecount "-1"; mp_death_drop_defuser "false"; mp_death_drop_taser "false"; mp_drop_knife_enable "true"; mp_death_drop_grenade "0"; ammo_grenade_limit_total "5"; mp_defuser_allocation "2"; mp_free_armor "2"; mp_ct_default_grenades "weapon_incgrenade weapon_hegrenade weapon_smokegrenade weapon_flashbang weapon_decoy"; mp_ct_default_primary "weapon_m4a1";""");
-                Server.ExecuteCommand("""mp_t_default_grenades "weapon_molotov weapon_hegrenade weapon_smokegrenade weapon_flashbang weapon_decoy"; mp_t_default_primary "weapon_ak47"; mp_warmup_online_enabled "true"; mp_warmup_pausetimer "1"; mp_warmup_start; bot_quota_mode normal; mp_solid_teammates 2; mp_autoteambalance false; mp_teammates_are_enemies false; buddha 1; buddha_ignore_bots 1; buddha_reset_hp 100;""");
+                Server.ExecuteCommand("""mp_t_default_grenades "weapon_molotov weapon_hegrenade weapon_smokegrenade weapon_flashbang weapon_decoy"; mp_t_default_primary "weapon_ak47"; mp_warmuptime 9999; mp_warmuptime_all_players_connected 0; mp_warmup_online_enabled "true"; mp_warmup_pausetimer "1"; mp_warmup_start; bot_quota_mode normal; mp_solid_teammates 2; mp_autoteambalance false; mp_teammates_are_enemies false; buddha 1; buddha_ignore_bots 1; buddha_reset_hp 100;""");
                 // CS2 March 2026+: Disable magazine-based reload (ammo discard on reload) for practice mode
                 if (pracDisableMagazineDrop.Value)
                 {
@@ -299,6 +301,14 @@ namespace MatchZy
             // going dryrun -> .prac, where the dryrun rounds stay on screen. Practice never wants a
             // round history, so wipe it on entry (and again per round below).
             ScheduleRoundHistoryWipe();
+
+            // Practice started right after a map load (AutoStart at +1s) usually runs before anyone
+            // is connected. The engine only begins its warmup period on the first player connect, so
+            // prac.cfg's mp_warmup_end was a no-op and the player then lands in a mp_warmuptime
+            // countdown (5s on a typical server cfg) before practice actually becomes a round.
+            // Settle it once things have landed; the warmup RoundStart in HandlePostRoundStartEvent
+            // covers the first-connect case whenever it happens.
+            AddTimer(3.0f, () => SettlePracticeWarmupState("+3s"));
 
             GetSpawns();
             Server.PrintToChatAll($" {ChatColors.Green}Spawns: {ChatColors.Default}.spawn, .ctspawn, .tspawn, .bestspawn, .worstspawn");
@@ -1092,6 +1102,7 @@ namespace MatchZy
             isKnifeRound = false;
             isKnifeRequired = false;
 
+            SetExplicitMode(2);
             StartPracticeMode();
         }
 
@@ -1132,6 +1143,7 @@ namespace MatchZy
 
             isPractice = false;
             isDryRun = true;
+            autoStartLatched = true; // explicit mode choice; no autostart mode maps to dryrun, so leave the cvar alone
 
             // Start dryrun from an empty round-history strip - whatever practice/warmup left behind is
             // not part of this dryrun. The rounds played during the dryrun then build up normally.
@@ -3895,8 +3907,10 @@ namespace MatchZy
 
             if (isPractice)
             {
-                // Force impacts OFF (default)
-                player.ReplicateConVar("sv_showimpacts", "0");
+                // Impacts ON by default in practice. sv_showimpacts is replicated per client and the
+                // client keeps whatever it last received (0 from the previous mode, e.g. deathmatch),
+                // so push the practice value explicitly; .impacts toggles it off per player.
+                player.ReplicateConVar("sv_showimpacts", "1");
                 // Don't add to dictionary - let first .impacts command handle it
 
                 // Force grenade preview ON (default in practice)
@@ -3911,7 +3925,7 @@ namespace MatchZy
                         if (!IsPlayerValid(player) || !player.IsValid)
                             return;
 
-                        player.ReplicateConVar("sv_showimpacts", "0");
+                        player.ReplicateConVar("sv_showimpacts", "1");
                     }
                 );
             }
@@ -3928,10 +3942,12 @@ namespace MatchZy
             if (!isPractice || !IsPlayerValid(player))
                 return;
 
-            // If not in dictionary, initialize to TRUE since sv_showimpacts starts at "1" in practice
+            // Not in the dictionary = never toggled = at the per-player default, which is ON
+            // (OnPlayerConnectFull / ResetAllPlayerPracticeSettings replicate sv_showimpacts 1).
+            // Keep this in sync with those two sites or the first press toggles the wrong way.
             if (!playerImpacts.ContainsKey(player!.Slot))
             {
-                playerImpacts[player.Slot] = true; // Default is TRUE (on) because server has sv_showimpacts "1"
+                playerImpacts[player.Slot] = true;
             }
 
             bool currentState = playerImpacts[player.Slot];
@@ -4151,8 +4167,8 @@ namespace MatchZy
             {
                 if (enteringPractice)
                 {
-                    // Entering practice mode - set practice defaults
-                    player.ReplicateConVar("sv_showimpacts", "0");
+                    // Entering practice mode - set practice defaults (impacts on; see OnPlayerConnectFull)
+                    player.ReplicateConVar("sv_showimpacts", "1");
                     if (playerImpacts.ContainsKey(player.Slot))
                         playerImpacts.Remove(player.Slot);
 

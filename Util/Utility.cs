@@ -2363,8 +2363,14 @@ namespace MatchZy
                 // this doesn't. Keeps the HUD on plain "WARMUP" with no running countdown.
                 // mp_warmup_pausetimer only holds under online warmup; offline warmup
                 // (mp_warmup_online_enabled 0) always counts down. Force it on, then pause.
+                // Practice lives in warmup as well (prac.cfg: mp_warmup_start + pausetimer 1) and
+                // loses the same race, most visibly after a map (re)load into practice where the
+                // first player's connect restarts the warmup period: without this the HUD ran a
+                // mp_warmuptime countdown. Dryrun is excluded: it plays real rounds (mp_warmup_end).
                 if (isWarmup)
                     Server.ExecuteCommand("mp_warmup_online_enabled 1;mp_warmup_pausetimer 1");
+                else if (isPractice && !isDryRun)
+                    SettlePracticeWarmupState("round_start");
 
                 // Debug: exercise the coach-spawn flow during warmup so it can be tested with
                 // bots without starting a full match. Only the coach handling runs here.
@@ -3522,16 +3528,104 @@ namespace MatchZy
             Console.WriteLine("[MatchZy] " + message);
         }
 
+        // Practice has two shapes (see practiceUsesWarmup). Whenever the engine (re)starts a warmup
+        // under practice - first player connect after a map load, mp_warmup_start's deferred init -
+        // put practice back into the shape it wants:
+        //  - prac.cfg practice: a live 60 min round. End the warmup the engine just began; without
+        //    this the player sat through a mp_warmuptime countdown (5s on a typical server cfg), or,
+        //    with the timer paused, stayed in warmup for good (no 60 min round timer).
+        //  - built-in fallback practice: a paused warmup. Pin mp_warmuptime long (a short inherited
+        //    value goes straight into the final-seconds countdown, which ignores the pause) and
+        //    re-assert the pause the deferred init reset.
+        private void SettlePracticeWarmupState(string where)
+        {
+            if (!isPractice || isDryRun)
+                return;
+            bool inWarmup = GetGameRules()?.WarmupPeriod ?? false;
+            if (practiceUsesWarmup)
+            {
+                Log($"[PracticeWarmup] {where}: warmup-based practice, pausetimer was {ConVar.Find("mp_warmup_pausetimer")?.GetPrimitiveValue<int>()}, warmuptime {ConVar.Find("mp_warmuptime")?.GetPrimitiveValue<float>()}, re-asserting pause");
+                Server.ExecuteCommand("mp_warmuptime 9999;mp_warmuptime_all_players_connected 0;mp_warmup_online_enabled 1;mp_warmup_pausetimer 1");
+                return;
+            }
+            if (inWarmup)
+            {
+                Log($"[PracticeWarmup] {where}: engine warmup active under prac.cfg practice, ending it (mp_warmup_end)");
+                Server.ExecuteCommand("mp_warmup_end");
+            }
+        }
+
+        // Called by the explicit mode commands (css_prac / css_match / css_scrim / css_sleep /
+        // css_exitprac). Consumes this map's AutoStart latch and writes the chosen mode back to
+        // matchzy_autostart_mode so it survives a changelevel.
+        //
+        // Why both: Load() queues config.cfg via Server.ExecuteCommand, which APPENDS to the command
+        // buffer. A mode-switch script doing
+        //   css_plugins load "MatchZy"; matchzy_autostart_mode 2; css_prac
+        // runs its remaining lines first, THEN config.cfg lands and its `matchzy_autostart_mode 1`
+        // overwrites the script's 2. The latch stops the deferred load-time AutoStart from starting
+        // warmup on top of the practice css_prac just started; writing the cvar makes the mode stick
+        // when the script (or CS2MapChange) reloads the map right after to apply the game mode,
+        // where OnMapStart's AutoStart would otherwise read the clobbered 1 and come up in warmup.
+        private void SetExplicitMode(int mode)
+        {
+            autoStartLatched = true;
+            explicitAutoStartMode = mode;
+            // Cvar writes inside this window are the command buffer still draining (our own write
+            // below, then the config.cfg that Load() appended): keep the explicit choice. A write
+            // after the window is an admin/cfg deliberately changing the mode: it wins.
+            explicitAutoStartModeGraceTick = Server.TickCount + 5;
+            if (autoStartModeCvar.Value != mode)
+            {
+                Log($"[SetExplicitMode] matchzy_autostart_mode {autoStartModeCvar.Value} -> {mode} (explicit mode command)");
+                autoStartModeCvar.Value = mode;
+            }
+        }
+
+        private void OnAutoStartModeCvarChanged(object? sender, int value)
+        {
+            if (explicitAutoStartMode is not int explicitMode || value == explicitMode)
+                return;
+            if (Server.TickCount <= explicitAutoStartModeGraceTick)
+            {
+                Log($"[AutoStart] matchzy_autostart_mode set to {value} right after an explicit mode command (cfg queued at load); keeping mode {explicitMode} for the next AutoStart");
+                return;
+            }
+            explicitAutoStartMode = null;
+        }
+
         private void AutoStart()
         {
             // Per-map latch: AutoStart is triggered from multiple sites (Load timer, OnMapStart,
             // first player connect). Run at most once per map load; latch is re-armed in OnMapStart.
+            // The latch is also consumed by the explicit mode commands (css_prac / css_dryrun /
+            // css_match / css_scrim / css_sleep): a mode-switch script that does
+            //   css_plugins load "MatchZy"; matchzy_autostart_mode 2; css_prac
+            // runs its remaining lines first, THEN the config.cfg queued by Load() lands
+            // (Server.ExecuteCommand appends to the command buffer) and its `matchzy_autostart_mode 1`
+            // overwrites the script's 2; the deferred load-time AutoStart read 1 and StartWarmup
+            // clobbered the practice session css_prac had just started. Consuming the latch in the
+            // command keeps that from happening, while OnMapStart re-arms it so a later changelevel
+            // (external too) still re-applies the mode on the new map.
             if (autoStartLatched)
             {
-                //Log($"[AutoStart] skipped duplicate (autoStartMode: {autoStartMode})");
+                Log($"[AutoStart] skipped: already ran or a mode was started explicitly on this map");
                 return;
             }
             autoStartLatched = true;
+
+            // A mode chosen explicitly since the last AutoStart (css_prac etc.) beats the cvar: the
+            // cvar may hold config.cfg's value, exec'd after the script that set it. Write it back so
+            // later map changes keep the mode too.
+            if (explicitAutoStartMode is int explicitMode)
+            {
+                explicitAutoStartMode = null;
+                if (autoStartModeCvar.Value != explicitMode)
+                {
+                    Log($"[AutoStart] restoring matchzy_autostart_mode {autoStartModeCvar.Value} -> {explicitMode} (explicit mode command overridden by a later cfg exec)");
+                    autoStartModeCvar.Value = explicitMode;
+                }
+            }
 
             // Read the ConVar live at consumption time. AutoStart fires ~1s after load / map start,
             // by which point any cfg (e.g. a mapchange script doing `matchzy_autostart_mode 2`) has

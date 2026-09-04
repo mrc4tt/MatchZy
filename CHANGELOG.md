@@ -4,6 +4,15 @@ Customized fork of [MatchZy](https://github.com/shobhit-pathak/MatchZy) by Shobh
 
 Fork version numbering is independent of upstream. Upstream changelog: <https://github.com/shobhit-pathak/MatchZy/blob/main/CHANGELOG.md>
 
+# 0.8.80
+
+#### September 4, 2026
+
+- Fixed the plugin starting warmup on top of a practice session when it was loaded from a mode-switch script. A script such as `css_plugins load "MatchZy"; matchzy_autostart_mode 2; css_prac` ran css_prac correctly, but the plugin's own config.cfg exec (queued at load) landed after the script's lines and reset matchzy_autostart_mode to 1, so the delayed autostart then exec'd warmup.cfg over prac.cfg. The explicit mode commands now consume that map's autostart, so the delayed autostart no longer overrides a mode an admin already chose.
+- css_prac, css_match, css_scrim, css_exitprac and css_sleep now also write the chosen mode to matchzy_autostart_mode (2, 1, 1, 1, 0), so the mode survives a map change. Before, a map change always fell back to the value in config.cfg, which sent a practice server back to warmup when a mode-switch script reloaded the map to apply game_alias. css_dryrun is unchanged (no autostart mode maps to dryrun).
+- Practice started by autostart on a fresh map (matchzy_autostart_mode 2, or the mode-switch flow above) now becomes a real practice round as soon as the first player connects. prac.cfg ran before anyone was in, so its mp_warmup_end did nothing and the engine started its own warmup on the first connect: the player sat through the server's mp_warmuptime countdown before practice settings (60 min round) took effect. The warmup is now ended right away. The built-in fallback practice (no prac.cfg) keeps its paused warmup and pins mp_warmuptime to 9999 so a short inherited value does not run a countdown.
+- Bullet impacts (sv_showimpacts) are now on for every player when practice starts or a player joins practice; .impacts turns them off per player. Before, each client was sent sv_showimpacts 0 on connect and at practice start, so nobody saw impacts until .impacts, and coming from another mode (deathmatch) the client kept that mode's 0. The .impacts toggle also assumed the wrong starting state, so it could take two presses.
+
 # 0.8.79
 
 #### September 2, 2026

@@ -1090,6 +1090,7 @@ namespace MatchZy
                 return;
             }
 
+            SetExplicitMode(1);
             StartScrimMode();
             // Apply clinch=0/overtime=0 NOW during warmup so client trophy UI slot
             // is allocated correctly at the upcoming warmup→live phase transition.
@@ -1170,6 +1171,7 @@ namespace MatchZy
 
             isPlayOutEnabled = false;
             isPlayOutEnabled2 = false; // clear hill flag too, else .hill -> .match leaks hill mode
+            SetExplicitMode(1);
             StartMatchMode();
             // Apply clinch=1/overtime=1 from live.cfg NOW during warmup so client
             // trophy UI slot is allocated at warmup→knife/live phase transition.
@@ -1195,6 +1197,7 @@ namespace MatchZy
 
             // Reset all player practice settings when exiting
             ResetAllPlayerPracticeSettings(enteringPractice: false);
+            SetExplicitMode(1);
 
             CleanupAllCollisionTimers();
 

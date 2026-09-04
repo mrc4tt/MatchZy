@@ -67,6 +67,7 @@ namespace MatchZy
                 return;
             }
 
+            SetExplicitMode(0);
             StartSleepMode();
         }
     }
