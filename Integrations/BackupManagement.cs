@@ -36,6 +36,14 @@ namespace MatchZy
         public string backupUploadHeaderKey = "";
         public string backupUploadHeaderValue = "";
 
+        // RegexOptions.Compiled emits IL and JITs the matcher when the Regex is CONSTRUCTED,
+        // not when it is matched. This pattern used to be built inside SanitizeValveBackup,
+        // i.e. once per live round on the game thread (CreateMatchZyRoundDataBackup), again in
+        // the 2s valve_backup fill-in, and again on every restore. Build it once and reuse it.
+        private static readonly Regex BlockedBackupCommands = new Regex(
+            @"^(playdemo|tv_record|tv_stoprecord|tv_autorecord|stopdemo|demo_(play|record|pause)|quit|exit)\b",
+            RegexOptions.IgnoreCase | RegexOptions.Compiled);
+
         // Sanitizes Valve backup script lines before executing them on the server during restore.
         // Blocks commands that can crash or hijack a dedicated server (e.g., playdemo, tv_record, quit).
         private static string SanitizeValveBackup(string? input)
@@ -46,9 +54,6 @@ namespace MatchZy
             var lines = input.Split(new[] { "\r\n", "\n" }, StringSplitOptions.None);
             var filtered = new List<string>();
 
-            // Expand this list as needed
-            var blocked = new Regex(@"^(playdemo|tv_record|tv_stoprecord|tv_autorecord|stopdemo|demo_(play|record|pause)|quit|exit)\b", RegexOptions.IgnoreCase | RegexOptions.Compiled);
-
             foreach (var line in lines)
             {
                 var trimmed = line.Trim();
@@ -57,7 +62,7 @@ namespace MatchZy
                     filtered.Add(line);
                     continue;
                 }
-                if (blocked.IsMatch(trimmed))
+                if (BlockedBackupCommands.IsMatch(trimmed))
                     continue; // drop dangerous lines
                 filtered.Add(line);
             }
@@ -1016,48 +1021,39 @@ namespace MatchZy
             }
         }
 
+        // Serialises the backup writes. Two round_starts close together (a restart, or the
+        // fill-in pass landing on the same file) must not interleave writes to the same path.
+        private static readonly SemaphoreSlim backupWriteLock = new SemaphoreSlim(1, 1);
+
+        /// <summary>
+        /// Round snapshot for the restore system. Split in two on purpose:
+        ///
+        /// The gathering below needs the game thread (entity + convar reads), so it stays here and
+        /// is cheap. Everything after it - reading the engine's valve backup .txt, sanitising it,
+        /// serialising a dictionary that embeds that whole blob as an escaped JSON string, and
+        /// writing the result - is pure file IO and string work that needs nothing from the engine.
+        /// It used to run inline and cost ~90 ms on the game thread of EVERY live round, which the
+        /// slow-frame profiler attributed as "MatchZy round_start". It now runs on the thread pool.
+        /// </summary>
         public void CreateMatchZyRoundDataBackup()
         {
             if (!isMatchLive || isRoundRestoring)
                 return;
             try
             {
+                // ---- game thread: engine state only ----
                 (int t1score, int t2score) = GetTeamsScore();
                 int roundNumber = t1score + t2score;
                 string round = roundNumber.ToString("D2");
                 string matchZyBackupFileName = $"matchzy_{liveMatchId}_{matchConfig.CurrentMapNumber}_round{round}.json";
                 string filePath = Path.Combine(Server.GameDirectory, "csgo", "MatchZyDataBackup", matchZyBackupFileName);
-
-                string? directoryPath = Path.GetDirectoryName(filePath);
-                if (directoryPath != null && !Directory.Exists(directoryPath))
-                {
-                    Directory.CreateDirectory(directoryPath);
-                }
+                string lastBackupFilePath = Path.Combine(
+                    Server.GameDirectory,
+                    "csgo",
+                    $"matchzy_{liveMatchId}_{matchConfig.CurrentMapNumber}_round{round}.txt"
+                );
 
                 var gameRules = Utilities.FindAllEntitiesByDesignerName<CCSGameRulesProxy>("cs_gamerules").First().GameRules!;
-                string lastBackupFilePath = $"matchzy_{liveMatchId}_{matchConfig.CurrentMapNumber}_round{round}.txt";
-                ;
-                bool lastBackupExists = File.Exists(Path.Combine(Server.GameDirectory, "csgo", lastBackupFilePath));
-                lastBackupFilePath = Path.Combine(Server.GameDirectory, "csgo", lastBackupFilePath);
-
-                // This runs on round_start, the same tick the engine writes its own round file, so the
-                // read can catch that file mid-write. A truncated copy stored here is permanent (the
-                // fill-in below only repairs an EMPTY valve_backup) and made the later restore load a
-                // corrupt file. Treat an incomplete read as "not there yet" so the fill-in handles it.
-                string valveBackupContent = "";
-                if (lastBackupExists)
-                {
-                    string rawValveBackup = File.ReadAllText(lastBackupFilePath);
-                    if (IsCompleteValveBackup(rawValveBackup))
-                    {
-                        valveBackupContent = rawValveBackup;
-                    }
-                    else
-                    {
-                        lastBackupExists = false;
-                        Log($"[CreateMatchZyRoundDataBackup] {Path.GetFileName(lastBackupFilePath)} is still being written ({rawValveBackup.Length} chars, unbalanced); leaving valve_backup empty for the fill-in pass.");
-                    }
-                }
 
                 Dictionary<string, string> roundData = new()
                 {
@@ -1084,56 +1080,120 @@ namespace MatchZy
                     { "CTTimeOuts", gameRules.CTTimeOuts.ToString() },
                     { "match_loaded", isMatchSetup.ToString() },
                     { "match_config", GetMatchConfig() },
-                    { "valve_backup", SanitizeValveBackup(valveBackupContent) },
+                    // Filled in off-thread once the engine's own round file has been read.
+                    { "valve_backup", "" },
                     // Scoreboard snapshot: the engine keeps kills/deaths/damage and the round-history
                     // strip as they were when the backup is loaded, so we have to put them back ourselves.
                     { "scoreboard", CaptureScoreboardSnapshot() },
                 };
-                JsonSerializerOptions options = new() { WriteIndented = true };
-                string defaultJson = JsonSerializer.Serialize(roundData, options);
 
-                File.WriteAllText(filePath, defaultJson);
-
-                if (!lastBackupExists)
-                {
-                    // The engine writes its own round file (mp_backup_round_auto) around the same tick as
-                    // this round_start snapshot, so it is often not on disk yet and the JSON ends up with
-                    // an empty valve_backup - which used to make the restore of that round a no-op. Fill
-                    // it in once the engine is done.
-                    string pendingJsonPath = filePath;
-                    string pendingValvePath = lastBackupFilePath;
-                    AddTimer(
-                        2.0f,
-                        () =>
-                        {
-                            try
-                            {
-                                if (!File.Exists(pendingValvePath) || !File.Exists(pendingJsonPath))
-                                    return;
-                                string valveContent = SanitizeValveBackup(File.ReadAllText(pendingValvePath));
-                                if (!IsCompleteValveBackup(valveContent))
-                                    return;
-                                var stored = JsonSerializer.Deserialize<Dictionary<string, string>>(File.ReadAllText(pendingJsonPath));
-                                // Repair an incomplete stored copy too, not just an empty one: a
-                                // truncated valve_backup is what silently breaks the restore, and
-                                // "non-empty" used to be treated as good enough.
-                                if (stored == null || IsCompleteValveBackup(stored.GetValueOrDefault("valve_backup", "")))
-                                    return;
-                                stored["valve_backup"] = valveContent;
-                                File.WriteAllText(pendingJsonPath, JsonSerializer.Serialize(stored, new JsonSerializerOptions { WriteIndented = true }));
-                                Log($"[CreateMatchZyRoundDataBackup] Filled in valve_backup for {Path.GetFileName(pendingJsonPath)} from {Path.GetFileName(pendingValvePath)}.");
-                            }
-                            catch (Exception ex)
-                            {
-                                Log($"[CreateMatchZyRoundDataBackup valve_backup fill-in] {ex.Message}");
-                            }
-                        }
-                    );
-                }
+                // ---- thread pool: file IO + JSON ----
+                // roundData is handed over wholesale and never touched here again.
+                _ = Task.Run(() => WriteRoundDataBackupAsync(filePath, lastBackupFilePath, roundData));
             }
             catch (Exception e)
             {
                 Console.WriteLine($"[MatchZy] [Exception] {e}");
+            }
+        }
+
+        /// <summary>
+        /// Off-thread half of <see cref="CreateMatchZyRoundDataBackup"/>: read the engine's valve
+        /// backup, sanitise, serialise, write. Never throws - an unobserved task exception would
+        /// tear down the process.
+        /// </summary>
+        private async Task WriteRoundDataBackupAsync(
+            string filePath,
+            string lastBackupFilePath,
+            Dictionary<string, string> roundData
+        )
+        {
+            // WriteIndented is deliberately off: the payload is dominated by one giant escaped
+            // string (valve_backup), which indentation cannot break up - it only costs a pass.
+            JsonSerializerOptions options = new() { WriteIndented = false };
+            bool needsFillIn = false;
+
+            await backupWriteLock.WaitAsync().ConfigureAwait(false);
+            try
+            {
+                string? directoryPath = Path.GetDirectoryName(filePath);
+                if (directoryPath != null && !Directory.Exists(directoryPath))
+                {
+                    Directory.CreateDirectory(directoryPath);
+                }
+
+                // This is triggered from round_start, the same tick the engine writes its own round
+                // file, so the read can catch that file mid-write. A truncated copy stored here is
+                // permanent (the fill-in below only repairs an INCOMPLETE valve_backup) and made the
+                // later restore load a corrupt file. Treat an incomplete read as "not there yet".
+                string valveBackupContent = "";
+                needsFillIn = true;
+                if (File.Exists(lastBackupFilePath))
+                {
+                    string rawValveBackup = await File.ReadAllTextAsync(lastBackupFilePath).ConfigureAwait(false);
+                    if (IsCompleteValveBackup(rawValveBackup))
+                    {
+                        valveBackupContent = rawValveBackup;
+                        needsFillIn = false;
+                    }
+                    else
+                    {
+                        Log($"[CreateMatchZyRoundDataBackup] {Path.GetFileName(lastBackupFilePath)} is still being written ({rawValveBackup.Length} chars, unbalanced); leaving valve_backup empty for the fill-in pass.");
+                    }
+                }
+
+                roundData["valve_backup"] = SanitizeValveBackup(valveBackupContent);
+                await File.WriteAllTextAsync(filePath, JsonSerializer.Serialize(roundData, options)).ConfigureAwait(false);
+            }
+            catch (Exception e)
+            {
+                Log($"[CreateMatchZyRoundDataBackup write] {e.Message}");
+                return;
+            }
+            finally
+            {
+                backupWriteLock.Release();
+            }
+
+            if (!needsFillIn)
+                return;
+
+            // The engine writes its own round file (mp_backup_round_auto) around the same tick as this
+            // round_start snapshot, so it is often not on disk yet and the JSON ends up with an empty
+            // valve_backup - which used to make the restore of that round a no-op. Fill it in once the
+            // engine is done. This was an AddTimer(2.0f) whose body did the same IO on the game thread
+            // (~9 ms/round in the profiler's "timer" bucket); it is a plain delay now and never touches
+            // the game thread, so unlike the timer it is not cancelled by unload or map change. That is
+            // intentional: the work only repairs a backup file already on disk and is guarded by the
+            // File.Exists / IsCompleteValveBackup checks below.
+            await Task.Delay(TimeSpan.FromSeconds(2)).ConfigureAwait(false);
+            await backupWriteLock.WaitAsync().ConfigureAwait(false);
+            try
+            {
+                if (!File.Exists(lastBackupFilePath) || !File.Exists(filePath))
+                    return;
+                string valveContent = SanitizeValveBackup(await File.ReadAllTextAsync(lastBackupFilePath).ConfigureAwait(false));
+                if (!IsCompleteValveBackup(valveContent))
+                    return;
+                var stored = JsonSerializer.Deserialize<Dictionary<string, string>>(
+                    await File.ReadAllTextAsync(filePath).ConfigureAwait(false)
+                );
+                // Repair an incomplete stored copy too, not just an empty one: a truncated
+                // valve_backup is what silently breaks the restore, and "non-empty" used to be
+                // treated as good enough.
+                if (stored == null || IsCompleteValveBackup(stored.GetValueOrDefault("valve_backup", "")))
+                    return;
+                stored["valve_backup"] = valveContent;
+                await File.WriteAllTextAsync(filePath, JsonSerializer.Serialize(stored, options)).ConfigureAwait(false);
+                Log($"[CreateMatchZyRoundDataBackup] Filled in valve_backup for {Path.GetFileName(filePath)} from {Path.GetFileName(lastBackupFilePath)}.");
+            }
+            catch (Exception ex)
+            {
+                Log($"[CreateMatchZyRoundDataBackup valve_backup fill-in] {ex.Message}");
+            }
+            finally
+            {
+                backupWriteLock.Release();
             }
         }
 
