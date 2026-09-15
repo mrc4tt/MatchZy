@@ -1053,7 +1053,16 @@ namespace MatchZy
                     $"matchzy_{liveMatchId}_{matchConfig.CurrentMapNumber}_round{round}.txt"
                 );
 
-                var gameRules = Utilities.FindAllEntitiesByDesignerName<CCSGameRulesProxy>("cs_gamerules").First().GameRules!;
+                // GetGameRules() is the cached lookup and returns null instead of throwing when
+                // cs_gamerules is momentarily absent, which .First() did - the exact pattern the
+                // comment on GetGameRules warns about. Skip the snapshot rather than write a
+                // backup with bogus timeout counts.
+                var gameRules = GetGameRules();
+                if (gameRules == null)
+                {
+                    Log("[CreateMatchZyRoundDataBackup] cs_gamerules not available; skipping this round's snapshot.");
+                    return;
+                }
 
                 Dictionary<string, string> roundData = new()
                 {

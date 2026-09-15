@@ -902,6 +902,9 @@ namespace MatchZy
 
             RegisterListener<Listeners.OnMapStart>(mapName =>
             {
+                // The cached cs_gamerules proxy belongs to the previous map's entity system.
+                InvalidateGameRulesCache();
+
                 // Re-arm AutoStart latch: allow exactly one AutoStart for this new map.
                 autoStartLatched = false;
 

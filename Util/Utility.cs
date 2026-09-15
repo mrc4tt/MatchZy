@@ -3311,12 +3311,30 @@ namespace MatchZy
             Server.ExecuteCommand($"hostname {formattedHostname}");
         }
 
+        // Cached cs_gamerules proxy. FindAllEntitiesByDesignerName walks the WHOLE active
+        // entity list and reads DesignerName out of native memory for every entity on the way,
+        // so an uncached GetGameRules() is thousands of native string reads. It is called from
+        // 16 sites here - several of them per round (round_start, phase checks, warmup checks) -
+        // and the entity lives for the whole map, so the scan is pure waste after the first hit.
+        // Cleared in OnMapStart (see MatchZy.cs); the IsValid check below is the second line of
+        // defence for a proxy that dies mid-map.
+        private CCSGameRulesProxy? _gameRulesProxy;
+
+        internal void InvalidateGameRulesCache()
+        {
+            _gameRulesProxy = null;
+        }
+
         // Returns null when the cs_gamerules entity is momentarily absent (map /
         // round / phase transitions). The old .First() threw InvalidOperationException
         // there, crashing the server mid-match. Callers MUST null-check.
         public CCSGameRules? GetGameRules()
         {
-            return Utilities.FindAllEntitiesByDesignerName<CCSGameRulesProxy>("cs_gamerules").FirstOrDefault()?.GameRules;
+            if (_gameRulesProxy != null && _gameRulesProxy.IsValid)
+                return _gameRulesProxy.GameRules;
+
+            _gameRulesProxy = Utilities.FindAllEntitiesByDesignerName<CCSGameRulesProxy>("cs_gamerules").FirstOrDefault();
+            return _gameRulesProxy?.GameRules;
         }
 
         // -1 when gamerules absent (no real phase is negative), so callers comparing
