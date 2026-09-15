@@ -4,6 +4,17 @@ Customized fork of [MatchZy](https://github.com/shobhit-pathak/MatchZy) by Shobh
 
 Fork version numbering is independent of upstream. Upstream changelog: <https://github.com/shobhit-pathak/MatchZy/blob/main/CHANGELOG.md>
 
+# 0.8.82
+
+#### September 15, 2026
+
+- Practice bot commands (.bot, .tbot, .ctbot, .crouchbot, .boost, .crouchboost) now correctly refuse to run on servers started with -nobots. The check read the command line through the .NET runtime, which inside CounterStrikeSharp does not return the server's real launch options, so the flag was never seen. With bots disabled the engine still creates a controller and pawn for each bot_add but gives it no player model, which is why .bot appeared to place an invisible bot that could still be shot and damaged. The flag is now read from the engine's own command line.
+- .warmupbots now refuses to run on a server started with -nobots as well, instead of setting a bot quota the engine answers with invisible bot shells.
+- .nobot used a different, broken -nobots check (it looked for a value on a flag that carries none), so it never matched either. It now uses the same check as the rest of the bot commands.
+- The "bots are disabled" notice is now sent only to the player who ran the command, in that player's language, instead of being broadcast to everyone in the server's default language.
+- Launch options are now read from the engine command line for every check that uses them, so -nohltv (used to skip CSTV and demo recording) is detected on servers where it previously went unnoticed.
+- Fixed .map being ignored after a map change. The duplicate-command guard stored a timestamp from the previous map, and because server time restarts on every map load the next .map looked like a repeat and was dropped until the server had been running long enough. Changing map twice in a row works again.
+
 # 0.8.80
 
 #### September 4, 2026

@@ -1689,7 +1689,14 @@ namespace MatchZy
             // Ignore a second request within 2s so the map does not change twice (a double
             // changelevel disconnects players: NETWORK_DISCONNECT_CREATE_SERVER_FAILED). Placed
             // after validation so a typo never blocks an immediate retry.
-            if (Server.CurrentTime - _lastMapChangeRequestTime < 2.0f)
+            //
+            // Server.CurrentTime is map-relative (it restarts near 0 on every map load) while this
+            // field survives the map change, so after a successful .map the stamp is in the NEW
+            // map's future and the delta goes negative. A plain "< 2.0f" test then swallowed every
+            // later .map until curtime climbed back past the old stamp. Treat a negative delta as
+            // "clock restarted" and let the request through. OnMapStart also clears the stamp.
+            float mapChangeDelta = Server.CurrentTime - _lastMapChangeRequestTime;
+            if (mapChangeDelta >= 0.0f && mapChangeDelta < 2.0f)
                 return;
             _lastMapChangeRequestTime = Server.CurrentTime;
 

@@ -16,7 +16,7 @@ namespace MatchZy
     public partial class MatchZy : BasePlugin
     {
         public override string ModuleName => "MatchZy";
-        public override string ModuleVersion => "0.8.81";
+        public override string ModuleVersion => "0.8.82";
         public override string ModuleAuthor => "WD- Edited by Miksen @ FSHOST.me";
         public override string ModuleDescription => "A plugin for running and managing CS2 practice/pugs/scrims/matches!";
         public string chatPrefix = $"{ChatColors.Green}[MatchZy]{ChatColors.Default}";
@@ -169,6 +169,9 @@ namespace MatchZy
         private string? _conflictingMapPlugin;
         // Server time of the last accepted map-change request, to debounce a duplicate .map that
         // fires both the chat dispatch and css_map (on servers where '.' is a chat trigger).
+        // Server.CurrentTime is map-relative, so this is reset in OnMapStart (and a negative
+        // delta is treated as a clock restart) - otherwise a stamp from the previous map blocks
+        // every .map on the new one.
         private float _lastMapChangeRequestTime = -999f;
 
         // True when the server lists "." in PublicChatTrigger/SilentChatTrigger in CounterStrikeSharp's
@@ -901,6 +904,11 @@ namespace MatchZy
             {
                 // Re-arm AutoStart latch: allow exactly one AutoStart for this new map.
                 autoStartLatched = false;
+
+                // Clear the .map debounce stamp: it holds a time from the PREVIOUS map and
+                // Server.CurrentTime restarts near 0 here, so a stale stamp would make the next
+                // .map look like a duplicate and get silently dropped.
+                _lastMapChangeRequestTime = -999f;
 
                 // A map change stops GOTV recording engine-side. Map changes we do not drive ourselves
                 // (CS2-SimpleAdmin css_map, an RTV plugin, a plain changelevel) skip our teardown, so
