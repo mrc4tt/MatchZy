@@ -1256,19 +1256,28 @@ namespace MatchZy
 
         private const int MaxPracticeBots = 5;
 
+        // Cached so the "bots are disabled" line is logged once per load, not on every .bot.
+        private static bool? noBotsFlag;
+
+        /// <summary>
+        /// True when the server was started with -nobots, which makes every bot command pointless.
+        /// </summary>
+        /// <remarks>
+        /// This used to read Environment.GetCommandLineArgs() directly, which inside the
+        /// CounterStrikeSharp host does not reliably return the server's real argv - so -nobots went
+        /// unnoticed and .bot ran anyway. With bots disabled the engine still hands out a controller
+        /// and pawn for bot_add but never gives it a player model: the result is solid, damageable
+        /// and completely invisible. HasLaunchOption (Util/CssApiCompat.cs) asks the engine's own
+        /// ICommandLine through the fork's CommandLine helper, falling back to /proc/self/cmdline.
+        /// </remarks>
         private static bool IsNoBotsFlagSet()
         {
-            string[] args;
-            try
+            if (noBotsFlag == null)
             {
-                args = Environment.GetCommandLineArgs();
-            }
-            catch
-            {
-                return false;
+                noBotsFlag = HasLaunchOption("-nobots") || HasLaunchOption("+nobots") || HasLaunchOption("nobots");
             }
 
-            return args.Any(a => a.Equals("-nobots", StringComparison.OrdinalIgnoreCase) || a.Equals("+nobots", StringComparison.OrdinalIgnoreCase) || a.Equals("nobots", StringComparison.OrdinalIgnoreCase));
+            return noBotsFlag.Value;
         }
 
         /// <summary>
@@ -1323,7 +1332,7 @@ namespace MatchZy
             if (IsNoBotsFlagSet())
             {
                 Server.PrintToConsole("[Info] Bots disabled due to -nobots flag.");
-                PrintToAllChat(Localizer["matchzy.pm.nobots"]);
+                PrintToPlayerChat(player!, Localizer.ForPlayer(player, "matchzy.pm.nobots"));
                 return;
             }
 
@@ -1345,7 +1354,7 @@ namespace MatchZy
             if (IsNoBotsFlagSet())
             {
                 Server.PrintToConsole("[Info] Bots disabled due to -nobots flag.");
-                PrintToAllChat(Localizer["matchzy.pm.nobots"]);
+                PrintToPlayerChat(player!, Localizer.ForPlayer(player, "matchzy.pm.nobots"));
                 return;
             }
 
@@ -1368,7 +1377,7 @@ namespace MatchZy
             if (IsNoBotsFlagSet())
             {
                 Server.PrintToConsole("[Info] Bots disabled due to -nobots flag.");
-                PrintToAllChat(Localizer["matchzy.pm.nobots"]);
+                PrintToPlayerChat(player!, Localizer.ForPlayer(player, "matchzy.pm.nobots"));
                 return;
             }
 
@@ -1393,7 +1402,7 @@ namespace MatchZy
             if (IsNoBotsFlagSet())
             {
                 Server.PrintToConsole("[Info] Bots disabled due to -nobots flag.");
-                PrintToAllChat(Localizer["matchzy.pm.nobots"]);
+                PrintToPlayerChat(player!, Localizer.ForPlayer(player, "matchzy.pm.nobots"));
                 return;
             }
 
@@ -1417,7 +1426,7 @@ namespace MatchZy
             if (IsNoBotsFlagSet())
             {
                 Server.PrintToConsole("[Info] Bots disabled due to -nobots flag.");
-                PrintToAllChat(Localizer["matchzy.pm.nobots"]);
+                PrintToPlayerChat(player!, Localizer.ForPlayer(player, "matchzy.pm.nobots"));
                 return;
             }
 
@@ -1440,7 +1449,7 @@ namespace MatchZy
             if (IsNoBotsFlagSet())
             {
                 Server.PrintToConsole("[Info] Bots disabled due to -nobots flag.");
-                PrintToAllChat(Localizer["matchzy.pm.nobots"]);
+                PrintToPlayerChat(player!, Localizer.ForPlayer(player, "matchzy.pm.nobots"));
                 return;
             }
 
@@ -1463,7 +1472,7 @@ namespace MatchZy
             if (IsNoBotsFlagSet())
             {
                 Server.PrintToConsole("[Info] Bots disabled due to -nobots flag.");
-                PrintToAllChat(Localizer["matchzy.pm.nobots"]);
+                PrintToPlayerChat(player!, Localizer.ForPlayer(player, "matchzy.pm.nobots"));
                 return;
             }
 
@@ -1487,7 +1496,7 @@ namespace MatchZy
             if (IsNoBotsFlagSet())
             {
                 Server.PrintToConsole("[Info] Bots disabled due to -nobots flag.");
-                PrintToAllChat(Localizer["matchzy.pm.nobots"]);
+                PrintToPlayerChat(player!, Localizer.ForPlayer(player, "matchzy.pm.nobots"));
                 return;
             }
 
@@ -2399,10 +2408,10 @@ namespace MatchZy
             if (!isPractice || player == null || !IsPlayerValid(player))
                 return;
 
-            if (NativeAPI.GetCommandParamValue("-nobots", DataType.DATA_TYPE_INT, -1) == 1)
+            if (IsNoBotsFlagSet())
             {
                 Server.PrintToConsole("[MatchZy] Bots are disabled due to '-nobots' flag.");
-                PrintToAllChat(Localizer["matchzy.pm.nobots"]);
+                PrintToPlayerChat(player!, Localizer.ForPlayer(player, "matchzy.pm.nobots"));
                 return;
             }
 

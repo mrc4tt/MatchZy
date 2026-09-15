@@ -37,6 +37,13 @@ namespace MatchZy
                 PrintToPlayerChat(player!, Localizer.ForPlayer(player, "matchzy.wb.off"));
                 return;
             }
+            // Same guard the practice bot commands use: with -nobots the engine creates a modelless,
+            // invisible shell for every bot it is asked for instead of a real bot.
+            if (IsNoBotsFlagSet())
+            {
+                PrintToPlayerChat(player!, Localizer.ForPlayer(player, "matchzy.pm.nobots"));
+                return;
+            }
             // Warmup/ready phase only - never during practice (own bot system) or a started match.
             if (isPractice || isDryRun || matchStarted || !isWarmup)
             {

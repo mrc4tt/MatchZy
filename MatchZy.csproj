@@ -19,6 +19,10 @@
          runs on stock upstream CounterStrikeSharp, which lacks the Trace types. -->
     <CssApiVersion Condition="'$(CssApiVersion)' == ''">1.0.398</CssApiVersion>
     <DefineConstants>$(DefineConstants);HAS_CSS_TRACE</DefineConstants>
+    <!-- Same deal for the fork's CommandLine helper (engine ICommandLine access). Compiled in
+         from the fork package; gated at RUNTIME on MatchZy.HasCssCommandLineApi so stock
+         upstream CounterStrikeSharp, which lacks the type, falls back to /proc/self/cmdline. -->
+    <DefineConstants>$(DefineConstants);HAS_CSS_COMMANDLINE</DefineConstants>
   </PropertyGroup>
   <ItemGroup>
     <!-- ExcludeAssets=runtime => not copied to output; the server loads its own CounterStrikeSharp

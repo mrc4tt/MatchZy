@@ -1,4 +1,8 @@
 using System.Runtime.CompilerServices;
+using System.Text;
+#if HAS_CSS_COMMANDLINE
+using CounterStrikeSharp.API;
+#endif
 #if HAS_CSS_TRACE
 using CounterStrikeSharp.API.Modules.Utils;
 #endif
@@ -56,11 +60,96 @@ namespace MatchZy
         }
 #endif
 
-        // Bare launch-option probe (e.g. "-nohltv") via the raw process command line. Used
-        // instead of the fork-only CounterStrikeSharp.API.CommandLine helper so the check
-        // works on stock builds too.
+        private static bool? hasCssCommandLineApi;
+
+        // True when the running CounterStrikeSharp build ships the fork's CommandLine helper
+        // (CounterStrikeSharp.API.CommandLine -> the engine's own ICommandLine). Probed once;
+        // false on stock builds.
+        public static bool HasCssCommandLineApi
+        {
+            get
+            {
+                if (hasCssCommandLineApi == null)
+                {
+#if HAS_CSS_COMMANDLINE
+                    try
+                    {
+                        ProbeCssCommandLineApi();
+                        hasCssCommandLineApi = true;
+                    }
+                    catch
+                    {
+                        hasCssCommandLineApi = false;
+                    }
+#else
+                    hasCssCommandLineApi = false;
+#endif
+                }
+                return hasCssCommandLineApi.Value;
+            }
+        }
+
+#if HAS_CSS_COMMANDLINE
+        // Same NoInlining + returned-Type trick as ProbeCssTraceApi: keep the fork-only typeref
+        // out of any method a stock server will JIT.
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        private static Type ProbeCssCommandLineApi()
+        {
+            return typeof(CommandLine);
+        }
+
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        private static bool HasParamViaFork(string flag)
+        {
+            return CommandLine.HasParam(flag);
+        }
+#endif
+
+        // Bare launch-option probe (e.g. "-nohltv", "-nobots").
+        //
+        // Environment.GetCommandLineArgs() is NOT reliable here: the managed runtime is hosted
+        // inside the game process rather than being its entry point, so it can report just the
+        // assembly path and never the server's real argv. Every launch-option check then reads
+        // false, which is how a server started with -nobots still ran .bot and produced the
+        // modelless, invisible bot shells the engine hands out when bots are disabled.
+        //
+        // Order: the fork's CommandLine helper (the engine's own ICommandLine - authoritative),
+        // then /proc/self/cmdline (the real NUL-separated argv on Linux), then the Environment
+        // args as a last resort.
         private static bool HasLaunchOption(string flag)
         {
+#if HAS_CSS_COMMANDLINE
+            if (HasCssCommandLineApi)
+            {
+                try
+                {
+                    return HasParamViaFork(flag);
+                }
+                catch
+                {
+                    // Fall through to the process command line.
+                }
+            }
+#endif
+
+            try
+            {
+                if (File.Exists("/proc/self/cmdline"))
+                {
+                    string raw = Encoding.UTF8.GetString(File.ReadAllBytes("/proc/self/cmdline"));
+                    foreach (string arg in raw.Split('\0'))
+                    {
+                        if (arg.Equals(flag, StringComparison.OrdinalIgnoreCase))
+                            return true;
+                    }
+                    return false;
+                }
+            }
+            catch
+            {
+                // Fall through to the Environment args.
+            }
+
             try
             {
                 return Environment.GetCommandLineArgs().Any(a => a.Equals(flag, StringComparison.OrdinalIgnoreCase));
