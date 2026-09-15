@@ -86,9 +86,17 @@ public class GrenadeThrownData
 
     // Managed fallback when a native *_Create sig didn't resolve from gamedata. Logs loudly so a
     // missing/stale gamedata entry is diagnosable instead of a silent dead rethrow.
+    // Sig keys already warned about. The fallback runs on EVERY rethrow while a sig is
+    // unresolved, and .rt / .throw is spammed constantly in practice - so the warning below
+    // was a synchronous console write per grenade, on the game thread, on top of the slower
+    // CreateEntityByName + DispatchSpawn path it is announcing. Warn once per key instead;
+    // the condition is a deploy problem, not a per-throw event.
+    private static readonly HashSet<string> WarnedUnresolvedSigs = new();
+
     private static T? CreateGrenadeFallback<T>(string className, string sigKey) where T : CBaseCSGrenadeProjectile
     {
-        Console.WriteLine($"[MatchZy] {sigKey} sig unresolved - using entity API for '{className}'. Verify gamedata/matchzy.json is deployed to addons/counterstrikesharp/gamedata/ and matches this CS2 build.");
+        if (WarnedUnresolvedSigs.Add(sigKey))
+            Console.WriteLine($"[MatchZy] {sigKey} sig unresolved - using entity API for '{className}'. Verify gamedata/matchzy.json is deployed to addons/counterstrikesharp/gamedata/ and matches this CS2 build. (This warning is printed once per sig key.)");
         var ent = Utilities.CreateEntityByName<T>(className);
         ent?.DispatchSpawn();
         return ent;

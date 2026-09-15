@@ -1302,7 +1302,6 @@ namespace MatchZy
             RegisterEventHandler<EventPlayerChat>(
                 (@event, info) =>
                 {
-                    int currentVersion = Api.GetVersion();
                     int index = @event.Userid + 1;
 
                     // Validate the userid before proceeding
