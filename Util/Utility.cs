@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Drawing;
 using System.Text;
 using System.Text.Json;
@@ -2386,6 +2387,22 @@ namespace MatchZy
                 return;
             }
 
+            // Per-stage wall clock for the live path. The whole handler runs on the game thread
+            // inside the round_start tick, so anything slow here is a server stall right as
+            // freezetime ends. Stages over RoundStartStageLogMs are named in the log line; the
+            // line itself only appears when the handler as a whole crossed that budget.
+            long stageStart = Stopwatch.GetTimestamp();
+            long handlerStart = stageStart;
+            StringBuilder? slowStages = null;
+            void Stage(string name)
+            {
+                long now = Stopwatch.GetTimestamp();
+                double ms = (now - stageStart) * 1000.0 / Stopwatch.Frequency;
+                stageStart = now;
+                if (ms >= RoundStartStageLogMs)
+                    (slowStages ??= new StringBuilder()).Append(name).Append('=').Append(ms.ToString("F1")).Append("ms ");
+            }
+
             // Re-apply clinch/overtime convars on round 1 so trophy/clinch UI refreshes
             // immediately rather than waiting for round 2. Runs for ALL match types
             // (scrim/hill/match) - match mode needs it so trophy reappears when
@@ -2405,6 +2422,7 @@ namespace MatchZy
                     Log($"[HandlePostRoundStartEvent playout-reapply] {ex.Message}");
                 }
             }
+            Stage("playout");
 
             playerHasTakenDamage = false;
 
@@ -2416,13 +2434,19 @@ namespace MatchZy
             // clears the flag).
             if (demoStartPending && isMatchLive && Server.CurrentTime >= demoStartArmTime)
                 StartDemoRecording();
+            Stage("demo");
 
             HandleCoaches();
+            Stage("coaches");
             CreateMatchZyRoundDataBackup();
+            Stage("backup");
             InitPlayerDamageInfo();
+            Stage("dmginfo");
             UpdateHostname();
+            Stage("hostname");
             // Set team names immediately
             SetTeamNames();
+            Stage("teamnames");
             // Also set with a delay to handle engine halftime processing that may override our names
             AddTimer(
                 0.5f,
@@ -2434,6 +2458,7 @@ namespace MatchZy
 
             // Initialize advanced stats tracking for this round
             OnAdvancedStatsRoundStart();
+            Stage("advstats");
 
             // ── Live scorebot: round_start event ──
             if (!string.IsNullOrEmpty(matchConfig.RemoteLogURL))
@@ -2449,7 +2474,17 @@ namespace MatchZy
                     await SendEventAsync(roundStartEvent);
                 });
             }
+            Stage("remotelog");
+
+            double totalMs = (Stopwatch.GetTimestamp() - handlerStart) * 1000.0 / Stopwatch.Frequency;
+            if (totalMs >= RoundStartStageLogMs)
+                Log($"[round_start perf] {totalMs:F1} ms on the game thread; stages over {RoundStartStageLogMs:F0} ms: {(slowStages?.ToString() ?? "none (cost spread across stages)")}");
         }
+
+        // Budget above which a round_start stage is named in the perf log line. A 64-tick frame is
+        // 15.6 ms and the slow-frame profiler flags anything over 31.2 ms, so 5 ms is the point where
+        // one stage on its own starts to eat a meaningful slice of the tick.
+        private const double RoundStartStageLogMs = 5.0;
 
         private void HandlePostRoundEndEvent(EventRoundEnd @event)
         {
@@ -4022,15 +4057,40 @@ namespace MatchZy
             };
         }
 
+        // live.cfg / live_wingman.cfg content keyed by path, revalidated by mtime. HandlePlayoutConfig
+        // reads two convars out of the file on every call, and it runs on the game thread at round
+        // start (rounds 0 and 1) as well as from the StartLive/StartScrim/StartHill NextFrame. A
+        // cached copy turns those into a stat() plus a regex over an in-memory string.
+        private static readonly Dictionary<string, (DateTime LastWriteUtc, string Content)> _cfgFileCache = new();
+        private static readonly object _cfgFileCacheLock = new();
+
+        private static string ReadCfgFileCached(string filePath)
+        {
+            // Missing file: fall through to ReadAllText so the caller sees the same
+            // FileNotFoundException it always did.
+            DateTime lastWrite = File.GetLastWriteTimeUtc(filePath);
+            lock (_cfgFileCacheLock)
+            {
+                if (_cfgFileCache.TryGetValue(filePath, out var cached) && cached.LastWriteUtc == lastWrite)
+                    return cached.Content;
+            }
+            string content = File.ReadAllText(filePath);
+            lock (_cfgFileCacheLock)
+            {
+                _cfgFileCache[filePath] = (lastWrite, content);
+            }
+            return content;
+        }
+
         public static string? GetConvarValueFromCFGFile(string filePath, string convarName)
         {
-            var fileContent = File.ReadAllText(filePath);
+            string fileContent = ReadCfgFileCached(filePath);
 
             string pattern = @$"^{convarName}\s+(.+)$";
 
-            Regex regex = new(pattern, RegexOptions.Multiline);
-
-            Match match = regex.Match(fileContent);
+            // The static overload goes through Regex's own parsed-pattern cache, so the pattern is
+            // parsed once per convar name instead of on every call.
+            Match match = Regex.Match(fileContent, pattern, RegexOptions.Multiline);
             string? value = match.Success ? match.Groups[1].Value : null;
             return value;
         }

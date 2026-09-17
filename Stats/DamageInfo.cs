@@ -8,43 +8,29 @@ namespace MatchZy
     {
         private void InitPlayerDamageInfo()
         {
-            foreach (var key in playerData.Keys)
+            // Read native state once per player, not once per attacker/target pair.
+            // Keep the same human T-vs-CT pairs, including zero-damage report entries.
+            var players = new List<(int Id, byte Team)>(playerData.Count);
+            foreach (var entry in playerData)
             {
-                if (!playerData[key].IsValid)
+                var player = entry.Value;
+                if (!player.IsValid || player.IsBot)
                     continue;
-                if (playerData[key].IsBot)
-                    continue;
-                int attackerId = key;
-                foreach (var key2 in playerData.Keys)
+                byte team = player.TeamNum;
+                if (team == 2 || team == 3)
+                    players.Add((entry.Key, team));
+            }
+
+            foreach (var attacker in players)
+            {
+                foreach (var target in players)
                 {
-                    if (key == key2)
+                    if (attacker.Team == target.Team)
                         continue;
-                    if (!playerData[key2].IsValid || playerData[key2].IsBot)
-                        continue;
-                    if (playerData[key].TeamNum == playerData[key2].TeamNum)
-                        continue;
-                    if (playerData[key].TeamNum == 2)
-                    {
-                        if (playerData[key2].TeamNum != 3)
-                            continue;
-                        int targetId = key2;
-                        if (!playerDamageInfo.TryGetValue(attackerId, out var attackerInfo))
-                            playerDamageInfo[attackerId] = attackerInfo = new Dictionary<int, DamagePlayerInfo>();
-
-                        if (!attackerInfo.TryGetValue(targetId, out var targetInfo))
-                            attackerInfo[targetId] = targetInfo = new DamagePlayerInfo();
-                    }
-                    else if (playerData[key].TeamNum == 3)
-                    {
-                        if (playerData[key2].TeamNum != 2)
-                            continue;
-                        int targetId = key2;
-                        if (!playerDamageInfo.TryGetValue(attackerId, out var attackerInfo))
-                            playerDamageInfo[attackerId] = attackerInfo = new Dictionary<int, DamagePlayerInfo>();
-
-                        if (!attackerInfo.TryGetValue(targetId, out var targetInfo))
-                            attackerInfo[targetId] = targetInfo = new DamagePlayerInfo();
-                    }
+                    if (!playerDamageInfo.TryGetValue(attacker.Id, out var attackerInfo))
+                        playerDamageInfo[attacker.Id] = attackerInfo = new Dictionary<int, DamagePlayerInfo>();
+                    if (!attackerInfo.ContainsKey(target.Id))
+                        attackerInfo[target.Id] = new DamagePlayerInfo();
                 }
             }
         }

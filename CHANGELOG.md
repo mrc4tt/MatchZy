@@ -4,6 +4,18 @@ Customized fork of [MatchZy](https://github.com/shobhit-pathak/MatchZy) by Shobh
 
 Fork version numbering is independent of upstream. Upstream changelog: <https://github.com/shobhit-pathak/MatchZy/blob/main/CHANGELOG.md>
 
+# 0.8.83
+
+#### September 16, 2026
+
+- Prepare managed rethrow entry points during background load warm-up to reduce first-use JIT work. Flash timings now separate entity creation from DispatchSpawn, and replayed projectiles receive the recorded item index on the managed creation path too.
+- Reduced repeated native player reads during round damage initialization, death tracking, and practice marker visibility checks. Added slow arc-render timings and released HTTP response resources after remote event delivery.
+- Practice rethrows resolve only the requested grenade factory instead of initializing all four on first use. Slow rethrows log signature-resolution, spawn, and setup timings to help diagnose gameplay stalls.
+- Round backups now serialize match and team configuration on a background worker using independent snapshots, reducing game-thread work while retaining the existing restore format.
+- Warm selected round-start methods and JSON serializer metadata in the background when the plugin loads, reducing first-use initialization work. Live testing is still required to determine whether this reduces the observed round-start stalls.
+- Round start no longer walks the full entity list to set the scoreboard team names, no longer re-reads live.cfg on rounds 1 and 2 (the file is cached and re-read only when it changes on disk), and encodes the scoreboard part of the round backup off the game thread.
+- Round start now logs a "[round_start perf]" line whenever its game-thread work exceeds 5 ms, naming the stages that went over.
+
 # 0.8.82
 
 #### September 15, 2026

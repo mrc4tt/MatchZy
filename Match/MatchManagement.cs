@@ -686,20 +686,21 @@ namespace MatchZy
             }
 
             // Also set directly on CCSTeam entities for reliability.
-            // Re-fetch fresh - cached refs can be stale right after a changelevel
-            // (SetTeamNames may run before the post-map RefreshTeamEntities timer fires),
-            // and a stale CCSTeam handle NREs on the ClanTeamname setter.
+            // Use the cached CCSTeam refs and only rescan on a miss. The refs can be stale right
+            // after a changelevel (SetTeamNames may run before the post-map RefreshTeamEntities
+            // timer fires) and a stale handle NREs on the ClanTeamname setter, which is what the
+            // IsValid check plus RefreshTeamEntities covers. The old unconditional
+            // FindAllEntitiesByDesignerName walked the whole entity list, reading DesignerName out
+            // of native memory for every entity, twice per round on the game thread (inline at
+            // round_start and again from the 0.5 s timer).
             try
             {
-                foreach (var team in Utilities.FindAllEntitiesByDesignerName<CCSTeam>("cs_team_manager"))
-                {
-                    if (team == null || !team.IsValid)
-                        continue;
-                    if (team.Teamname == "CT")
-                        team.ClanTeamname = ctName;
-                    else if (team.Teamname == "TERRORIST")
-                        team.ClanTeamname = tName;
-                }
+                if (_cachedCtTeam == null || !_cachedCtTeam.IsValid || _cachedTTeam == null || !_cachedTTeam.IsValid)
+                    RefreshTeamEntities();
+                if (_cachedCtTeam != null && _cachedCtTeam.IsValid)
+                    _cachedCtTeam.ClanTeamname = ctName;
+                if (_cachedTTeam != null && _cachedTTeam.IsValid)
+                    _cachedTTeam.ClanTeamname = tName;
             }
             catch (Exception e)
             {

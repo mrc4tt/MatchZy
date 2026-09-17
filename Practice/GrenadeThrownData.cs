@@ -1,4 +1,5 @@
 using System.Linq;
+using System.Diagnostics;
 using CounterStrikeSharp.API;
 using CounterStrikeSharp.API.Core;
 using CounterStrikeSharp.API.Modules.Utils;
@@ -121,39 +122,58 @@ public class GrenadeThrownData
         // already used the managed entity API) kept working. Fall back to CreateEntityByName for
         // every type so a rethrow ALWAYS spawns a projectile; the common Teleport block below
         // imparts the recorded launch velocity regardless of how the entity was created.
+        long throwStart = Stopwatch.GetTimestamp();
+        double resolveMs = 0;
+        double flashCreateMs = 0, flashDispatchMs = 0;
         CBaseCSGrenadeProjectile? grenadeEntity = null;
         switch (Type)
         {
             case "smoke":
             {
-                grenadeEntity = GrenadeFunctions.CSmokeGrenadeProjectile_CreateFunc?.Invoke(Position.Handle, Angle.Handle, Velocity.Handle, Velocity.Handle, IntPtr.Zero, ItemIndex, (int)player.Team);
+                long resolveStart = Stopwatch.GetTimestamp();
+                var factory = GrenadeFunctions.CSmokeGrenadeProjectile_CreateFunc;
+                resolveMs = Stopwatch.GetElapsedTime(resolveStart).TotalMilliseconds;
+                grenadeEntity = factory?.Invoke(Position.Handle, Angle.Handle, Velocity.Handle, Velocity.Handle, IntPtr.Zero, ItemIndex, (int)player.Team);
                 grenadeEntity ??= CreateGrenadeFallback<CSmokeGrenadeProjectile>("smokegrenade_projectile", "CSmokeGrenadeProjectile_Create");
                 break;
             }
             case "molotov":
             case "incendiary":
             {
-                grenadeEntity = GrenadeFunctions.CMolotovProjectile_CreateFunc?.Invoke(Position.Handle, Angle.Handle, Velocity.Handle, Velocity.Handle, IntPtr.Zero, ItemIndex);
+                long resolveStart = Stopwatch.GetTimestamp();
+                var factory = GrenadeFunctions.CMolotovProjectile_CreateFunc;
+                resolveMs = Stopwatch.GetElapsedTime(resolveStart).TotalMilliseconds;
+                grenadeEntity = factory?.Invoke(Position.Handle, Angle.Handle, Velocity.Handle, Velocity.Handle, IntPtr.Zero, ItemIndex);
                 grenadeEntity ??= CreateGrenadeFallback<CMolotovProjectile>(Type == "incendiary" ? "incendiary_projectile" : "molotov_projectile", "CMolotovProjectile_Create");
                 break;
             }
             case "hegrenade":
             {
-                grenadeEntity = GrenadeFunctions.CHEGrenadeProjectile_CreateFunc?.Invoke(Position.Handle, Angle.Handle, Velocity.Handle, Velocity.Handle, IntPtr.Zero, ItemIndex);
+                long resolveStart = Stopwatch.GetTimestamp();
+                var factory = GrenadeFunctions.CHEGrenadeProjectile_CreateFunc;
+                resolveMs = Stopwatch.GetElapsedTime(resolveStart).TotalMilliseconds;
+                grenadeEntity = factory?.Invoke(Position.Handle, Angle.Handle, Velocity.Handle, Velocity.Handle, IntPtr.Zero, ItemIndex);
                 grenadeEntity ??= CreateGrenadeFallback<CHEGrenadeProjectile>("hegrenade_projectile", "CHEGrenadeProjectile_Create");
                 break;
             }
             case "decoy":
             {
-                grenadeEntity = GrenadeFunctions.CDecoyProjectile_CreateFunc?.Invoke(Position.Handle, Angle.Handle, Velocity.Handle, Velocity.Handle, IntPtr.Zero, ItemIndex);
+                long resolveStart = Stopwatch.GetTimestamp();
+                var factory = GrenadeFunctions.CDecoyProjectile_CreateFunc;
+                resolveMs = Stopwatch.GetElapsedTime(resolveStart).TotalMilliseconds;
+                grenadeEntity = factory?.Invoke(Position.Handle, Angle.Handle, Velocity.Handle, Velocity.Handle, IntPtr.Zero, ItemIndex);
                 grenadeEntity ??= CreateGrenadeFallback<CDecoyProjectile>("decoy_projectile", "CDecoyProjectile_Create");
                 break;
             }
             case "flash":
             {
                 // Flash has no native factory - always the managed path.
+                long createStart = Stopwatch.GetTimestamp();
                 grenadeEntity = Utilities.CreateEntityByName<CFlashbangProjectile>("flashbang_projectile");
+                long dispatchStart = Stopwatch.GetTimestamp();
+                flashCreateMs = Stopwatch.GetElapsedTime(createStart, dispatchStart).TotalMilliseconds;
                 grenadeEntity?.DispatchSpawn();
+                flashDispatchMs = Stopwatch.GetElapsedTime(dispatchStart).TotalMilliseconds;
                 break;
             }
             default:
@@ -161,8 +181,12 @@ public class GrenadeThrownData
                 break;
         }
 
+        long createdAt = Stopwatch.GetTimestamp();
         if (grenadeEntity == null)
+        {
+            LogSlowThrow(throwStart, createdAt, resolveMs, flashCreateMs, flashDispatchMs);
             return;
+        }
 
         // Apply the recorded launch transform to EVERY grenade type - including smoke.
         // Smokes were previously excluded (DesignerName != "smokegrenade_projectile"),
@@ -174,6 +198,10 @@ public class GrenadeThrownData
         // with zero velocity, poisoning .last / .rt.
         if (grenadeEntity != null)
         {
+            // Native factories receive the recorded item index, but managed flash/fallback
+            // creation did not. Assign after spawn, when the entity handle is valid, and
+            // before detonation can run. Do not invent a weapon-info pointer or offset.
+            grenadeEntity.ItemIndex = ItemIndex;
             grenadeEntity.InitialPosition.X = Position.X;
             grenadeEntity.InitialPosition.Y = Position.Y;
             grenadeEntity.InitialPosition.Z = Position.Z;
@@ -207,5 +235,19 @@ public class GrenadeThrownData
                 smoke.SmokeColor.Z = smokeColor.Value.B;
             }
         }
+        LogSlowThrow(throwStart, createdAt, resolveMs, flashCreateMs, flashDispatchMs);
+    }
+
+    private void LogSlowThrow(long startedAt, long createdAt, double resolveMs, double flashCreateMs, double flashDispatchMs)
+    {
+        long finishedAt = Stopwatch.GetTimestamp();
+        double totalMs = Stopwatch.GetElapsedTime(startedAt, finishedAt).TotalMilliseconds;
+        if (totalMs < 5.0)
+            return;
+        double createMs = Stopwatch.GetElapsedTime(startedAt, createdAt).TotalMilliseconds - resolveMs;
+        double setupMs = Stopwatch.GetElapsedTime(createdAt, finishedAt).TotalMilliseconds;
+        // Wall time includes nested engine/plugin callbacks; it is not exclusive CPU time.
+        Console.WriteLine($"[MatchZy] [rethrow perf] {Type}: {totalMs:F1} ms; resolve={resolveMs:F1} ms spawn={createMs:F1} ms setup={setupMs:F1} ms" +
+            (Type == "flash" ? $"; create={flashCreateMs:F1} ms dispatch={flashDispatchMs:F1} ms" : ""));
     }
 }

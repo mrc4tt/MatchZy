@@ -310,12 +310,14 @@ public partial class MatchZy
         {
             if (player == null || !player.IsValid || player.IsBot)
                 continue;
-            if (player.PlayerPawn?.Value == null || player.PlayerPawn.Value.Health <= 0)
+            var pawn = player.PlayerPawn?.Value;
+            if (pawn == null || pawn.Health <= 0)
                 continue;
 
-            if (player.TeamNum == (int)CsTeam.Terrorist)
+            var team = player.TeamNum;
+            if (team == (int)CsTeam.Terrorist)
                 aliveT++;
-            else if (player.TeamNum == (int)CsTeam.CounterTerrorist)
+            else if (team == (int)CsTeam.CounterTerrorist)
                 aliveCT++;
         }
     }

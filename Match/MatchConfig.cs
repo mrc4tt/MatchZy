@@ -5,6 +5,22 @@ namespace MatchZy
 {
     public class MatchConfig
     {
+        // Called on the game thread before handing backup data to a worker. Copy every
+        // mutable member so later veto/config edits cannot change an in-flight backup.
+        internal MatchConfig SnapshotForBackup()
+        {
+            var copy = (MatchConfig)MemberwiseClone();
+            copy.Maplist = new(Maplist);
+            copy.MapsPool = new(MapsPool);
+            copy.MapsLeftInVetoPool = new(MapsLeftInVetoPool);
+            copy.MapBanOrder = new(MapBanOrder);
+            copy.MapSides = new(MapSides);
+            copy.ChangedCvars = new(ChangedCvars, ChangedCvars.Comparer);
+            copy.OriginalCvars = new(OriginalCvars, OriginalCvars.Comparer);
+            copy.Spectators = Spectators.DeepClone();
+            return copy;
+        }
+
         [JsonPropertyName("maplist")]
         public List<string> Maplist { get; set; } = new List<string>();
 

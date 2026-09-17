@@ -904,7 +904,10 @@ namespace MatchZy
             public int CashEarned { get; set; }
         }
 
-        private string CaptureScoreboardSnapshot()
+        // Game-thread half of the scoreboard snapshot: entity reads only. The JSON encoding of the
+        // list happens in WriteRoundDataBackupAsync on the thread pool; ScoreboardSnapshot is a plain
+        // POCO so the list can cross threads once it is built.
+        private List<ScoreboardSnapshot> CaptureScoreboardSnapshot()
         {
             var snapshot = new List<ScoreboardSnapshot>();
             try
@@ -945,7 +948,7 @@ namespace MatchZy
             {
                 Log($"[CaptureScoreboardSnapshot] {e.Message}");
             }
-            return JsonSerializer.Serialize(snapshot);
+            return snapshot;
         }
 
         // Puts the scoreboard back to the restored round. mp_backup_restore_load_file only restores
@@ -1025,6 +1028,12 @@ namespace MatchZy
         // fill-in pass landing on the same file) must not interleave writes to the same path.
         private static readonly SemaphoreSlim backupWriteLock = new SemaphoreSlim(1, 1);
 
+        // System.Text.Json caches its per-type metadata on the options instance, so a fresh
+        // JsonSerializerOptions per write rebuilt that metadata every round. One shared instance.
+        // WriteIndented is deliberately off: the payload is dominated by one giant escaped string
+        // (valve_backup), which indentation cannot break up - it only costs a pass.
+        internal static readonly JsonSerializerOptions BackupJsonOptions = new() { WriteIndented = false };
+
         /// <summary>
         /// Round snapshot for the restore system. Split in two on purpose:
         ///
@@ -1071,8 +1080,8 @@ namespace MatchZy
                     { "map_name", Server.MapName },
                     { "mapnumber", matchConfig.CurrentMapNumber.ToString() },
                     { "round", round },
-                    { "team1", GetTeamConfig("team1") },
-                    { "team2", GetTeamConfig("team2") },
+                    { "team1", "" },
+                    { "team2", "" },
                     { "team1_name", matchzyTeam1.teamName },
                     { "team1_flag", matchzyTeam1.teamFlag },
                     { "team1_tag", matchzyTeam1.teamTag },
@@ -1088,17 +1097,24 @@ namespace MatchZy
                     { "TerroristTimeOuts", gameRules.TerroristTimeOuts.ToString() },
                     { "CTTimeOuts", gameRules.CTTimeOuts.ToString() },
                     { "match_loaded", isMatchSetup.ToString() },
-                    { "match_config", GetMatchConfig() },
+                    { "match_config", "" },
                     // Filled in off-thread once the engine's own round file has been read.
                     { "valve_backup", "" },
                     // Scoreboard snapshot: the engine keeps kills/deaths/damage and the round-history
                     // strip as they were when the backup is loaded, so we have to put them back ourselves.
-                    { "scoreboard", CaptureScoreboardSnapshot() },
+                    // Gathered here, JSON-encoded off-thread.
+                    { "scoreboard", "" },
                 };
+                List<ScoreboardSnapshot> scoreboard = CaptureScoreboardSnapshot();
+                MatchConfig configSnapshot = matchConfig.SnapshotForBackup();
+                Team team1Snapshot = matchzyTeam1.SnapshotForBackup();
+                Team team2Snapshot = matchzyTeam2.SnapshotForBackup();
 
                 // ---- thread pool: file IO + JSON ----
-                // roundData is handed over wholesale and never touched here again.
-                _ = Task.Run(() => WriteRoundDataBackupAsync(filePath, lastBackupFilePath, roundData));
+                // roundData and scoreboard are handed over wholesale and never touched here again.
+                _ = Task.Run(() => WriteRoundDataBackupAsync(
+                    filePath, lastBackupFilePath, roundData, scoreboard,
+                    configSnapshot, team1Snapshot, team2Snapshot));
             }
             catch (Exception e)
             {
@@ -1114,12 +1130,14 @@ namespace MatchZy
         private async Task WriteRoundDataBackupAsync(
             string filePath,
             string lastBackupFilePath,
-            Dictionary<string, string> roundData
+            Dictionary<string, string> roundData,
+            List<ScoreboardSnapshot> scoreboard,
+            MatchConfig configSnapshot,
+            Team team1Snapshot,
+            Team team2Snapshot
         )
         {
-            // WriteIndented is deliberately off: the payload is dominated by one giant escaped
-            // string (valve_backup), which indentation cannot break up - it only costs a pass.
-            JsonSerializerOptions options = new() { WriteIndented = false };
+            JsonSerializerOptions options = BackupJsonOptions;
             bool needsFillIn = false;
 
             await backupWriteLock.WaitAsync().ConfigureAwait(false);
@@ -1152,6 +1170,12 @@ namespace MatchZy
                 }
 
                 roundData["valve_backup"] = SanitizeValveBackup(valveBackupContent);
+                // Keep Newtonsoft's existing field/property names and nested JSON strings.
+                // Only detached snapshots are read here, never live plugin or engine state.
+                roundData["team1"] = Newtonsoft.Json.JsonConvert.SerializeObject(team1Snapshot);
+                roundData["team2"] = Newtonsoft.Json.JsonConvert.SerializeObject(team2Snapshot);
+                roundData["match_config"] = Newtonsoft.Json.JsonConvert.SerializeObject(configSnapshot);
+                roundData["scoreboard"] = JsonSerializer.Serialize(scoreboard);
                 await File.WriteAllTextAsync(filePath, JsonSerializer.Serialize(roundData, options)).ConfigureAwait(false);
             }
             catch (Exception e)

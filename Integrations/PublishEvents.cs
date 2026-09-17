@@ -37,7 +37,7 @@ namespace MatchZy
                     request.Headers.TryAddWithoutValidation(matchConfig.RemoteLogAuthKey, matchConfig.RemoteLogAuthValue);
                 }
 
-                var response = await _sharedHttpClient.SendAsync(request);
+                using var response = await _sharedHttpClient.SendAsync(request).ConfigureAwait(false);
 
                 if (!response.IsSuccessStatusCode)
                 {

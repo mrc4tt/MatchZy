@@ -16,7 +16,7 @@ namespace MatchZy
     public partial class MatchZy : BasePlugin
     {
         public override string ModuleName => "MatchZy";
-        public override string ModuleVersion => "0.8.82";
+        public override string ModuleVersion => "0.8.83";
         public override string ModuleAuthor => "WD- Edited by Miksen @ FSHOST.me";
         public override string ModuleDescription => "A plugin for running and managing CS2 practice/pugs/scrims/matches!";
         public string chatPrefix = $"{ChatColors.Green}[MatchZy]{ChatColors.Default}";
@@ -315,6 +315,8 @@ namespace MatchZy
                     Log($"[Load] Database init failed: {ex.Message}");
                 }
             });
+            // Pre-pay the first live round_start's serializer/JIT costs off the game thread.
+            WarmRoundStartPaths();
             // Wrap startup config/ConVar/AutoStart init in try/catch. A throw anywhere
             // here (missing/locked cfg file, transient I/O error, null ConVar) would
             // otherwise propagate out of Load() and make CSS abort the plugin load -

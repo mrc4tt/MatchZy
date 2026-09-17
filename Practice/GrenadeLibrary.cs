@@ -256,12 +256,15 @@ namespace MatchZy
                     var pawn = player.PlayerPawn?.Value;
                     var o = pawn?.AbsOrigin;
                     if (o == null) continue;
+                    // AbsOrigin is engine-backed; snapshot it once for this recipient.
+                    float x = o.X, y = o.Y, z = o.Z;
+                    var transmitEntities = info.TransmitEntities;
                     foreach (var g in activeNadeGroups)
                     {
-                        float dx = g.Pos.X - o.X, dy = g.Pos.Y - o.Y, dz = g.Pos.Z - o.Z;
+                        float dx = g.Pos.X - x, dy = g.Pos.Y - y, dz = g.Pos.Z - z;
                         if (dx * dx + dy * dy + dz * dz > NadeHideRadiusSq) continue;
-                        if (g.Beam != null && g.Beam.IsValid) info.TransmitEntities.Remove(g.Beam);
-                        if (g.Label != null && g.Label.IsValid) info.TransmitEntities.Remove(g.Label);
+                        if (g.Beam != null && g.Beam.IsValid) transmitEntities.Remove(g.Beam);
+                        if (g.Label != null && g.Label.IsValid) transmitEntities.Remove(g.Label);
                     }
                 }
             }

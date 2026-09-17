@@ -2682,7 +2682,8 @@ namespace MatchZy
         {
             if (pts.Count < 2)
                 return;
-            var beams = new List<CBeam>();
+            long startedAt = System.Diagnostics.Stopwatch.GetTimestamp();
+            var beams = new List<CBeam>(pts.Count - 1);
             for (int i = 0; i < pts.Count - 1; i++)
             {
                 var b = Utilities.CreateEntityByName<CBeam>("beam");
@@ -2703,7 +2704,10 @@ namespace MatchZy
                 foreach (var b in beams)
                     if (b != null && b.IsValid)
                         SafeRemoveEntity(b, "arc");
-            });
+            }, TimerFlags.STOP_ON_MAPCHANGE);
+            double elapsedMs = System.Diagnostics.Stopwatch.GetElapsedTime(startedAt).TotalMilliseconds;
+            if (elapsedMs >= 5.0)
+                Log($"[arc perf] Created {beams.Count} beams in {elapsedMs:F1} ms on the game thread.");
         }
 
         [ConsoleCommand("css_spec", "Switches team to Spectator")]

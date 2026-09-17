@@ -9,6 +9,18 @@ namespace MatchZy
 {
     public class Team
     {
+        // Do not transfer engine-backed coach controllers to the backup worker.
+        // Coaches are excluded from the serialized format already.
+        internal Team SnapshotForBackup() => new()
+        {
+            id = id,
+            teamName = teamName,
+            teamFlag = teamFlag,
+            teamTag = teamTag,
+            teamPlayers = teamPlayers?.DeepClone(),
+            seriesScore = seriesScore,
+        };
+
         [JsonPropertyName("id")]
         public string id = "";
 
