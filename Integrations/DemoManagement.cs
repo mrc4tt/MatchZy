@@ -165,12 +165,17 @@ namespace MatchZy
             }
 
             activeDemoFile = tempDemoPath;
+            // The engine resolves a relative tv_record path against the first Game search path in
+            // gameinfo.gi, which is csgo/addons/metamod on Metamod servers. An absolute path keeps the
+            // demo in csgo/, where the folder above was created and the checks and upload look for it.
+            string recordPath = Path.Join(Server.GameDirectory, "csgo", tempDemoPath).Replace('\\', '/');
+            string recordArg = recordPath.Contains(' ') ? $"\"{recordPath}\"" : recordPath;
             // tv_record_immediate 1 makes GOTV write the .dem while the match runs instead of buffering
             // it, so the file is on disk (which is what the verification below checks) and survives a
             // server crash mid-match.
-            Server.ExecuteCommand($"tv_record_immediate 1;tv_record {tempDemoPath}");
+            Server.ExecuteCommand($"tv_record_immediate 1;tv_record {recordArg}");
             isDemoRecording = true;
-            Log($"[StartDemoRecording] tv_record {tempDemoPath} (attempt {demoStartAttempts}/{DemoStartMaxAttempts})");
+            Log($"[StartDemoRecording] tv_record {recordArg} (attempt {demoStartAttempts}/{DemoStartMaxAttempts})");
             VerifyDemoRecording(tempDemoPath);
         }
 
