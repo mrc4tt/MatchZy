@@ -107,6 +107,8 @@ namespace MatchZy
 
         public FakeConVar<bool> dotTriggerDedupe = new("matchzy_dot_trigger_dedupe", "Only has an effect when \".\" is listed in PublicChatTrigger/SilentChatTrigger in CounterStrikeSharp's configs/core.json. CSS then already runs css_<command> for a dot message before the chat event fires, so MatchZy skips its own chat dispatch for commands it registers as console commands - otherwise every such command runs twice and prints twice. Set to false to restore the old double-dispatch behaviour. Default: true", true);
 
+        public FakeConVar<bool> nadeRecordDebug = new("matchzy_nade_record_debug", "Practice: log why a thrown grenade was or was not recorded for .rt/.last (one line per throw). Default: false", false);
+
         public FakeConVar<bool> coachDebugEnabled = new("matchzy_coach_debug", "Coach-spawn debug: logs/announces each real-player spawn reassignment, keeps coaches alive (no suicide) for inspection, and runs spawn enforcement during warmup so it can be tested with bots without starting a full match. Default: false", false);
 
         [ConsoleCommand("matchzy_whitelist_enabled_default", "Whether Whitelist is enabled by default or not. Default value: false")]
