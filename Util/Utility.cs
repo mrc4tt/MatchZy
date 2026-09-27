@@ -3414,6 +3414,41 @@ namespace MatchZy
             return (gameRules.CTTimeOutActive || gameRules.TerroristTimeOutActive) && gameRules.FreezePeriod;
         }
 
+        // Bots have no SteamID (0), so all of them would share one stats row. Give each a stable id
+        // from its name instead: 90000000000000000 + FNV-1a(name). Real SteamID64s sit around
+        // 7.656e16, so the range cannot collide with an account, and it still fits the signed
+        // BIGINT/INTEGER steamid64 column. Same name, same id, so a bot keeps one row per map.
+        internal const ulong BotStatsIdBase = 90_000_000_000_000_000UL;
+
+        internal static ulong BotStatsId(string name)
+        {
+            uint hash = 2166136261;
+            foreach (char c in name)
+            {
+                hash ^= c;
+                hash *= 16777619;
+            }
+            return BotStatsIdBase + hash;
+        }
+
+        // Who gets stats: every tracked human (playerData), plus bots on CT/T when
+        // matchzy_stats_include_bots is on. Bots are deliberately NOT added to playerData, which
+        // also drives the ready system, veto and pause counts.
+        private IEnumerable<CCSPlayerController> StatsPlayers()
+        {
+            foreach (var player in playerData.Values)
+                yield return player;
+
+            if (!statsIncludeBots.Value)
+                yield break;
+
+            foreach (var bot in Utilities.GetPlayers())
+            {
+                if (bot is { IsValid: true, IsBot: true, IsHLTV: false } && bot.TeamNum is 2 or 3)
+                    yield return bot;
+            }
+        }
+
         public (Dictionary<ulong, Dictionary<string, object>>, List<StatsPlayer>, List<StatsPlayer>) GetPlayerStatsDict()
         {
             Dictionary<ulong, Dictionary<string, object>> playerStatsDictionary = new Dictionary<ulong, Dictionary<string, object>>();
@@ -3423,14 +3458,13 @@ namespace MatchZy
             int roundsPlayed = gameRules?.TotalRoundsPlayed ?? 0;
             try
             {
-                foreach (int key in playerData.Keys)
+                foreach (CCSPlayerController player in StatsPlayers())
                 {
-                    CCSPlayerController player = playerData[key];
                     if (!player.IsValid || player.ActionTrackingServices == null)
                         continue;
 
                     var playerStats = player.ActionTrackingServices.MatchStats;
-                    ulong steamid64 = player.SteamID;
+                    ulong steamid64 = player.IsBot ? BotStatsId(player.PlayerName) : player.SteamID;
 
                     // Create a nested dictionary to store individual stats for the player
                     Dictionary<string, object> stats = new Dictionary<string, object>
@@ -3564,7 +3598,10 @@ namespace MatchZy
             // player, which is a match-config / side-mapping problem, not a database one.
             if (playerStatsDictionary.Count == 0 && isMatchLive)
             {
-                if (playerData.Count == 0)
+                int botsInPlay = Utilities.GetPlayers().Count(p => p is { IsValid: true, IsBot: true, IsHLTV: false } && p.TeamNum is 2 or 3);
+                if (playerData.Count == 0 && botsInPlay > 0 && !statsIncludeBots.Value)
+                    Log($"[GetPlayerStatsDict] No human players in play, only {botsInPlay} bot(s), so no player stats are recorded. Set matchzy_stats_include_bots true to record bots.");
+                else if (playerData.Count == 0)
                     Log("[GetPlayerStatsDict] WARNING: playerData is empty during a live round, so no player stats will be recorded. Every connected player resolved to CsTeam.None - check the team rosters in the match config and the CT/T side mapping.");
                 else
                     Log($"[GetPlayerStatsDict] WARNING: no player stats collected from {playerData.Count} playerData entries - none were valid or had ActionTrackingServices.");

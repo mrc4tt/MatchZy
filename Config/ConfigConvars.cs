@@ -10,6 +10,8 @@ namespace MatchZy
 {
     public partial class MatchZy
     {
+        public FakeConVar<bool> statsIncludeBots = new("matchzy_stats_include_bots", "Whether bots on CT/T get player stats (database, CSV and stats events). Bots have no SteamID, so each is recorded under a stable id of 90000000000000000 plus a hash of its name. Default: false", false);
+
         public FakeConVar<bool> smokeColorEnabled = new("matchzy_smoke_color_enabled", "Whether player-specific smoke color is enabled or not. Default: false", false);
 
         public FakeConVar<float> botJiggleRange = new("matchzy_botjiggle_range", "Practice .botjiggle: how far (units) bots strafe side-to-side. Default: 30", 30.0f);

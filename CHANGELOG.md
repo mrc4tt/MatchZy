@@ -4,6 +4,11 @@ Customized fork of [MatchZy](https://github.com/shobhit-pathak/MatchZy) by Shobh
 
 Fork version numbering is independent of upstream. Upstream changelog: <https://github.com/shobhit-pathak/MatchZy/blob/main/CHANGELOG.md>
 
+# Unreleased
+
+- New `matchzy_stats_include_bots` (default false): bots on CT/T get player stats in the database, CSV and stats events. Bots have no SteamID, so each is recorded under a stable id of 90000000000000000 plus a hash of its name (one row per bot per map). Bots are still not tracked as match players, so the ready system, veto and pauses are unchanged.
+- A live round with only bots now logs that plainly (and names the convar) instead of the roster warning "Every connected player resolved to CsTeam.None".
+
 # 0.8.83
 
 #### September 16, 2026
