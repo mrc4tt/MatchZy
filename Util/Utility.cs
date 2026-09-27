@@ -3982,7 +3982,10 @@ namespace MatchZy
             if (matched == null || !matched.IsValid)
                 return false;
             ws.ActiveWeapon.Raw = matched.Raw;
-            Utilities.SetStateChanged(pawn, "CCSPlayer_WeaponServices", "m_hActiveWeapon");
+            // m_hActiveWeapon lives in the WeaponServices component, not on the pawn, so mark the
+            // pawn's networked pointer to it. Naming the component class here instead notifies the
+            // PAWN at the component-relative offset, i.e. some unrelated pawn field.
+            Utilities.SetStateChanged(pawn, "CBasePlayerPawn", "m_pWeaponServices");
             return true;
         }
 
