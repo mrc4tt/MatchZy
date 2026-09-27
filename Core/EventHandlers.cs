@@ -268,18 +268,15 @@ public partial class MatchZy
             // kill did not run (it is suppressed during a pause/tactical-timeout window). Kill
             // them now instead. The old upstream fallback bounced the coach through Spectator
             // (ChangeTeam Spectator -> back) - never do that: it is a ghosting window and a
-            // visible team flicker. Debug mode keeps coaches alive for inspection on purpose.
-            if (!coachDebugEnabled.Value)
+            // visible team flicker.
+            foreach (var coach in coaches)
             {
-                foreach (var coach in coaches)
+                if (!IsPlayerValid(coach))
+                    continue;
+                if (coach.PlayerPawn.Value?.LifeState == (byte)LifeState_t.LIFE_ALIVE)
                 {
-                    if (!IsPlayerValid(coach))
-                        continue;
-                    if (coach.PlayerPawn.Value?.LifeState == (byte)LifeState_t.LIFE_ALIVE)
-                    {
-                        KillCoaches();
-                        break;
-                    }
+                    KillCoaches();
+                    break;
                 }
             }
             return HookResult.Continue;
@@ -322,11 +319,7 @@ public partial class MatchZy
             if (!isPractice || entity == null || entity.Entity == null)
                 return;
             if (!Constants.ProjectileTypeMap.ContainsKey(entity.Entity.DesignerName))
-            {
-                if (nadeRecordDebug.Value && entity.Entity.DesignerName.Contains("projectile"))
-                    Log($"[NadeRecord] skip: '{entity.Entity.DesignerName}' is not a recorded projectile type");
                 return;
-            }
 
             Server.NextFrame(() =>
             {
@@ -334,38 +327,28 @@ public partial class MatchZy
                 {
                     // Verify entity is still valid before creating wrapper
                     if (entity == null || !entity.IsValid || entity.Handle == IntPtr.Zero)
-                    {
-                        NadeRecordSkip("projectile gone one frame after spawn");
                         return;
-                    }
 
                     CBaseCSGrenadeProjectile projectile = new CBaseCSGrenadeProjectile(entity.Handle);
 
-                    if (projectile.Globalname == "custom")
-                        return; // our own .rt/.throw replay, never recorded
-                    if (!projectile.IsValid || !projectile.Thrower.IsValid || projectile.Thrower.Value == null || projectile.Thrower.Value.Controller.Value == null)
-                    {
-                        NadeRecordSkip($"no thrower (valid={projectile.IsValid}, thrower handle valid={projectile.Thrower.IsValid}, pawn={projectile.Thrower.Value != null}, controller={projectile.Thrower.Value?.Controller.Value != null}, owner={projectile.OwnerEntity.IsValid})");
+                    if (!projectile.IsValid || !projectile.Thrower.IsValid || projectile.Thrower.Value == null || projectile.Thrower.Value.Controller.Value == null || projectile.Globalname == "custom")
                         return;
-                    }
 
                     CCSPlayerController player = new(projectile.Thrower.Value.Controller.Value.Handle);
                     if (!player.IsValid || player.PlayerPawn.Value == null || !player.PlayerPawn.IsValid)
-                    {
-                        NadeRecordSkip("thrower controller has no valid pawn");
                         return;
-                    }
                     var throwerSceneNode = player.PlayerPawn.Value.CBodyComponent?.SceneNode;
                     if (throwerSceneNode?.AbsOrigin == null)
-                    {
-                        NadeRecordSkip("thrower pawn has no scene node origin");
                         return;
-                    }
                     int client = player.UserId!.Value;
 
                     Vector position = new(projectile.AbsOrigin!.X, projectile.AbsOrigin.Y, projectile.AbsOrigin.Z);
                     QAngle angle = new(projectile.AbsRotation!.X, projectile.AbsRotation.Y, projectile.AbsRotation.Z);
-                    Vector velocity = new(projectile.AbsVelocity.X, projectile.AbsVelocity.Y, projectile.AbsVelocity.Z);
+                    // Prefer m_vInitialVelocity: the engine sets it when it creates the projectile
+                    // (the launch velocity), while AbsVelocity can still read ~0 one frame after spawn.
+                    Vector velocity = new(projectile.InitialVelocity.X, projectile.InitialVelocity.Y, projectile.InitialVelocity.Z);
+                    if (velocity.X * velocity.X + velocity.Y * velocity.Y + velocity.Z * velocity.Z < 2500f)
+                        velocity = new(projectile.AbsVelocity.X, projectile.AbsVelocity.Y, projectile.AbsVelocity.Z);
                     Vector angularVelocity = new(projectile.AngVelocity.X, projectile.AngVelocity.Y, projectile.AngVelocity.Z);
                     string nadeType = Constants.ProjectileTypeMap[entity.Entity.DesignerName];
 
@@ -413,8 +396,6 @@ public partial class MatchZy
                     // when it's clearly alive (>= 50 u/s); otherwise recover it from the projectile's
                     // position delta over the next frame (AbsOrigin is reliably live).
                     float velMagSq = velocity.X * velocity.X + velocity.Y * velocity.Y + velocity.Z * velocity.Z;
-                    if (nadeRecordDebug.Value)
-                        Log($"[NadeRecord] {nadeType} by {player.PlayerName} (userid {client}): speed {System.Math.Sqrt(velMagSq):0}, item {itemIndex}{(velMagSq >= 2500f ? ", recording" : ", recovering velocity next frame")}");
                     if (velMagSq >= 2500f)
                     {
                         RecordThrownNade(client, nadeType, position, angle, playerOrigin, eyeAngles, itemIndex, duckAmount, velocity, angularVelocity);
@@ -428,29 +409,26 @@ public partial class MatchZy
                             {
                                 var ent2 = Utilities.GetEntityFromIndex<CBaseCSGrenadeProjectile>((int)projIndex);
                                 if (ent2 == null || !ent2.IsValid || ent2.AbsOrigin == null)
-                                {
-                                    NadeRecordSkip("projectile gone before its velocity could be recovered");
                                     return;
-                                }
                                 var o = ent2.AbsOrigin;
                                 // (p1 - p0) per tick -> units/sec (CS2 default 64 tick).
                                 Vector recovered = new((o.X - p0.X) * 64f, (o.Y - p0.Y) * 64f, (o.Z - p0.Z) * 64f);
-                                if (coachDebugEnabled.Value)
-                                    Log($"[NadeRecord] AbsVelocity low ({System.Math.Sqrt(velMagSq):0}); recovered {recovered.X:0}/{recovered.Y:0}/{recovered.Z:0} from position delta");
+                                // A zero-velocity record is useless: Throw() refuses it, so .rt would
+                                // silently spawn nothing. Leave the previous history entry in place.
+                                if (recovered.X * recovered.X + recovered.Y * recovered.Y + recovered.Z * recovered.Z < 2500f)
+                                    return;
                                 RecordThrownNade(client, nadeType, p0, angle, playerOrigin, eyeAngles, itemIndex, duckAmount, recovered, angularVelocity);
                             }
-                            catch (Exception ex)
+                            catch (Exception)
                             {
                                 // Projectile detonated/freed between frames - ignore.
-                                NadeRecordSkip($"velocity recovery failed: {ex.Message}");
                             }
                         });
                     }
                 }
-                catch (Exception ex)
+                catch (Exception)
                 {
                     // Entity was destroyed between frames - silently ignore
-                    NadeRecordSkip($"exception reading the projectile: {ex.Message}");
                 }
             });
         }
@@ -458,15 +436,6 @@ public partial class MatchZy
         {
             Log($"[OnEntitySpawnedHandler FATAL] An error occurred: {e.Message}");
         }
-    }
-
-    // Why a throw was not recorded for .rt/.last. Every exit above used to be silent, so a
-    // build that changed one thing about projectiles showed only "You have not thrown any
-    // nade yet!". matchzy_nade_record_debug turns these on.
-    private void NadeRecordSkip(string reason)
-    {
-        if (nadeRecordDebug.Value)
-            Log($"[NadeRecord] not recorded: {reason}");
     }
 
     public HookResult EventPlayerDeathPreHandler(EventPlayerDeath @event, GameEventInfo info)

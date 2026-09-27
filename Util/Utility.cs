@@ -2387,10 +2387,6 @@ namespace MatchZy
                 else if (isPractice && !isDryRun)
                     SettlePracticeWarmupState("round_start");
 
-                // Debug: exercise the coach-spawn flow during warmup so it can be tested with
-                // bots without starting a full match. Only the coach handling runs here.
-                if (coachDebugEnabled.Value && GetAllCoaches().Count > 0)
-                    HandleCoaches();
                 return;
             }
 
@@ -4411,8 +4407,6 @@ namespace MatchZy
                 teamSpawns[side] = pool;
             }
 
-            if (coachDebugEnabled.Value)
-                Log($"[RandomizeSpawns] pools: CT={teamSpawns[(byte)CsTeam.CounterTerrorist].Count} T={teamSpawns[(byte)CsTeam.Terrorist].Count}");
 
             // Exclude coaches: they are placed at their own viewing spot by the coach system and
             // must NOT be teleported onto a competitive spawn (that both mis-seats the coach and eats
@@ -4435,8 +4429,6 @@ namespace MatchZy
                 spawnPosition.Teleport(player);
                 moved++;
             }
-            if (coachDebugEnabled.Value)
-                Log($"[RandomizeSpawns] moved {moved} player(s), {skipped} skipped (no spawn pool)");
         }
     }
 }

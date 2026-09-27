@@ -25,8 +25,7 @@ public partial class MatchZy
 
     public HookResult OnCoachPlayerSpawn(EventPlayerSpawn @event, GameEventInfo info)
     {
-        // Debug mode runs the coach flow during warmup too (bot testing without a full match).
-        if (!matchStarted && !coachDebugEnabled.Value)
+        if (!matchStarted)
             return HookResult.Continue;
 
         CCSPlayerController? player = @event.Userid;
@@ -230,11 +229,7 @@ public partial class MatchZy
         // actual cvar type (float; reading it as int reinterprets the bits = garbage).
         float freeze = GetFreezeTime();
         float killDelay = Math.Max(0.5f, freeze - 1.0f);
-        if (coachDebugEnabled.Value)
-            Log($"[HandleCoaches] mp_freezetime={freeze:F1}s, coach kill would fire at {killDelay:F1}s - SKIPPED (debug mode keeps coaches alive)");
-        // Skip coach cleanup while debugging so coaches stay alive/visible for screenshots.
-        if (!coachDebugEnabled.Value)
-            coachKillTimer ??= AddTimer(killDelay, KillCoaches);
+        coachKillTimer ??= AddTimer(killDelay, KillCoaches);
 
         if (haveCoachSpawns)
         {
@@ -292,7 +287,6 @@ public partial class MatchZy
     private void EnforceCompetitiveSpawnsCore()
     {
         HashSet<CCSPlayerController> coaches = GetAllCoaches();
-        bool debug = coachDebugEnabled.Value;
 
         foreach (byte side in new[] { (byte)CsTeam.CounterTerrorist, (byte)CsTeam.Terrorist })
         {
@@ -356,23 +350,6 @@ public partial class MatchZy
                 remainingSpawns.RemoveAt(keepS);
             }
 
-            // Diagnostics: whoever is still unmatched is about to be moved - log how far they were
-            // from the nearest candidate so threshold/coverage gaps show up in one log line.
-            if (debug)
-            {
-                Log($"[CoachDebug] team {side}: {realPlayers.Count - remainingPlayers.Count}/{realPlayers.Count} players verified on competitive spawns ({spawns.Count} canonical)");
-                foreach (var rp in remainingPlayers)
-                {
-                    Vector pos = rp.PlayerPawn.Value!.CBodyComponent!.SceneNode!.AbsOrigin;
-                    float best = float.MaxValue;
-                    foreach (var s in spawns)
-                    {
-                        float dx = s.PlayerPosition.X - pos.X, dy = s.PlayerPosition.Y - pos.Y, dz = s.PlayerPosition.Z - pos.Z;
-                        best = Math.Min(best, dx * dx + dy * dy + dz * dz);
-                    }
-                    Log($"[CoachDebug] team {side}: {rp.PlayerName} unmatched - nearest candidate {(float)Math.Sqrt(best):0}u away ({spawns.Count} candidates)");
-                }
-            }
 
             // Remaining (displaced) players: bind the globally-closest (player, spawn) pairs. Beats a
             // spawn-centric greedy because the coach-bumped player snaps to the freed competitive slot
@@ -406,12 +383,6 @@ public partial class MatchZy
                 CCSPlayerController player = remainingPlayers[bestP];
                 Position spawn = remainingSpawns[bestS];
 
-                if (debug)
-                {
-                    Vector old = player.PlayerPawn.Value!.CBodyComponent!.SceneNode!.AbsOrigin;
-                    Log($"[CoachDebug] team {side}: {player.PlayerName} ({old.X:F0},{old.Y:F0},{old.Z:F0}) -> ({spawn.PlayerPosition.X:F0},{spawn.PlayerPosition.Y:F0},{spawn.PlayerPosition.Z:F0})");
-                    PrintToAllChat($"{ChatColors.Yellow}[CoachDebug]{ChatColors.Default} reseated {ChatColors.Green}{player.PlayerName}{ChatColors.Default} (team {side})");
-                }
 
                 new Position(spawn).Teleport(player);
                 remainingPlayers.RemoveAt(bestP);
@@ -591,8 +562,6 @@ public partial class MatchZy
             if (best == null)
                 return;
 
-            if (coachDebugEnabled.Value)
-                Log($"[FixDisplacedPlayerSpawn] team {side}: {player.PlayerName} off-competitive at spawn, moved to ({best.PlayerPosition.X:F0},{best.PlayerPosition.Y:F0},{best.PlayerPosition.Z:F0})");
             new Position(best).Teleport(player);
         }
         catch (Exception e)
@@ -854,8 +823,6 @@ public partial class MatchZy
             var los = Trace.TraceEndShape(eyePos, clusterEye, null, opts);
             if (los.DidHit())
                 continue;
-            if (coachDebugEnabled.Value)
-                Log($"[CoachPlace] team {teamNum}: BEHIND margin={margin:0} pos=({eyePos.X:0},{eyePos.Y:0},{eyePos.Z:0}) spawns={spawns.Count}");
             result = new Position(eyePos, new QAngle(pitch, yawDeg, 0.0f));
             return true;
         }
@@ -868,8 +835,6 @@ public partial class MatchZy
         if (ceil.DidHit())
             topZ = Math.Min(topZ, ceil.HitPoint.Z - 30.0f);
         var overheadPos = new Vector(rear.X, rear.Y, Math.Max(topZ, cz + 80.0f));
-        if (coachDebugEnabled.Value)
-            Log($"[CoachPlace] team {teamNum}: OVERHEAD pos=({overheadPos.X:0},{overheadPos.Y:0},{overheadPos.Z:0}) spawns={spawns.Count}");
         result = new Position(overheadPos, new QAngle(40.0f, yawDeg, 0.0f));
         return true;
     }
@@ -1033,9 +998,6 @@ public partial class MatchZy
 
     private void KillCoaches()
     {
-        // Debug mode keeps coaches alive for inspection - never suicide them.
-        if (coachDebugEnabled.Value)
-            return;
         if (isPaused || IsTacticalTimeoutActive())
             return;
         HashSet<CCSPlayerController> coaches = GetAllCoaches();
@@ -1096,7 +1058,7 @@ public partial class MatchZy
                 // damage for the kill; the pawn is dead a tick later so it never becomes shootable.
                 coach.PlayerPawn.Value.TakesDamage = true;
                 coach.PlayerPawn.Value.CommitSuicide(explode: false, force: true);
-                // Always-on (not debug-gated): the freezetime kill is otherwise completely
+                // Always logged: the freezetime kill is otherwise completely
                 // silent in production logs, which made "coach did not die" impossible to
                 // diagnose from a server log.
                 Log($"[KillCoaches] Killed coach {coach.PlayerName} during freezetime");

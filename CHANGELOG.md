@@ -9,6 +9,9 @@ Fork version numbering is independent of upstream. Upstream changelog: <https://
 - New `matchzy_stats_include_bots` (default false): bots on CT/T get player stats in the database, CSV and stats events. Bots have no SteamID, so each is recorded under a stable id of 90000000000000000 plus a hash of its name (one row per bot per map). Bots are still not tracked as match players, so the ready system, veto and pauses are unchanged.
 - Players vs bots matches: a team with `"players": "any"` takes any human not on another roster, and a team with `"bots": true` (optional `"bot_difficulty"` 0-3) is filled with bots up to `players_per_team` and kept on its side through warmup, live, halftime, overtime and round restores. A bot match needs a fixed map list (the load is refused if it would veto), draws knife sides at random, and the bot side always counts as ready/unpaused and is ignored by autopause. Bot stats are recorded automatically; `.warmupbots` is disabled in these matches. See the README.
 - A live round with only bots now logs that plainly (and names the convar) instead of the roster warning "Every connected player resolved to CsTeam.None".
+- Removed `matchzy_coach_debug` and its coach/spawn debug log lines. Coaches are now always killed at the end of freezetime.
+- Removed the `[rethrow perf]` timing line that slow practice rethrows printed to the server console.
+- Practice: a normal throw now stores the grenade's launch velocity reliably, so `.rethrow` / `.rt` no longer spawns nothing after a throw was recorded with zero velocity.
 
 # 0.8.83
 
