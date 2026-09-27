@@ -488,6 +488,12 @@ namespace MatchZy
                     return;
                 }
 
+                // The bot team cannot type .unpause; it always agrees.
+                if (IsBotSide(2))
+                    unpauseData["t"] = true;
+                if (IsBotSide(3))
+                    unpauseData["ct"] = true;
+
                 if ((bool)unpauseData["t"] && (bool)unpauseData["ct"])
                 {
                     PrintToAllChat(Localizer["matchzy.pause.teamsunpausedthematch"]);

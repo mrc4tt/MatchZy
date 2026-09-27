@@ -171,8 +171,9 @@ public partial class MatchZy
             return;
 
         int minPlayers = autoPauseMinPlayers.Value;
-        int ctPlayerCount = GetTeamPlayerCount(CsTeam.CounterTerrorist);
-        int tPlayerCount = GetTeamPlayerCount(CsTeam.Terrorist);
+        // The bot side has no humans by design; never count it short.
+        int ctPlayerCount = IsBotSide(3) ? minPlayers : GetTeamPlayerCount(CsTeam.CounterTerrorist);
+        int tPlayerCount = IsBotSide(2) ? minPlayers : GetTeamPlayerCount(CsTeam.Terrorist);
 
         // Check if we need to auto-pause (team has < min players)
         if (!isPaused && (ctPlayerCount < minPlayers || tPlayerCount < minPlayers))

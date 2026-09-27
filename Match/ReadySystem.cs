@@ -31,6 +31,10 @@ public partial class MatchZy
     {
         // if (matchStarted) return true;
 
+        // The bot team cannot type .ready.
+        if (IsBotSide(team))
+            return true;
+
         int minPlayers = GetPlayersPerTeam(team);
         int minReady = GetTeamMinReady(team);
         (int playerCount, int readyCount) = GetTeamPlayerCount(team, false);

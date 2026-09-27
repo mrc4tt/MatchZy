@@ -227,9 +227,11 @@ namespace MatchZy
                             return $"{field} should be a JSON structure!";
                         }
 
-                        if ((field != "spectators") && (jsonData[field]!["players"] == null || jsonData[field]!["players"]!.Type != JTokenType.Object))
+                        // A bot team needs no roster, and "players": "any" opens the team to any human.
+                        if ((field != "spectators") && !IsBotTeamToken(jsonData[field]) && !IsOpenRosterToken(jsonData[field]!["players"])
+                            && (jsonData[field]!["players"] == null || jsonData[field]!["players"]!.Type != JTokenType.Object))
                         {
-                            return $"{field} should have 'players' JSON!";
+                            return $"{field} should have 'players' JSON, \"players\": \"any\", or \"bots\": true!";
                         }
 
                         break;
@@ -327,6 +329,31 @@ namespace MatchZy
             matchzyTeam1.teamPlayers = team1["players"] == null || team1["players"]!.Type == JTokenType.Null ? null : team1["players"];
             matchzyTeam2.teamPlayers = team2["players"] == null || team2["players"]!.Type == JTokenType.Null ? null : team2["players"];
 
+            // Players-vs-bots keys (Match/BotTeam.cs). Set on every load: the Team objects outlive
+            // a match, so a flag left over from the previous one would carry into this one.
+            matchzyTeam1.botTeam = IsBotTeamToken(team1);
+            matchzyTeam2.botTeam = IsBotTeamToken(team2);
+            matchzyTeam1.botDifficulty = BotDifficultyFrom(team1);
+            matchzyTeam2.botDifficulty = BotDifficultyFrom(team2);
+            matchzyTeam1.openRoster = !matchzyTeam1.botTeam && IsOpenRosterToken(team1["players"]);
+            matchzyTeam2.openRoster = !matchzyTeam2.botTeam && IsOpenRosterToken(team2["players"]);
+            // The "any" marker is not a roster; the bot team has none.
+            if (matchzyTeam1.openRoster || matchzyTeam1.botTeam)
+                matchzyTeam1.teamPlayers = null;
+            if (matchzyTeam2.openRoster || matchzyTeam2.botTeam)
+                matchzyTeam2.teamPlayers = null;
+
+            if (matchzyTeam1.botTeam && matchzyTeam2.botTeam)
+            {
+                Log("[LOADMATCH] team1 and team2 cannot both be bot teams.");
+                return false;
+            }
+            if (matchzyTeam1.openRoster && matchzyTeam2.openRoster)
+            {
+                Log("[LOADMATCH] Only one team can use \"players\": \"any\" - leave both rosters out for a free-for-all join instead.");
+                return false;
+            }
+
             matchConfig = new()
             {
                 MatchId = liveMatchId,
@@ -348,6 +375,16 @@ namespace MatchZy
                 Log($"[LOADMATCH] The map pool {matchConfig.MapsPool.Count} is not large enough to play a series of {matchConfig.NumMaps} maps.");
                 return false;
             }
+
+            // A bot team cannot take part in a veto, so a bot match plays a fixed map list:
+            // maplist length == num_maps, or skip_veto true (the first num_maps maps are played).
+            if (HasBotTeam() && !matchConfig.SkipVeto)
+            {
+                Log($"[LOADMATCH] A match with a bot team needs a fixed map list: give exactly num_maps maps ({matchConfig.NumMaps}) or set \"skip_veto\": true. Refusing to load.");
+                return false;
+            }
+            if (HasBotTeam() && IsNoBotsFlagSet())
+                Log("[LOADMATCH] WARNING: the server runs with -nobots, so the bot team will be empty.");
 
             if (!matchConfig.SkipVeto)
             {
@@ -394,6 +431,16 @@ namespace MatchZy
                     }
                 }
 
+                // Bots cannot knife and pick a side, so a bot match draws each knife side at random.
+                if (HasBotTeam())
+                {
+                    for (int i = 0; i < matchConfig.MapSides.Count; i++)
+                    {
+                        if (matchConfig.MapSides[i] == "knife")
+                            matchConfig.MapSides[i] = new Random().Next(0, 2) == 0 ? "team1_ct" : "team1_t";
+                    }
+                }
+
                 string currentMapName = Server.MapName;
                 string mapName = matchConfig.Maplist[0].ToString();
 
@@ -430,6 +477,8 @@ namespace MatchZy
 
             SetTeamNames();
             UpdatePlayersMap();
+            // After SetMapSides: the bot team's side is only known from here on.
+            ApplyBotTeam();
 
             // Eagerly allocate matchid right after config validates so liveMatchId
             // is set well before HandleMatchStart fires. Avoids -1 leaking into
@@ -874,7 +923,8 @@ namespace MatchZy
         // so players can freely choose T/CT without being forced back to spectator.
         private bool IsTeamWhitelistConfigured()
         {
-            return RosterSize(matchzyTeam1.teamPlayers) > 0 || RosterSize(matchzyTeam2.teamPlayers) > 0;
+            return RosterSize(matchzyTeam1.teamPlayers) > 0 || RosterSize(matchzyTeam2.teamPlayers) > 0
+                || OpenRosterTeam() != null || HasBotTeam();
         }
 
         // Counts a roster token in either supported shape. Counting only JObject meant an
@@ -904,13 +954,16 @@ namespace MatchZy
             var steamId = player.SteamID;
             try
             {
+                // The bot team never takes a human, even one listed on its roster.
                 Team? rosteredTeam = null;
-                if (LookupRosterEntry(matchzyTeam1.teamPlayers, steamId))
+                if (!matchzyTeam1.botTeam && LookupRosterEntry(matchzyTeam1.teamPlayers, steamId))
                     rosteredTeam = matchzyTeam1;
-                else if (LookupRosterEntry(matchzyTeam2.teamPlayers, steamId))
+                else if (!matchzyTeam2.botTeam && LookupRosterEntry(matchzyTeam2.teamPlayers, steamId))
                     rosteredTeam = matchzyTeam2;
                 else if (LookupRosterEntry(matchConfig.Spectators, steamId))
                     return CsTeam.Spectator;
+                else
+                    rosteredTeam = OpenRosterTeam();
 
                 if (rosteredTeam == null)
                     return CsTeam.None;

@@ -37,6 +37,13 @@ namespace MatchZy
                 PrintToPlayerChat(player!, Localizer.ForPlayer(player, "matchzy.wb.off"));
                 return;
             }
+            // A players-vs-bots match already runs its own bot team; warmup bots would fight it
+            // over bot_quota and bot_join_team.
+            if (HasBotTeam())
+            {
+                PrintToPlayerChat(player!, "Warmup bots are not available in a match with a bot team.");
+                return;
+            }
             // Same guard the practice bot commands use: with -nobots the engine creates a modelless,
             // invisible shell for every bot it is asked for instead of a real bot.
             if (IsNoBotsFlagSet())

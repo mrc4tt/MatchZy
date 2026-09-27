@@ -19,6 +19,9 @@ namespace MatchZy
             teamTag = teamTag,
             teamPlayers = teamPlayers?.DeepClone(),
             seriesScore = seriesScore,
+            openRoster = openRoster,
+            botTeam = botTeam,
+            botDifficulty = botDifficulty,
         };
 
         [JsonPropertyName("id")]
@@ -41,6 +44,17 @@ namespace MatchZy
 
         [JsonPropertyName("seriesscore")]
         public int seriesScore = 0;
+
+        // "players": "any" - any human not on another roster plays for this team.
+        [JsonPropertyName("openroster")]
+        public bool openRoster = false;
+
+        // "bots": true - this team is played by bots (see Match/BotTeam.cs).
+        [JsonPropertyName("botteam")]
+        public bool botTeam = false;
+
+        [JsonPropertyName("botdifficulty")]
+        public int botDifficulty = 2;
     }
 
     public partial class MatchZy
@@ -197,6 +211,9 @@ namespace MatchZy
             target.teamTag = source.teamTag;
             target.teamPlayers = source.teamPlayers;
             target.seriesScore = source.seriesScore;
+            target.openRoster = source.openRoster;
+            target.botTeam = source.botTeam;
+            target.botDifficulty = source.botDifficulty;
         }
 
         public bool AddPlayerToTeam(string steamId, string name, JToken? team)

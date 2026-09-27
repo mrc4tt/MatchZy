@@ -242,6 +242,10 @@ public partial class MatchZy
     {
         try
         {
+            // Re-assert the bot team every round: follows halftime/overtime side swaps and
+            // round restores, and refills bots the engine dropped.
+            if (isMatchSetup)
+                ApplyBotTeam();
             HandlePostRoundStartEvent(@event);
             return HookResult.Continue;
         }

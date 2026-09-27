@@ -15,6 +15,26 @@ Type in chat with a dot prefix (the `!` / `css_` prefixes work too, e.g. `!ready
 - `.map <name/id>` - change map (name or workshop id; auto-yields to a dedicated map plugin if one is installed).
 - Match flow: `.match`, `.scrim`, `.prac`, `.dry`, `.warmup`, and the ready commands (`.ready` / `.r`, `.forceready`).
 
+## Players vs bots matches
+
+A match config can make one team open to any human and the other a bot team:
+
+```json
+{
+  "matchid": 0,
+  "num_maps": 1,
+  "maplist": ["de_dust2"],
+  "players_per_team": 5,
+  "team1": { "name": "Players", "players": "any" },
+  "team2": { "name": "Bots", "bots": true, "bot_difficulty": 2 }
+}
+```
+
+- `"players": "any"` - any human who is not on another roster (or the spectators) joins this team. No SteamIDs needed. Named rosters keep working on the other team.
+- `"bots": true` - the team is played by bots, filled up to `players_per_team`. `bot_difficulty` 0-3, default 2. Humans cannot join it; the bots follow their side through halftime and overtime.
+- Bots cannot veto, knife or type commands, so a bot match needs a fixed map list (exactly `num_maps` maps, or `"skip_veto": true`) and the load is refused otherwise. A `knife` side is drawn at random instead. The bot side always counts as ready and agrees to unpause, and autopause never counts it short.
+- Player stats include the bots automatically (see `matchzy_stats_include_bots`). `.warmupbots` is disabled in these matches.
+
 ## Requirements
 
 - **CS2 dedicated server** (Windows/Linux)
