@@ -4,6 +4,15 @@ Customized fork of [MatchZy](https://github.com/shobhit-pathak/MatchZy) by Shobh
 
 Fork version numbering is independent of upstream. Upstream changelog: <https://github.com/shobhit-pathak/MatchZy/blob/main/CHANGELOG.md>
 
+# 0.8.86
+
+#### September 28, 2026
+
+- New `matchzy_coach_enabled` (default true): set it to false to turn off `.coach` / `css_coach`. Players who are already coaching stay coaches until `.uncoach` or the match resets.
+- `.coach` now only lets you coach the team you are on. `.coach ct` while on T (or from spectator) is refused, so a player can no longer register as the other team's coach.
+- New live remote log events: `grenade_thrown`, `grenade_detonated` (smoke, flash, HE, molotov with position), `player_blinded` (who flashed whom, duration, team flash), `bomb_pickup`, `bomb_dropped` and `bomb_exploded`. Sent while the match is live and a remote log URL is set, like `player_hurt`.
+- `bomb_planted` and `bomb_defused` now report the correct site. Previously `site` was almost always "B".
+
 # 0.8.85
 
 #### September 27, 2026
