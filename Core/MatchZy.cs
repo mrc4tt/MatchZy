@@ -1102,7 +1102,7 @@ namespace MatchZy
                         RoundNumber = GetRoundNumer(),
                         PlayerName = player.PlayerName,
                         PlayerSteamId = player.SteamID.ToString(),
-                        Site = @event.Site == 0 ? "A" : "B",
+                        Site = GetPlantedBombSite(),
                         CtAlive = ctAlive,
                         TAlive = tAlive,
                     };
@@ -1138,7 +1138,7 @@ namespace MatchZy
                         RoundNumber = GetRoundNumer(),
                         PlayerName = player.PlayerName,
                         PlayerSteamId = player.SteamID.ToString(),
-                        Site = @event.Site == 0 ? "A" : "B",
+                        Site = GetPlantedBombSite(),
                         CtAlive = ctAlive,
                         TAlive = tAlive,
                     };
@@ -1256,6 +1256,8 @@ namespace MatchZy
                     return HookResult.Continue;
                 }
             );
+
+            RegisterLiveUtilityEvents();
 
             // ── Live scorebot: player_hurt event ──
             RegisterEventHandler<EventPlayerHurt>(

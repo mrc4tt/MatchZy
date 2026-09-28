@@ -482,3 +482,125 @@ public class MatchUnpausedLiveEvent : MatchZyMapEvent
     public MatchUnpausedLiveEvent()
         : base("match_unpaused") { }
 }
+
+// ══════════════════════════════════════════════════════════════════════
+// Grenade / flash / bomb carrier events (for real-time scorebot)
+// ══════════════════════════════════════════════════════════════════════
+
+public class GrenadeThrownLiveEvent : MatchZyMapEvent
+{
+    [JsonPropertyName("player_name")]
+    public required string PlayerName { get; init; }
+
+    [JsonPropertyName("player_steamid")]
+    public required string PlayerSteamId { get; init; }
+
+    [JsonPropertyName("player_team")]
+    public required string PlayerTeam { get; init; }
+
+    [JsonPropertyName("grenade")]
+    public required string Grenade { get; init; } // "smoke" | "flash" | "he" | "molotov" | "incendiary" | "decoy"
+
+    [JsonPropertyName("round_number")]
+    public required int RoundNumber { get; init; }
+
+    public GrenadeThrownLiveEvent()
+        : base("grenade_thrown") { }
+}
+
+public class GrenadeDetonatedLiveEvent : MatchZyMapEvent
+{
+    [JsonPropertyName("player_name")]
+    public string? PlayerName { get; init; }
+
+    [JsonPropertyName("player_steamid")]
+    public string? PlayerSteamId { get; init; }
+
+    [JsonPropertyName("player_team")]
+    public string? PlayerTeam { get; init; }
+
+    [JsonPropertyName("grenade")]
+    public required string Grenade { get; init; } // "smoke" | "flash" | "he" | "molotov"
+
+    [JsonPropertyName("x")]
+    public float X { get; init; }
+
+    [JsonPropertyName("y")]
+    public float Y { get; init; }
+
+    [JsonPropertyName("z")]
+    public float Z { get; init; }
+
+    [JsonPropertyName("round_number")]
+    public required int RoundNumber { get; init; }
+
+    public GrenadeDetonatedLiveEvent()
+        : base("grenade_detonated") { }
+}
+
+public class PlayerBlindedLiveEvent : MatchZyMapEvent
+{
+    [JsonPropertyName("attacker_name")]
+    public string? AttackerName { get; init; }
+
+    [JsonPropertyName("attacker_steamid")]
+    public string? AttackerSteamId { get; init; }
+
+    [JsonPropertyName("attacker_team")]
+    public string? AttackerTeam { get; init; }
+
+    [JsonPropertyName("victim_name")]
+    public required string VictimName { get; init; }
+
+    [JsonPropertyName("victim_steamid")]
+    public required string VictimSteamId { get; init; }
+
+    [JsonPropertyName("victim_team")]
+    public required string VictimTeam { get; init; }
+
+    [JsonPropertyName("duration")]
+    public float Duration { get; init; } // seconds
+
+    [JsonPropertyName("team_flash")]
+    public bool TeamFlash { get; init; }
+
+    [JsonPropertyName("round_number")]
+    public required int RoundNumber { get; init; }
+
+    public PlayerBlindedLiveEvent()
+        : base("player_blinded") { }
+}
+
+public class BombCarrierLiveEvent : MatchZyMapEvent
+{
+    [JsonPropertyName("player_name")]
+    public required string PlayerName { get; init; }
+
+    [JsonPropertyName("player_steamid")]
+    public required string PlayerSteamId { get; init; }
+
+    [JsonPropertyName("round_number")]
+    public required int RoundNumber { get; init; }
+
+    // "bomb_pickup" | "bomb_dropped"
+    public BombCarrierLiveEvent(string eventName)
+        : base(eventName) { }
+}
+
+public class BombExplodedLiveEvent : MatchZyMapEvent
+{
+    [JsonPropertyName("site")]
+    public required string Site { get; init; }
+
+    [JsonPropertyName("round_number")]
+    public required int RoundNumber { get; init; }
+
+    [JsonPropertyName("ct_alive")]
+    public int CtAlive { get; init; }
+
+    [JsonPropertyName("t_alive")]
+    public int TAlive { get; init; }
+
+    public BombExplodedLiveEvent()
+        : base("bomb_exploded") { }
+}
