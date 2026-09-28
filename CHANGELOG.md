@@ -4,6 +4,13 @@ Customized fork of [MatchZy](https://github.com/shobhit-pathak/MatchZy) by Shobh
 
 Fork version numbering is independent of upstream. Upstream changelog: <https://github.com/shobhit-pathak/MatchZy/blob/main/CHANGELOG.md>
 
+# 0.8.87
+
+#### September 28, 2026
+
+- New optional `"coaches"` list per team in the match config (object keyed by SteamID64 or an array, like `"players"`). Listed coaches can join their team, are not kicked by `matchzy_kick_when_no_match_loaded`, and become its coach automatically. When a team has a list, only those SteamIDs can `.coach` it. See the README.
+- Coaches no longer count toward `players_per_team` in the ready check and no longer need to `.ready`.
+
 # 0.8.86
 
 #### September 28, 2026
