@@ -89,6 +89,9 @@ public partial class MatchZy
         {
             if (!playerData[key].IsValid)
                 continue;
+            // Coaches do not play, so they neither fill a player slot nor need to ready up.
+            if (!includeCoaches && (matchzyTeam1.coach.Contains(playerData[key]) || matchzyTeam2.coach.Contains(playerData[key])))
+                continue;
             if (playerData[key].TeamNum == team)
             {
                 playerCount++;

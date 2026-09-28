@@ -1537,6 +1537,9 @@ namespace MatchZy
                     // Update or add player - dictionary update is idempotent
                     playerData[userId] = player;
 
+                    if (isMatchSetup)
+                        AssignRosteredCoach(player);
+
                     // Only add to ready status if not already present
                     if (!playerReadyStatus.ContainsKey(userId))
                     {

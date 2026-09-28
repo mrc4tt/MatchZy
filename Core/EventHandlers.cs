@@ -51,6 +51,9 @@ public partial class MatchZy
             playerData[userId] = player;
             connectedPlayers++;
 
+            if (isMatchSetup)
+                AssignRosteredCoach(player);
+
             // Set ready status based on game state
             if (readyAvailable && !matchStarted)
             {

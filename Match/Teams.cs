@@ -18,6 +18,7 @@ namespace MatchZy
             teamFlag = teamFlag,
             teamTag = teamTag,
             teamPlayers = teamPlayers?.DeepClone(),
+            teamCoaches = teamCoaches?.DeepClone(),
             seriesScore = seriesScore,
             openRoster = openRoster,
             botTeam = botTeam,
@@ -38,6 +39,11 @@ namespace MatchZy
 
         [JsonPropertyName("teamplayers")]
         public JToken? teamPlayers;
+
+        // "coaches": optional roster of SteamIDs (same shapes as "players") that may join this team
+        // as its coach. Listed coaches are made coaches automatically on connect.
+        [JsonPropertyName("teamcoaches")]
+        public JToken? teamCoaches;
 
         [JsonIgnore, Newtonsoft.Json.JsonIgnore]
         public HashSet<CCSPlayerController> coach = [];
@@ -74,6 +80,14 @@ namespace MatchZy
             if (isPractice)
             {
                 ReplyToUserCommand(player, "Uncoach command can only be used in match mode!");
+                return;
+            }
+            // Listed only as a coach (not as a player): uncoaching would put an extra player on the team.
+            if (GetRosteredCoachTeam(player.SteamID) != null
+                && !LookupRosterEntry(matchzyTeam1.teamPlayers, player.SteamID)
+                && !LookupRosterEntry(matchzyTeam2.teamPlayers, player.SteamID))
+            {
+                ReplyToUserCommand(player, "You are listed as a coach in the match config and cannot play.");
                 return;
             }
 
@@ -210,6 +224,7 @@ namespace MatchZy
             target.teamFlag = source.teamFlag;
             target.teamTag = source.teamTag;
             target.teamPlayers = source.teamPlayers;
+            target.teamCoaches = source.teamCoaches;
             target.seriesScore = source.seriesScore;
             target.openRoster = source.openRoster;
             target.botTeam = source.botTeam;

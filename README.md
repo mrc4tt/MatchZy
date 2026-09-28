@@ -35,6 +35,23 @@ A match config can make one team open to any human and the other a bot team:
 - Bots cannot veto, knife or type commands, so a bot match needs a fixed map list (exactly `num_maps` maps, or `"skip_veto": true`) and the load is refused otherwise. A `knife` side is drawn at random instead. The bot side always counts as ready and agrees to unpause, and autopause never counts it short.
 - Player stats include the bots automatically (see `matchzy_stats_include_bots`). `.warmupbots` is disabled in these matches.
 
+## Coaches
+
+A team in the match config can list its coaches next to its players. Same shape as `"players"`: an object keyed by SteamID64, or an array of SteamID64s.
+
+```json
+"team1": {
+  "name": "Team A",
+  "players": { "76561198000000001": "Player1", "76561198000000002": "Player2" },
+  "coaches": { "76561198000000009": "CoachA" }
+}
+```
+
+- A listed coach may join that team (and is not kicked by `matchzy_kick_when_no_match_loaded`) and becomes its coach automatically. They cannot `.uncoach` into a player.
+- When a team has a `coaches` list, only the SteamIDs on it can `.coach` that team. Without a list, anyone on the team can `.coach`, as before.
+- `.coach` only works for the team you are on. `matchzy_coach_enabled false` turns coaching off entirely, including the listed coaches.
+- Coaches do not count toward `players_per_team` in the ready check and do not need to `.ready`.
+
 ## Requirements
 
 - **CS2 dedicated server** (Windows/Linux)

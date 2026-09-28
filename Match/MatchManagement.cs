@@ -328,6 +328,8 @@ namespace MatchZy
             matchzyTeam2.teamName = RemoveSpecialCharacters(team2["name"]!.ToString());
             matchzyTeam1.teamPlayers = team1["players"] == null || team1["players"]!.Type == JTokenType.Null ? null : team1["players"];
             matchzyTeam2.teamPlayers = team2["players"] == null || team2["players"]!.Type == JTokenType.Null ? null : team2["players"];
+            matchzyTeam1.teamCoaches = CoachRosterFrom(team1);
+            matchzyTeam2.teamCoaches = CoachRosterFrom(team2);
 
             // Players-vs-bots keys (Match/BotTeam.cs). Set on every load: the Team objects outlive
             // a match, so a flag left over from the previous one would carry into this one.
@@ -611,12 +613,16 @@ namespace MatchZy
                 team1Data["id"] = matchzyTeam1.id;
                 team1Data["name"] = matchzyTeam1.teamName;
                 team1Data["players"] = matchzyTeam1.teamPlayers;
+                if (matchzyTeam1.teamCoaches != null)
+                    team1Data["coaches"] = matchzyTeam1.teamCoaches;
                 matchData["team1"] = team1Data;
 
                 var team2Data = new JObject();
                 team2Data["id"] = matchzyTeam2.id;
                 team2Data["name"] = matchzyTeam2.teamName;
                 team2Data["players"] = matchzyTeam2.teamPlayers;
+                if (matchzyTeam2.teamCoaches != null)
+                    team2Data["coaches"] = matchzyTeam2.teamCoaches;
                 matchData["team2"] = team2Data;
 
                 if (matchConfig.Spectators != null)
@@ -960,6 +966,8 @@ namespace MatchZy
                     rosteredTeam = matchzyTeam1;
                 else if (!matchzyTeam2.botTeam && LookupRosterEntry(matchzyTeam2.teamPlayers, steamId))
                     rosteredTeam = matchzyTeam2;
+                else if (GetRosteredCoachTeam(steamId) is Team coachTeam)
+                    rosteredTeam = coachTeam;
                 else if (LookupRosterEntry(matchConfig.Spectators, steamId))
                     return CsTeam.Spectator;
                 else

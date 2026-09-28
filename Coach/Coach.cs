@@ -8,6 +8,7 @@ using CounterStrikeSharp.API.Modules.Commands;
 using CounterStrikeSharp.API.Modules.Cvars;
 using CounterStrikeSharp.API.Modules.Memory;
 using CounterStrikeSharp.API.Modules.Utils;
+using Newtonsoft.Json.Linq;
 
 namespace MatchZy;
 
@@ -203,6 +204,13 @@ public partial class MatchZy
         }
         else
         {
+            return;
+        }
+
+        // A team with a "coaches" list in the match config only takes the coaches listed there.
+        if (RosterSize(matchZyCoachTeam.teamCoaches) > 0 && !LookupRosterEntry(matchZyCoachTeam.teamCoaches, player!.SteamID))
+        {
+            ReplyToUserCommand(player, $"Only the coaches listed in the match config can coach {matchZyCoachTeam.teamName}.");
             return;
         }
 
@@ -1528,5 +1536,55 @@ public partial class MatchZy
         {
             Log($"[GetCoachSpawns] FATAL error loading coach spawns for map {Server.MapName}: {ex.Message}");
         }
+    }
+
+    // Reads a team's optional "coaches" roster. Accepts the same shapes as "players": an object
+    // keyed by SteamID ({"765...": "Name"}) or an array of SteamIDs. A bot team takes no coaches.
+    private JToken? CoachRosterFrom(JToken team)
+    {
+        JToken? coaches = team["coaches"];
+        if (coaches == null || coaches.Type == JTokenType.Null || IsBotTeamToken(team))
+            return null;
+        if (coaches.Type != JTokenType.Object && coaches.Type != JTokenType.Array)
+        {
+            Log("[LOADMATCH] Ignoring \"coaches\": it must be an object keyed by SteamID or an array of SteamIDs.");
+            return null;
+        }
+        return coaches;
+    }
+
+    // The team whose "coaches" roster lists this SteamID, or null. Always null while coaching
+    // is disabled, so a listed coach is then treated like anyone else not in the match.
+    private Team? GetRosteredCoachTeam(ulong steamId)
+    {
+        if (!coachEnabled.Value)
+            return null;
+        if (!matchzyTeam1.botTeam && LookupRosterEntry(matchzyTeam1.teamCoaches, steamId))
+            return matchzyTeam1;
+        if (!matchzyTeam2.botTeam && LookupRosterEntry(matchzyTeam2.teamCoaches, steamId))
+            return matchzyTeam2;
+        return null;
+    }
+
+    // Makes a player listed under a team's "coaches" that team's coach. Idempotent: called on
+    // connect and from UpdatePlayersMap. A SteamID listed as a player too plays instead.
+    private void AssignRosteredCoach(CCSPlayerController player)
+    {
+        if (player == null || !player.IsValid || player.IsBot || player.IsHLTV)
+            return;
+        Team? coachTeam = GetRosteredCoachTeam(player.SteamID);
+        if (coachTeam == null)
+            return;
+        if (LookupRosterEntry(matchzyTeam1.teamPlayers, player.SteamID) || LookupRosterEntry(matchzyTeam2.teamPlayers, player.SteamID))
+            return;
+        if (matchzyTeam1.coach.Contains(player) || matchzyTeam2.coach.Contains(player))
+            return;
+
+        coachTeam.coach.Add(player);
+        player.Clan = $"[{coachTeam.teamName} COACH]";
+        if (player.InGameMoneyServices != null)
+            player.InGameMoneyServices.Account = 0;
+        Server.NextFrame(EnforceCompetitiveTeammateColors);
+        PrintToAllChat($"{ChatColors.Green}{player.PlayerName}{ChatColors.Default} is now coaching {ChatColors.Green}{coachTeam.teamName}{ChatColors.Default}!");
     }
 }
