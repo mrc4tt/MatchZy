@@ -26,6 +26,8 @@ namespace MatchZy
 
         public FakeConVar<bool> techPauseEnabled = new("matchzy_enable_tech_pause", "Whether .tech command is enabled or not. Default: true", true);
 
+        public FakeConVar<bool> coachEnabled = new("matchzy_coach_enabled", "Whether players can become a coach with .coach / css_coach. Players already coaching stay coaches until .uncoach or the match resets. Default: true", true);
+
         public FakeConVar<int> techPauseDuration = new("matchzy_tech_pause_duration", "Tech pause duration in seconds. Default value: 300", 300);
 
         public FakeConVar<int> maxTechPausesAllowed = new("matchzy_max_tech_pauses_allowed", " Max tech pauses allowed. Default value: 2", 2);

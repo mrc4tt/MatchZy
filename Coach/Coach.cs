@@ -143,6 +143,11 @@ public partial class MatchZy
             ReplyToUserCommand(player, "Coach command can only be used in match mode!");
             return;
         }
+        if (!coachEnabled.Value)
+        {
+            ReplyToUserCommand(player, "Coaching is disabled on this server.");
+            return;
+        }
 
         side = side.Trim().ToLower();
 
@@ -167,6 +172,16 @@ public partial class MatchZy
         if (side != "t" && side != "ct")
         {
             ReplyToUserCommand(player, "Usage: .coach t or .coach ct");
+            return;
+        }
+
+        // A coach may only coach the side they are on. Otherwise a player could register as the
+        // other team's coach (and be treated as one: kept out of alive counts, handed the bomb
+        // transfer, relocated to that team's coach spot) without ever joining that team.
+        byte wantedTeam = side == "t" ? (byte)CsTeam.Terrorist : (byte)CsTeam.CounterTerrorist;
+        if (player!.TeamNum != wantedTeam)
+        {
+            ReplyToUserCommand(player, "You can only coach the team you are on. Join that team first, then use .coach");
             return;
         }
 

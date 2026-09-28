@@ -244,6 +244,9 @@ matchzy_everyone_is_admin false
 
 // The server hostname to use. Set to """" to disable/use existing.
 // Example matchzy_hostname_format ""MatchZy | {TEAM1} vs {TEAM2}""
+// Whether players can become a coach with .coach. Coaches can only coach the team they are on. Default: true
+matchzy_coach_enabled true
+
 matchzy_hostname_format """"
 
 // Whether to show damage report after each round or not. Default: true.
