@@ -4,3 +4,6 @@ CLAUDE.md
 bin/
 obj/
 .git-credentials
+
+# MkDocs build output
+documentation/site/

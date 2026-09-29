@@ -1,0 +1,202 @@
+# What's new
+
+A short summary of each release. The [full changelog](changelog.md) has the details and background for every change.
+
+## 0.8.88 <small>September 29, 2026</small>
+
+- **Added:** Documentation site.
+- **Changed:** New config.cfg defaults: `matchzy_minimum_ready_required 2`, `matchzy_chat_messages_timer_delay 21`. Existing config.cfg files keep their values.
+- **Changed:** On/off settings accept `1` / `0` as well as `true` / `false`.
+- **Fixed:** `.t` / `.ct` from spectator in practice (gamedata key name).
+- **Fixed:** Team `"players"` as an array of SteamID64s in match configs.
+- **Fixed:** Remote log URL from config.cfg lost when a match was loaded.
+- **Fixed:** Dot forms `.skipveto`, `.rmap`, `.surrender`, `.configs`, `.kniferound`, `.autopause`, `.listbackups`, and `.version` in chat.
+- **Fixed:** Empty `matchzy_admin_chat_prefix` resetting the wrong prefix.
+
+## 0.8.87 <small>September 28, 2026</small>
+
+- **Added:** `"coaches"` list per team in the match config. Listed coaches can join, are not kicked, and become coach automatically.
+- **Changed:** Coaches no longer count toward `players_per_team` and do not need to `.ready`.
+
+## 0.8.86 <small>September 28, 2026</small>
+
+- **Added:** `matchzy_coach_enabled` to turn coaching off.
+- **Added:** Live events `grenade_thrown`, `grenade_detonated`, `player_blinded`, `bomb_pickup`, `bomb_dropped`, `bomb_exploded`.
+- **Changed:** `.coach` only works for the team you are on.
+- **Fixed:** `bomb_planted` / `bomb_defused` report the correct site.
+
+## 0.8.85 <small>September 27, 2026</small>
+
+- **Added:** Players vs bots matches (`"players": "any"` and `"bots": true` in the match config).
+- **Added:** `matchzy_stats_include_bots` to record bot stats.
+- **Removed:** `matchzy_coach_debug`.
+- **Fixed:** `.rethrow` spawning nothing after some throws.
+
+## 0.8.83 <small>September 16, 2026</small>
+
+- **Changed:** Less work on the game thread at round start and during practice rethrows (fewer hitches).
+- **Changed:** Round backups are written in the background.
+
+## 0.8.82 <small>September 15, 2026</small>
+
+- **Fixed:** Practice bot commands and `.warmupbots` respect `-nobots` (no more invisible bots).
+- **Fixed:** `.map` ignored after a map change.
+- **Fixed:** `-nohltv` detection.
+
+## 0.8.80 <small>September 4, 2026</small>
+
+- **Changed:** Mode commands (`css_prac`, `css_match`, ...) remember the mode across map changes.
+- **Changed:** Practice started on a fresh map starts right away, without a warmup countdown.
+- **Changed:** Bullet impacts are on by default in practice.
+- **Fixed:** Warmup starting on top of practice when loaded from a mode-switch script.
+
+## 0.8.79 <small>September 2, 2026</small>
+
+- **Changed:** `.mhelp` shows each admin the commands they can run, and the permission for the rest. Any admin can open it.
+
+## 0.8.78 <small>September 1, 2026</small>
+
+- **Added:** Workshop maps by name with `ws:<name>`.
+- **Fixed:** `workshop/<id>` map formats in match configs and veto.
+
+## 0.8.77 <small>August 25, 2026</small>
+
+- **Changed:** Runs on stock CounterStrikeSharp as well as the fork.
+- **Changed:** `gamedata/matchzy.json` includes the weapon-select offset.
+
+## 0.8.76 <small>August 17, 2026</small>
+
+- **Fixed:** `.bot` refusing to spawn when CSTV is disabled.
+
+## 0.8.75 <small>August 15, 2026</small>
+
+- **Fixed:** `matchzy_kick_when_no_match_loaded` and the whitelist are enforced again.
+- **Fixed:** A server crash when a player outside a set-up match joined a team.
+
+## 0.8.74 <small>August 11, 2026</small>
+
+- **Added:** `matchzy_auto_team_names_enabled`.
+- **Changed:** Demo recording is verified by file growth and restarted if it stalls.
+- **Changed:** `tv_enable_dynamic 0` while recording; practice bots never take the CSTV slot.
+- **Fixed:** Molotov detonation times per grenade.
+
+## 0.8.73 <small>August 6, 2026</small>
+
+- **Changed:** `config.cfg` is no longer in the release zip, so updates never overwrite it. `database.json.example` is shipped instead.
+- **Fixed:** Demos not recorded on `.match`, `.scrim` and `.hill`, or after another plugin changed map.
+- **Fixed:** Several database issues: MySQL player stats, reused match ids, concurrent writes, multi-kill columns.
+- **Fixed:** Stopped matches get an end time in the database.
+- **Fixed:** `.restore` failing on a half-written round file.
+- **Fixed:** Knife maps using the previous match's sides.
+
+## 0.8.72 <small>August 5, 2026</small>
+
+- **Added:** `matchzy_restore_auto_unpause`, `matchzy_restore_unpause_delay`, `matchzy_restore_scoreboard_stats`, `matchzy_dot_trigger_dedupe`.
+- **Changed:** A restore rolls back the scoreboard and is only announced once it loaded.
+- **Changed:** `.restorecurrent` / `!rr` no longer ask for confirmation.
+- **Fixed:** Match stuck paused after a restore.
+- **Fixed:** Commands running twice when `.` is a CounterStrikeSharp chat trigger.
+- **Fixed:** Config files written to two folders (`MatchZy` and `matchzy`).
+
+## 0.8.71 <small>August 1, 2026</small>
+
+- **Added:** Demo upload after each map, S3 presigned upload (`matchzy_demo_upload_s3`), upload headers, `demo_upload_ended` event.
+
+## 0.8.70 <small>July 31, 2026</small>
+
+- **Fixed:** Match end data written twice at series end.
+
+## 0.8.69 <small>July 30, 2026</small>
+
+- **Fixed:** `.t` / `.ct` from spectator in practice kicking the player or leaving them dead.
+
+## 0.8.68 <small>July 29, 2026</small>
+
+- **Added:** `.backups` without a live match lists the newest backup files (restore after a crash). `!loadbackup` from chat.
+- **Fixed:** `.botjiggle` hiding new bots; `.bot` sometimes spawning nothing.
+
+## 0.8.67 <small>July 28, 2026</small>
+
+- **Removed:** `matchzy_random_spawns`.
+- **Changed:** Coaches never displace players from competitive spawns, have no teammate color and are hidden from the kill feed.
+- **Changed:** `bot_quota 0` and `mp_randomspawn 0` in the mode cfgs.
+
+## 0.8.66 <small>July 27, 2026</small>
+
+- **Fixed:** Demos not recording on `.scrim` and `.hill`.
+
+## 0.8.65 <small>July 27, 2026</small>
+
+- **Fixed:** Coach killed after the round went live; `.watchme` / `.spec` failing to move players.
+
+## 0.8.64 <small>July 24, 2026</small>
+
+- **Removed:** Experimental `.jt` / `.jumpthrow`.
+- **Fixed:** Crash when switching to the side you are already on; `.loadbotpos` tilted bots.
+
+## 0.8.63 <small>July 24, 2026</small>
+
+- **Fixed:** A match loaded by URL being lost on the map change to its first map.
+
+## 0.8.62 <small>July 24, 2026</small>
+
+- **Added:** Named bot positions (`.savebotpos`, `.loadbotpos`, `.listbotpos`, `.delbotpos`, `.showbotpos`) and `.botjiggle`.
+- **Added:** Molotov burn time in chat.
+
+## 0.8.61 <small>July 20, 2026</small>
+
+- **Added:** `matchzy_coaching_mode`, `.showcoachspawns`, `.coachtest`.
+- **Changed:** Coach viewing spots reworked for the whole map pool.
+- **Fixed:** Crash from `.watchme` / `.fas`.
+
+## 0.8.60 <small>July 19, 2026</small>
+
+- **Fixed:** Coach falling out of the map on some maps.
+
+## 0.8.59 <small>July 19, 2026</small>
+
+- **Added:** Grenade library: `.shownades`, `.hidenades`, shared pack (`.libadd`, `.libremove`, `.liblist`), `.nades` menu, throw styles on `.savenade`, `.ln #N`.
+- **Added:** `.warmupbots`, BO2 in `.matchsetup`.
+- **Changed:** Dryrun keeps playing until `.exitdry`.
+- **Removed:** Experimental `.predict`.
+
+## 0.8.58 <small>July 18, 2026</small>
+
+- **Added:** `.matchstop` alias.
+- **Fixed:** Dot commands during match setup; `.stopmatch` before the match is live.
+
+## 0.8.57 <small>July 17, 2026</small>
+
+- **Changed:** Practice turns off team-damage kicks.
+- **Changed:** `matchzy_ready_hint_style` controls the whole ready display.
+- **Fixed:** `.bot` spawning two bots; ghost bodies after a disconnect in practice.
+
+## 0.8.56 <small>July 16, 2026</small>
+
+- **Added:** Named positions, `.flashtest`, `.blind`, `.wipe`, `.cleanup`, `.autoclear`, `.landmarker`, `.arc`, `.mynades`, `matchzy_ready_up_by_ping`.
+- **Changed:** `.delnade` deletes several lineups or `all`.
+- **Changed:** Retired settings are removed from `config.cfg` on load.
+
+## 0.8.55 <small>July 16, 2026</small>
+
+- **Added:** Interactive spawn markers (aim + E to teleport).
+- **Changed:** `.back` steps through history like CS:GO.
+
+## 0.8.54 <small>July 16, 2026</small>
+
+- **Added:** `.grt` global rethrow; incendiary rethrow.
+- **Fixed:** Rethrow for smoke, HE, molotov and decoy; grenade spin on rethrow.
+
+## 0.8.53 <small>July 15, 2026</small>
+
+- **Added:** HTML ready-up panel, `matchzy_ready_clantag_enabled`.
+- **Changed:** MatchZy ships its own `gamedata/matchzy.json`.
+- **Changed:** Yields `css_map` to CS2-SimpleAdmin / CS2MapChange.
+
+## 0.8.52 <small>July 15, 2026</small>
+
+- **Added:** `.map` command with name resolution and workshop ids.
+- **Changed:** Config folder name is detected (`MatchZy` or `matchzy`); `admins.json` is loaded.
+- **Removed:** End-of-match summary panel.
+
+Older releases: see the [full changelog](changelog.md).

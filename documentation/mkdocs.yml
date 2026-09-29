@@ -1,0 +1,134 @@
+site_name: MatchZy (Miksen Fork)
+site_url: https://matchzy.miksen.me/
+site_description: MatchZy fork for CS2 servers - match management, practice mode, coaching, live events and stats on CounterStrikeSharp.
+site_author: Miksen
+repo_url: https://git.miksen.me/mikkel/matchzy
+repo_name: mikkel/matchzy
+edit_uri: ""
+copyright: MatchZy by Shobhit Pathak (upstream). Fork maintained by Miksen.
+
+theme:
+  name: material
+  language: en
+  icon:
+    logo: material/sword-cross
+    repo: fontawesome/brands/git-alt
+  favicon: assets/favicon.svg
+  font:
+    text: Inter
+    code: JetBrains Mono
+  palette:
+    - media: "(prefers-color-scheme)"
+      toggle:
+        icon: material/brightness-auto
+        name: Switch to light mode
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: deep orange
+      accent: amber
+      toggle:
+        icon: material/weather-sunny
+        name: Switch to dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: deep orange
+      accent: amber
+      toggle:
+        icon: material/weather-night
+        name: Switch to system preference
+  features:
+    - navigation.instant
+    - navigation.instant.progress
+    - navigation.tracking
+    - navigation.tabs
+    - navigation.tabs.sticky
+    - navigation.sections
+    - navigation.top
+    - navigation.footer
+    - navigation.indexes
+    - toc.follow
+    - search.suggest
+    - search.highlight
+    - search.share
+    - content.code.copy
+    - content.code.annotate
+    - content.tabs.link
+
+extra_css:
+  - assets/extra.css
+
+plugins:
+  - search
+
+markdown_extensions:
+  - abbr
+  - admonition
+  - attr_list
+  - def_list
+  - footnotes
+  - md_in_html
+  - tables
+  - toc:
+      permalink: true
+  - pymdownx.details
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
+  - pymdownx.inlinehilite
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.keys
+  - pymdownx.mark
+  - pymdownx.tabbed:
+      alternate_style: true
+  - pymdownx.tasklist:
+      custom_checkbox: true
+  - pymdownx.emoji:
+      emoji_index: !!python/name:material.extensions.emoji.twemoji
+      emoji_generator: !!python/name:material.extensions.emoji.to_svg
+  - pymdownx.snippets:
+      base_path: [".."]
+      check_paths: true
+
+extra:
+  generator: false
+  social:
+    - icon: fontawesome/brands/git-alt
+      link: https://git.miksen.me/mikkel/matchzy
+      name: Source on git.miksen.me
+    - icon: fontawesome/brands/github
+      link: https://github.com/shobhit-pathak/MatchZy
+      name: Upstream MatchZy
+
+nav:
+  - Home: index.md
+  - Fork vs upstream: comparison.md
+  - Getting started:
+      - getting-started/index.md
+      - Installation: getting-started/installation.md
+      - Updating: getting-started/updating.md
+      - Gamedata: getting-started/gamedata.md
+  - Guides:
+      - guides/index.md
+      - Game modes: guides/game-modes.md
+      - Running a match: guides/match-setup.md
+      - Ready system: guides/ready-system.md
+      - Pauses and backups: guides/pauses-backups.md
+      - Coaching: guides/coaching.md
+      - Practice mode: guides/practice.md
+      - Admin menus: guides/menus.md
+      - Demos (GOTV): guides/demos.md
+      - Stats and database: guides/stats.md
+      - Live events API: guides/events.md
+  - Reference:
+      - reference/index.md
+      - Commands: reference/commands.md
+      - Configuration (convars): reference/convars.md
+      - Match config JSON: reference/match-config.md
+      - Events: reference/events.md
+      - Files and folders: reference/files.md
+  - Changelog:
+      - "What's new": whats-new.md
+      - Full changelog: changelog.md

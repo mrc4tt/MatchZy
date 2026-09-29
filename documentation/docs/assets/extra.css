@@ -1,0 +1,45 @@
+:root {
+  --mz-card-border: var(--md-default-fg-color--lightest);
+}
+
+/* Home hero */
+.mz-hero {
+  padding: 2.2rem 0 1.2rem;
+  text-align: center;
+}
+.mz-hero h1 {
+  font-weight: 800;
+  font-size: 2.4rem;
+  margin: 0 0 .4rem;
+  letter-spacing: -0.02em;
+}
+.mz-hero p.mz-lead {
+  font-size: 1.05rem;
+  max-width: 40rem;
+  margin: 0 auto 1.2rem;
+  color: var(--md-default-fg-color--light);
+}
+.mz-hero .md-button { margin: .25rem; }
+
+/* Version pill */
+.mz-pill {
+  display: inline-block;
+  font-size: .7rem;
+  font-weight: 600;
+  padding: .1rem .55rem;
+  border-radius: 1rem;
+  background: var(--md-accent-fg-color--transparent);
+  color: var(--md-default-fg-color);
+  border: 1px solid var(--mz-card-border);
+  vertical-align: middle;
+}
+
+/* Comparison table marks */
+.mz-yes { color: #2e7d32; font-weight: 700; }
+.mz-no { color: var(--md-default-fg-color--lighter); }
+.mz-plus { color: var(--md-primary-fg-color); font-weight: 700; }
+[data-md-color-scheme="slate"] .mz-yes { color: #66bb6a; }
+
+/* Tables: keep command columns tidy */
+.md-typeset table:not([class]) td:first-child code { white-space: nowrap; }
+.md-typeset .grid.cards > ul > li { border-radius: .5rem; }
