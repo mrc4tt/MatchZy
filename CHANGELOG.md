@@ -9,6 +9,7 @@ Fork version numbering is independent of upstream. Upstream changelog: <https://
 #### September 29, 2026
 
 - Fixed a server crash about one second after a player connected to a server with a loaded match (0.8.88 and 0.8.89). The automatic team placement on connect forced the engine's team join on a player who was still in the team menu. Players now pick a team from the menu again, as before 0.8.88; the roster lock still only lets them join their own team, and a player who ends up on the wrong side, is off the roster or is a substitute on a full side is still moved.
+- New `matchzy_coach_listed_only` (default false): in a match loaded from a match config, only the SteamIDs in a team's `"coaches"` list may coach that team, and a team without a list has no coach. Use `matchzy_coach_enabled false` to turn coaching off completely.
 - New `matchzy_loaded_match_hide_mode_hints` (default true): in a match loaded from a match config (JSON file, URL or `.matchsetup`), a joining player only sees "Please type .ready to ready up!". The mode hints (.scrim, .prac, .knife) and the admin help line are not shown, since they do not apply to a loaded match. Set it to false to show them as before.
 
 # 0.8.89

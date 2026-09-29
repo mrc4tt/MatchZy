@@ -36,6 +36,8 @@ namespace MatchZy
 
         public FakeConVar<int> autoPauseMinPlayers = new("matchzy_autopause_minplayers", "Minimum players required per team before auto-pause triggers. Default: 5", 5);
 
+        public FakeConVar<bool> coachListedOnly = new("matchzy_coach_listed_only", "In a match loaded from a match config, only the SteamIDs in a team's \"coaches\" list may coach that team; teams without a list have no coach. Default: false", false);
+
         public FakeConVar<bool> loadedMatchHideModeHints = new("matchzy_loaded_match_hide_mode_hints", "In a match loaded from a match config, show only the ready-up hint when a player joins, not the mode hints (.scrim / .prac / .knife) and the admin help line. Default: true", true);
 
         public FakeConVar<int> overtimePausesPerTeam = new("matchzy_overtime_pauses_per_team", "How many times each team may use .pause in each overtime period. 0 = no limit. Admin pauses are not counted. Default: 1", 1);

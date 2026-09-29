@@ -125,6 +125,7 @@ Database connection settings are in [`database.json`](files.md#databasejson), no
 | Setting | Default | cfg | Description |
 |---|---|---|---|
 | `matchzy_coach_enabled` :fontawesome-solid-code-fork: | `true` | Y | Allow `.coach`. |
+| `matchzy_coach_listed_only` :fontawesome-solid-code-fork: | `false` | Y | In a loaded match only the SteamIDs in a team's `coaches` list may coach it; a team without a list has no coach. |
 | `matchzy_coaching_mode` :fontawesome-solid-code-fork: | `1` | Y | Coach viewing spot: `1` use `spawns/coach/<map>.json` when present, otherwise compute one; `2` always compute. |
 
 ## Practice

@@ -164,6 +164,11 @@ matchzy_autopause_minplayers 5
 // Default value: 3
 matchzy_autopause_resume_delay 3
 
+// In a match loaded from a match config, only the SteamIDs in a team's ""coaches"" list may coach that team;
+// a team without a list has no coach. Use matchzy_coach_enabled false to turn coaching off completely.
+// Default value: false
+matchzy_coach_listed_only false
+
 // In a match loaded from a match config (JSON/URL/.matchsetup), show only the ready-up hint (.ready)
 // when a player joins, and hide the mode hints (.scrim / .prac / .knife) and the admin help line. Default value: true
 matchzy_loaded_match_hide_mode_hints true

@@ -214,6 +214,14 @@ public partial class MatchZy
             return;
         }
 
+        // matchzy_coach_listed_only: in a loaded match only the SteamIDs in a team's "coaches" list may
+        // coach it; a team without a list has no coach.
+        if (isMatchSetup && coachListedOnly.Value && RosterSize(matchZyCoachTeam.teamCoaches) == 0)
+        {
+            ReplyToUserCommand(player, $"Only coaches listed in the match config can coach, and {matchZyCoachTeam.teamName} has none.");
+            return;
+        }
+
         // Without a coaches list, a team with a player roster is coached by someone on that roster.
         // Standing on the side was not enough: a player who is not in the match (an admin exempt
         // from the kick, or anyone the engine auto-assigned) could coach either team.
