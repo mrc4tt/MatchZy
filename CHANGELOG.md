@@ -4,6 +4,12 @@ Customized fork of [MatchZy](https://github.com/shobhit-pathak/MatchZy) by Shobh
 
 Fork version numbering is independent of upstream. Upstream changelog: <https://github.com/shobhit-pathak/MatchZy/blob/main/CHANGELOG.md>
 
+# 0.8.90
+
+#### September 29, 2026
+
+- Fixed a server crash about one second after a player connected to a server with a loaded match (0.8.88 and 0.8.89). The automatic team placement on connect forced the engine's team join on a player who was still in the team menu. Players now pick a team from the menu again, as before 0.8.88; the roster lock still only lets them join their own team, and a player who ends up on the wrong side, is off the roster or is a substitute on a full side is still moved.
+
 # 0.8.89
 
 #### September 29, 2026
