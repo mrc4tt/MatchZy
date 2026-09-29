@@ -2,10 +2,13 @@
 
 A short summary of each release. The [full changelog](changelog.md) has the details and background for every change.
 
+## 0.8.91 <small>September 29, 2026</small>
+
+- **Added:** `matchzy_coach_listed_only` (default false): only coaches listed in the match config may coach.
+
 ## 0.8.90 <small>September 29, 2026</small>
 
 - **Fixed:** Server crash right after a player connected to a loaded match (automatic team placement on connect removed; players pick their team from the menu again, locked to their roster side).
-- **Added:** `matchzy_coach_listed_only` (default false): only coaches listed in the match config may coach.
 - **Added:** `matchzy_loaded_match_hide_mode_hints` (default true): only the ready-up hint is shown to joining players in a loaded match.
 
 ## 0.8.89 <small>September 29, 2026</small>
