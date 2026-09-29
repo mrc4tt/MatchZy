@@ -4,6 +4,14 @@ Customized fork of [MatchZy](https://github.com/shobhit-pathak/MatchZy) by Shobh
 
 Fork version numbering is independent of upstream. Upstream changelog: <https://github.com/shobhit-pathak/MatchZy/blob/main/CHANGELOG.md>
 
+# 0.8.89
+
+#### September 29, 2026
+
+- Tactical timeouts in overtime: live.cfg now sets `mp_team_timeout_ot_add_once 1`, `mp_team_timeout_ot_add_each 0` and `mp_team_timeout_ot_max 5`, so each team gets one extra tactical timeout (`.tac`) when the match goes to overtime. The old live.cfg had no `mp_team_timeout_ot_add_once`, so a team that had used its timeouts in regulation had none in overtime. `mp_team_timeout_max` is now 4 (was 3). These are only defaults: both config.cfg and live.cfg can be edited to your needs. Set the timeouts in `cfg/MatchZy/live.cfg` (it runs when the match goes live, so the same lines in config.cfg would be overridden), or per match in the match config's `cvars` block. Note that live.cfg is part of the release zip, so extracting an update over the server replaces it; keep a copy of your edits (config.cfg is never replaced).
+- New `matchzy_overtime_pauses_per_team` (default 1, 0 = no limit): how many times each team may use `.pause` in each overtime period. Admin pauses are not counted; regulation is unchanged. Chat announces the overtime allowance when overtime starts. Change it to your needs in config.cfg.
+- `.pause` no longer requires tech pauses to be enabled. It was refused whenever `matchzy_enable_tech_pause` was false.
+
 # 0.8.88
 
 #### September 29, 2026
