@@ -4,6 +4,88 @@ Customized fork of [MatchZy](https://github.com/shobhit-pathak/MatchZy) by Shobh
 
 Fork version numbering is independent of upstream. Upstream changelog: <https://github.com/shobhit-pathak/MatchZy/blob/main/CHANGELOG.md>
 
+# 0.8.88
+
+#### September 29, 2026
+
+- Fixed a knife round being played although the match config sets the side (`"map_sides": ["team1_ct"]` and similar). Every player who connected during warmup switched the knife round back on. The same reset also undid `.scrim` / `.hill` (no knife) and an admin's `.knife off`, and `matchzy_knife_enabled_default false` was lost after the first match reset. In a loaded match `map_sides` now always decides.
+- Players in a loaded match are put on their team automatically when they connect (no team menu), listed spectators on Spectator, and anyone not in the match on Spectator. Players already on the server when a match is loaded are moved to their team as well. A player the game auto-assigned to the wrong team, or who came from Spectator, is moved back too; before, only a player with a live body was corrected, so someone could end up on (and coach) the other team.
+- `players_per_team` is enforced when players join: substitutes listed in a roster wait on Spectator while their side is full. Side swaps (halftime, knife switch) are not affected.
+- After a veto that keeps the current map, and after every map change of a loaded match, players are moved to the sides of that map.
+- `.coach` without a `coaches` list now requires the player to be on that team's roster. A player not in the match (for example an admin exempt from the kick) could coach either team.
+- `get5_endmatch` / `.forceend` / `!forceend` now follow Get5: without an argument they cancel the match (in any state, including warmup and veto), with `team1` or `team2` that team wins the series. They used to do nothing outside a live map and, mid-map, score the map for the team ahead and move a series on.
+- A stopped or cancelled match sends `match_cancelled` and closes its database row also when it is stopped before going live (warmup, veto, knife, between maps).
+- A database outage at ready-up no longer replaces the match id with -1 (which silenced every event for the map).
+- The veto no longer hangs when a captain leaves: a teammate takes over, or the veto is aborted when the team is empty.
+- `skip_veto` now defaults to false like Get5: a map pool larger than `num_maps` is vetoed unless `"skip_veto": true` is set. A pool of exactly `num_maps` maps is played in order as before. The Get5 keys `side_type` (standard, always_knife, never_knife, random) and `veto_first` (team1, team2, random) are now read. `skip_veto`, `clinch_series` and `wingman` accept 1/0 as well as true/false.
+- Match config `cvars` are applied before the live restart, so round 1 already uses them, and `mp_overtime_enable` / `mp_match_can_clinch` from the match config are no longer overwritten by the live.cfg values.
+- `matchzy_remote_backup_url` (`get5_remote_backup_url`) now uploads every round backup (with the Get5 headers). The setting was read but never used.
+- Surrender (`!gg`) needs votes from the players on the team (all but one), not from `min_players_to_ready`: with `min_players_to_ready 1` one player could surrender. It is not available in a multi-map series (it would end the whole series), coaches cannot vote, and votes reset at halftime and on a new match.
+- `series_end` is sent after `map_result` has been delivered. `map_picked` and `side_picked` use a 0-based `map_number` like the other events. `get5_status` reports side as `ct`/`t` and ready state and connected players per team.
+- Pause and unpause messages name the right team after halftime.
+- The previous match's veto no longer decides who starts the next veto.
+- Security: entries in the match config `cvars` block must be a real convar or a `matchzy_` / `get5_` setting with a plain value; anything else (e.g. `quit`, or a value with a quote or `;`) is ignored and logged. `rcon_password` cannot be set from a match config. Map names from a match config, veto, backup or `.map` may only contain letters, digits and `_ - . / :`. Match config loads that fail (invalid JSON, `num_maps` below 1, a team without a name, a non-numeric `matchid`) are refused and reset cleanly. The load URL's auth header value, the match config body and presigned demo upload URLs are no longer written to the log.
+- MatchZy's own `admins.json` now honors flags in its value: a value such as `"@css/chat"` grants only the commands that accept that flag. An empty value or text without flags (for example the player's name) keeps full admin, as before.
+- MatchZy settings set in a match config's `cvars` block (for example `matchzy_kick_when_no_match_loaded`, `matchzy_knife_enabled_default`, demo and backup upload settings) are restored at series end like the other cvars; they used to stay on the server. The remote log settings are kept so `series_end` still reaches the match's URL. A stopped or cancelled match now restores its `cvars` too.
+- New `matchzy_forfeit_ready_timeout` (default 0 = off): in a loaded match, a team that is not ready this many seconds after the ready phase of a map began forfeits the series; if neither team is ready the match is cancelled (`match_cancelled` with reason `no_show`). Reminders are printed at 5, 2 and 1 minute(s) and 30 seconds.
+- New `matchzy_forfeit_leave_timeout` (default 0 = off): in a loaded match, a team with no players left on its side for this many seconds during a live map forfeits the series.
+- New `matchzy_veto_step_timeout` (default 0 = off): seconds a veto captain has for each ban, pick or side choice before it is made at random (a random map, or CT for a side).
+- New `knife_won` event (Get5 format: `team`, `side`, `swapped`) when the knife winner has chosen a side.
+- The `1k` stat (rounds with exactly one kill) is filled in the stats events.
+- `.importnade` refuses codes with invalid numbers, and imported lineups load as smokes instead of failing.
+- `.matchsetup`: a stale menu of an admin whose wizard was taken over can no longer change or cancel the new admin's setup.
+- Fixed `.t` / `.ct` from spectator in practice falling back to the old behavior (player left dead with a team-menu hint). The gamedata key had been renamed to `CBasePlayerController_HandleCommand_JoinTeam` in `gamedata/matchzy.json` while the plugin still looked up `CCSPlayerController_HandleCommandJoinTeam`. Both names are now accepted.
+- Match configs that list team `"players"` as an array of SteamID64s are accepted again (as strings or as plain numbers). The load check only allowed the object form. Adding a player to an array roster with `matchzy_addplayer` now stores the SteamID instead of the name, and `matchzy_removeplayer` removes from array rosters and spectators too.
+- `matchzy_remote_log_url` and its header settings set in config.cfg are kept when a match config is loaded. Before, loading a match dropped them, so no events were sent for that match unless the URL was repeated in the match config's `cvars` block.
+- The default for `matchzy_minimum_ready_required` in a newly generated config.cfg is now 2 (was 10), matching the plugin default. The default for `matchzy_chat_messages_timer_delay` is now 21 seconds in the plugin as well (was 13). Existing config.cfg files keep their values.
+- On/off settings such as `matchzy_whitelist_enabled_default`, `matchzy_knife_enabled_default` and `matchzy_allow_pause` now accept `1` and `0` as well as `true` and `false`. Before, `1` could not switch a disabled setting on.
+- `matchzy_admin_chat_prefix` with an empty value now resets the admin prefix. It reset the normal chat prefix instead.
+- `.version` in chat now replies. It printed nothing.
+- `.skipveto` / `.sv`, `.rmap`, `.surrender`, `.configs`, `.kniferound`, `.autopause` and `.listbackups` now work with the dot prefix, as `.mhelp` lists them. Before, only the `!` form worked. `.mhelp` also shows the real team name commands (`.team1` / `.team2`), `.rrestore` instead of `.rr`, and lists `.forceend` separately.
+- Fixed a loaded match being wiped by its own map change. The map change to map 2 of a series, and to the map picked in the veto, reset the whole match (series score, rosters, veto result), so the next map came up as an empty server. A cross-map round restore was lost the same way. A map change in the middle of a live map still resets the match; a map change during warmup of a loaded match keeps the match and changes back to the match's map.
+- Fixed warmup never ending after a map veto. The match-start guard stayed set after the veto, so the second ready-up was ignored.
+- A forfeit or surrender reports its winner in `series_end` even when the series score is level.
+- Fixed every finished series being announced as a tie ("X and Y have tied the match") with `series_end` winner "none". A drawn scrim or pug no longer announces "Draw has won the match".
+- `map_result` and `series_end` report the correct winning side, and a draw as side "0" / team "none". Before, the side was "2" whenever team2 won and a draw was reported as a team2 win.
+- `round_end` `winner.team` is now the team that won the round. It was the team ahead on score.
+- A drawn map in a series no longer breaks the series (the next map lookup ran past the end of the map list).
+- matchzy_stats_matches gets its winner and end time when the series ends, not after every map. Surrender (`css_gg`) stores the map's round score in matchzy_stats_maps instead of the series score.
+- The last round's player stats are written to the database before the map's CSV export.
+- Stats events now fill `kast`, `trade_kills`, `first_kills_t/ct`, `first_deaths_t/ct`, `flash_assists`, `friendlies_flashed`, `team_kills`, `suicides`, `knife_kills`, `bomb_plants`, `bomb_defuses` and `1v3`-`1v5` (human players). They were always 0.
+- A suicide no longer counts as a kill for KAST, and team kills no longer count as opening or trade kills.
+- Coaches are left out of player stats, the CSV, the stats JSON, the damage report, `player_death` / `freezetime_end` events and alive counts. Their end-of-freezetime death used to be the first death of every round, which took the opening duel stats away from the players.
+- `freezetime_end` reports `has_helmet` and `has_defuser` correctly. They were always false.
+- `player_death`, `bomb_planted`, `bomb_defused` and `freezetime_end` are sent for live rounds only, not during the knife round or side selection.
+- New `player_kill` event for every kill in a live round: killer, victim, assister (and whether it was a flash assist), weapon, headshot, wallbang, no-scope, through smoke, blind, distance, team kill, opening kill, trade kill, the killer's HP, and the killer's kills this round and this map. `player_death` is still sent as before and also covers suicides and world deaths.
+- New `player_disconnect` event (user id, SteamID, name, team, reason) while a match is loaded.
+- Disconnect cleanup (ready check, player list, coach list, practice data) no longer requires the leaving player to still have a valid, connected pawn, so it also runs for spectators and players already marked as disconnecting.
+- Auto-pause now triggers when a player leaves a full match. It required 10 connected players, which is exactly what a disconnect takes away. Only players on T/CT count (not spectators or coaches), so a smaller match is never auto-paused.
+- A manual or admin pause is no longer auto-resumed because of an earlier auto-pause.
+- `matchzy_max_tech_pauses_allowed` and `matchzy_tech_pause_duration` are now enforced: each team gets its tech pauses per map, and a tech pause ends on its own when the time runs out (-1 = no limit). Unpausing earlier, or a later regular or admin pause, cancels that countdown.
+- `matchzy_allow_unpause false` now disables `.unpause`. The setting existed but was never checked.
+- `matchzy_allow_pause`, `matchzy_allow_unpause`, `matchzy_stop_command_no_damage` and `matchzy_asay_console_enabled` are added to config.cfg (appended to existing files with their current defaults).
+- `.stop` works in round 1 of scrim and hill (it looked for a backup file name that was never written).
+- A round restore during the last round of a half no longer skips the halftime side swap, which mixed up team scores and stats for the rest of the map.
+- `.match`, `.scrim` and `.hill` no longer change knife/playout settings when a match is already running. Typed during the knife round they could leave the match stuck.
+- `.match` / `.scrim` / `.hill` could reset a loaded match after the server had been in sleep mode once.
+- A match start no longer continues if the match was reset while its database row was being created.
+- A failed demo recording is no longer reported as the match demo, and the part recorded before a stall is still uploaded when the restart fails. A restarted recording no longer overwrites an earlier demo with the same name (the new file gets `_part2`, ...), and all parts of a map's demo are uploaded. Demo uploads stream the file instead of loading it into memory.
+- The advanced stats JSON counts rounds from the scoreboard, so a replayed round no longer lowers ADR and rating.
+- The coach no longer causes a possible crash when the bomb is moved from the coach to a player, or when a coach on the wrong team is moved back.
+- `.matchsetup` is no longer locked for everyone when the admin using it closed the menu or left. The lock is released when its owner is gone or after 3 minutes without use.
+- `.rr` and the admin menu's "Restart Round" restore the current round in a match (`.rr` still restarts the round in practice). They did nothing outside practice.
+- `.forceend` and `!forceend` now do the same thing (end the match through the normal match-end path, like `get5_endmatch`).
+- Practice: `.ff` twice in a row no longer leaves players frozen, and the server no longer stays at 5x speed when practice ends during a fast forward.
+- Practice: `.timer` stops when practice mode ends instead of running into the match.
+- Practice: `.back` no longer teleports spectators or dead players.
+- Practice: `.hidespawns` / `.showspawns` no longer remove bot position, coach spot or grenade markers.
+- Practice: a damaged `botpositions.json` or grenade library file is backed up and never overwritten by a later save.
+- Practice: fixed a possible server crash when a crouching bot was kicked right after spawning.
+- Practice: `.delay 0` clears a grenade delay, and `.delay` with no throw history no longer errors.
+- Practice: best/worst spawn commands no longer error on maps where spawns had not been collected yet.
+- Practice: stray bots are kicked by id, so a practice bot with the same name is never kicked by mistake.
+- Added a documentation site at https://matchzy.miksen.me.
+
 # 0.8.87
 
 #### September 28, 2026
