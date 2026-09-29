@@ -11,8 +11,11 @@
 
 ## Install from the release zip
 
+[:material-download: Download MatchZy @@MATCHZY_VERSION@@ (.zip)](https://git.miksen.me/mikkel/matchzy/releases/download/@@MATCHZY_VERSION@@/MatchZy-@@MATCHZY_VERSION@@.zip){ .md-button .md-button--primary }
+[Release notes](https://git.miksen.me/mikkel/matchzy/releases/latest){ .md-button }
+
 1. Install **CounterStrikeSharp** into `game/csgo/addons/counterstrikesharp/`.
-2. Download the latest `MatchZy-<version>.zip` from the [releases page](https://git.miksen.me/mikkel/matchzy/releases).
+2. Download the latest `MatchZy-<version>.zip` (button above, or the [releases page](https://git.miksen.me/mikkel/matchzy/releases)).
 3. Extract the zip into `game/csgo/`. It contains:
 
     ```text

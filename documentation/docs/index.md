@@ -6,13 +6,16 @@ hide:
 
 <div class="mz-hero" markdown>
 
-# MatchZy <span class="mz-pill">Miksen fork · 0.8.88</span>
+# MatchZy <span class="mz-pill">Miksen fork · @@MATCHZY_VERSION@@</span>
 
 <p class="mz-lead">Match management, practice mode, coaching, live events and stats for CS2 servers running CounterStrikeSharp. Built on MatchZy, extended for hosted competitive servers.</p>
 
-[Get started](getting-started/installation.md){ .md-button .md-button--primary }
+[:material-download: Download @@MATCHZY_VERSION@@](https://git.miksen.me/mikkel/matchzy/releases/download/@@MATCHZY_VERSION@@/MatchZy-@@MATCHZY_VERSION@@.zip){ .md-button .md-button--primary }
+[Get started](getting-started/installation.md){ .md-button }
 [What the fork adds](comparison.md){ .md-button }
 [Commands](reference/commands.md){ .md-button }
+
+<small>[Release notes](https://git.miksen.me/mikkel/matchzy/releases/latest) · [All releases](https://git.miksen.me/mikkel/matchzy/releases)</small>
 
 </div>
 

@@ -6,6 +6,7 @@ on:
     paths:
       - documentation/**
       - CHANGELOG.md
+      - Core/MatchZy.cs
       - .github/workflows/docs.yml
   workflow_dispatch:
 
@@ -38,6 +39,14 @@ jobs:
       # Deploys as a Pages artifact (Settings > Pages > Source: GitHub Actions) instead of a
       # gh-pages branch: the Forgejo push mirror syncs with --mirror and deletes any branch that
       # only exists on GitHub. docs/CNAME is copied into the site for the custom domain.
+      # The download buttons use @@MATCHZY_VERSION@@; fill in the plugin's ModuleVersion so they
+      # always point at the current release zip.
+      - name: Insert release version
+        run: |
+          VERSION=$(grep -oP 'ModuleVersion\s*=>\s*"\K[^"]*' Core/MatchZy.cs)
+          test -n "$VERSION"
+          grep -rl '@@MATCHZY_VERSION@@' documentation/docs | xargs -r sed -i "s/@@MATCHZY_VERSION@@/$VERSION/g"
+
       - name: Build site
         working-directory: documentation
         run: mkdocs build --strict
