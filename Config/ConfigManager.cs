@@ -164,6 +164,10 @@ matchzy_autopause_minplayers 5
 // Default value: 3
 matchzy_autopause_resume_delay 3
 
+// In a match loaded from a match config (JSON/URL/.matchsetup), show only the ready-up hint (.ready)
+// when a player joins, and hide the mode hints (.scrim / .prac / .knife) and the admin help line. Default value: true
+matchzy_loaded_match_hide_mode_hints true
+
 // How many times each team may use .pause in each overtime period. 0 = no limit.
 // Tactical timeouts (.tac) in overtime come from live.cfg (mp_team_timeout_ot_add_once / _ot_add_each / _ot_max).
 // Default value: 1

@@ -36,6 +36,8 @@ namespace MatchZy
 
         public FakeConVar<int> autoPauseMinPlayers = new("matchzy_autopause_minplayers", "Minimum players required per team before auto-pause triggers. Default: 5", 5);
 
+        public FakeConVar<bool> loadedMatchHideModeHints = new("matchzy_loaded_match_hide_mode_hints", "In a match loaded from a match config, show only the ready-up hint when a player joins, not the mode hints (.scrim / .prac / .knife) and the admin help line. Default: true", true);
+
         public FakeConVar<int> overtimePausesPerTeam = new("matchzy_overtime_pauses_per_team", "How many times each team may use .pause in each overtime period. 0 = no limit. Admin pauses are not counted. Default: 1", 1);
 
         public FakeConVar<int> forfeitReadyTimeout = new("matchzy_forfeit_ready_timeout", "Seconds after the ready phase of a loaded match begins before a team that is not ready forfeits the series (neither ready: the match is cancelled). 0 = off. Default: 0", 0);

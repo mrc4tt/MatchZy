@@ -7,6 +7,11 @@ namespace MatchZy;
 
 public partial class MatchZy
 {
+    // A match from a match config is loaded, or is being loaded: a load whose first map differs
+    // from the current one changes map first and only finishes (isMatchSetup) about a second after
+    // the new map starts. A player joining in that window counts as joining a loaded match too.
+    private bool IsMatchLoadedOrPending() => isMatchSetup || pendingMatchLoadJson != null;
+
     public HookResult EventPlayerConnectFullHandler(EventPlayerConnectFull @event, GameEventInfo info)
     {
         try
@@ -86,10 +91,17 @@ public partial class MatchZy
                     // Forcing it to true for every player who connected during warmup overrode a
                     // configured side (team1_ct/team2_ct/...) and started a knife round anyway, and
                     // did the same to scrim/hill and to an admin's .knife off.
-                    PrintToPlayerChat(player, Localizer.ForPlayer(player, "matchzy.eh.warmup"));
+                    // In a match loaded from a match config the mode hints (.scrim / .prac / .knife)
+                    // do not apply; matchzy_loaded_match_hide_mode_hints keeps only the ready hint.
+                    bool hideModeHints = IsMatchLoadedOrPending() && loadedMatchHideModeHints.Value;
+                    if (!hideModeHints)
+                        PrintToPlayerChat(player, Localizer.ForPlayer(player, "matchzy.eh.warmup"));
                     PrintToPlayerChat(player, Localizer.ForPlayer(player, "matchzy.eh.start"));
-                    PrintToAdmins(Localizer.ForPlayer(player, "matchzy.eh.prac"));
-                    PrintToAdmins(Localizer.ForPlayer(player, "matchzy.eh.knife"));
+                    if (!hideModeHints)
+                    {
+                        PrintToAdmins(Localizer.ForPlayer(player, "matchzy.eh.prac"));
+                        PrintToAdmins(Localizer.ForPlayer(player, "matchzy.eh.knife"));
+                    }
                 }
                 else if (isPractice && !readyAvailable)
                 {
@@ -108,6 +120,8 @@ public partial class MatchZy
             AddTimer(4.0f, () =>
             {
                 if (!IsHumanPlayerValid(player))
+                    return;
+                if (IsMatchLoadedOrPending() && loadedMatchHideModeHints.Value)
                     return;
                 if (IsPlayerAdmin(player, "", "@css/config", "@css/map", "@custom/prac"))
                 {
