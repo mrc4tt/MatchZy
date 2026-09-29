@@ -10,29 +10,43 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
 
 jobs:
   deploy:
     name: Build and deploy docs
     # GitHub Pages only exists on the github.com mirror. The job-level `if` skips the whole job on
-    # the Forgejo runner, so none of its steps are prepared there.
+    # the Forgejo runner, so none of its actions are fetched there.
     if: github.server_url == 'https://github.com'
     runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
 
       - name: Install MkDocs
         run: python3 -m pip install -r documentation/requirements.txt
 
-      - name: Deploy to gh-pages
+      # Deploys as a Pages artifact (Settings > Pages > Source: GitHub Actions) instead of a
+      # gh-pages branch: the Forgejo push mirror syncs with --mirror and deletes any branch that
+      # only exists on GitHub. docs/CNAME is copied into the site for the custom domain.
+      - name: Build site
         working-directory: documentation
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          # Builds with --strict so a broken link fails the deploy. docs/CNAME carries the
-          # custom domain (matchzy.miksen.me) onto the gh-pages branch.
-          mkdocs gh-deploy --force --strict
+        run: mkdocs build --strict
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: documentation/site
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
