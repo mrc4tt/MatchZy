@@ -2,6 +2,10 @@
 
 A short summary of each release. The [full changelog](changelog.md) has the details and background for every change.
 
+## 0.8.90 <small>September 29, 2026</small>
+
+- **Fixed:** Server crash right after a player connected to a loaded match (automatic team placement on connect removed; players pick their team from the menu again, locked to their roster side).
+
 ## 0.8.89 <small>September 29, 2026</small>
 
 - **Fixed:** Teams get a tactical timeout in overtime (live.cfg: `mp_team_timeout_ot_add_once 1`, `mp_team_timeout_ot_max 5`; `mp_team_timeout_max 4`).

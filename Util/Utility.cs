@@ -4664,6 +4664,12 @@ namespace MatchZy
                     return;
                 if (player.Team == team)
                     return;
+                // Never move a player who is still in the team menu (team None). Forcing the join
+                // from there (HandleCommand_JoinTeam on an unassigned controller) crashed the server
+                // right after a player connected (0.8.88). They pick a team themselves; the jointeam
+                // listener only lets them pick their roster side and this handler corrects the rest.
+                if (player.TeamNum == (byte)CsTeam.None)
+                    return;
 
                 if (team == CsTeam.Spectator)
                 {
@@ -4684,7 +4690,7 @@ namespace MatchZy
                         player.ChangeTeam(team);
                     }
                 }
-                else if (player.TeamNum <= (byte)CsTeam.Spectator)
+                else if (player.TeamNum == (byte)CsTeam.Spectator)
                 {
                     // From Spectator / the team menu: SwitchTeam only writes the team number and
                     // Respawn on an observer crashes, so use the engine's join handler (same path as

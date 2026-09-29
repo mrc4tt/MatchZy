@@ -26,8 +26,8 @@ There are three ways to run a match, from quick pug to fully scripted tournament
     matchzy_loadmatch_url "https://example.com/match.json" "Authorization" "Bearer <token>"
     ```
 
-    Players are put on their team automatically when they connect, anyone not in the match
-    watches from Spectator, substitutes wait while their side has `players_per_team` players,
+    Players can only join their own team from the team menu, anyone not in the match is moved
+    to Spectator, substitutes wait while their side has `players_per_team` players,
     the veto runs if configured, and events go to your [remote log URL](events.md).
 
 ## Series and veto

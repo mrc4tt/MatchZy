@@ -7,59 +7,6 @@ namespace MatchZy;
 
 public partial class MatchZy
 {
-    /// <summary>
-    /// Places a player who just connected to a loaded match on the side the match gives them.
-    /// A connecting player has no pawn and sits in the team menu, so this uses the engine's own
-    /// join handler (HandleCommand_JoinTeam, the same path as practice .t/.ct from spectator) and
-    /// respawns them during warmup only. Mid-round joiners wait for the next round like any join.
-    /// </summary>
-    private void AutoAssignConnectingPlayer(CCSPlayerController player, CsTeam team)
-    {
-        if (team is not (CsTeam.Terrorist or CsTeam.CounterTerrorist or CsTeam.Spectator))
-            return;
-        int? expectedUserId = player.UserId;
-        // A moment after connect-full so the client is fully in before its team changes.
-        AddTimer(1.0f, () =>
-        {
-            if (player == null || !player.IsValid || player.UserId != expectedUserId || player.Connected != PlayerConnectedState.Connected)
-                return;
-            if (!isMatchSetup || player.TeamNum == (byte)team)
-                return;
-            // Only from the menu / Spectator. Someone already on a side is handled by the
-            // EventPlayerTeam roster lock, which never touches a live pawn unsafely.
-            if (player.TeamNum > (byte)CsTeam.Spectator)
-                return;
-
-            try
-            {
-                if (team == CsTeam.Spectator)
-                {
-                    if (player.TeamNum != (byte)CsTeam.Spectator)
-                        player.ChangeTeam(CsTeam.Spectator);
-                    return;
-                }
-
-                try
-                {
-                    handleCommandJoinTeam.Value.Invoke(player, (byte)team, 2, 0f);
-                }
-                catch (Exception joinEx)
-                {
-                    Log($"[AutoAssign] HandleCommand_JoinTeam unavailable ({joinEx.Message}), falling back to ChangeTeam");
-                    player.ChangeTeam(team);
-                }
-
-                // Respawn only while nobody is playing yet (warmup / ready phase).
-                // Coaches stay unspawned (like the ready-phase respawn handler).
-                RespawnWhenTeamApplied(player, team, RespawnRetryAttempts, keepGoing: () => isMatchSetup && !matchStarted && !IsMatchCoach(player) && !IsSideFull(team, player));
-            }
-            catch (Exception e)
-            {
-                Log($"[AutoAssign] Could not place {player.PlayerName} on {team}: {e.Message}");
-            }
-        });
-    }
-
     public HookResult EventPlayerConnectFullHandler(EventPlayerConnectFull @event, GameEventInfo info)
     {
         try
@@ -97,11 +44,6 @@ public partial class MatchZy
                         PrintToAllChat($"Kicking player {player.PlayerName} - Not a player in this game.");
                         KickPlayerDeferred(player);
                     }
-                    else if (isMatchSetup && IsTeamWhitelistConfigured())
-                    {
-                        // Not in this match (e.g. an admin exempt from the kick): watch from Spectator.
-                        AutoAssignConnectingPlayer(player, CsTeam.Spectator);
-                    }
                     return HookResult.Continue;
                 }
             }
@@ -112,15 +54,6 @@ public partial class MatchZy
             if (isMatchSetup)
                 AssignRosteredCoach(player);
 
-            // Put a rostered player straight on their team (or a listed spectator on Spectator)
-            // instead of showing the team menu, where only one choice was allowed anyway.
-            if (isMatchSetup && IsTeamWhitelistConfigured())
-            {
-                CsTeam assigned = GetPlayerTeam(player);
-                if (assigned is CsTeam.Terrorist or CsTeam.CounterTerrorist && !IsMatchCoach(player) && IsSideFull(assigned, player))
-                    assigned = CsTeam.Spectator; // substitute: the side is already full
-                AutoAssignConnectingPlayer(player, assigned);
-            }
 
             // Set ready status based on game state
             if (readyAvailable && !matchStarted)
