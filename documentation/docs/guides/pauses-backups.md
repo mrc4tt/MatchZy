@@ -6,7 +6,7 @@
 |---|---|---|
 | Normal | `.pause` | Both teams type `.unpause`. |
 | Tactical | `.tac` (or `.pause` with `matchzy_use_pause_command_for_tactical_pause`) | The timeout runs out. |
-| Technical | `.tech` | Both teams unpause, or `matchzy_tech_pause_duration` runs out. Limited per team by `matchzy_max_tech_pauses_allowed`. |
+| Technical | `.tech` | Both teams unpause, or `matchzy_tech_pause_duration` runs out (then it unpauses on its own). Each team gets `matchzy_max_tech_pauses_allowed` per map. |
 | Admin | `.forcepause` | An admin types `.forceunpause`. |
 | Auto :fontawesome-solid-code-fork: | A team drops below `matchzy_autopause_minplayers` | The team is full again; the game resumes after `matchzy_autopause_resume_delay` seconds. |
 

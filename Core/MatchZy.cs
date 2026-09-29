@@ -152,7 +152,7 @@ namespace MatchZy
 
         // Each message is kept in chat display for ~13 seconds, hence setting default chat timer to 13 seconds.
         // Configurable using matchzy_chat_messages_timer_delay <seconds>
-        public int chatTimerDelay = 13;
+        public int chatTimerDelay = 21;
         public int afterReadyDelay = 3;
         public int roundKnifeStartMessageDelay = 11;
 
@@ -195,6 +195,11 @@ namespace MatchZy
         /// <summary>
         /// Count alive non-bot, non-HLTV players per team. Used by scorebot events.
         /// </summary>
+        private bool IsMatchCoach(CCSPlayerController? player)
+        {
+            return player != null && (matchzyTeam1.coach.Contains(player) || matchzyTeam2.coach.Contains(player));
+        }
+
         private (int ctAlive, int tAlive) CountAlivePlayers()
         {
             int ct = 0,
@@ -202,7 +207,7 @@ namespace MatchZy
             foreach (var kvp in playerData)
             {
                 var p = kvp.Value;
-                if (p == null || !p.IsValid || p.IsBot || p.IsHLTV)
+                if (p == null || !p.IsValid || p.IsBot || p.IsHLTV || IsMatchCoach(p))
                     continue;
                 if (p.PlayerPawn?.Value == null)
                     continue;
@@ -468,7 +473,9 @@ namespace MatchZy
                 { ".breakrestore", OnBreakRestoreCommand },
                 { ".nobreak", OnBreakRestoreCommand },
                 { ".rs", OnRestartRoundCommand },
-                { ".rr", OnRestartRoundCommand },
+                // .rr restarts the round in practice; everywhere else it matches !rr (restore the
+                // current round). It used to be practice-only, so it did nothing in a match.
+                { ".rr", (p, c) => { if (isPractice) OnRestartRoundCommand(p, c); else OnRestoreCurrentRoundCommand(p, c); } },
                 { ".restart", OnRestartMatchCommand },
                 { ".abort", OnRestartMatchCommand },
                 { ".forceend", OnEndMatchCommand },
@@ -618,6 +625,14 @@ namespace MatchZy
                 { ".warmupbots", OnWarmupBotsCommand },
                 { ".coachtest", OnCoachTestCommand },
                 { ".version", OnMatchZyVersionCommand },
+                // Dot forms of admin commands that .mhelp lists; before these only the ! form worked.
+                { ".skipveto", OnSkipVetoCommand },
+                { ".sv", OnSkipVetoCommand },
+                { ".rmap", OnMapReloadCommand },
+                { ".surrender", OnSurrenderCommand },
+                { ".configs", OnMatchSettingsCommand },
+                { ".kniferound", OnKnifeCommand },
+                { ".autopause", (p, _) => OnAutoPauseCommand(p, null!) },
                 { ".readycheck", OnReadyCheckCommand },
                 { ".rcheck", OnReadyCheckCommand },
                 { ".rc", OnReadyCheckCommand },
@@ -755,7 +770,11 @@ namespace MatchZy
 
                     CCSPlayerController? player = @event.Userid;
 
-                    if (!IsPlayerValid(player))
+                    // Controller-level check: a player who arrives on a side without a pawn (the
+                    // engine's auto-assign after the team menu times out, or a join from Spectator)
+                    // failed IsPlayerValid and was never moved back, so someone off the roster
+                    // could end up on the other team (and coach it).
+                    if (player == null || !player.IsValid || player.Connected != PlayerConnectedState.Connected)
                         return HookResult.Continue;
 
                     if (player!.IsHLTV || player.IsBot)
@@ -763,8 +782,28 @@ namespace MatchZy
                         return HookResult.Continue;
                     }
 
+                    // Where the player is going, not where they were (player_team fires before the
+                    // controller's team number is updated).
+                    CsTeam joinedTeam = (CsTeam)@event.Team;
                     CsTeam playerTeam = GetPlayerTeam(player);
+                    if (playerTeam == CsTeam.None && !IsMatchCoach(player))
+                        playerTeam = CsTeam.Spectator;
+                    // A full side (players_per_team) takes no more players; extra roster players
+                    // (substitutes) watch until a slot opens.
+                    // Only for a real join (from the menu or Spectator). A T<->CT move is a side swap
+                    // (halftime, knife .switch) where the engine moves players one by one, so the
+                    // target side still looks full and half the teams would be sent to Spectator.
+                    bool isJoin = @event.Oldteam <= (int)CsTeam.Spectator;
+                    if (isJoin && playerTeam is CsTeam.Terrorist or CsTeam.CounterTerrorist && !IsMatchCoach(player) && IsSideFull(playerTeam, player))
+                    {
+                        PrintToPlayerChat(player, $"Your team already has {matchConfig.PlayersPerTeam} players. You are placed as a spectator.");
+                        playerTeam = CsTeam.Spectator;
+                    }
+                    if (joinedTeam == playerTeam || joinedTeam == CsTeam.None)
+                        return HookResult.Continue;
 
+                    // (Off-roster players were mapped to Spectator above: SwitchPlayerTeam ignores
+                    // None, so they used to keep whatever team the engine auto-assigned.)
                     SwitchPlayerTeam(player, playerTeam);
 
                     return HookResult.Continue;
@@ -831,6 +870,13 @@ namespace MatchZy
                             // For other teams, restrict to assigned team
                             if (joiningTeam != playerTeam)
                             {
+                                return HookResult.Stop;
+                            }
+
+                            // ...and only while it has room (players_per_team; coaches excluded).
+                            if (!IsMatchCoach(player) && IsSideFull((CsTeam)joiningTeam, player))
+                            {
+                                PrintToPlayerChat(player, $"Your team already has {matchConfig.PlayersPerTeam} players.");
                                 return HookResult.Stop;
                             }
                         }
@@ -965,8 +1011,27 @@ namespace MatchZy
                             AutoStart();
                             return;
                         }
+
+                        // A loaded match continued on this map (series map 2, the veto's map, a restore):
+                        // make sure it is the map the match expects. A plain map change from another
+                        // plugin or .map during warmup would otherwise keep the match on a map that is
+                        // not in its map list.
+                        if (!isPreVeto && !isVeto && matchConfig.CurrentMapNumber < matchConfig.Maplist.Count)
+                        {
+                            string expectedMap = matchConfig.Maplist[matchConfig.CurrentMapNumber];
+                            bool plainMapName = !expectedMap.All(char.IsDigit) && !expectedMap.Contains('/') && !expectedMap.Contains(':');
+                            if (plainMapName && !string.Equals(expectedMap, mapName, StringComparison.OrdinalIgnoreCase) && Server.IsMapValid(expectedMap))
+                            {
+                                Log($"[OnMapStart] Loaded match expects {expectedMap} but the server is on {mapName}; changing back.");
+                                ChangeMap(expectedMap, 3);
+                                return;
+                            }
+                        }
+
                         if (isWarmup)
                             StartWarmup();
+                        // Players stay connected across the map change; put them on the sides of this map.
+                        PlaceMatchPlayers();
                         if (isPractice)
                             StartPracticeMode();
                     }
@@ -1020,23 +1085,46 @@ namespace MatchZy
                     var attacker = @event.Attacker;
                     var assister = @event.Assister;
 
-                    OnAdvancedStatsPlayerDeath(victim, attacker, assister);
+                    OnAdvancedStatsPlayerDeath(victim, attacker, assister, @event.Weapon ?? "", @event.Assistedflash);
 
                     return HookResult.Continue;
                 }
             );
 
+            // Advanced stats: bomb plants/defuses and team flashes (not gated on the remote log URL,
+            // unlike the scorebot handlers below, so the stats are complete either way).
+            RegisterEventHandler<EventBombPlanted>((@event, info) =>
+            {
+                OnAdvancedStatsBombPlanted(@event.Userid);
+                return HookResult.Continue;
+            });
+            RegisterEventHandler<EventBombDefused>((@event, info) =>
+            {
+                OnAdvancedStatsBombDefused(@event.Userid);
+                return HookResult.Continue;
+            });
+            RegisterEventHandler<EventPlayerBlind>((@event, info) =>
+            {
+                OnAdvancedStatsPlayerBlind(@event.Userid, @event.Attacker, @event.BlindDuration);
+                return HookResult.Continue;
+            });
+
             // ── Live scorebot: player_death event ──
+            // Gated on isMatchLive (not matchStarted, which also covers the knife round and the
+            // post-knife side selection warmup), like player_hurt and the utility events.
             RegisterEventHandler<EventPlayerDeath>(
                 (@event, info) =>
                 {
-                    if (!matchStarted)
+                    if (!isMatchLive)
                         return HookResult.Continue;
                     if (string.IsNullOrEmpty(matchConfig.RemoteLogURL))
                         return HookResult.Continue;
 
                     var victim = @event.Userid;
                     if (victim == null || !victim.IsValid)
+                        return HookResult.Continue;
+                    // The coach is killed at the end of every freeze time; that is not a round death.
+                    if (IsMatchCoach(victim))
                         return HookResult.Continue;
 
                     var attacker = @event.Attacker;
@@ -1079,11 +1167,11 @@ namespace MatchZy
                 HookMode.Post
             );
 
-            // ── Live scorebot: bomb_planted event ──
+            // ── Live scorebot: bomb_planted event (live rounds only, not the knife round) ──
             RegisterEventHandler<EventBombPlanted>(
                 (@event, info) =>
                 {
-                    if (!matchStarted)
+                    if (!isMatchLive)
                         return HookResult.Continue;
                     if (string.IsNullOrEmpty(matchConfig.RemoteLogURL))
                         return HookResult.Continue;
@@ -1115,11 +1203,11 @@ namespace MatchZy
                 }
             );
 
-            // ── Live scorebot: bomb_defused event ──
+            // ── Live scorebot: bomb_defused event (live rounds only, not the knife round) ──
             RegisterEventHandler<EventBombDefused>(
                 (@event, info) =>
                 {
-                    if (!matchStarted)
+                    if (!isMatchLive)
                         return HookResult.Continue;
                     if (string.IsNullOrEmpty(matchConfig.RemoteLogURL))
                         return HookResult.Continue;
@@ -1155,7 +1243,7 @@ namespace MatchZy
             RegisterEventHandler<EventRoundFreezeEnd>(
                 (@event, info) =>
                 {
-                    if (!matchStarted)
+                    if (!isMatchLive)
                         return HookResult.Continue;
                     if (string.IsNullOrEmpty(matchConfig.RemoteLogURL))
                         return HookResult.Continue;
@@ -1167,12 +1255,16 @@ namespace MatchZy
                     foreach (var kvp in playerData)
                     {
                         var p = kvp.Value;
-                        if (p == null || !p.IsValid || p.IsBot || p.IsHLTV)
+                        if (p == null || !p.IsValid || p.IsBot || p.IsHLTV || IsMatchCoach(p))
                             continue;
                         if (p.PlayerPawn?.Value == null)
                             continue;
 
                         var pawn = p.PlayerPawn.Value;
+                        // ItemServices is materialized as the base CPlayer_ItemServices, so an
+                        // `as CCSPlayer_ItemServices` cast is always null; wrap the pointer instead.
+                        var itemServicesPtr = pawn.ItemServices;
+                        var csItemServices = itemServicesPtr != null ? new CCSPlayer_ItemServices(itemServicesPtr.Handle) : null;
                         bool alive = pawn.LifeState == (byte)LifeState_t.LIFE_ALIVE;
                         string side =
                             p.TeamNum == (int)CsTeam.CounterTerrorist ? "CT"
@@ -1197,8 +1289,8 @@ namespace MatchZy
                                 Team = side,
                                 Hp = alive ? pawn.Health : 0,
                                 Armor = pawn.ArmorValue,
-                                HasHelmet = p.PlayerPawn.Value.ItemServices != null && (p.PlayerPawn.Value.ItemServices as CCSPlayer_ItemServices)?.HasHelmet == true,
-                                HasDefuser = p.PlayerPawn.Value.ItemServices != null && (p.PlayerPawn.Value.ItemServices as CCSPlayer_ItemServices)?.HasDefuser == true,
+                                HasHelmet = csItemServices?.HasHelmet == true,
+                                HasDefuser = csItemServices?.HasDefuser == true,
                                 Money = p.InGameMoneyServices?.Account ?? 0,
                             }
                         );
@@ -1258,6 +1350,7 @@ namespace MatchZy
             );
 
             RegisterLiveUtilityEvents();
+            StartForfeitMonitor();
 
             // ── Live scorebot: player_hurt event ──
             RegisterEventHandler<EventPlayerHurt>(
@@ -1404,6 +1497,11 @@ namespace MatchZy
                     if (message.StartsWith(".restore "))
                     {
                         HandleRestoreCommand(player, messageCommandArg);
+                    }
+
+                    if (message.StartsWith(".listbackups"))
+                    {
+                        HandleListBackupsChatCommand(player, messageCommandArg);
                     }
 
                     if (message.StartsWith(".asay"))

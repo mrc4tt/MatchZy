@@ -13,6 +13,7 @@ Demo recording in CS2 fails silently in several ways (a `mp_restartgame` killing
 
 - Recording starts after the go-live restart has settled, in match, scrim and hill.
 - The file is checked to be **growing** on disk, not just to exist, and it is watched for the whole map. A stalled recording is restarted into a new file (up to three attempts).
+- A restarted recording never overwrites an earlier file: it gets `_part2`, `_part3`, ... and every part of the map is uploaded.
 - `tv_record_immediate` is used, so a demo survives a server crash.
 - `tv_enable_dynamic 0` is set so the CSTV bot is not removed while nobody spectates.
 - Practice bots never take the CSTV slot.

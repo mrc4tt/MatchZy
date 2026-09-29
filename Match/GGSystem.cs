@@ -35,6 +35,21 @@ namespace MatchZy
                 return;
             }
 
+            // Coaches do not play and do not vote.
+            if (IsMatchCoach(player))
+            {
+                ReplyToUserCommand(player, "Coaches cannot vote to surrender.");
+                return;
+            }
+
+            // A surrender ends the whole series. In a BO2/BO3/BO5 that would hand over the remaining
+            // maps too, so it is only allowed in a single-map match.
+            if (isMatchSetup && matchConfig.NumMaps > 1)
+            {
+                ReplyToUserCommand(player, "Surrender is not available in a multi-map series. Ask an admin.");
+                return;
+            }
+
             //
             (int t1score, int t2score) = GetTeamsScore();
             int playerTeamScore = 0;
@@ -95,11 +110,10 @@ namespace MatchZy
 
             ggVotes[playerTeam].Add(player.UserId.Value);
 
-            int votesNeeded;
-            if (matchConfig.MinPlayersToReady == 1)
-                votesNeeded = 1;
-            else
-                votesNeeded = Math.Max(2, matchConfig.MinPlayersToReady - 1);
+            // Sized from the players actually on the team (no coaches), not from min_players_to_ready:
+            // a tournament config with min_players_to_ready 1 let a single player surrender.
+            int teamSize = GetTeamPlayerCount(playerTeam);
+            int votesNeeded = teamSize <= 2 ? Math.Max(1, teamSize) : teamSize - 1;
 
             int currentVotes = ggVotes[playerTeam].Count;
 

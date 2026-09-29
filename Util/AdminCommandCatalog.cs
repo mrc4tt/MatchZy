@@ -40,8 +40,8 @@ namespace MatchZy
             new("Setup", ".teamsize <n> / .readyrequired", "Players required to ready", "css_readyrequired", PermConfig),
             new("Setup", ".knife / .kniferound", "Toggle knife round", "css_roundknife", PermConfig),
             new("Setup", ".settings / .configs", "Show match settings", "css_settings", PermConfig),
-            new("Setup", ".skipveto", "Skip current veto phase", "css_skipveto", PermConfig),
-            new("Setup", ".team <ct|t> <name>", "Set team name", "css_team", PermConfig),
+            new("Setup", ".skipveto / .sv", "Skip current veto phase", "css_skipveto", PermConfig),
+            new("Setup", ".team1 / .ctname <name>, .team2 / .tname <name>", "Set team names", "css_team", PermConfig),
             new("Setup", ".whitelist", "Toggle whitelist", "css_whitelist", PermConfig),
             new("Setup", ".globalnades", "Toggle global nade lineups", "css_save_nades_as_global", PermConfig),
             new("Setup", ".rmap", "Reload current map", "css_rmap", PermRootOnly),
@@ -49,11 +49,12 @@ namespace MatchZy
             // Control
             new("Control", ".start / .force / .forcestart", "Force start match", "css_start", PermConfig),
             new("Control", ".restart / .abort", "Restart match", "css_restart", PermConfig),
-            new("Control", ".endmatch / .end / .forceend / .exitscrim", "End and reset match", "css_endmatch", PermConfig),
+            new("Control", ".endmatch / .end / .stopmatch / .exitscrim", "End and reset match", "css_endmatch", PermConfig),
+            new("Control", ".forceend", "End match through the normal match-end path", "get5_endmatch", PermConfig),
             new("Control", ".surrender / .matchgg", "Surrender match", "css_endmatch", PermConfig),
             new("Control", ".restore <round>", "Restore a round backup", "css_restore", PermConfig),
             new("Control", ".restorelast / .rl", "Restore previous round", "css_restorelast", PermConfig),
-            new("Control", ".restorecurrent / .rr", "Restart current round", "css_restorecurrent", PermConfig),
+            new("Control", ".restorecurrent / .rrestore / !rr", "Restart current round", "css_restorecurrent", PermConfig),
             new("Control", ".backupmenu / .backups / .backup", "Backup list with restore buttons", "css_backupmenu", PermConfig),
             new("Control", ".listbackups <matchid>", "List backups for a match", "css_restore", PermConfig),
 
@@ -68,7 +69,8 @@ namespace MatchZy
             // Coach / library
             new("Coach", ".coachtest", "Place yourself as coach", "css_coachtest", PermMapOrPrac),
             new("Coach", ".savecoachspawn / .clearcoachspawns / .listcoachspawns / .showcoachspawns", "Coach spawn spots", "css_savecoachspawn", PermConfig),
-            new("Nades", ".libadd / .libremove", "Global grenade library", "css_libadd", PermConfig),
+            new("Nades", ".libadd <name>", "Add a lineup to the global grenade library", "css_libadd", PermConfig),
+            new("Nades", ".libremove <name>", "Remove a lineup from the global grenade library", "css_libremove", PermConfig),
         };
 
         /// <summary>True when the player passes at least one catalog gate, i.e. is some kind of admin.</summary>

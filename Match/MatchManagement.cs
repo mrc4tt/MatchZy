@@ -68,6 +68,7 @@ namespace MatchZy
 
                 string jsonData = File.ReadAllText(filePath);
                 bool success = LoadMatchFromJSON(jsonData);
+                // (LoadMatchFromJSON reports exceptions as a failed load, so this resets too.)
                 if (!success)
                 {
                     // command.ReplyToCommand("Match load failed! Resetting current match");
@@ -103,7 +104,8 @@ namespace MatchZy
             string headerName = command.ArgCount > 3 ? command.ArgByIndex(2) : "";
             string headerValue = command.ArgCount > 3 ? command.ArgByIndex(3) : "";
 
-            Log($"[LoadMatchDataCommand] Match setup request received with URL: {url} headerName: {headerName} and headerValue: {headerValue}");
+            // The header value is usually an auth token: never write it to the log.
+            Log($"[LoadMatchDataCommand] Match setup request received with URL: {url} headerName: {headerName}{(headerValue != "" ? " (header value set)" : "")}");
 
             if (!IsValidUrl(url))
             {
@@ -128,12 +130,13 @@ namespace MatchZy
                             request.Headers.TryAddWithoutValidation(headerName, headerValue);
                         }
 
-                        var response = await _sharedHttpClient.SendAsync(request);
+                        using var response = await _sharedHttpClient.SendAsync(request);
 
                         if (response.IsSuccessStatusCode)
                         {
                             string jsonData = await response.Content.ReadAsStringAsync();
-                            Log($"[LoadMatchFromURL] Received following data: {jsonData}");
+                            // Not the body itself: its cvars block can carry tokens (remote log header values).
+                            Log($"[LoadMatchFromURL] Received match config ({jsonData.Length} characters).");
 
                             // LoadMatchFromJSON uses native APIs - must run on game thread
                             Server.NextFrame(() =>
@@ -193,6 +196,11 @@ namespace MatchZy
                 switch (field)
                 {
                     case "matchid":
+                        // Get5 allows the id as a number or a numeric string.
+                        if (!long.TryParse(jsonData[field]!.ToString(), out _))
+                        {
+                            return $"{field} should be a number!";
+                        }
                         break;
                     case "players_per_team":
                     case "min_players_to_ready":
@@ -202,6 +210,11 @@ namespace MatchZy
                         if (!int.TryParse(jsonData[field]!.ToString(), out numMaps))
                         {
                             return $"{field} should be an integer!";
+                        }
+
+                        if (field == "num_maps" && numMaps < 1)
+                        {
+                            return $"{field} should be at least 1!";
                         }
 
                         if (field == "num_maps" && numMaps > jsonData["maplist"]!.ToObject<List<string>>()!.Count)
@@ -227,11 +240,17 @@ namespace MatchZy
                             return $"{field} should be a JSON structure!";
                         }
 
+                        if (field != "spectators" && (jsonData[field]!["name"] == null || string.IsNullOrWhiteSpace(jsonData[field]!["name"]!.ToString())))
+                        {
+                            return $"{field} should have a 'name'!";
+                        }
+
                         // A bot team needs no roster, and "players": "any" opens the team to any human.
                         if ((field != "spectators") && !IsBotTeamToken(jsonData[field]) && !IsOpenRosterToken(jsonData[field]!["players"])
-                            && (jsonData[field]!["players"] == null || jsonData[field]!["players"]!.Type != JTokenType.Object))
+                            && (jsonData[field]!["players"] == null
+                                || (jsonData[field]!["players"]!.Type != JTokenType.Object && jsonData[field]!["players"]!.Type != JTokenType.Array)))
                         {
-                            return $"{field} should have 'players' JSON, \"players\": \"any\", or \"bots\": true!";
+                            return $"{field} should have 'players' (an object keyed by SteamID64 or an array of SteamID64s), \"players\": \"any\", or \"bots\": true!";
                         }
 
                         break;
@@ -253,6 +272,12 @@ namespace MatchZy
                         if (!jsonData[field]!.Any())
                         {
                             return $"{field} should contain atleast 1 map!";
+                        }
+
+                        foreach (var mapEntry in jsonData[field]!)
+                        {
+                            if (!IsSafeMapName(mapEntry.ToString()))
+                                return $"{field} contains an invalid map name: {mapEntry}";
                         }
 
                         break;
@@ -294,6 +319,22 @@ namespace MatchZy
 
         public bool LoadMatchFromJSON(string jsonData, bool skipMapChange = false)
         {
+            // Any exception (invalid JSON, e.g. an HTML error page served with status 200, or an
+            // unexpected value) used to escape to the caller half-applied and without a reset.
+            // Report it as a failed load instead; every caller then resets the match.
+            try
+            {
+                return LoadMatchFromJSONCore(jsonData, skipMapChange);
+            }
+            catch (Exception e)
+            {
+                Log($"[LoadMatchFromJSON] The match config could not be loaded: {e.Message}");
+                return false;
+            }
+        }
+
+        private bool LoadMatchFromJSONCore(string jsonData, bool skipMapChange)
+        {
             JObject jsonDataObject = JObject.Parse(jsonData);
 
             string validationError = ValidateMatchJsonStructure(jsonDataObject);
@@ -306,7 +347,7 @@ namespace MatchZy
 
             if (jsonDataObject["matchid"] != null)
             {
-                long parsedId = (long)jsonDataObject["matchid"]!;
+                long.TryParse(jsonDataObject["matchid"]!.ToString(), out long parsedId);
                 // Only honor positive matchids. Zero/negative means "no existing
                 // match" - let InitMatchAsync allocate a fresh autoincrement row.
                 if (parsedId > 0)
@@ -363,6 +404,15 @@ namespace MatchZy
                 MapsLeftInVetoPool = maplist.ToObject<List<string>>()!,
                 NumMaps = jsonDataObject["num_maps"]!.Value<int>(),
                 MinPlayersToReady = minimumReadyRequired,
+                // The remote log settings come from config.cfg / the console, not the match JSON.
+                // Carry them over (as ResetMatch does) or a URL set in config.cfg stops receiving
+                // events as soon as a match is loaded. A "cvars" block in the JSON still overrides
+                // them when it runs.
+                RemoteLogURL = matchConfig.RemoteLogURL,
+                RemoteLogHeaderKey = matchConfig.RemoteLogHeaderKey,
+                RemoteLogHeaderValue = matchConfig.RemoteLogHeaderValue,
+                RemoteLogAuthKey = matchConfig.RemoteLogAuthKey,
+                RemoteLogAuthValue = matchConfig.RemoteLogAuthValue,
             };
 
             GetOptionalMatchValues(jsonDataObject);
@@ -473,6 +523,8 @@ namespace MatchZy
 
             StartWarmup();
             isMatchSetup = true;
+            // StartWarmup ran just before isMatchSetup was set, so start the no-show timer here.
+            MarkReadyPhaseStarted();
 
             if (matchConfig.SkipVeto)
                 SetMapSides();
@@ -481,6 +533,10 @@ namespace MatchZy
             UpdatePlayersMap();
             // After SetMapSides: the bot team's side is only known from here on.
             ApplyBotTeam();
+            // Only when the sides are known (no veto pending); after a veto FinishVeto sets them
+            // and the jointeam handler places players as they pick a team.
+            if (matchConfig.SkipVeto)
+                PlaceMatchPlayers();
 
             // Eagerly allocate matchid right after config validates so liveMatchId
             // is set well before HandleMatchStart fires. Avoids -1 leaking into
@@ -775,11 +831,28 @@ namespace MatchZy
                     string cvarName = cvarData.Name;
                     string cvarValue = cvarData.Value.ToString();
 
+                    // Each entry becomes a console command, so only real convars (and MatchZy/Get5
+                    // settings) with plain values are accepted. A key such as "quit" or a value
+                    // containing a quote or ';' could otherwise run any console command from the
+                    // match JSON.
+                    if (!IsAllowedMatchCvar(cvarName, cvarValue, out string rejectReason))
+                    {
+                        Log($"[GetCvarValues] Ignoring cvar '{cvarName}' from the match config: {rejectReason}");
+                        continue;
+                    }
+
                     var cvar = ConVar.Find(cvarName);
                     matchConfig.ChangedCvars[cvarName] = cvarValue;
                     if (cvar != null)
                     {
                         matchConfig.OriginalCvars[cvarName] = GetConvarStringValue(cvar);
+                    }
+                    else if (PluginSettingAccessors.TryGetValue(cvarName, out var accessor))
+                    {
+                        // MatchZy settings that are console commands have no convar to read back, so
+                        // remember the server's own value; otherwise the match's value stayed on the
+                        // server after the series (e.g. matchzy_kick_when_no_match_loaded).
+                        matchConfig.OriginalCvars[cvarName] = accessor.Get();
                     }
                 }
             }
@@ -823,17 +896,41 @@ namespace MatchZy
 
             if (jsonDataObject["clinch_series"] != null)
             {
-                matchConfig.SeriesCanClinch = bool.Parse(jsonDataObject["clinch_series"]!.ToString());
+                matchConfig.SeriesCanClinch = ParseCvarBool(jsonDataObject["clinch_series"]!.ToString(), matchConfig.SeriesCanClinch);
+            }
+
+            // Get5 side_type: standard / always_knife / never_knife (and MatchZy's random).
+            if (jsonDataObject["side_type"] != null)
+            {
+                string sideType = jsonDataObject["side_type"]!.ToString().Trim().ToLowerInvariant();
+                if (sideType is "standard" or "always_knife" or "never_knife" or "random")
+                    matchConfig.MatchSideType = sideType;
+                else
+                    Log($"[LOADMATCH] Unknown side_type '{sideType}', using standard.");
+            }
+
+            // Get5 veto_first: team1 / team2 / random. Decides who starts a generated veto.
+            vetoFirstTeam = null;
+            if (jsonDataObject["veto_first"] != null)
+            {
+                string vetoFirst = jsonDataObject["veto_first"]!.ToString().Trim().ToLowerInvariant();
+                vetoFirstTeam = vetoFirst switch
+                {
+                    "team1" => matchzyTeam1,
+                    "team2" => matchzyTeam2,
+                    "random" => new Random().Next(0, 2) == 0 ? matchzyTeam1 : matchzyTeam2,
+                    _ => null,
+                };
             }
 
             if (jsonDataObject["skip_veto"] != null)
             {
-                matchConfig.SkipVeto = bool.Parse(jsonDataObject["skip_veto"]!.ToString());
+                matchConfig.SkipVeto = ParseCvarBool(jsonDataObject["skip_veto"]!.ToString(), matchConfig.SkipVeto);
             }
 
             if (jsonDataObject["wingman"] != null)
             {
-                matchConfig.Wingman = bool.Parse(jsonDataObject["wingman"]!.ToString());
+                matchConfig.Wingman = ParseCvarBool(jsonDataObject["wingman"]!.ToString(), matchConfig.Wingman);
             }
 
             if (jsonDataObject["veto_mode"] != null)
@@ -917,6 +1014,8 @@ namespace MatchZy
 
         public void SwapSidesInTeamData(bool swapTeams)
         {
+            // Surrender votes are kept per side; a side swap must not carry them to the other team.
+            ResetGGVotes();
             (teamSides[matchzyTeam1], teamSides[matchzyTeam2]) = (teamSides[matchzyTeam2], teamSides[matchzyTeam1]);
             (reverseTeamSides["CT"], reverseTeamSides["TERRORIST"]) = (reverseTeamSides["TERRORIST"], reverseTeamSides["CT"]);
 
@@ -927,6 +1026,29 @@ namespace MatchZy
         // Returns true when at least one team has a non-empty player whitelist.
         // When false (e.g. matches created via .matchsetup wizard), team locking is bypassed
         // so players can freely choose T/CT without being forced back to spectator.
+        /// <summary>
+        /// True when the side already has players_per_team players (humans, no coaches, not
+        /// counting <paramref name="except"/>). A roster may list substitutes; only
+        /// players_per_team of them play at once.
+        /// </summary>
+        private bool IsSideFull(CsTeam side, CCSPlayerController? except)
+        {
+            if (side is not (CsTeam.Terrorist or CsTeam.CounterTerrorist) || matchConfig.PlayersPerTeam <= 0)
+                return false;
+            int count = 0;
+            foreach (var p in Utilities.GetPlayers())
+            {
+                if (p == null || !p.IsValid || p.IsBot || p.IsHLTV || p.Team != side)
+                    continue;
+                if (except != null && p == except)
+                    continue;
+                if (IsMatchCoach(p))
+                    continue;
+                count++;
+            }
+            return count >= matchConfig.PlayersPerTeam;
+        }
+
         private bool IsTeamWhitelistConfigured()
         {
             return RosterSize(matchzyTeam1.teamPlayers) > 0 || RosterSize(matchzyTeam2.teamPlayers) > 0
@@ -1011,8 +1133,9 @@ namespace MatchZy
             string key = steamId.ToString();
             if (roster is JObject rosterObject)
                 return rosterObject[key] != null;
+            // Get5 panels often write SteamID64s as bare numbers, so accept integers as well as strings.
             if (roster is JArray rosterArray)
-                return rosterArray.Any(entry => entry.Type == JTokenType.String && entry.ToString() == key);
+                return rosterArray.Any(entry => (entry.Type == JTokenType.String || entry.Type == JTokenType.Integer) && entry.ToString() == key);
             return false;
         }
 
@@ -1020,6 +1143,8 @@ namespace MatchZy
         {
             long matchId = liveMatchId;
             (int team1Score, int team2Score) = (matchzyTeam1.seriesScore, matchzyTeam2.seriesScore);
+            if (winnerName == "Draw")
+                winnerName = null;
             if (winnerName == null)
             {
                 PrintToAllChat($"{ChatColors.Green}{matchzyTeam1.teamName}{ChatColors.Default} and {ChatColors.Green}{matchzyTeam2.teamName}{ChatColors.Default} have tied the match");
@@ -1029,15 +1154,14 @@ namespace MatchZy
                 Server.PrintToChatAll($"{chatPrefix} {ChatColors.Green}{winnerName}{ChatColors.Default} has won the match");
             }
 
-            string winnerTeam =
-                (winnerName == null) ? "none"
-                : matchzyTeam1.seriesScore > matchzyTeam2.seriesScore ? "team1"
-                : "team2";
-
             var seriesResultEvent = new MatchZySeriesResultEvent()
             {
                 MatchId = matchId,
-                Winner = new Winner(t1score > t2score && reverseTeamSides["CT"] == matchzyTeam1 ? "3" : "2", winnerTeam),
+                // A forfeit or surrender names its winner even when the series score does not show
+                // one (1-1 in a BO3); otherwise use the series score.
+                Winner = winnerName == matchzyTeam1.teamName ? BuildWinnerFor(matchzyTeam1)
+                    : winnerName == matchzyTeam2.teamName ? BuildWinnerFor(matchzyTeam2)
+                    : BuildWinner(team1Score, team2Score),
                 Team1SeriesScore = team1Score,
                 Team2SeriesScore = team2Score,
                 TimeUntilRestore = 10,
@@ -1050,10 +1174,18 @@ namespace MatchZy
                 // duplicated the update and could clobber the map row's scores with series scores.
                 if (writeEndData)
                 {
-                    await database.SetMatchEndDataAsync(matchId, currentMapNumber, winnerName ?? "Draw", team1Score, team2Score, winnerName ?? "Draw", team1Score, team2Score);
+                    // Map columns get this map's round score, the match columns the series score
+                    // (both used to receive the series score).
+                    await database.SetMatchEndDataAsync(matchId, currentMapNumber, winnerName ?? "Draw", t1score, t2score, winnerName ?? "Draw", team1Score, team2Score);
                 }
-                // Making sure that map end event is fired first
-                await Task.Delay(2000);
+                // Making sure that map end event is fired first: wait for the map_result task
+                // itself (a fixed 2 s was shorter than a slow HTTP send).
+                Task? mapResult = lastMapResultTask;
+                if (mapResult != null)
+                {
+                    try { await mapResult.WaitAsync(TimeSpan.FromSeconds(30)); } catch { }
+                }
+                await Task.Delay(500);
                 await SendEventAsync(seriesResultEvent);
             });
 
@@ -1187,10 +1319,16 @@ namespace MatchZy
 
         public void HandlePlayoutConfig()
         {
+            // A value set in the match config's "cvars" block wins over the mode defaults below;
+            // e.g. "mp_overtime_enable": "0" for draws used to be overwritten with live.cfg's 1.
+            bool fromMatchConfig(string cvar) => matchConfig.ChangedCvars.ContainsKey(cvar);
+
             if (isPlayOutEnabled || isPlayOutEnabled2)
             {
-                Server.ExecuteCommand("mp_overtime_enable 0");
-                Server.ExecuteCommand("mp_match_can_clinch 0");
+                if (!fromMatchConfig("mp_overtime_enable"))
+                    Server.ExecuteCommand("mp_overtime_enable 0");
+                if (!fromMatchConfig("mp_match_can_clinch"))
+                    Server.ExecuteCommand("mp_match_can_clinch 0");
                 Server.ExecuteCommand("mp_match_end_changelevel 0");
                 Server.ExecuteCommand("mp_match_end_restart 0");
                 Server.ExecuteCommand("mp_endmatch_votenextmap 0");
@@ -1200,8 +1338,10 @@ namespace MatchZy
             var absoluteCfgPath = Path.Join(Server.GameDirectory + "/csgo/cfg", GetGameMode() == 1 ? liveCfgPath : liveWingmanCfgPath);
             string? matchCanClinch = GetConvarValueFromCFGFile(absoluteCfgPath, "mp_match_can_clinch");
             string? overtimeEnabled = GetConvarValueFromCFGFile(absoluteCfgPath, "mp_overtime_enable");
-            Server.ExecuteCommand($"mp_match_can_clinch {matchCanClinch ?? "1"}");
-            Server.ExecuteCommand($"mp_overtime_enable {overtimeEnabled ?? "1"}");
+            if (!fromMatchConfig("mp_match_can_clinch"))
+                Server.ExecuteCommand($"mp_match_can_clinch {matchCanClinch ?? "1"}");
+            if (!fromMatchConfig("mp_overtime_enable"))
+                Server.ExecuteCommand($"mp_overtime_enable {overtimeEnabled ?? "1"}");
         }
     }
 }

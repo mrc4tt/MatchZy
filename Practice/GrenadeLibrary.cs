@@ -471,6 +471,7 @@ namespace MatchZy
             if (!float.TryParse(p[0], NumberStyles.Float, CultureInfo.InvariantCulture, out float x)) return false;
             if (!float.TryParse(p[1], NumberStyles.Float, CultureInfo.InvariantCulture, out float y)) return false;
             if (!float.TryParse(p[2], NumberStyles.Float, CultureInfo.InvariantCulture, out float z)) return false;
+            if (!float.IsFinite(x) || !float.IsFinite(y) || !float.IsFinite(z)) return false;
             v = new Vector(x, y, z);
             return true;
         }
@@ -483,6 +484,7 @@ namespace MatchZy
             if (!float.TryParse(p[0], NumberStyles.Float, CultureInfo.InvariantCulture, out float x)) return false;
             if (!float.TryParse(p[1], NumberStyles.Float, CultureInfo.InvariantCulture, out float y)) return false;
             if (!float.TryParse(p[2], NumberStyles.Float, CultureInfo.InvariantCulture, out float z)) return false;
+            if (!float.IsFinite(x) || !float.IsFinite(y) || !float.IsFinite(z)) return false;
             a = new QAngle(x, y, z);
             return true;
         }
@@ -595,22 +597,41 @@ namespace MatchZy
         {
             string path = GrenadeLibraryPath;
             if (!File.Exists(path))
+            {
+                _globalPackLoadFailed = false;
                 return new();
+            }
             try
             {
-                return JsonSerializer.Deserialize<Dictionary<string, Dictionary<string, Dictionary<string, string>>>>(ReadSavedNadesJson(path))
+                var loaded = JsonSerializer.Deserialize<Dictionary<string, Dictionary<string, Dictionary<string, string>>>>(ReadSavedNadesJson(path))
                        ?? new();
+                _globalPackLoadFailed = false;
+                return loaded;
             }
             catch (Exception e)
             {
                 Log($"[GrenadeLibrary] pack parse: {e.Message}");
+                // Keep a copy and block saves so .libadd/.libremove can't overwrite the pack with {}.
+                if (!_globalPackLoadFailed)
+                    BackupCorruptJsonFile(path, "GrenadeLibrary");
+                _globalPackLoadFailed = true;
                 return new();
             }
         }
 
-        private void SaveGlobalPack(Dictionary<string, Dictionary<string, Dictionary<string, string>>> pack)
+        // Set when the global pack failed to parse; cleared by the next successful load.
+        private bool _globalPackLoadFailed = false;
+
+        // Returns false (and writes nothing) when the pack on disk failed to parse on the last load.
+        private bool SaveGlobalPack(Dictionary<string, Dictionary<string, Dictionary<string, string>>> pack)
         {
+            if (_globalPackLoadFailed)
+            {
+                Log($"[GrenadeLibrary] save refused: {GrenadeLibraryPath} failed to parse. Fix or remove it first.");
+                return false;
+            }
             File.WriteAllText(GrenadeLibraryPath, JsonSerializer.Serialize(pack, new JsonSerializerOptions { WriteIndented = true }));
+            return true;
         }
 
         // .libadd <name> - promote the caller's saved lineup (current map) into the shared pack.
@@ -638,7 +659,11 @@ namespace MatchZy
                 var pack = LoadGlobalPack();
                 if (!pack.TryGetValue(map, out var mapSlots)) { mapSlots = new(); pack[map] = mapSlots; }
                 mapSlots[name] = new Dictionary<string, string>(info);
-                SaveGlobalPack(pack);
+                if (!SaveGlobalPack(pack))
+                {
+                    ReplyToUserCommand(player, "The grenade library file is unreadable, not saving (a backup copy was made; check the server log).");
+                    return;
+                }
                 RefreshNadeMarkersIfActive(player);
                 ReplyToUserCommand(player, Localizer.ForPlayer(player, "matchzy.gl.added", name));
             }
@@ -663,7 +688,11 @@ namespace MatchZy
                 if (pack.TryGetValue(map, out var mapSlots) && mapSlots.Remove(name))
                 {
                     if (mapSlots.Count == 0) pack.Remove(map);
-                    SaveGlobalPack(pack);
+                    if (!SaveGlobalPack(pack))
+                    {
+                        ReplyToUserCommand(player, "The grenade library file is unreadable, not saving (a backup copy was made; check the server log).");
+                        return;
+                    }
                     RefreshNadeMarkersIfActive(player);
                     ReplyToUserCommand(player, Localizer.ForPlayer(player, "matchzy.gl.removed", name));
                 }

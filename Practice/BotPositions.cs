@@ -43,19 +43,59 @@ namespace MatchZy
             try
             {
                 if (!File.Exists(BotPositionsPath))
+                {
+                    _botPositionsLoadFailed = false;
                     return new();
-                return JsonSerializer.Deserialize<Dictionary<string, Dictionary<string, BotPos>>>(File.ReadAllText(BotPositionsPath), BotPosJsonOpts) ?? new();
+                }
+                var loaded = JsonSerializer.Deserialize<Dictionary<string, Dictionary<string, BotPos>>>(File.ReadAllText(BotPositionsPath), BotPosJsonOpts) ?? new();
+                _botPositionsLoadFailed = false;
+                return loaded;
             }
             catch (Exception e)
             {
                 Log($"[BotPositions] load: {e.Message}");
+                // Unparseable file: keep a copy and block saves, else the next save would write the
+                // empty dict back and silently erase every stored position.
+                if (!_botPositionsLoadFailed)
+                    BackupCorruptJsonFile(BotPositionsPath, "BotPositions");
+                _botPositionsLoadFailed = true;
                 return new();
             }
         }
 
-        private void SaveBotPositions(Dictionary<string, Dictionary<string, BotPos>> data)
+        // Set when botpositions.json failed to parse; cleared by the next successful load.
+        private bool _botPositionsLoadFailed = false;
+
+        // Returns false (and writes nothing) when the file on disk failed to parse on the last load.
+        private bool SaveBotPositions(Dictionary<string, Dictionary<string, BotPos>> data)
         {
+            if (_botPositionsLoadFailed)
+            {
+                Log($"[BotPositions] save refused: {BotPositionsPath} failed to parse. Fix or remove it first.");
+                return false;
+            }
             File.WriteAllText(BotPositionsPath, JsonSerializer.Serialize(data, BotPosJsonOpts));
+            return true;
+        }
+
+        // Copy a JSON file that failed to parse to <name>.corrupt-<timestamp>.json next to it, so a
+        // later save (or a manual fix) never loses the original content.
+        private void BackupCorruptJsonFile(string path, string tag)
+        {
+            try
+            {
+                if (!File.Exists(path))
+                    return;
+                string dir = Path.GetDirectoryName(path) ?? "";
+                string name = Path.GetFileNameWithoutExtension(path);
+                string backup = Path.Join(dir, $"{name}.corrupt-{DateTime.Now:yyyyMMddHHmmss}.json");
+                File.Copy(path, backup, overwrite: false);
+                Log($"[{tag}] {path} failed to parse; copied it to {backup}. Saves are blocked until the file is fixed.");
+            }
+            catch (Exception e)
+            {
+                Log($"[{tag}] could not back up corrupt file {path}: {e.Message}");
+            }
         }
 
         // ── save / load / list / delete ──────────────────────────────────────────────────────────
@@ -95,7 +135,11 @@ namespace MatchZy
                 string map = Server.MapName;
                 if (!data.TryGetValue(map, out var slots)) { slots = new(); data[map] = slots; }
                 slots[name] = new BotPos { X = o.X, Y = o.Y, Z = o.Z, Pitch = a.X, Yaw = a.Y, Team = player.TeamNum, Crouch = crouch };
-                SaveBotPositions(data);
+                if (!SaveBotPositions(data))
+                {
+                    ReplyToUserCommand(player, "botpositions.json is unreadable, not saving (a backup copy was made; check the server log).");
+                    return;
+                }
                 ReplyToUserCommand(player, Localizer.ForPlayer(player, "matchzy.bp.saved", name));
             }
             catch (Exception e)
@@ -202,7 +246,11 @@ namespace MatchZy
                 }
                 if (slots.Count == 0)
                     data.Remove(Server.MapName);
-                SaveBotPositions(data);
+                if (!SaveBotPositions(data))
+                {
+                    ReplyToUserCommand(player, "botpositions.json is unreadable, not saving (a backup copy was made; check the server log).");
+                    return;
+                }
                 ReplyToUserCommand(player, Localizer.ForPlayer(player, "matchzy.bp.deleted", nearest));
             }
             catch (Exception e)

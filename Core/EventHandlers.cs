@@ -7,6 +7,59 @@ namespace MatchZy;
 
 public partial class MatchZy
 {
+    /// <summary>
+    /// Places a player who just connected to a loaded match on the side the match gives them.
+    /// A connecting player has no pawn and sits in the team menu, so this uses the engine's own
+    /// join handler (HandleCommand_JoinTeam, the same path as practice .t/.ct from spectator) and
+    /// respawns them during warmup only. Mid-round joiners wait for the next round like any join.
+    /// </summary>
+    private void AutoAssignConnectingPlayer(CCSPlayerController player, CsTeam team)
+    {
+        if (team is not (CsTeam.Terrorist or CsTeam.CounterTerrorist or CsTeam.Spectator))
+            return;
+        int? expectedUserId = player.UserId;
+        // A moment after connect-full so the client is fully in before its team changes.
+        AddTimer(1.0f, () =>
+        {
+            if (player == null || !player.IsValid || player.UserId != expectedUserId || player.Connected != PlayerConnectedState.Connected)
+                return;
+            if (!isMatchSetup || player.TeamNum == (byte)team)
+                return;
+            // Only from the menu / Spectator. Someone already on a side is handled by the
+            // EventPlayerTeam roster lock, which never touches a live pawn unsafely.
+            if (player.TeamNum > (byte)CsTeam.Spectator)
+                return;
+
+            try
+            {
+                if (team == CsTeam.Spectator)
+                {
+                    if (player.TeamNum != (byte)CsTeam.Spectator)
+                        player.ChangeTeam(CsTeam.Spectator);
+                    return;
+                }
+
+                try
+                {
+                    handleCommandJoinTeam.Value.Invoke(player, (byte)team, 2, 0f);
+                }
+                catch (Exception joinEx)
+                {
+                    Log($"[AutoAssign] HandleCommand_JoinTeam unavailable ({joinEx.Message}), falling back to ChangeTeam");
+                    player.ChangeTeam(team);
+                }
+
+                // Respawn only while nobody is playing yet (warmup / ready phase).
+                // Coaches stay unspawned (like the ready-phase respawn handler).
+                RespawnWhenTeamApplied(player, team, RespawnRetryAttempts, keepGoing: () => isMatchSetup && !matchStarted && !IsMatchCoach(player) && !IsSideFull(team, player));
+            }
+            catch (Exception e)
+            {
+                Log($"[AutoAssign] Could not place {player.PlayerName} on {team}: {e.Message}");
+            }
+        });
+    }
+
     public HookResult EventPlayerConnectFullHandler(EventPlayerConnectFull @event, GameEventInfo info)
     {
         try
@@ -44,6 +97,11 @@ public partial class MatchZy
                         PrintToAllChat($"Kicking player {player.PlayerName} - Not a player in this game.");
                         KickPlayerDeferred(player);
                     }
+                    else if (isMatchSetup && IsTeamWhitelistConfigured())
+                    {
+                        // Not in this match (e.g. an admin exempt from the kick): watch from Spectator.
+                        AutoAssignConnectingPlayer(player, CsTeam.Spectator);
+                    }
                     return HookResult.Continue;
                 }
             }
@@ -53,6 +111,16 @@ public partial class MatchZy
 
             if (isMatchSetup)
                 AssignRosteredCoach(player);
+
+            // Put a rostered player straight on their team (or a listed spectator on Spectator)
+            // instead of showing the team menu, where only one choice was allowed anyway.
+            if (isMatchSetup && IsTeamWhitelistConfigured())
+            {
+                CsTeam assigned = GetPlayerTeam(player);
+                if (assigned is CsTeam.Terrorist or CsTeam.CounterTerrorist && !IsMatchCoach(player) && IsSideFull(assigned, player))
+                    assigned = CsTeam.Spectator; // substitute: the side is already full
+                AutoAssignConnectingPlayer(player, assigned);
+            }
 
             // Set ready status based on game state
             if (readyAvailable && !matchStarted)
@@ -80,7 +148,11 @@ public partial class MatchZy
                         AutoStart();
                     }
 
-                    isKnifeRequired = true;
+                    // Do NOT touch isKnifeRequired here. It is set by SetMapSides() (match config
+                    // map_sides), the mode commands (.match/.scrim/.hill), .knife and ResetMatch().
+                    // Forcing it to true for every player who connected during warmup overrode a
+                    // configured side (team1_ct/team2_ct/...) and started a knife round anyway, and
+                    // did the same to scrim/hill and to an admin's .knife off.
                     PrintToPlayerChat(player, Localizer.ForPlayer(player, "matchzy.eh.warmup"));
                     PrintToPlayerChat(player, Localizer.ForPlayer(player, "matchzy.eh.start"));
                     PrintToAdmins(Localizer.ForPlayer(player, "matchzy.eh.prac"));
@@ -125,11 +197,28 @@ public partial class MatchZy
         {
             CCSPlayerController? player = @event.Userid;
 
-            // Early validation
-            if (!IsPlayerValid(player) || !player!.UserId.HasValue)
+            // Controller-level validation only. IsPlayerValid also requires
+            // Connected == Connected and a valid pawn, which a leaving player (state
+            // Disconnecting, or a spectator without a pawn) can fail - that skipped all the
+            // cleanup below and left stale ready/playerData/coach entries behind.
+            if (player == null || !player.IsValid || !player.UserId.HasValue)
                 return HookResult.Continue;
 
             int userId = player.UserId.Value;
+
+            if ((isMatchSetup || matchStarted) && !player.IsBot && !player.IsHLTV)
+            {
+                var disconnectEvent = new MatchZyPlayerDisconnectedEvent
+                {
+                    MatchId = liveMatchId,
+                    Player = userId,
+                    PlayerSteamId = player.SteamID.ToString(),
+                    PlayerName = player.PlayerName,
+                    PlayerTeam = player.TeamNum switch { 2 => "T", 3 => "CT", 1 => "SPEC", _ => "none" },
+                    Reason = @event.Reason,
+                };
+                Task.Run(async () => await SendEventAsync(disconnectEvent));
+            }
 
             // Practice orphaned-pawn cleanup: in practice the round is kept alive (buddha /
             // ignore_round_win_conditions), so a disconnecting human's pawn can linger as a
@@ -155,6 +244,12 @@ public partial class MatchZy
 
             playerData.Remove(userId);
             infernoStartTimes.Remove(userId);
+
+            // A veto captain left: hand the captaincy to a teammate and re-prompt the current step,
+            // or abort the veto when the team has nobody left. The veto used to wait forever
+            // (paused) for the missing captain.
+            if (isVeto && !player.IsBot)
+                HandleVetoCaptainLeft(userId);
 
             if (matchzyTeam1.coach.Remove(player) || matchzyTeam2.coach.Remove(player))
             {
@@ -232,6 +327,38 @@ public partial class MatchZy
                 pendingMatchLoadIsG5 = isG5ApiMatch;
                 pendingMatchLoadConfigFile = loadedConfigFile;
             }
+
+            // A loaded match that is between maps must survive the changelevel: the next map of a
+            // series (HandleMatchEnd) and the map picked in the veto (FinishVeto) both clear
+            // matchStarted/isMatchLive and then change map, and OnMapStart resumes the match in
+            // warmup. Resetting here wiped the series, the veto result and the team rosters, so map
+            // 2 of a BO3 came up as an empty server. The same goes for a round restore that needs a
+            // different map. A map change in the middle of a live map (another plugin, a plain
+            // changelevel) still resets, since the match cannot continue from there.
+            if (isMatchSetup && (!matchStarted || isRoundRestorePending))
+            {
+                Log($"[OnMapEndHandler] Keeping the loaded match across the map change (map {matchConfig.CurrentMapNumber + 1}/{matchConfig.NumMaps}, restorePending: {isRoundRestorePending})");
+                KillPhaseTimers();
+                // A match start that was in progress (ready-up done, database row being created) is
+                // abandoned by the map change; the players ready up again on the new map. Leaving
+                // the flag set would make HandleMatchStart return at once forever.
+                matchStartInProgress = false;
+                if (matchStarted)
+                {
+                    // Cross-map restore: the queued backup is applied by HandleMatchStart once the
+                    // players ready up on the new map, which needs the match back in warmup.
+                    matchStarted = false;
+                    matchStartInProgress = false;
+                    isMatchLive = false;
+                    isKnifeRound = false;
+                    isSideSelectionPhase = false;
+                    isPaused = false;
+                    isWarmup = true;
+                    readyAvailable = true;
+                }
+                return;
+            }
+
             ResetMatch();
             // isKnifeRequired is set explicitly by ResetMatch() - never toggle blindly
         }

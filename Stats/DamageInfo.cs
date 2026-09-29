@@ -14,7 +14,9 @@ namespace MatchZy
             foreach (var entry in playerData)
             {
                 var player = entry.Value;
-                if (!player.IsValid || player.IsBot)
+                // Coaches sit on CT/T but never fight; without this every enemy saw a
+                // "0 / 0 hits" line for each coach.
+                if (!player.IsValid || player.IsBot || IsMatchCoach(player))
                     continue;
                 byte team = player.TeamNum;
                 if (team == 2 || team == 3)

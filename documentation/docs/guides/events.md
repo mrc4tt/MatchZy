@@ -35,8 +35,8 @@ app.post("/matchzy/events", (req, res) => {
 
   const e = req.body;
   switch (e.event) {
-    case "player_death":
-      console.log(`${e.attacker_name} killed ${e.victim_name} with ${e.weapon}`);
+    case "player_kill":
+      console.log(`${e.killer_name} killed ${e.victim_name} with ${e.weapon}` + (e.headshot ? " (HS)" : ""));
       break;
     case "round_end":
       console.log(`Round ${e.round_number}: ${e.team1.score} - ${e.team2.score}`);

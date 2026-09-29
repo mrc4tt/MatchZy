@@ -4,6 +4,7 @@ using System.Text.Json.Serialization;
 using CounterStrikeSharp.API.Core;
 using CounterStrikeSharp.API.Core.Attributes.Registration;
 using CounterStrikeSharp.API.Modules.Commands;
+using CounterStrikeSharp.API.Modules.Utils;
 
 namespace MatchZy
 {
@@ -125,24 +126,32 @@ namespace MatchZy
             {
                 (int team1, int team2) = GetTeamsScore();
 
-                bool ready = true;
-                foreach (var key in playerReadyStatus.Keys)
+                // Get5 reports per team: side as "ct"/"t", the team's own ready state and its
+                // connected players. (It used to send "terrorist", the server-wide ready state for
+                // both teams and -1 for connected clients.)
+                CsTeam SideOf(Team t) => teamSides[t] == "CT" ? CsTeam.CounterTerrorist : CsTeam.Terrorist;
+                bool TeamReady(CsTeam side)
                 {
-                    if (!playerReadyStatus[key])
+                    foreach (var kv in playerData)
                     {
-                        ready = false;
-                        break;
+                        if (kv.Value == null || !kv.Value.IsValid || kv.Value.Team != side || IsMatchCoach(kv.Value))
+                            continue;
+                        if (!playerReadyStatus.TryGetValue(kv.Key, out bool r) || !r)
+                            return false;
                     }
+                    return true;
                 }
+                CsTeam side1 = SideOf(matchzyTeam1);
+                CsTeam side2 = SideOf(matchzyTeam2);
 
                 get5Status.Team1 = new Get5StatusTeam
                 {
                     Name = matchzyTeam1.teamName,
                     SeriesScore = matchzyTeam1.seriesScore,
                     CurrentMapScore = team1,
-                    ConnectedClients = -1,
-                    Ready = ready,
-                    Side = teamSides[matchzyTeam1].ToLower(),
+                    ConnectedClients = GetTeamPlayerCount(side1),
+                    Ready = TeamReady(side1),
+                    Side = side1 == CsTeam.CounterTerrorist ? "ct" : "t",
                 };
 
                 get5Status.Team2 = new Get5StatusTeam
@@ -150,9 +159,9 @@ namespace MatchZy
                     Name = matchzyTeam2.teamName,
                     SeriesScore = matchzyTeam2.seriesScore,
                     CurrentMapScore = team2,
-                    ConnectedClients = -1,
-                    Ready = ready,
-                    Side = teamSides[matchzyTeam2].ToLower(),
+                    ConnectedClients = GetTeamPlayerCount(side2),
+                    Ready = TeamReady(side2),
+                    Side = side2 == CsTeam.CounterTerrorist ? "ct" : "t",
                 };
             }
 

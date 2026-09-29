@@ -454,6 +454,14 @@ namespace MatchZy
         [ConsoleCommand("css_unpause", "Unpause the match")]
         public void OnUnpauseCommand(CCSPlayerController? player, CommandInfo? command)
         {
+            // matchzy_allow_unpause was registered but never checked. Only gate players: the
+            // server console and internal callers (player == null) must still be able to unpause.
+            if (player != null && !allowUnpauseCommand.Value)
+            {
+                player.PrintToChat($"{chatPrefix} ⛔ Unpause command is disabled.");
+                return;
+            }
+
             if ((isMatchLive || isKnifeRound) && isPaused)
             {
                 var pauseTeamName = unpauseData["pauseTeam"];
@@ -498,6 +506,7 @@ namespace MatchZy
                 {
                     PrintToAllChat(Localizer["matchzy.pause.teamsunpausedthematch"]);
                     Server.ExecuteCommand("mp_unpause_match;");
+                    CancelTechPauseTimer();
                     isPaused = false;
                     unpauseData["ct"] = false;
                     unpauseData["t"] = false;
@@ -521,6 +530,7 @@ namespace MatchZy
                 {
                     PrintToAllChat(Localizer["matchzy.pause.adminunpausedthematch"]);
                     Server.ExecuteCommand("mp_unpause_match;");
+                    CancelTechPauseTimer();
                     isPaused = false;
                     unpauseData["ct"] = false;
                     unpauseData["t"] = false;
@@ -717,14 +727,44 @@ namespace MatchZy
         }
 
         [ConsoleCommand("get5_endmatch", "Ends resets the current match")]
+        [ConsoleCommand("css_forceend", "Ends the match through the normal match-end path (same as .forceend and get5_endmatch)")]
         public void OnEndMatchCommand(CCSPlayerController? player, CommandInfo? command)
         {
             if (IsPlayerAdmin(player, "get5_endmatch", "@css/config"))
             {
                 if (!isPractice)
                 {
-                    Server.PrintToChatAll($"{chatPrefix} An admin force-ended the match.");
-                    HandleMatchEnd();
+                    // Get5 semantics (what G5API's "cancel match" / forfeit sends):
+                    //   get5_endmatch          -> cancel the match, no winner
+                    //   get5_endmatch team1|2  -> end the series with that team as the winner
+                    // It used to run the normal map-end path, which did nothing outside a live map
+                    // (the server stayed locked on the old match) and, mid-map, scored the map for
+                    // whichever team was ahead and moved a series on to the next map.
+                    string winnerArg = command != null && command.ArgCount >= 2 ? command.ArgByIndex(1).Trim().ToLowerInvariant() : "";
+                    bool matchActive = matchStarted || isMatchSetup || isVeto || isPreVeto;
+                    if (!matchActive)
+                    {
+                        ReplyToUserCommand(player, "No match is loaded.");
+                        return;
+                    }
+
+                    if (winnerArg == "team1" || winnerArg == "team2")
+                    {
+                        Team winTeam = winnerArg == "team1" ? matchzyTeam1 : matchzyTeam2;
+                        (int t1score, int t2score) = GetTeamsScore();
+                        Server.PrintToChatAll($"{chatPrefix} An admin ended the match. {ChatColors.Green}{winTeam.teamName}{ChatColors.Default} wins.");
+                        if (isDemoRecording)
+                            StopDemoRecording(activeDemoFile, liveMatchId, matchConfig.CurrentMapNumber);
+                        winTeam.seriesScore = Math.Max(winTeam.seriesScore, (matchConfig.NumMaps / 2) + 1);
+                        readyAvailable = false;
+                        isPreVeto = false;
+                        EndSeries(winTeam.teamName, 5, t1score, t2score);
+                    }
+                    else
+                    {
+                        Server.PrintToChatAll($"{chatPrefix} An admin cancelled the match.");
+                        ResetMatch(true, "ended_early");
+                    }
                 }
                 else
                 {
@@ -742,7 +782,6 @@ namespace MatchZy
         [ConsoleCommand("css_endgame", "Ends and resets match")]
         [ConsoleCommand("css_forcestop", "Ends and resets match")]
         [ConsoleCommand("css_endmatch", "Ends and resets match")]
-        [ConsoleCommand("css_forceend", "Ends and resets match")]
         [ConsoleCommand("css_end", "Ends and resets match")]
         [ConsoleCommand("css_exitscrim", "Ends and resets match")]
         public void OnStopMatchCommand(CCSPlayerController? player, CommandInfo? command)
@@ -1084,17 +1123,20 @@ namespace MatchZy
             if (GuardAgainstDryRun(player))
                 return;
 
-            isKnifeRound = false;
-            isKnifeRequired = false;
-            isPlayOutEnabled = true;
-            isPlayOutEnabled2 = false;
-            isMatchModeEnabled = false;
-
+            // Check before touching any flag: flipping isKnifeRound/playout during a running knife
+            // round or live match left the match stuck (knife round never resolved) or changed
+            // overtime/clinch mid-match.
             if (matchStarted)
             {
                 ReplyToUserCommand(player, "MatchZy is already in Scrim/Full30 Mode!");
                 return;
             }
+
+            isKnifeRound = false;
+            isKnifeRequired = false;
+            isPlayOutEnabled = true;
+            isPlayOutEnabled2 = false;
+            isMatchModeEnabled = false;
 
             SetExplicitMode(1);
             StartScrimMode();
@@ -1124,17 +1166,18 @@ namespace MatchZy
             if (GuardAgainstDryRun(player))
                 return;
 
-            isKnifeRequired = false;
-            isKnifeRound = false;
-
-            ReplyToUserCommand(player, "Hill mode has been loaded.");
-            ReplyToUserCommand(player, "Knife Round is disabled for this mode.");
-
+            // Check before touching any flag (see OnScrimCommand).
             if (matchStarted)
             {
                 ReplyToUserCommand(player, "MatchZy is already in hill mode!");
                 return;
             }
+
+            isKnifeRequired = false;
+            isKnifeRound = false;
+
+            ReplyToUserCommand(player, "Hill mode has been loaded.");
+            ReplyToUserCommand(player, "Knife Round is disabled for this mode.");
 
             isPlayOutEnabled = false;
             isPlayOutEnabled2 = true;
@@ -1155,6 +1198,13 @@ namespace MatchZy
             }
             if (GuardAgainstDryRun(player))
                 return;
+
+            // Check before touching any flag (see OnScrimCommand).
+            if (matchStarted)
+            {
+                ReplyToUserCommand(player, "MatchZy is already in match mode!");
+                return;
+            }
 
             isKnifeRequired = true;
             // Compact match-status readout: show every toggle at a glance (knife / demo recording /
@@ -1269,14 +1319,17 @@ namespace MatchZy
         [ConsoleCommand("version", "Returns server version")]
         public void OnMatchZyVersionCommand(CCSPlayerController? player, CommandInfo? command)
         {
-            if (command == null)
-                return;
+            // The .version chat alias is dispatched without a CommandInfo, so reply through the
+            // player in that case instead of returning silently.
+            Action<string> reply = command != null
+                ? message => command.ReplyToCommand(message)
+                : message => ReplyToUserCommand(player, message);
 
             string steamInfFilePath = Path.Combine(Server.GameDirectory, "csgo", "steam.inf");
 
             if (!File.Exists(steamInfFilePath))
             {
-                command.ReplyToCommand("Unable to locate steam.inf file!");
+                reply("Unable to locate steam.inf file!");
                 return;
             }
 
@@ -1295,12 +1348,12 @@ namespace MatchZy
             // Build the response similar to CS2 status command format
             if (patchVersion != null && serverVersion != null)
             {
-                command.ReplyToCommand($"Protocol version: [{patchVersion}/{serverVersion}]");
-                command.ReplyToCommand($"MatchZy version: {ModuleVersion}");
+                reply($"Protocol version: [{patchVersion}/{serverVersion}]");
+                reply($"MatchZy version: {ModuleVersion}");
             }
             else
             {
-                command.ReplyToCommand("Unable to get server version");
+                reply("Unable to get server version");
             }
         }
 

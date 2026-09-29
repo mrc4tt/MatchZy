@@ -87,8 +87,23 @@ public class MatchZyPlayerTimedRoundEvent : MatchZyTimedRoundEvent
 
 public class MatchZyPlayerDisconnectedEvent : MatchZyMatchEvent
 {
+    // Engine user id of the player that left.
     [JsonPropertyName("player")]
     public required int Player { get; init; }
+
+    [JsonPropertyName("player_steamid")]
+    public required string PlayerSteamId { get; init; }
+
+    [JsonPropertyName("player_name")]
+    public required string PlayerName { get; init; }
+
+    // "CT" / "T" / "SPEC" / "none"
+    [JsonPropertyName("player_team")]
+    public required string PlayerTeam { get; init; }
+
+    // Engine disconnect reason code (ENetworkDisconnectionReason).
+    [JsonPropertyName("reason")]
+    public required int Reason { get; init; }
 
     public MatchZyPlayerDisconnectedEvent()
         : base("player_disconnect") { }
@@ -217,6 +232,24 @@ public class MatchZyMapVetoedEvent : MatchZyMapSelectionEvent
         : base("map_vetoed") { }
 }
 
+/// <summary>Get5 knife_won: the knife round winner and the side it chose.</summary>
+public class MatchZyKnifeWonEvent : MatchZyMapEvent
+{
+    [JsonPropertyName("team")]
+    public required string Team { get; init; }
+
+    // "ct" or "t": the side the winner starts the map on.
+    [JsonPropertyName("side")]
+    public required string Side { get; init; }
+
+    // True when the winner switched sides after the knife round.
+    [JsonPropertyName("swapped")]
+    public bool Swapped { get; init; }
+
+    public MatchZyKnifeWonEvent()
+        : base("knife_won") { }
+}
+
 public class MatchZySidePickedEvent : MatchZyMapSelectionEvent
 {
     [JsonPropertyName("map_number")]
@@ -247,6 +280,96 @@ public class MatchZyDemoUploadedEvent : MatchZyMatchEvent
 // ═══════════════════════════════════════════════════════════════════
 // Live scorebot events (mid-round, for real-time HLTV-style updates)
 // ═══════════════════════════════════════════════════════════════════
+
+/// <summary>
+/// One per kill of an enemy (or a teammate, flagged team_kill); suicides and world deaths are not
+/// kills and only appear as player_death. Killer-centric, for kill feeds and scorebots.
+/// </summary>
+public class PlayerKillLiveEvent : MatchZyMapEvent
+{
+    [JsonPropertyName("round_number")]
+    public required int RoundNumber { get; init; }
+
+    [JsonPropertyName("killer_name")]
+    public required string KillerName { get; init; }
+
+    [JsonPropertyName("killer_steamid")]
+    public required string KillerSteamId { get; init; }
+
+    [JsonPropertyName("killer_team")]
+    public required string KillerTeam { get; init; }
+
+    [JsonPropertyName("killer_hp")]
+    public int KillerHp { get; init; }
+
+    [JsonPropertyName("victim_name")]
+    public required string VictimName { get; init; }
+
+    [JsonPropertyName("victim_steamid")]
+    public required string VictimSteamId { get; init; }
+
+    [JsonPropertyName("victim_team")]
+    public required string VictimTeam { get; init; }
+
+    [JsonPropertyName("assister_name")]
+    public string? AssisterName { get; init; }
+
+    [JsonPropertyName("assister_steamid")]
+    public string? AssisterSteamId { get; init; }
+
+    [JsonPropertyName("flash_assist")]
+    public bool FlashAssist { get; init; }
+
+    [JsonPropertyName("weapon")]
+    public required string Weapon { get; init; }
+
+    [JsonPropertyName("headshot")]
+    public bool Headshot { get; init; }
+
+    [JsonPropertyName("penetrated")]
+    public bool Penetrated { get; init; }
+
+    [JsonPropertyName("noscope")]
+    public bool Noscope { get; init; }
+
+    [JsonPropertyName("thrusmoke")]
+    public bool Thrusmoke { get; init; }
+
+    [JsonPropertyName("attackerblind")]
+    public bool Attackerblind { get; init; }
+
+    // Units between killer and victim, null if a position was not available.
+    [JsonPropertyName("distance")]
+    public double? Distance { get; init; }
+
+    [JsonPropertyName("team_kill")]
+    public bool TeamKill { get; init; }
+
+    // First enemy kill of the round (opening kill).
+    [JsonPropertyName("first_kill")]
+    public bool FirstKill { get; init; }
+
+    // Killed the enemy who killed a teammate within the last 5 seconds (human players).
+    [JsonPropertyName("trade_kill")]
+    public bool TradeKill { get; init; }
+
+    // Enemy kills by the killer in this round, including this one (2 = double kill, ...).
+    [JsonPropertyName("killer_round_kills")]
+    public int KillerRoundKills { get; init; }
+
+    // Enemy kills by the killer on this map, including this one.
+    [JsonPropertyName("killer_map_kills")]
+    public int KillerMapKills { get; init; }
+
+    [JsonPropertyName("ct_alive")]
+    public int CtAlive { get; init; }
+
+    [JsonPropertyName("t_alive")]
+    public int TAlive { get; init; }
+
+    public PlayerKillLiveEvent()
+        : base("player_kill") { }
+}
 
 public class PlayerDeathLiveEvent : MatchZyMapEvent
 {

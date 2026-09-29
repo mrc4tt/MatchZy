@@ -9,8 +9,130 @@ namespace MatchZy
         // Live scorebot events for utility and the bomb carrier: grenade_thrown, grenade_detonated,
         // player_blinded, bomb_pickup, bomb_dropped, bomb_exploded. Same gating as player_hurt:
         // only while the match is live and a remote log URL is set.
+        // player_kill bookkeeping. Map kills reset when a map goes live (ResetAdvancedStats); round
+        // kills and the opening-kill flag reset when the round number changes.
+        private readonly Dictionary<ulong, int> liveMapKills = new();
+        private readonly Dictionary<ulong, int> liveRoundKills = new();
+        private int liveKillRound = -1;
+        private bool liveRoundFirstKillDone = false;
+
+        // Called at every live round start: a restore of the current round replays the same round
+        // number, so keying the reset on the round number alone carried the aborted attempt's kills over.
+        private void ResetLiveRoundKillCounters()
+        {
+            liveRoundKills.Clear();
+            liveRoundFirstKillDone = false;
+            liveKillRound = GetRoundNumer();
+        }
+
+        private void ResetLiveKillCounters()
+        {
+            liveMapKills.Clear();
+            liveRoundKills.Clear();
+            liveKillRound = -1;
+            liveRoundFirstKillDone = false;
+        }
+
+        private HookResult SendPlayerKillEvent(EventPlayerDeath @event)
+        {
+            try
+            {
+                if (!ShouldSendLiveEvent())
+                    return HookResult.Continue;
+
+                var victim = @event.Userid;
+                var killer = @event.Attacker;
+                if (victim == null || !victim.IsValid || killer == null || !killer.IsValid)
+                    return HookResult.Continue; // world damage, fall, bomb: a death, not a kill
+                if (killer == victim || IsMatchCoach(victim))
+                    return HookResult.Continue; // suicide / the coach's freeze-time removal
+
+                int round = GetRoundNumer();
+                if (round != liveKillRound)
+                {
+                    liveKillRound = round;
+                    liveRoundKills.Clear();
+                    liveRoundFirstKillDone = false;
+                }
+
+                bool teamKill = killer.TeamNum == victim.TeamNum;
+                bool firstKill = false;
+                int roundKills = 0;
+                int mapKills = 0;
+                ulong killerKey = killer.IsBot ? BotStatsId(killer.PlayerName) : killer.SteamID;
+                if (!teamKill)
+                {
+                    firstKill = !liveRoundFirstKillDone;
+                    liveRoundFirstKillDone = true;
+                    roundKills = liveRoundKills[killerKey] = liveRoundKills.GetValueOrDefault(killerKey) + 1;
+                    mapKills = liveMapKills[killerKey] = liveMapKills.GetValueOrDefault(killerKey) + 1;
+                }
+                else
+                {
+                    roundKills = liveRoundKills.GetValueOrDefault(killerKey);
+                    mapKills = liveMapKills.GetValueOrDefault(killerKey);
+                }
+
+                var killerPawn = killer.PlayerPawn?.Value;
+                var victimPawn = victim.PlayerPawn?.Value;
+                double? distance = null;
+                var from = killerPawn?.AbsOrigin;
+                var to = victimPawn?.AbsOrigin;
+                if (from != null && to != null)
+                {
+                    float dx = from.X - to.X, dy = from.Y - to.Y, dz = from.Z - to.Z;
+                    distance = Math.Round(Math.Sqrt(dx * dx + dy * dy + dz * dz), 1);
+                }
+
+                var assister = @event.Assister;
+                bool assisterValid = assister != null && assister.IsValid;
+                var (ctAlive, tAlive) = CountAlivePlayers();
+
+                var killEvent = new PlayerKillLiveEvent
+                {
+                    MatchId = liveMatchId,
+                    MapNumber = matchConfig.CurrentMapNumber,
+                    RoundNumber = round,
+                    KillerName = killer.PlayerName,
+                    KillerSteamId = killer.SteamID.ToString(),
+                    KillerTeam = GetTeamSide(killer),
+                    KillerHp = killerPawn?.Health ?? 0,
+                    VictimName = victim.PlayerName,
+                    VictimSteamId = victim.SteamID.ToString(),
+                    VictimTeam = GetTeamSide(victim),
+                    AssisterName = assisterValid ? assister!.PlayerName : null,
+                    AssisterSteamId = assisterValid ? assister!.SteamID.ToString() : null,
+                    FlashAssist = assisterValid && @event.Assistedflash,
+                    Weapon = @event.Weapon ?? "unknown",
+                    Headshot = @event.Headshot,
+                    Penetrated = @event.Penetrated > 0,
+                    Noscope = @event.Noscope,
+                    Thrusmoke = @event.Thrusmoke,
+                    Attackerblind = @event.Attackerblind,
+                    Distance = distance,
+                    TeamKill = teamKill,
+                    FirstKill = firstKill,
+                    TradeKill = !teamKill && lastDeathWasTradeKill,
+                    KillerRoundKills = roundKills,
+                    KillerMapKills = mapKills,
+                    CtAlive = ctAlive,
+                    TAlive = tAlive,
+                };
+                Task.Run(async () => await SendEventAsync(killEvent));
+            }
+            catch (Exception e)
+            {
+                Log($"[SendPlayerKillEvent FATAL] {e.Message}");
+            }
+            return HookResult.Continue;
+        }
+
         private void RegisterLiveUtilityEvents()
         {
+            // player_kill. Registered after the advanced-stats player_death handler (Load order), so
+            // lastDeathWasTradeKill already describes this death.
+            RegisterEventHandler<EventPlayerDeath>((@event, info) => SendPlayerKillEvent(@event), HookMode.Post);
+
             RegisterEventHandler<EventGrenadeThrown>((@event, info) =>
             {
                 try

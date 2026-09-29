@@ -120,10 +120,10 @@ Runs after a match config with `"skip_veto": false` is loaded. The chat tells ea
 |---|---|---|
 | `.pause` `.p` | Player | Pauses the match in the next freeze time. Unpausing needs both teams. If `matchzy_use_pause_command_for_tactical_pause` is on, this calls a tactical timeout instead. |
 | `.unpause` `.up` | Player | Your team's vote to unpause. The game resumes when both teams have voted. |
-| `.tech` | Player | Technical pause for connection or hardware trouble. Limited to `matchzy_max_tech_pauses_allowed` per team and `matchzy_tech_pause_duration` seconds each. |
+| `.tech` | Player | Technical pause for connection or hardware trouble. Each team gets `matchzy_max_tech_pauses_allowed` per map; each one ends on its own after `matchzy_tech_pause_duration` seconds. |
 | `.tac` | Player | Tactical timeout from your team's timeout budget. |
 | `.stop` | Player | Vote to replay the current round from its start. Both teams must type it. With `matchzy_stop_command_no_damage`, it is refused once someone has damaged an opponent. |
-| `!gg` :fontawesome-solid-code-fork: | Player | Surrender vote. Your team must be 6 or more rounds behind and enough teammates must vote. |
+| `!gg` :fontawesome-solid-code-fork: | Player | Surrender vote. Your team must be 6 or more rounds behind and all but one of its players must vote. Single-map matches only. |
 
 ### Coaching
 
@@ -142,13 +142,13 @@ More in [Coaching](../guides/coaching.md).
 | `.forceunpause` `.fup` | Config | Lifts any pause at once. |
 | `.restore <round>` | Config | Restores the match to the start of that round (score, money, equipment). |
 | `.restorelast` `.rl` :fontawesome-solid-code-fork: | Config | Restores the previous round. |
-| `.restorecurrent` `.rrestore` :fontawesome-solid-code-fork: | Config | Restarts the current round from its start. Also `!rr` and `!restartround`. |
+| `.restorecurrent` `.rrestore` `.rr` :fontawesome-solid-code-fork: | Config | Restarts the current round from its start. Also `!rr` and `!restartround`. (In practice, `.rr` restarts the practice round.) |
 | `.backups` `.backup` `.backupmenu` :fontawesome-solid-code-fork: | Config | Lists this match's backups with score and a restore hint. Outside a live match it lists the newest backup files on disk, handy after a server crash. |
 | `!loadbackup <file>` :fontawesome-solid-code-fork: | Config | Restores a backup file by name. |
 | `.listbackups [matchid]` | Config | Lists every backup of a match. |
 | `.restart` | Config | Resets the match back to warmup. |
 | `.stopmatch` `.endmatch` `.end` `.matchstop` | Config | Stops the match and resets it. Works in setup, veto, warmup, knife and live :fontawesome-solid-code-fork:. The match gets an end time and no winner in the database. |
-| `.forceend` | Config | Ends the match through the normal match-end path (like `get5_endmatch`). |
+| `.forceend` | Config | Cancels the match (like `get5_endmatch`). From the console, `get5_endmatch team1` / `team2` ends the series with that team as winner. |
 | `.matchgg` `.surrender` :fontawesome-solid-code-fork: | Config | Ends the match as a surrender. |
 | `.autopause` :fontawesome-solid-code-fork: | Root | Turns autopause (pause when a team is short) on or off. Also `!autopause_minplayers <n>`, `!autopause_delay <s>` and `!autopause_status`. |
 
@@ -234,7 +234,7 @@ Every grenade you throw is recorded (position, view, how it was thrown).
 | `.ff` `.fastforward` | Speeds up time for 10 seconds (wait out smokes and fires). |
 | `.break` | Breaks all breakable glass, doors and props. |
 | `.breakrestore` :fontawesome-solid-code-fork: | Restores everything `.break` destroyed. |
-| `.rs` :fontawesome-solid-code-fork: | Restarts the practice round. |
+| `.rs` `.rr` :fontawesome-solid-code-fork: | Restarts the practice round. |
 
 ## Dryrun
 
@@ -270,7 +270,7 @@ Run from the server console, RCON or a panel. Players cannot use these.
 | `matchzy_removeplayer <steamid64>` | Removes a player. Alias `get5_removeplayer`. |
 | `matchzy_loadbackup <file>` | Restores a round backup. Alias `get5_loadbackup`. |
 | `matchzy_listbackups [matchid]` | Lists backups. Alias `get5_listbackups`. |
-| `get5_endmatch` | Ends the match. |
+| `get5_endmatch [team1\|team2]` | Cancels the match, or ends the series with the given team as winner (Get5 behavior). |
 | `get5_status` / `get5_web_available` | Status replies for Get5 panels. |
 | `matchzy_version` | Version info. |
 

@@ -45,4 +45,4 @@
 }
 ```
 
-Keys must be SteamID64s. Players are also admins when they hold `@css/root` or the permission a command checks in CounterStrikeSharp's own admin system, or when `matchzy_everyone_is_admin` is on. `.mhelp` shows each admin exactly which commands they can run.
+Keys must be SteamID64s. An empty value means full admin. A value such as `"@css/chat"` or `"@css/map, @css/config"` grants only the commands that accept one of those flags. Players are also admins when they hold `@css/root` or the permission a command checks in CounterStrikeSharp's own admin system, or when `matchzy_everyone_is_admin` is on. `.mhelp` shows each admin exactly which commands they can run.

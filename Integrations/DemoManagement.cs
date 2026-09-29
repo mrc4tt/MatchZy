@@ -20,6 +20,9 @@ namespace MatchZy
         public string demoUploadHeaderKey = "";
         public string demoUploadHeaderValue = "";
         public string activeDemoFile = "";
+        // Earlier files of this map's recording, left behind when the watchdog restarted a stalled
+        // recording into a new file. Uploaded together with activeDemoFile when the map ends.
+        private readonly List<string> previousDemoSegments = new();
         public bool isDemoRecording = false;
         public bool isDemoUploadS3Enabled = false;
 
@@ -62,6 +65,9 @@ namespace MatchZy
         {
             demoStartAttempts = 0;
             demoAnnounced = false;
+            // A new match's recording: parts left by an earlier match that was stopped (no
+            // StopDemoRecording) must not be uploaded under this match's id.
+            previousDemoSegments.Clear();
             demoStartPending = true;
             demoStartArmTime = Server.CurrentTime + restartSettleSeconds;
             AddTimer(fallbackSeconds, () =>
@@ -88,6 +94,7 @@ namespace MatchZy
             demoStartAttempts = 0;
             demoAnnounced = false;
             activeDemoFile = "";
+            previousDemoSegments.Clear();
             demoWatchdogTimer?.Kill();
             demoWatchdogTimer = null;
         }
@@ -146,6 +153,21 @@ namespace MatchZy
             demoStartAttempts++;
             string demoFileName = FormatCvarValue(demoNameFormat.Replace(" ", "_")) + ".dem";
             string tempDemoPath = demoPath == "" ? demoFileName : demoPath + demoFileName;
+
+            // Never record over an existing demo. A name format without {TIME} gives the watchdog
+            // restart (and a replayed map) the same file name, and tv_record would truncate the
+            // earlier recording. Add _part2, _part3, ... instead.
+            try
+            {
+                string baseDemoPath = tempDemoPath.Substring(0, tempDemoPath.Length - ".dem".Length);
+                for (int part = 2; File.Exists(Path.Join(Server.GameDirectory, "csgo", tempDemoPath)) && part < 100; part++)
+                    tempDemoPath = $"{baseDemoPath}_part{part}.dem";
+                demoFileName = Path.GetFileName(tempDemoPath);
+            }
+            catch (Exception ex)
+            {
+                Log($"[StartDemoRecording] Could not check for an existing demo file: {ex.Message}");
+            }
             try
             {
                 string? directoryPath = Path.GetDirectoryName(Path.Join(Server.GameDirectory + "/csgo/" + demoPath));
@@ -302,6 +324,9 @@ namespace MatchZy
                 demoWatchdogTimer?.Kill();
                 demoWatchdogTimer = null;
                 Log($"[Demo] Watchdog: recording {expectedDemoFile} stalled mid-match - restarting into a new demo.");
+                // Keep the stalled file: it holds the match up to the stall and is uploaded too.
+                if (!string.IsNullOrEmpty(activeDemoFile) && !previousDemoSegments.Contains(activeDemoFile))
+                    previousDemoSegments.Add(activeDemoFile);
                 isDemoRecording = false;
                 demoStartAttempts = 0;
                 Server.ExecuteCommand("tv_stoprecord");
@@ -326,6 +351,8 @@ namespace MatchZy
             {
                 Log($"[Demo] GOTV demo {expectedDemoFile} {reason} after {demoStartAttempts} attempts - giving up for this map.");
                 AnnounceDemoStatus(false, "CSTV demo could not be started - this match is NOT being recorded.");
+                // No demo exists, so map_result / match_cancelled and the stats export must not name one.
+                activeDemoFile = "";
                 return;
             }
             Log($"[Demo] GOTV demo {expectedDemoFile} {reason} - retrying tv_record.");
@@ -343,11 +370,30 @@ namespace MatchZy
             PrintToAllChat($"{(recording ? ChatColors.Green : ChatColors.Red)}{message}");
         }
 
+        // The demo file map_result / the stats export should name: the current recording, or the last
+        // earlier part when a watchdog restart could not start a new one. Set by StopDemoRecording.
+        public string lastStoppedDemoFile = "";
+
         public void StopDemoRecording(string activeDemoFile, long liveMatchId, int currentMapNumber)
         {
-            string demoPath = Path.Join(Server.GameDirectory + "/csgo/" + activeDemoFile);
+            // Earlier segments from a watchdog restart come first, then the current file. The current
+            // file only counts while it is actually recording (a failed restart leaves none).
+            var segmentFiles = new List<string>(previousDemoSegments);
+            if (isDemoRecording && !string.IsNullOrEmpty(activeDemoFile))
+                segmentFiles.Add(activeDemoFile);
+            previousDemoSegments.Clear();
+            lastStoppedDemoFile = segmentFiles.Count > 0 ? segmentFiles[^1] : "";
+            var segmentPaths = segmentFiles.Select(f => Path.Join(Server.GameDirectory + "/csgo/" + f)).ToList();
             (int t1score, int t2score) = GetTeamsScore();
             int roundNumber = t1score + t2score;
+
+            // Snapshot the upload settings now, not when the upload timer fires: the series end
+            // restores the match config's cvars right after this, which can clear a demo upload URL
+            // that came from the match config.
+            string uploadURL = demoUploadURL;
+            string headerKey = demoUploadHeaderKey;
+            string headerValue = demoUploadHeaderValue;
+            bool useS3 = isDemoUploadS3Enabled;
 
             if (isDemoRecording)
             {
@@ -357,31 +403,32 @@ namespace MatchZy
                 demoWatchdogTimer?.Kill();
                 demoWatchdogTimer = null;
                 Log($"[StopDemoRecording] tv_stoprecord - {activeDemoFile}");
+            }
+
+            // Also runs when the recording is no longer active: parts left by a watchdog restart that
+            // then failed still hold the match up to the stall and must be uploaded.
+            if (segmentPaths.Count > 0)
+            {
                 AddTimer(15, () =>
                 {
-                    // Snapshot the upload settings on the main thread - the Task.Run below must not
-                    // read plugin state while a convar change or ResetMatch could be mutating it.
-                    string uploadURL = demoUploadURL;
-                    string headerKey = demoUploadHeaderKey;
-                    string headerValue = demoUploadHeaderValue;
-                    bool useS3 = isDemoUploadS3Enabled;
-                    string demoFileName = Path.GetFileName(demoPath);
-
                     Task.Run(async () =>
                     {
-                        bool uploadSuccess = await UploadFileAsync(demoPath, uploadURL, headerKey, headerValue, liveMatchId, currentMapNumber, roundNumber, useS3);
-
-                        // Only report the result when an upload was actually configured, otherwise every
-                        // server without a demo upload URL would emit a failed demo_upload_ended per map.
-                        if (uploadURL == "") return;
-
-                        await SendEventAsync(new MatchZyDemoUploadedEvent
+                        foreach (string segmentPath in segmentPaths)
                         {
-                            MatchId = liveMatchId,
-                            MapNumber = currentMapNumber,
-                            FileName = demoFileName,
-                            Success = uploadSuccess,
-                        });
+                            bool uploadSuccess = await UploadFileAsync(segmentPath, uploadURL, headerKey, headerValue, liveMatchId, currentMapNumber, roundNumber, useS3);
+
+                            // Only report the result when an upload was actually configured, otherwise every
+                            // server without a demo upload URL would emit a failed demo_upload_ended per map.
+                            if (uploadURL == "") return;
+
+                            await SendEventAsync(new MatchZyDemoUploadedEvent
+                            {
+                                MatchId = liveMatchId,
+                                MapNumber = currentMapNumber,
+                                FileName = Path.GetFileName(segmentPath),
+                                Success = uploadSuccess,
+                            });
+                        }
                     });
                 });
             }

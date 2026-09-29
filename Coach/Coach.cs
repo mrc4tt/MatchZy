@@ -214,6 +214,16 @@ public partial class MatchZy
             return;
         }
 
+        // Without a coaches list, a team with a player roster is coached by someone on that roster.
+        // Standing on the side was not enough: a player who is not in the match (an admin exempt
+        // from the kick, or anyone the engine auto-assigned) could coach either team.
+        if (RosterSize(matchZyCoachTeam.teamCoaches) == 0 && RosterSize(matchZyCoachTeam.teamPlayers) > 0
+            && !LookupRosterEntry(matchZyCoachTeam.teamPlayers, player!.SteamID))
+        {
+            ReplyToUserCommand(player, $"Only players on the {matchZyCoachTeam.teamName} roster can coach {matchZyCoachTeam.teamName}.");
+            return;
+        }
+
         matchZyCoachTeam.coach.Add(player!);
         player!.Clan = $"[{matchZyCoachTeam.teamName} COACH]";
         if (player.InGameMoneyServices != null)
@@ -958,21 +968,28 @@ public partial class MatchZy
     /// </summary>
     public void TransferCoachBomb(CCSPlayerController coach)
     {
-        if (coach.TeamNum != (int)CsTeam.Terrorist)
-            return; // can't have bomb
+        // Runs off the EventPlayerGivenC4 dispatch. Removing a held, networked C4 synchronously
+        // inside that event (the old bomb.Remove()) is the WriteEnterPVS / weapon-hook crash
+        // class, so: next frame kill it via entity IO, and give the new carrier the bomb one
+        // frame after that. Both players are re-validated at each step.
+        Server.NextFrame(() =>
+        {
+            if (!IsPlayerValid(coach) || coach.TeamNum != (int)CsTeam.Terrorist)
+                return; // can't have bomb
 
-        // find bomb and new target
-        var bomb = coach.PlayerPawn.Value!.WeaponServices!.MyWeapons.Where(w => w != null && w.IsValid && w.Value!.DesignerName == "weapon_c4").FirstOrDefault();
-        if (bomb == null || bomb.Value == null)
-            return; // should never trigger
+            var target = Utilities.GetPlayers().FirstOrDefault(p => IsPlayerValid(p) && !reverseTeamSides["TERRORIST"].coach.Contains(p) && p.TeamNum == (int)CsTeam.Terrorist && p.PawnIsAlive);
+            if (target == null)
+                return; // no one to hand it to; the coach keeps it until the kill at freeze end drops it
 
-        var target = Utilities.GetPlayers().FirstOrDefault(p => IsPlayerValid(p) && !reverseTeamSides["TERRORIST"].coach.Contains(p) && p.TeamNum == (int)CsTeam.Terrorist && p.PawnIsAlive);
-        if (!IsPlayerValid(target) || target == null)
-            return; // should never trigger
+            if (!RemoveWeaponByName(coach, "weapon_c4"))
+                return;
 
-        // transfer bomb
-        bomb.Value!.Remove();
-        target!.GiveNamedItem("weapon_c4");
+            Server.NextFrame(() =>
+            {
+                if (IsPlayerValid(target) && target.PawnIsAlive && target.TeamNum == (int)CsTeam.Terrorist)
+                    target.GiveNamedItem("weapon_c4");
+            });
+        });
     }
 
     public CsTeam GetCoachTeam(CCSPlayerController coach)
@@ -1013,7 +1030,22 @@ public partial class MatchZy
             // Direct switch - the old upstream flow hopped through Spectator first
             // (ChangeTeam(Spectator) -> ChangeTeam(back)), which is both a ghosting window
             // and a scoreboard flicker. Coaches must never touch the Spectator team.
-            playerController.ChangeTeam(oldTeam);
+            // Never ChangeTeam a live pawn (weapon-strip path, other plugins' weapon hooks
+            // re-enter -> SIGSEGV): SwitchTeam skips the strip, and a live coach is killed
+            // first, like the practice side switch.
+            if (playerController.PawnIsAlive)
+            {
+                playerController.CommitSuicide(false, true);
+                Server.NextFrame(() =>
+                {
+                    if (IsPlayerValid(playerController) && playerController.Team != oldTeam)
+                        playerController.SwitchTeam(oldTeam);
+                });
+            }
+            else
+            {
+                playerController.SwitchTeam(oldTeam);
+            }
         }
         if (playerController.InGameMoneyServices != null)
             playerController.InGameMoneyServices.Account = 0;

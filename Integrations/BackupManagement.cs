@@ -817,6 +817,7 @@ namespace MatchZy
             if (!pauseAfterRoundRestore)
             {
                 Server.ExecuteCommand("mp_unpause_match;");
+                CancelTechPauseTimer();
                 isPaused = false;
                 unpauseData["ct"] = false;
                 unpauseData["t"] = false;
@@ -869,6 +870,7 @@ namespace MatchZy
                     restoreUnpauseTimer?.Kill();
                     restoreUnpauseTimer = null;
                     Server.ExecuteCommand("mp_unpause_match;");
+                    CancelTechPauseTimer();
                     isPaused = false;
                     unpauseData["ct"] = false;
                     unpauseData["t"] = false;
@@ -1112,9 +1114,22 @@ namespace MatchZy
 
                 // ---- thread pool: file IO + JSON ----
                 // roundData and scoreboard are handed over wholesale and never touched here again.
-                _ = Task.Run(() => WriteRoundDataBackupAsync(
-                    filePath, lastBackupFilePath, roundData, scoreboard,
-                    configSnapshot, team1Snapshot, team2Snapshot));
+                // Remote backup upload settings, captured on the game thread.
+                string uploadUrl = backupUploadURL;
+                string uploadHeaderKey = backupUploadHeaderKey;
+                string uploadHeaderValue = backupUploadHeaderValue;
+                long uploadMatchId = liveMatchId;
+                int uploadMapNumber = matchConfig.CurrentMapNumber;
+                int uploadRound = t1score + t2score;
+                _ = Task.Run(async () =>
+                {
+                    await WriteRoundDataBackupAsync(
+                        filePath, lastBackupFilePath, roundData, scoreboard,
+                        configSnapshot, team1Snapshot, team2Snapshot);
+                    // matchzy_remote_backup_url (get5_remote_backup_url) was stored but never used.
+                    if (uploadUrl != "")
+                        await UploadRoundBackupAsync(filePath, uploadUrl, uploadHeaderKey, uploadHeaderValue, uploadMatchId, uploadMapNumber, uploadRound);
+                });
             }
             catch (Exception e)
             {
@@ -1127,6 +1142,53 @@ namespace MatchZy
         /// backup, sanitise, serialise, write. Never throws - an unobserved task exception would
         /// tear down the process.
         /// </summary>
+        /// <summary>
+        /// POSTs a finished round backup (the MatchZy JSON) to matchzy_remote_backup_url, with the
+        /// Get5 headers panels use to file it, so a crashed match can be restored elsewhere.
+        /// Worker thread only; never throws.
+        /// </summary>
+        private async Task UploadRoundBackupAsync(string filePath, string url, string headerKey, string headerValue, long matchId, int mapNumber, int roundNumber)
+        {
+            try
+            {
+                if (!IsValidUrl(url) || !File.Exists(filePath))
+                    return;
+                string body;
+                await backupWriteLock.WaitAsync().ConfigureAwait(false);
+                try
+                {
+                    body = await File.ReadAllTextAsync(filePath).ConfigureAwait(false);
+                }
+                finally
+                {
+                    backupWriteLock.Release();
+                }
+
+                using var request = new HttpRequestMessage(HttpMethod.Post, url);
+                using var content = new StringContent(body, System.Text.Encoding.UTF8, "application/json");
+                string fileName = Path.GetFileName(filePath);
+                content.Headers.Add("MatchZy-FileName", fileName);
+                content.Headers.Add("MatchZy-MatchId", matchId.ToString());
+                content.Headers.Add("MatchZy-MapNumber", mapNumber.ToString());
+                content.Headers.Add("MatchZy-RoundNumber", roundNumber.ToString());
+                content.Headers.Add("Get5-FileName", fileName);
+                content.Headers.Add("Get5-MatchId", matchId.ToString());
+                content.Headers.Add("Get5-MapNumber", mapNumber.ToString());
+                content.Headers.Add("Get5-RoundNumber", roundNumber.ToString());
+                request.Content = content;
+                if (!string.IsNullOrEmpty(headerKey) && !string.IsNullOrEmpty(headerValue))
+                    request.Headers.TryAddWithoutValidation(headerKey, headerValue);
+
+                using var response = await _sharedHttpClient.SendAsync(request).ConfigureAwait(false);
+                if (!response.IsSuccessStatusCode)
+                    Log($"[UploadRoundBackup] Upload of {fileName} failed: {response.StatusCode}");
+            }
+            catch (Exception e)
+            {
+                Log($"[UploadRoundBackup] {e.Message}");
+            }
+        }
+
         private async Task WriteRoundDataBackupAsync(
             string filePath,
             string lastBackupFilePath,
@@ -1545,23 +1607,34 @@ namespace MatchZy
         [ConsoleCommand("matchzy_listbackups", "List all the backups for the provided matchid")]
         public void OnListBackupCommand(CCSPlayerController? player, CommandInfo command)
         {
+            ListBackups(player, command.ArgCount >= 2 ? command.GetArg(1) : null, message => command.ReplyToCommand(message));
+        }
+
+        // Chat form (.listbackups [matchid]): the dot dispatch has no CommandInfo to reply through.
+        private void HandleListBackupsChatCommand(CCSPlayerController? player, string arg)
+        {
+            ListBackups(player, string.IsNullOrWhiteSpace(arg) ? null : arg.Trim(), message => ReplyToUserCommand(player, message));
+        }
+
+        private void ListBackups(CCSPlayerController? player, string? matchIdArg, Action<string> reply)
+        {
             if (!IsPlayerAdmin(player, "css_restore", "@css/config"))
             {
                 SendPlayerNotAdminMessage(player);
                 return;
             }
 
-            var matchId = command.ArgCount >= 2 ? command.GetArg(1) : liveMatchId.ToString();
+            var matchId = matchIdArg ?? liveMatchId.ToString();
             List<string> backups = GetBackups(matchId);
 
             if (backups.Count == 0)
             {
-                command.ReplyToCommand($"Found no backup files for match ID: {matchId}");
+                reply($"Found no backup files for match ID: {matchId}");
                 return; // FIX: Add return here
             }
 
             // Header
-            command.ReplyToCommand($"=== Backups for Match {matchId} ({backups.Count} found) ===");
+            reply($"=== Backups for Match {matchId} ({backups.Count} found) ===");
 
             int index = 1;
             foreach (string backup in backups)
@@ -1588,24 +1661,24 @@ namespace MatchZy
                         string roundNum = roundMatch.Success ? int.Parse(roundMatch.Groups[1].Value).ToString() : "?";
 
                         // Format: "#1 | Round 5 | Team1 2 - 3 Team2 | de_dust2 | 2024-01-15 14:30:22"
-                        command.ReplyToCommand($"#{index} | Round {roundNum} | {team1} {score1} - {score2} {team2} | {map} | {timestamp}");
+                        reply($"#{index} | Round {roundNum} | {team1} {score1} - {score2} {team2} | {map} | {timestamp}");
                     }
                     else
                     {
                         // Fallback if format is unexpected
-                        command.ReplyToCommand($"#{index} | {backupInfo}");
+                        reply($"#{index} | {backupInfo}");
                     }
                 }
                 else
                 {
                     // If GetBackupInfo failed, show just the filename
-                    command.ReplyToCommand($"#{index} | {Path.GetFileName(backup)}");
+                    reply($"#{index} | {Path.GetFileName(backup)}");
                 }
 
                 index++;
             }
 
-            command.ReplyToCommand($"Use '!restore <round>' to restore a specific round");
+            reply($"Use '!restore <round>' to restore a specific round");
         }
     }
 }

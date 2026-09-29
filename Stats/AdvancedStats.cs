@@ -54,6 +54,7 @@ public partial class MatchZy
     private class PlayerRoundStats
     {
         public bool GotKill { get; set; } = false;
+        public int Kills { get; set; } = 0; // enemy kills this round (for 1k rounds)
         public bool GotAssist { get; set; } = false;
         public bool Survived { get; set; } = true; // Assume alive until death
         public bool WasTraded { get; set; } = false;
@@ -69,6 +70,22 @@ public partial class MatchZy
         public int OpeningDeaths { get; set; } = 0;
         public int TradeKills { get; set; } = 0;
         public int TradedDeaths { get; set; } = 0; // Deaths that were traded by teammate
+
+        // Per-side opening duels (the side the player was on when it happened)
+        public int FirstKillsT { get; set; } = 0;
+        public int FirstKillsCT { get; set; } = 0;
+        public int FirstDeathsT { get; set; } = 0;
+        public int FirstDeathsCT { get; set; } = 0;
+
+        // Counters the engine's MatchStats does not provide
+        public int TeamKills { get; set; } = 0;
+        public int Suicides { get; set; } = 0;
+        public int KnifeKills { get; set; } = 0;
+        public int FlashAssists { get; set; } = 0;
+        public int FriendliesFlashed { get; set; } = 0;
+        public int BombPlants { get; set; } = 0;
+        public int BombDefuses { get; set; } = 0;
+        public int Kills1 { get; set; } = 0; // rounds with exactly one kill (Get5 "1k")
 
         // Clutch stats
         public int Clutch1v1Attempts { get; set; } = 0;
@@ -105,7 +122,8 @@ public partial class MatchZy
         // Initialize round stats for all players
         foreach (var player in Utilities.GetPlayers())
         {
-            if (player == null || !player.IsValid || player.IsBot)
+            // Only players on a side; spectators and coaches are not part of the round.
+            if (player == null || !player.IsValid || player.IsBot || player.TeamNum is not (2 or 3) || IsMatchCoach(player))
                 continue;
             var steamId = player.SteamID;
 
@@ -156,6 +174,11 @@ public partial class MatchZy
                 stats.KastRounds++;
             }
 
+            if (roundStats.Kills == 1)
+            {
+                stats.Kills1++;
+            }
+
             // Opening stats
             if (roundStats.WasOpeningKill)
             {
@@ -172,13 +195,79 @@ public partial class MatchZy
     // Kill event handler (call this from EventPlayerDeath)
     // ═══════════════════════════════════════════════════════════════════
 
-    public void OnAdvancedStatsPlayerDeath(CCSPlayerController? victim, CCSPlayerController? attacker, CCSPlayerController? assister)
+    private AdvancedPlayerStats AdvancedStatsFor(ulong steamId)
     {
+        if (!advancedStats.TryGetValue(steamId, out var stats))
+        {
+            stats = new AdvancedPlayerStats();
+            advancedStats[steamId] = stats;
+        }
+        return stats;
+    }
+
+    // Bomb plant/defuse and team-flash counters for the stats events. Humans only, live match only,
+    // like the rest of the advanced stats.
+    private void OnAdvancedStatsBombPlanted(CCSPlayerController? player)
+    {
+        if (isMatchLive && player != null && player.IsValid && !player.IsBot)
+            AdvancedStatsFor(player.SteamID).BombPlants++;
+    }
+
+    private void OnAdvancedStatsBombDefused(CCSPlayerController? player)
+    {
+        if (isMatchLive && player != null && player.IsValid && !player.IsBot)
+            AdvancedStatsFor(player.SteamID).BombDefuses++;
+    }
+
+    private void OnAdvancedStatsPlayerBlind(CCSPlayerController? victim, CCSPlayerController? attacker, float duration)
+    {
+        if (!isMatchLive || duration <= 0f)
+            return;
+        if (victim == null || !victim.IsValid || attacker == null || !attacker.IsValid || attacker.IsBot)
+            return;
+        if (attacker != victim && attacker.TeamNum == victim.TeamNum)
+            AdvancedStatsFor(attacker.SteamID).FriendliesFlashed++;
+    }
+
+    // Set by OnAdvancedStatsPlayerDeath for the death it just processed; read by the player_kill
+    // event handler, which is registered after it and runs for the same player_death.
+    private bool lastDeathWasTradeKill = false;
+
+    public void OnAdvancedStatsPlayerDeath(CCSPlayerController? victim, CCSPlayerController? attacker, CCSPlayerController? assister, string weapon = "", bool assistedFlash = false)
+    {
+        lastDeathWasTradeKill = false;
         if (!isMatchLive || victim == null || !victim.IsValid || victim.IsBot)
+            return;
+        // The coach's end-of-freezetime suicide would otherwise be the first death of every round
+        // and take the opening duel away from the real players.
+        if (IsMatchCoach(victim))
             return;
 
         var victimSteamId = victim.SteamID;
         var victimTeam = (CsTeam)victim.TeamNum;
+
+        bool attackerValid = attacker != null && attacker.IsValid;
+        bool isSuicide = !attackerValid || attacker == victim;
+        bool isTeamKill = !isSuicide && attacker!.TeamNum == victim.TeamNum;
+
+        if (isSuicide)
+        {
+            // World damage / fall / bomb has no attacker; only an explicit self-kill is a suicide.
+            if (attackerValid)
+                AdvancedStatsFor(victimSteamId).Suicides++;
+        }
+        else if (isTeamKill)
+        {
+            if (!attacker!.IsBot)
+                AdvancedStatsFor(attacker.SteamID).TeamKills++;
+        }
+        else if (!attacker!.IsBot && (weapon.Contains("knife", StringComparison.OrdinalIgnoreCase) || weapon.Contains("bayonet", StringComparison.OrdinalIgnoreCase)))
+        {
+            AdvancedStatsFor(attacker.SteamID).KnifeKills++;
+        }
+
+        if (assistedFlash && !isTeamKill && assister != null && assister.IsValid && !assister.IsBot && assister.TeamNum != victim.TeamNum)
+            AdvancedStatsFor(assister.SteamID).FlashAssists++;
 
         // Mark player as dead this round
         if (playerRoundStats.TryGetValue(victimSteamId, out var victimRoundStats))
@@ -190,7 +279,9 @@ public partial class MatchZy
         var death = new RoundDeath
         {
             VictimSteamId = victimSteamId,
-            KillerSteamId = attacker != null && attacker.IsValid && !attacker.IsBot ? attacker.SteamID : null,
+            // Only a kill on an enemy counts as the killer's: a suicide used to credit the victim
+            // with a kill (KAST "K" for dying), and a team kill counted as an opening/trade kill.
+            KillerSteamId = !isSuicide && !isTeamKill && !attacker!.IsBot ? attacker.SteamID : null,
             VictimTeam = victimTeam,
             Time = DateTime.UtcNow,
         };
@@ -207,11 +298,23 @@ public partial class MatchZy
             {
                 vrs.WasOpeningDeath = true;
             }
+            if (victimTeam == CsTeam.Terrorist)
+                AdvancedStatsFor(victimSteamId).FirstDeathsT++;
+            else if (victimTeam == CsTeam.CounterTerrorist)
+                AdvancedStatsFor(victimSteamId).FirstDeathsCT++;
 
             // Mark opening kill
             if (death.KillerSteamId.HasValue && playerRoundStats.TryGetValue(death.KillerSteamId.Value, out var krs))
             {
                 krs.WasOpeningKill = true;
+            }
+            if (death.KillerSteamId.HasValue)
+            {
+                // The killer is on the other side of the victim.
+                if (victimTeam == CsTeam.CounterTerrorist)
+                    AdvancedStatsFor(death.KillerSteamId.Value).FirstKillsT++;
+                else if (victimTeam == CsTeam.Terrorist)
+                    AdvancedStatsFor(death.KillerSteamId.Value).FirstKillsCT++;
             }
         }
 
@@ -247,6 +350,7 @@ public partial class MatchZy
             {
                 // This is a trade kill!
                 tradedDeath.WasTraded = true;
+                lastDeathWasTradeKill = true;
 
                 // Mark the killer's trade kill stat
                 if (!advancedStats.ContainsKey(killerSteamId))
@@ -272,6 +376,7 @@ public partial class MatchZy
             if (playerRoundStats.TryGetValue(killerSteamId, out var killerRoundStats))
             {
                 killerRoundStats.GotKill = true;
+                killerRoundStats.Kills++;
             }
         }
 
@@ -429,6 +534,7 @@ public partial class MatchZy
 
     private void ResetAdvancedStats()
     {
+        ResetLiveKillCounters();
         advancedStats.Clear();
         playerRoundStats.Clear();
         roundDeaths.Clear();
@@ -460,15 +566,18 @@ public partial class MatchZy
     {
         try
         {
+            // Rounds on the scoreboard, not the round_end counter: a round replayed after a restore
+            // ends twice, which counted it twice and understated ADR, KPR and rating.
+            int roundsPlayed = t1score + t2score > 0 ? t1score + t2score : totalRoundsPlayed;
             var allPlayers = new List<MatchStatsPlayer>();
 
             foreach (var player in playerStatsListTeam1)
             {
-                allPlayers.Add(CreateMatchStatsPlayer(player, matchzyTeam1.teamName, totalRoundsPlayed));
+                allPlayers.Add(CreateMatchStatsPlayer(player, matchzyTeam1.teamName, roundsPlayed));
             }
             foreach (var player in playerStatsListTeam2)
             {
-                allPlayers.Add(CreateMatchStatsPlayer(player, matchzyTeam2.teamName, totalRoundsPlayed));
+                allPlayers.Add(CreateMatchStatsPlayer(player, matchzyTeam2.teamName, roundsPlayed));
             }
 
             return new MatchStatsJson
@@ -476,7 +585,7 @@ public partial class MatchZy
                 MatchId = liveMatchId,
                 Map = Server.MapName,
                 Date = DateTime.UtcNow.ToString("o"),
-                TotalRounds = totalRoundsPlayed,
+                TotalRounds = roundsPlayed,
                 DemoFilename = demoFilename,
                 Team1 = new TeamStatsJson
                 {

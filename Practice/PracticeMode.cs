@@ -692,6 +692,19 @@ namespace MatchZy
                         string lineupName = parts[0].Trim();
                         string[] posAng = parts.Skip(1).Select(p => p.Replace(",", "")).ToArray(); // Replace ',' with '' for proper parsing
 
+                        // Only finite numbers inside the map bounds: NaN / Infinity / 1e39 were stored
+                        // as-is and later used as a teleport target and marker origin.
+                        var parsed = new float[6];
+                        for (int i = 0; i < 6; i++)
+                        {
+                            if (!float.TryParse(posAng[i], System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out parsed[i])
+                                || !float.IsFinite(parsed[i]) || Math.Abs(parsed[i]) > 65536f)
+                            {
+                                ReplyToUserCommand(player, Localizer.ForPlayer(player, "matchzy.pm.lineupinvalidcode"));
+                                return;
+                            }
+                        }
+
                         // Get player info: steamid
                         string playerSteamID = player.SteamID.ToString();
                         string currentMapName = Server.MapName;
@@ -733,6 +746,8 @@ namespace MatchZy
                             { "Angles", $"{posAng[3]} {posAng[4]} {posAng[5]}" },
                             { "Desc", "" },
                             { "Map", currentMapName },
+                            // The import code has no grenade type; .loadnade and the library need one.
+                            { "Type", "Smoke" },
                         };
 
                         // Serialize the updated dictionary back to JSON
@@ -887,7 +902,8 @@ namespace MatchZy
                                     // pose via a weapon re-deploy (no respawn).
                                     // The grenade is re-deployed by classname
                                     // (CS2 `slotN` grenade commands are dead).
-                                    string nadeType = lineupInfo["Type"];
+                                    // Imported lineups (.importnade) carry no Type; default to smoke.
+                                    string nadeType = lineupInfo.TryGetValue("Type", out var storedType) ? storedType : "Smoke";
                                     bool isCT = player.TeamNum == (byte)CsTeam.CounterTerrorist;
                                     string nadeWeapon = nadeType switch
                                     {
@@ -970,17 +986,25 @@ namespace MatchZy
             beam.Teleport(basePos, new QAngle(0, 0, 0), new Vector(0, 0, 0));
 
             beam.DispatchSpawn();
+            spawnMarkerBeams.Add(beam.EntityHandle.Raw);
         }
+
+        // Only the beams ShowSpawnBeam drew. Bot-position, coach-spawn, grenade-arc and landing
+        // markers share the "beam" designer name but have their own owners/toggles, so a
+        // designer-wide sweep here left those toggles on with dead entity refs. Stored as raw
+        // entity handles (index + serial) so a stale entry after a map change resolves to null
+        // instead of a dangling pointer.
+        readonly List<uint> spawnMarkerBeams = new();
 
         public void RemoveSpawnBeams()
         {
-            var beams = Utilities.FindAllEntitiesByDesignerName<CEntityInstance>("beam");
-            foreach (var beam in beams)
+            foreach (uint raw in spawnMarkerBeams)
             {
-                if (beam == null)
-                    continue;
-                beam.Remove();
+                var beam = new CHandle<CBeam>(raw).Value;
+                if (beam != null && beam.IsValid)
+                    SafeRemoveEntity(beam, "spawnbeam");
             }
+            spawnMarkerBeams.Clear();
             // Full teardown: also disarm the +use interaction. Every mode-transition path
             // (match start, prac restart, sleep, map change) already calls RemoveSpawnBeams,
             // so folding the flag/list reset here disarms interaction on all of them.
@@ -1140,6 +1164,7 @@ namespace MatchZy
             readyStatusHintTimer?.Kill();
             readyStatusHintTimer = null;
             ClearClanTags();
+            ClearPracticeTimers();
 
             isPractice = false;
             isDryRun = true;
@@ -1733,19 +1758,9 @@ namespace MatchZy
                             if (isCrouched)
                             {
                                 player.PlayerPawn.Value!.Flags |= (uint)PlayerFlags.FL_DUCKING;
-                                CCSPlayer_MovementServices movementService = new(player.PlayerPawn.Value.MovementServices!.Handle);
-                                AddTimer(0.1f, () => movementService.DuckAmount = 1);
-                                AddTimer(
-                                    0.2f,
-                                    () =>
-                                    {
-                                        // Validate player and pawn still exist before accessing Bot
-                                        if (IsPlayerValid(player) && player.PlayerPawn != null && player.PlayerPawn.Value != null && player.PlayerPawn.Value.Bot != null)
-                                        {
-                                            player.PlayerPawn.Value.Bot.IsCrouching = true;
-                                        }
-                                    }
-                                );
+                                var crouchBot = player;
+                                AddTimer(0.1f, () => SetBotDuckAmountFull(crouchBot));
+                                AddTimer(0.2f, () => SetBotCrouching(crouchBot));
                             }
                             CCSPlayerController? botOwner = (CCSPlayerController)botData["owner"];
 
@@ -1774,14 +1789,26 @@ namespace MatchZy
                         // This most often happens when a player changes team with bot_quota_mode set to fill
                         // Extra bots from bot_add are already handled in SpawnBot
                         // Delay this for a few seconds to prevent crashes
-                        // IMPORTANT: Capture PlayerName NOW before the timer fires, as bot may be invalid later
+                        // Kick by userid, not name: the name may be reused by a bot we spawn in the
+                        // meantime (and bot_kick with an unquoted name can match the wrong one).
                         string botName = player.PlayerName;
+                        int strayUserId = player.UserId.Value;
+                        var strayBot = player;
                         Log($"Kicking bot {botName} due to erroneous spawning");
                         AddTimer(
                             2.5f,
                             () =>
                             {
-                                Server.ExecuteCommand($"bot_kick {botName}");
+                                if (strayBot == null || !strayBot.IsValid || !strayBot.IsBot || strayBot.IsHLTV
+                                    || strayBot.UserId != strayUserId)
+                                    return;
+                                lock (_botsDictLock)
+                                {
+                                    // Claimed as a practice bot since: keep it.
+                                    if (pracUsedBots.ContainsKey(strayUserId))
+                                        return;
+                                }
+                                Server.ExecuteCommand($"kickid {strayUserId}");
                             }
                         );
                     }
@@ -1791,6 +1818,44 @@ namespace MatchZy
             }
 
             return HookResult.Continue;
+        }
+
+        // Timer-deferred crouch writes for practice bots. The bot may have been kicked or its pawn
+        // replaced by the time these fire, so re-validate the controller + pawn and re-fetch
+        // MovementServices from the live pawn (a MovementServices captured before the timer can
+        // point at freed memory).
+        private void SetBotDuckAmountFull(CCSPlayerController? bot)
+        {
+            if (!IsPlayerValid(bot))
+                return;
+            var pawn = bot!.PlayerPawn.Value;
+            if (pawn == null || !pawn.IsValid || pawn.MovementServices == null || pawn.MovementServices.Handle == IntPtr.Zero)
+                return;
+            try
+            {
+                new CCSPlayer_MovementServices(pawn.MovementServices.Handle).DuckAmount = 1;
+            }
+            catch (Exception ex)
+            {
+                Log($"[SetBotDuckAmountFull] {ex.Message}");
+            }
+        }
+
+        private void SetBotCrouching(CCSPlayerController? bot)
+        {
+            if (!IsPlayerValid(bot))
+                return;
+            var pawn = bot!.PlayerPawn.Value;
+            if (pawn == null || !pawn.IsValid || pawn.Bot == null)
+                return;
+            try
+            {
+                pawn.Bot.IsCrouching = true;
+            }
+            catch (Exception ex)
+            {
+                Log($"[SetBotCrouching] {ex.Message}");
+            }
         }
 
         // ============================================================================
@@ -1926,38 +1991,9 @@ namespace MatchZy
 
                 if (player.PlayerPawn.Value.MovementServices != null)
                 {
-                    var movementService = new CCSPlayer_MovementServices(player.PlayerPawn.Value.MovementServices.Handle);
-
                     var capturedPlayer = player;
-                    AddTimer(
-                        0.1f,
-                        () =>
-                        {
-                            if (capturedPlayer?.IsValid == true && capturedPlayer.PlayerPawn?.IsValid == true && capturedPlayer.PlayerPawn.Value?.MovementServices != null)
-                            {
-                                try
-                                {
-                                    movementService.DuckAmount = 1;
-                                }
-                                catch { }
-                            }
-                        }
-                    );
-
-                    AddTimer(
-                        0.2f,
-                        () =>
-                        {
-                            if (capturedPlayer?.IsValid == true && capturedPlayer.PlayerPawn?.IsValid == true && capturedPlayer.PlayerPawn.Value?.Bot != null)
-                            {
-                                try
-                                {
-                                    capturedPlayer.PlayerPawn.Value.Bot.IsCrouching = true;
-                                }
-                                catch { }
-                            }
-                        }
-                    );
+                    AddTimer(0.1f, () => SetBotDuckAmountFull(capturedPlayer));
+                    AddTimer(0.2f, () => SetBotCrouching(capturedPlayer));
                 }
             }
             catch (Exception ex)
@@ -2151,18 +2187,9 @@ namespace MatchZy
                         // ADDED: Validate MovementServices before accessing
                         if (claimedBot.PlayerPawn!.Value!.MovementServices != null)
                         {
-                            CCSPlayer_MovementServices movementService = new(claimedBot.PlayerPawn.Value.MovementServices.Handle);
-                            AddTimer(0.1f, () => movementService.DuckAmount = 1);
-                            AddTimer(
-                                0.2f,
-                                () =>
-                                {
-                                    if (claimedBot.PlayerPawn?.Value?.Bot != null)
-                                    {
-                                        claimedBot.PlayerPawn.Value.Bot.IsCrouching = true;
-                                    }
-                                }
-                            );
+                            var crouchBot = claimedBot;
+                            AddTimer(0.1f, () => SetBotDuckAmountFull(crouchBot));
+                            AddTimer(0.2f, () => SetBotCrouching(crouchBot));
                         }
                     }
 
@@ -2420,8 +2447,6 @@ namespace MatchZy
                 return;
 
             int botUserId = closestBot.UserId.Value;
-            // IMPORTANT: Capture PlayerName NOW before NextFrame, as bot may become invalid
-            string botName = closestBot.PlayerName;
 
             // Mark as being processed
             lock (_botsDictLock)
@@ -2442,7 +2467,8 @@ namespace MatchZy
                     // Re-validate before kicking
                     if (closestBot.IsValid && closestBot.PlayerPawn?.IsValid == true && closestBot.Connected == PlayerConnectedState.Connected)
                     {
-                        Server.ExecuteCommand($"bot_kick {botName}");
+                        // kickid by the captured userid, not bot_kick <name> (names can repeat).
+                        Server.ExecuteCommand($"kickid {botUserId}");
 
                         // Clean up tracking after small delay
                         AddTimer(
@@ -2514,6 +2540,12 @@ namespace MatchZy
             CleanupAllCollisionTimers();
         }
 
+        // Active .ff window: its restore timer and the movetypes snapshotted when it began. A second
+        // .ff inside the window is ignored, else it would snapshot MOVETYPE_NONE as the "pre" state
+        // and leave everyone frozen when the window ends.
+        CounterStrikeSharp.API.Modules.Timers.Timer? fastForwardTimer = null;
+        Dictionary<int, MoveType_t>? preFastForwardMoveTypes = null;
+
         [ConsoleCommand("css_ff", "Fast forwards the timescale to 20 seconds")]
         [ConsoleCommand("css_fastforward", "Fast forwards the timescale to 20 seconds")]
         public void OnFFCommand(CCSPlayerController? player, CommandInfo? command)
@@ -2521,42 +2553,61 @@ namespace MatchZy
             if (!isPractice || player == null)
                 return;
 
-            Dictionary<int, MoveType_t> preFastForwardMoveTypes = new();
+            if (preFastForwardMoveTypes != null)
+            {
+                ReplyToUserCommand(player, "Fast forward is already running.");
+                return;
+            }
+
+            Dictionary<int, MoveType_t> moveTypes = new();
 
             foreach (var key in playerData.Keys)
             {
                 if (!IsPlayerValid(playerData[key]))
                     continue;
-                preFastForwardMoveTypes[key] = playerData[key].PlayerPawn.Value!.MoveType;
+                moveTypes[key] = playerData[key].PlayerPawn.Value!.MoveType;
 
                 playerData[key].PlayerPawn.Value!.MoveType = MoveType_t.MOVETYPE_NONE;
                 Schema.SetSchemaValue(playerData[key].PlayerPawn.Value!.Handle, "CBaseEntity", "m_nActualMoveType", 0);
                 Utilities.SetStateChanged(playerData[key].PlayerPawn.Value!, "CBaseEntity", "m_MoveType");
             }
+            preFastForwardMoveTypes = moveTypes;
 
             Server.PrintToChatAll($"{chatPrefix} Fastforwarding 10 seconds!");
             Server.ExecuteCommand("host_timescale 5");
-            AddTimer(
-                10.0f,
-                () =>
-                {
-                    ResetFastForward(preFastForwardMoveTypes);
-                }
-            );
+            fastForwardTimer?.Kill();
+            fastForwardTimer = AddTimer(10.0f, ResetFastForward);
         }
 
-        public void ResetFastForward(Dictionary<int, MoveType_t> preFastForwardMoveTypes)
+        public void ResetFastForward()
         {
-            if (!isPractice)
-                return;
+            // Always drop the timescale first, even if practice ended during the window, so the
+            // server never stays at 5x.
             Server.ExecuteCommand("host_timescale 1");
+            fastForwardTimer = null;
+            var moveTypes = preFastForwardMoveTypes;
+            preFastForwardMoveTypes = null;
+            if (moveTypes == null)
+                return;
+
             foreach (var key in playerData.Keys)
             {
-                if (!IsPlayerValid(playerData[key]))
+                var p = playerData[key];
+                if (!IsPlayerValid(p))
                     continue;
-                playerData[key].PlayerPawn.Value!.MoveType = preFastForwardMoveTypes[key];
-                Schema.SetSchemaValue(playerData[key].PlayerPawn.Value!.Handle, "CBaseEntity", "m_nActualMoveType", (int)preFastForwardMoveTypes[key]);
-                Utilities.SetStateChanged(playerData[key].PlayerPawn.Value!, "CBaseEntity", "m_MoveType");
+                var pawn = p.PlayerPawn.Value!;
+                MoveType_t restore;
+                if (!isPractice || !moveTypes.TryGetValue(key, out restore))
+                {
+                    // Practice ended mid-window, or the player joined during it (no snapshot): only
+                    // unfreeze pawns still held by the fast forward.
+                    if (pawn.MoveType != MoveType_t.MOVETYPE_NONE)
+                        continue;
+                    restore = MoveType_t.MOVETYPE_WALK;
+                }
+                pawn.MoveType = restore;
+                Schema.SetSchemaValue(pawn.Handle, "CBaseEntity", "m_nActualMoveType", (int)restore);
+                Utilities.SetStateChanged(pawn, "CBaseEntity", "m_MoveType");
             }
         }
 
@@ -3037,15 +3088,40 @@ namespace MatchZy
         // reaches: ChangeTeam leaves the controller observing, and both
         // ExecuteClientCommand variants fail to deliver "jointeam" (see the comment at
         // the call site). Resolved from the gamedata key
-        // "CCSPlayerController_HandleCommandJoinTeam", shipped in the plugin's own
-        // gamedata/matchzy.json so it resolves on both the fork and stock upstream
-        // CounterStrikeSharp (regenerate via the CS2SigMaker/ida-pro-mcp tooling if a
-        // CS2 update breaks it). If the file is not deployed the key is missing -
+        // "CBasePlayerController_HandleCommand_JoinTeam" (the name the gamedata regen
+        // tooling emits) or the older "CCSPlayerController_HandleCommandJoinTeam", shipped
+        // in the plugin's own gamedata/matchzy.json so it resolves on both the fork and
+        // stock upstream CounterStrikeSharp (regenerate via the CS2SigMaker/ida-pro-mcp
+        // tooling if a CS2 update breaks it). Both names are accepted because a regen
+        // renamed the key once and silently broke this path. If neither key is present
         // GetSignature throws, the caller catches and falls back to ChangeTeam + the
         // team-menu hint.
+        private static readonly string[] HandleCommandJoinTeamKeys =
+        {
+            "CBasePlayerController_HandleCommand_JoinTeam",
+            "CCSPlayerController_HandleCommandJoinTeam",
+        };
+
         private static readonly Lazy<MemoryFunctionVoid<CCSPlayerController, int, int, float>> handleCommandJoinTeam =
-            new(() => new MemoryFunctionVoid<CCSPlayerController, int, int, float>(
-                GameData.GetSignature("CCSPlayerController_HandleCommandJoinTeam")));
+            new(() => new MemoryFunctionVoid<CCSPlayerController, int, int, float>(ResolveHandleCommandJoinTeamSignature()));
+
+        private static string ResolveHandleCommandJoinTeamSignature()
+        {
+            Exception? last = null;
+            foreach (var key in HandleCommandJoinTeamKeys)
+            {
+                try
+                {
+                    return GameData.GetSignature(key);
+                }
+                catch (Exception e)
+                {
+                    last = e;
+                }
+            }
+            throw new InvalidOperationException(
+                $"None of the gamedata keys {string.Join(", ", HandleCommandJoinTeamKeys)} is present in gamedata/matchzy.json.", last);
+        }
 
         // Respawn a player once a spectator->team join (client-issued "jointeam", see
         // SideSwitchCommand) has actually applied. The join lands some frames/net round
@@ -3068,11 +3144,13 @@ namespace MatchZy
         //   CCSPlayerController::Respawn() exactly.
         // - If nothing lands, tell the player to use the team menu (upstream MatchZy's
         //   fallback for this same engine limitation).
-        private void RespawnWhenTeamApplied(CCSPlayerController player, CsTeam team, int attemptsLeft)
+        // keepGoing: optional predicate replacing the default "still in practice" check (the
+        // match-setup auto-placement respawns during the ready phase, where isPractice is false).
+        private void RespawnWhenTeamApplied(CCSPlayerController player, CsTeam team, int attemptsLeft, Func<bool>? keepGoing = null)
         {
             AddTimer(0.1f, () =>
             {
-                if (!isPractice || player == null || !player.IsValid || player.Connected != PlayerConnectedState.Connected)
+                if (!(keepGoing?.Invoke() ?? isPractice) || player == null || !player.IsValid || player.Connected != PlayerConnectedState.Connected)
                     return;
                 if (player.PawnIsAlive)
                     return;
@@ -3107,7 +3185,7 @@ namespace MatchZy
                 }
                 if (attemptsLeft > 1)
                 {
-                    RespawnWhenTeamApplied(player, team, attemptsLeft - 1);
+                    RespawnWhenTeamApplied(player, team, attemptsLeft - 1, keepGoing);
                 }
                 else
                 {
@@ -3205,8 +3283,7 @@ namespace MatchZy
         }
 
         // Landing marker: a short vertical beam at a detonation point, auto-removed after a
-        // few seconds. Reuses the CBeam draw from the spawn markers. RemoveSpawnBeams also clears
-        // these (shared "beam" designer), which is fine - a mode transition wipes both.
+        // few seconds. Reuses the CBeam draw from the spawn markers; removes itself on its own timer.
         private void DrawLandingMarker(float x, float y, float z)
         {
             CBeam? beam = Utilities.CreateEntityByName<CBeam>("beam");
@@ -3322,6 +3399,12 @@ namespace MatchZy
         {
             if (!isPractice || player == null || !player.UserId.HasValue)
                 return;
+            // Guard here (not only in css_back) so the chat .back path is covered too: no
+            // teleporting spectators or dead pawns.
+            if (player.TeamNum == (byte)CsTeam.Spectator)
+                return;
+            if (!IsPlayerValid(player) || player.PlayerPawn.Value!.LifeState != (byte)LifeState_t.LIFE_ALIVE)
+                return;
             int userId = player.UserId.Value;
             if (!string.IsNullOrWhiteSpace(number))
             {
@@ -3434,7 +3517,8 @@ namespace MatchZy
                 return;
             }
 
-            if (float.TryParse(delay, out float delayInSeconds) && delayInSeconds > 0)
+            // 0 is allowed so a previously set delay can be cleared.
+            if (float.TryParse(delay, out float delayInSeconds) && delayInSeconds >= 0)
             {
                 if (IsValidPositionForLastGrenade(player, 0))
                 {
@@ -3444,18 +3528,38 @@ namespace MatchZy
             }
             else
             {
-                PrintToPlayerChat(player, Localizer.ForPlayer(player, "matchzy.pm.delayvalidnumber", $"{delayInSeconds:0.00}", $"{lastGrenadesData[userId].Count}"));
+                // Invalid number: show usage. The old reply indexed lastGrenadesData[userId] (KeyNotFound
+                // with no throw history) and its text claimed the delay had been set.
+                ReplyToUserCommand(player, Localizer.ForPlayer(player, "matchzy.cc.usage", $"!delay <delay_in_seconds>"));
                 return;
             }
         }
 
         public void DisplayPracticeTimerCenter(int userId)
         {
-            if (!playerData.ContainsKey(userId) || !playerTimers.ContainsKey(userId))
+            if (!playerTimers.TryGetValue(userId, out var practiceTimer))
+                return;
+            // Practice ended while the REPEAT timer was running: stop it here so it doesn't keep
+            // ticking into the match.
+            if (!isPractice)
+            {
+                practiceTimer.KillTimer();
+                playerTimers.Remove(userId);
+                return;
+            }
+            if (!playerData.ContainsKey(userId))
                 return;
             if (!IsPlayerValid(playerData[userId]))
                 return;
             playerTimers[userId].DisplayTimerCenter(playerData[userId]);
+        }
+
+        // Kill and drop every running .timer. Called on any exit from practice mode.
+        public void ClearPracticeTimers()
+        {
+            foreach (var practiceTimer in playerTimers.Values)
+                practiceTimer.KillTimer();
+            playerTimers.Clear();
         }
 
         [ConsoleCommand("css_throw", "Throws the last thrown grenade")]
@@ -3896,7 +4000,9 @@ namespace MatchZy
         public HookResult OnPlayerDisconnect(EventPlayerDisconnect @event, GameEventInfo info)
         {
             var player = @event.Userid;
-            if (!IsPlayerValid(player))
+            // Controller-level check: a leaving player can already be Disconnecting or have no
+            // pawn, and IsPlayerValid would then skip the per-slot cleanup.
+            if (player == null || !player.IsValid)
                 return HookResult.Continue;
 
             // Clean up the slot so next player gets fresh state
@@ -4174,6 +4280,14 @@ namespace MatchZy
 
         private void ResetAllPlayerPracticeSettings(bool enteringPractice)
         {
+            if (!enteringPractice)
+            {
+                // Every mode transition out of practice runs through here: stop the .timer repeaters
+                // and take down the .showbotpos markers (RemoveSpawnBeams only owns spawn markers).
+                ClearPracticeTimers();
+                ClearBotPosViz();
+            }
+
             var players = Utilities.GetPlayers().Where(p => IsPlayerValid(p) && !p.IsBot);
 
             foreach (var player in players)
@@ -4235,8 +4349,14 @@ namespace MatchZy
 
         public void TeleportPlayerToBestSpawn(CCSPlayerController player, byte teamNum)
         {
-            if (!spawnsData.TryGetValue(teamNum, out List<Position>? teamSpawns))
-                return;
+            // Spawn lists can be empty (not collected yet on this map): collect like css_spawn does,
+            // and no-op if there are still none rather than indexing [-1].
+            if (!spawnsData.TryGetValue(teamNum, out List<Position>? teamSpawns) || teamSpawns.Count == 0)
+            {
+                GetSpawns();
+                if (!spawnsData.TryGetValue(teamNum, out teamSpawns) || teamSpawns.Count == 0)
+                    return;
+            }
             var playerPawn = player?.PlayerPawn?.Value;
             var playerPosition = playerPawn?.CBodyComponent?.SceneNode?.AbsOrigin;
             if (playerPawn == null || playerPosition == null)
@@ -4255,13 +4375,21 @@ namespace MatchZy
                 }
             }
 
+            if (closestIndex < 0)
+                return;
             TeleportUpright(player, teamSpawns[closestIndex].PlayerPosition, teamSpawns[closestIndex].PlayerAngle);
         }
 
         public void TeleportPlayerToWorstSpawn(CCSPlayerController player, byte teamNum)
         {
-            if (!spawnsData.TryGetValue(teamNum, out List<Position>? teamSpawns))
-                return;
+            // Spawn lists can be empty (not collected yet on this map): collect like css_spawn does,
+            // and no-op if there are still none rather than indexing [-1].
+            if (!spawnsData.TryGetValue(teamNum, out List<Position>? teamSpawns) || teamSpawns.Count == 0)
+            {
+                GetSpawns();
+                if (!spawnsData.TryGetValue(teamNum, out teamSpawns) || teamSpawns.Count == 0)
+                    return;
+            }
             var playerPawn = player?.PlayerPawn?.Value;
             var playerPosition = playerPawn?.CBodyComponent?.SceneNode?.AbsOrigin;
             if (playerPawn == null || playerPosition == null)
@@ -4280,6 +4408,8 @@ namespace MatchZy
                 }
             }
 
+            if (farthestIndex < 0)
+                return;
             TeleportUpright(player, teamSpawns[farthestIndex].PlayerPosition, teamSpawns[farthestIndex].PlayerAngle);
         }
     }

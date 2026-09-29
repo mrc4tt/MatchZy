@@ -66,16 +66,18 @@ Prefer an in-game flow? Admins can build the same config with the [`.matchsetup`
 | `num_maps` | integer | **required** | Maps in the series (BO1, BO3, ...). Must not exceed the length of `maplist`. |
 | `maplist` | string[] | **required** | Map pool. See [map formats](#map-formats). |
 | `team1`, `team2` | object | **required** | See [team fields](#team-fields). |
-| `skip_veto` | bool | `true` | Play the first `num_maps` maps in order. Forced on when `maplist` has exactly `num_maps` maps. Set `false` to run a veto. |
+| `skip_veto` | bool | `false` | Play the first `num_maps` maps in order instead of a veto. Forced on when `maplist` has exactly `num_maps` maps. |
+| `side_type` | string | `standard` | `standard` (knife unless `map_sides` says otherwise; side pick in the veto), `always_knife`, `never_knife` (team1 starts CT), `random`. |
+| `veto_first` | string | - | `team1`, `team2` or `random`: who starts a generated veto. |
 | `veto_mode` | string[] | generated | Veto order using `team1_ban`, `team2_ban`, `team1_pick`, `team2_pick`. Generated if omitted. |
-| `map_sides` | string[] | `knife` | Per map: `team1_ct`, `team1_t`, `team2_ct`, `team2_t` or `knife`. |
-| `players_per_team` | integer | `5` | Team size. Also the number of bots on a bot team. |
+| `map_sides` | string[] | `knife` | Per map: `team1_ct`, `team1_t`, `team2_ct`, `team2_t` or `knife`. A fixed side means no knife round on that map. |
+| `players_per_team` | integer | `5` | Players per side at a time. Extra roster players (substitutes) wait on Spectator while their side is full. Also the number of bots on a bot team. |
 | `min_players_to_ready` | integer | server setting | Ready players needed to start. |
 | `min_spectators_to_ready` | integer | `0` | Ready spectators needed. |
 | `spectators` | object | `{}` | `{ "players": { "<steamid64>": "<name>" } }`. |
 | `clinch_series` | bool | `true` | End the series once a team has won the majority of maps. |
 | `wingman` | bool | `false` | Wingman game mode, uses `live_wingman.cfg`. |
-| `cvars` | object | - | Cvars applied when the match loads, e.g. `{ "mp_overtime_enable": "1" }`. Restored at series end when `matchzy_reset_cvars_on_series_end` is on. |
+| `cvars` | object | - | Cvars applied when the match loads and before each map goes live, e.g. `{ "mp_overtime_enable": "1" }`. Only existing convars and `matchzy_` / `get5_` settings are accepted, with plain values (no quotes or `;`). Restored at series end when `matchzy_reset_cvars_on_series_end` is on. |
 
 ## Team fields
 

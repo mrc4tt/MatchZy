@@ -26,18 +26,29 @@ There are three ways to run a match, from quick pug to fully scripted tournament
     matchzy_loadmatch_url "https://example.com/match.json" "Authorization" "Bearer <token>"
     ```
 
-    Teams are locked to their rosters, the veto runs if configured, and events go to your
-    [remote log URL](events.md).
+    Players are put on their team automatically when they connect, anyone not in the match
+    watches from Spectator, substitutes wait while their side has `players_per_team` players,
+    the veto runs if configured, and events go to your [remote log URL](events.md).
 
 ## Series and veto
 
 - `num_maps` sets the series length. `maplist` is the map pool.
-- With `"skip_veto": true` (default) the first `num_maps` maps are played in order.
-- With `"skip_veto": false` teams `.ban` and `.pick` in chat. Set the order with `veto_mode`, or let MatchZy generate one.
+- A pool of exactly `num_maps` maps, or `"skip_veto": true`, plays the maps in order.
+- Otherwise teams `.ban` and `.pick` in chat (Get5 default). Set the order with `veto_mode`, or let MatchZy generate one (`veto_first` picks the starting team). If a captain leaves, a teammate takes over.
 - `map_sides` sets the starting side per map (`team1_ct`, `team2_t`, `knife`, ...).
 - `clinch_series` ends a BO3 at 2-0.
 
 Workshop maps work everywhere a map name does: `workshop/<id>`, `ws/<id>` or `ws:<name>` (hosted collection). :fontawesome-solid-code-fork:
+
+## Tournament timeouts :fontawesome-solid-code-fork:
+
+| Setting | What it does |
+|---|---|
+| `matchzy_forfeit_ready_timeout 600` | A team not ready 10 minutes after the ready phase began loses by forfeit (neither ready: cancelled). |
+| `matchzy_forfeit_leave_timeout 300` | A team with nobody on the server for 5 minutes during a live map loses by forfeit. |
+| `matchzy_veto_step_timeout 60` | A captain who does not ban, pick or choose a side within 60 seconds gets a random choice. |
+
+All three are off (`0`) by default. A forfeit ends the series with the other team as winner (`series_end`), like `get5_endmatch team1|team2`.
 
 ## Locking the server to the match
 

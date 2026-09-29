@@ -584,7 +584,10 @@ namespace MatchZy
             }
         }
 
-        public async Task SetMatchEndDataAsync(long matchId, int mapNumber, string mapWinner, int team1Score, int team2Score, string matchWinner, int matchTeam1Score, int matchTeam2Score)
+        // matchWinner == null: the series is not over yet (a map of a BO3 ended). Only the running series
+        // score is written to matchzy_stats_matches; end_time and winner are set when the series ends,
+        // so a cancel during a later map can still close the match row.
+        public async Task SetMatchEndDataAsync(long matchId, int mapNumber, string mapWinner, int team1Score, int team2Score, string? matchWinner, int matchTeam1Score, int matchTeam2Score)
         {
             if (matchId == -1)
             {
@@ -618,23 +621,42 @@ namespace MatchZy
                 );
 
                 // Update match data
-                await conn.ExecuteAsync(
-                    @"
-                    UPDATE matchzy_stats_matches
-                    SET end_time = @EndTime,
-                        winner = @Winner,
-                        team1_score = @Team1Score,
-                        team2_score = @Team2Score
-                    WHERE matchid = @MatchId",
-                    new
-                    {
-                        EndTime = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"),
-                        Winner = matchWinner,
-                        Team1Score = matchTeam1Score,
-                        Team2Score = matchTeam2Score,
-                        MatchId = matchId,
-                    }
-                );
+                if (matchWinner != null)
+                {
+                    await conn.ExecuteAsync(
+                        @"
+                        UPDATE matchzy_stats_matches
+                        SET end_time = @EndTime,
+                            winner = @Winner,
+                            team1_score = @Team1Score,
+                            team2_score = @Team2Score
+                        WHERE matchid = @MatchId",
+                        new
+                        {
+                            EndTime = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"),
+                            Winner = matchWinner,
+                            Team1Score = matchTeam1Score,
+                            Team2Score = matchTeam2Score,
+                            MatchId = matchId,
+                        }
+                    );
+                }
+                else
+                {
+                    await conn.ExecuteAsync(
+                        @"
+                        UPDATE matchzy_stats_matches
+                        SET team1_score = @Team1Score,
+                            team2_score = @Team2Score
+                        WHERE matchid = @MatchId",
+                        new
+                        {
+                            Team1Score = matchTeam1Score,
+                            Team2Score = matchTeam2Score,
+                            MatchId = matchId,
+                        }
+                    );
+                }
 
                 Log($"[SetMatchEndData] Match {matchId} end data set successfully");
             }

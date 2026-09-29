@@ -12,6 +12,23 @@ A short summary of each release. The [full changelog](changelog.md) has the deta
 - **Fixed:** Remote log URL from config.cfg lost when a match was loaded.
 - **Fixed:** Dot forms `.skipveto`, `.rmap`, `.surrender`, `.configs`, `.kniferound`, `.autopause`, `.listbackups`, and `.version` in chat.
 - **Fixed:** Empty `matchzy_admin_chat_prefix` resetting the wrong prefix.
+- **Fixed:** A loaded match (series map 2, the map picked in the veto) being wiped by its own map change.
+- **Fixed:** Warmup never ending after a veto.
+- **Fixed:** Finished series announced as a tie; wrong winner side/team in `map_result`, `series_end` and `round_end`.
+- **Fixed:** Auto-pause not triggering when a player leaves; tech pause limit and duration not enforced; `matchzy_allow_unpause` ignored.
+- **Fixed:** Coaches showing up in stats, damage reports and events, and taking the opening duel of every round.
+- **Added:** `player_kill` event for every kill: killer, victim, weapon, headshot, wallbang, distance, flash assist, opening kill, trade kill, and the killer's kills this round and map.
+- **Added:** Stats events fill KAST, trades, first kills/deaths per side, flash assists, team kills, knife kills, bomb plants/defuses. New `player_disconnect` event.
+- **Fixed:** Demo recordings: no overwrite on restart (`_part2`), all parts uploaded, failed demos not reported.
+- **Fixed:** `.rr` / admin menu "Restart Round" in a match, `.forceend` vs `!forceend`, `.matchsetup` lock, `.stop` in round 1 of scrim/hill.
+- **Fixed:** Knife round played although `map_sides` fixed the side.
+- **Added:** Players are placed on their team on connect; non-roster players watch; `players_per_team` limits the players per side.
+- **Changed:** `get5_endmatch` follows Get5 (cancel, or `team1`/`team2` wins). `skip_veto` defaults to false; `side_type` and `veto_first` are read.
+- **Fixed:** Coaching another team, veto hanging when a captain leaves, remote backup upload, `!gg` threshold, event order and `get5_status` fields.
+- **Added:** Tournament timeouts: `matchzy_forfeit_ready_timeout`, `matchzy_forfeit_leave_timeout`, `matchzy_veto_step_timeout` (all off by default). `knife_won` event, `1k` stat.
+- **Fixed:** MatchZy settings from a match config's `cvars` are restored after the series.
+- **Security:** Match config `cvars` and map names can no longer run console commands; admins.json flags are honored; secrets are kept out of the log.
+- **Fixed:** Several practice issues (`.ff`, `.timer`, `.back`, spawn markers, corrupt JSON files, `.delay`, bot kicks).
 
 ## 0.8.87 <small>September 28, 2026</small>
 

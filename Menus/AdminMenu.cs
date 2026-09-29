@@ -100,7 +100,9 @@ namespace MatchZy
             var menu = new WasdMenu($"{chatPrefix} Match Control", this) { PrevMenu = parent };
             menu.AddItem("Force Start", (p, _) => OnStartCommand(p, null));
             menu.AddItem("Knife Round", (p, _) => OnKnifeCommand(p, null));
-            menu.AddItem("Restart Round", (p, _) => OnRestartRoundCommand(p, null));
+            // Restore the current round from its backup. OnRestartRoundCommand is the practice-only
+            // .rs and did nothing in a match.
+            menu.AddItem("Restart Round", (p, _) => OnRestoreCurrentRoundCommand(p, null));
             menu.AddItem("Restart Match", (p, _) => OnRestartMatchCommand(p, null));
             menu.AddItem("Force End Match", (p, _) => OnEndMatchCommand(p, null));
             menu.AddItem("Stop Match", (p, _) => OnStopMatchCommand(p, null));

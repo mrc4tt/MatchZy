@@ -14,6 +14,8 @@ namespace MatchZy
         private class MatchSetupState
         {
             public ulong AdminSteamId;
+            // Last time the owner used the wizard; an idle wizard stops blocking other admins.
+            public DateTime StartedAt = DateTime.UtcNow;
             public int NumMaps = 1;
             public bool SkipVeto = true;
             public bool KnifeRound = true;
@@ -50,6 +52,15 @@ namespace MatchZy
                 ReplyToUserCommand(player, "matchzymaps.cfg has no maps - add some before running .matchsetup.");
                 return;
             }
+            // The lock used to be released only by Cancel / Start / Back, so an admin who closed the
+            // menu (ESC, timeout) or left the server blocked the wizard for everyone until a plugin
+            // reload. Treat it as abandoned when its owner is gone or it has been idle for a while.
+            if (activeSetup != null && activeSetup.AdminSteamId != player.SteamID)
+            {
+                bool ownerOnline = Utilities.GetPlayers().Any(p => p.IsValid && !p.IsBot && p.SteamID == activeSetup.AdminSteamId);
+                if (!ownerOnline || DateTime.UtcNow - activeSetup.StartedAt > TimeSpan.FromMinutes(3))
+                    activeSetup = null;
+            }
             if (activeSetup != null && activeSetup.AdminSteamId != player.SteamID)
             {
                 ReplyToUserCommand(player, "Another admin is already in the setup wizard. Wait for them to finish or cancel.");
@@ -73,6 +84,9 @@ namespace MatchZy
                 "Best of 1 (BO1)",
                 (p, _) =>
                 {
+                    // The wizard can be reclaimed by another admin; a stale menu must not touch it.
+                    if (!ValidateSetupOwner(p))
+                        return;
                     activeSetup!.NumMaps = 1;
                     activeSetup.SelectedMaps.Clear();
                     OpenMapModeMenu(p);
@@ -82,6 +96,9 @@ namespace MatchZy
                 "Best of 2 (BO2)",
                 (p, _) =>
                 {
+                    // The wizard can be reclaimed by another admin; a stale menu must not touch it.
+                    if (!ValidateSetupOwner(p))
+                        return;
                     activeSetup!.NumMaps = 2;
                     activeSetup.SelectedMaps.Clear();
                     OpenMapModeMenu(p);
@@ -91,6 +108,9 @@ namespace MatchZy
                 "Best of 3 (BO3)",
                 (p, _) =>
                 {
+                    // The wizard can be reclaimed by another admin; a stale menu must not touch it.
+                    if (!ValidateSetupOwner(p))
+                        return;
                     activeSetup!.NumMaps = 3;
                     activeSetup.SelectedMaps.Clear();
                     OpenMapModeMenu(p);
@@ -100,6 +120,9 @@ namespace MatchZy
                 "Best of 5 (BO5)",
                 (p, _) =>
                 {
+                    // The wizard can be reclaimed by another admin; a stale menu must not touch it.
+                    if (!ValidateSetupOwner(p))
+                        return;
                     activeSetup!.NumMaps = 5;
                     activeSetup.SelectedMaps.Clear();
                     OpenMapModeMenu(p);
@@ -111,6 +134,9 @@ namespace MatchZy
                 "« Back to Admin Menu",
                 (p, _) =>
                 {
+                    // The wizard can be reclaimed by another admin; a stale menu must not touch it.
+                    if (!ValidateSetupOwner(p))
+                        return;
                     activeSetup = null;
                     OpenMatchAdminMenu(p);
                 }
@@ -131,6 +157,9 @@ namespace MatchZy
                 $"Pre-pick {s.NumMaps} map(s) - no veto",
                 (p, _) =>
                 {
+                    // The wizard can be reclaimed by another admin; a stale menu must not touch it.
+                    if (!ValidateSetupOwner(p))
+                        return;
                     s.SkipVeto = true;
                     s.SelectedMaps.Clear();
                     OpenMapPickMenu(p);
@@ -142,6 +171,9 @@ namespace MatchZy
                     $"Veto from full pool ({poolSize} maps)",
                     (p, _) =>
                     {
+                        // The wizard can be reclaimed by another admin; a stale menu must not touch it.
+                        if (!ValidateSetupOwner(p))
+                            return;
                         s.SkipVeto = false;
                         s.SelectedMaps = new List<string>(mapRotationList);
                         OpenSidesMenu(p);
@@ -167,6 +199,9 @@ namespace MatchZy
                     label,
                     (p, _) =>
                     {
+                        // The wizard can be reclaimed by another admin; a stale menu must not touch it.
+                        if (!ValidateSetupOwner(p))
+                            return;
                         if (s.SelectedMaps.Contains(capturedMap))
                             s.SelectedMaps.Remove(capturedMap);
                         else if (s.SelectedMaps.Count < s.NumMaps)
@@ -193,6 +228,9 @@ namespace MatchZy
                 "Knife round decides sides",
                 (p, _) =>
                 {
+                    // The wizard can be reclaimed by another admin; a stale menu must not touch it.
+                    if (!ValidateSetupOwner(p))
+                        return;
                     activeSetup!.KnifeRound = true;
                     OpenConfirmMenu(p);
                 }
@@ -201,6 +239,9 @@ namespace MatchZy
                 "Skip knife (Team1 starts CT)",
                 (p, _) =>
                 {
+                    // The wizard can be reclaimed by another admin; a stale menu must not touch it.
+                    if (!ValidateSetupOwner(p))
+                        return;
                     activeSetup!.KnifeRound = false;
                     OpenConfirmMenu(p);
                 }
@@ -227,6 +268,9 @@ namespace MatchZy
                 $"Teams: {team1} vs {team2}",
                 (p, o) =>
                 {
+                    // The wizard can be reclaimed by another admin; a stale menu must not touch it.
+                    if (!ValidateSetupOwner(p))
+                        return;
                     ReplyToUserCommand(p, "Type .team1 <name> / .team2 <name> in chat - menu refreshes automatically.");
                     o.PostSelectAction = CS2MenuManager.API.Enum.PostSelectAction.Nothing;
                 }
@@ -295,6 +339,10 @@ namespace MatchZy
 
         private void CancelSetup(CCSPlayerController player)
         {
+            // Only the owner may cancel: a stale menu of an admin whose lock was reclaimed must not
+            // wipe the new owner's setup.
+            if (!ValidateSetupOwner(player))
+                return;
             activeSetup = null;
             ReplyToUserCommand(player, "Match setup cancelled.");
         }
@@ -311,6 +359,7 @@ namespace MatchZy
                 ReplyToUserCommand(player, "This setup belongs to another admin.");
                 return false;
             }
+            activeSetup.StartedAt = DateTime.UtcNow;
             return true;
         }
 

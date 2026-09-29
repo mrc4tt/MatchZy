@@ -192,6 +192,7 @@ namespace MatchZy
             if (!ulong.TryParse(arg, out ulong steamId))
             {
                 command.ReplyToCommand($"Invalid Steam64");
+                return;
             }
 
             bool success = RemovePlayerFromTeam(steamId.ToString());
@@ -251,7 +252,8 @@ namespace MatchZy
             }
             else if (team is JArray jArrayTeam)
             {
-                jArrayTeam.Add(name);
+                // An array roster holds SteamID64s only (no names), so store the id.
+                jArrayTeam.Add(steamId);
                 LoadClientNames();
                 return true;
             }
@@ -262,22 +264,26 @@ namespace MatchZy
         {
             List<JToken?> teams = [matchzyTeam1.teamPlayers, matchzyTeam2.teamPlayers, matchConfig.Spectators];
 
+            bool removed = false;
             foreach (var team in teams)
             {
-                if (team is null)
-                    continue;
                 if (team is JObject jObjectTeam)
                 {
-                    jObjectTeam.Remove(steamId);
-                    return true;
+                    removed |= jObjectTeam.Remove(steamId);
                 }
                 else if (team is JArray jArrayTeam)
                 {
-                    jArrayTeam.Remove(steamId);
-                    return true;
+                    // JArray.Remove compares token references, so match the SteamID by value.
+                    foreach (var entry in jArrayTeam.Where(e => (e.Type == JTokenType.String || e.Type == JTokenType.Integer) && e.ToString() == steamId).ToList())
+                    {
+                        entry.Remove();
+                        removed = true;
+                    }
                 }
             }
-            return false;
+            if (removed)
+                LoadClientNames();
+            return removed;
         }
     }
 }

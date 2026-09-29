@@ -34,7 +34,9 @@ namespace MatchZy
         public List<string> MapBanOrder { get; set; } = new List<string>();
 
         [JsonPropertyName("skip_veto")]
-        public bool SkipVeto { get; set; } = true;
+        // Get5 default: a map pool larger than num_maps is vetoed unless skip_veto is set.
+        // (A pool of exactly num_maps maps always skips the veto.)
+        public bool SkipVeto { get; set; } = false;
 
         [JsonPropertyName("match_id")]
         public long MatchId { get; set; }

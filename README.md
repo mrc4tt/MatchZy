@@ -83,7 +83,7 @@ MatchZy resolves a few game functions by key from CounterStrikeSharp's gamedata 
 
 - `CCSGameRules_PostCleanUp` - `.breakrestore` (respawn breakable props in practice).
 - `CSmokeGrenadeProjectile_Create`, `CHEGrenadeProjectile_Create`, `CMolotovProjectile_Create`, `CDecoyProjectile_Create` - practice grenade rethrow (`.rt` / `.last` / `.back`).
-- `CCSPlayerController_HandleCommandJoinTeam` - spectator-to-team switch in practice (`.t` / `.ct` from spec).
+- `CBasePlayerController_HandleCommand_JoinTeam` - spectator-to-team switch in practice (`.t` / `.ct` from spec). The older key name `CCSPlayerController_HandleCommandJoinTeam` is also accepted.
 - `CCSPlayer_WeaponServices_SelectItem` (vtable offset) - putting a restored grenade or weapon in hand (`.last` / `.back` / `.ln`).
 
 Signatures shift when Valve updates CS2. If a rethrow or `.breakrestore` stops working after a game update, regenerate the signatures for the new `libserver.so` (Linux) / `server.dll` (Windows) and update `gamedata/matchzy.json`. Missing or stale keys degrade gracefully (the feature no-ops), they do not crash the plugin.

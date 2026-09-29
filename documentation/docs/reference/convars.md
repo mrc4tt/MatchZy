@@ -20,7 +20,7 @@ Legend: **cfg** = present in the generated `config.cfg`. :fontawesome-solid-code
 | `matchzy_kick_when_no_match_loaded` | `false` | Y | Kick players who are not on the loaded match's roster (everyone if no match is loaded). Admins are exempt. |
 | `matchzy_hostname_format` | `""` | Y | Hostname template, e.g. `MatchZy \| {TEAM1} vs {TEAM2}`. Empty keeps your hostname. |
 | `matchzy_map_console_command_enabled` :fontawesome-solid-code-fork: | `true` | Y | Register `css_map` / `!map`. Set `false` when another plugin owns it. MatchZy also yields automatically when CS2-SimpleAdmin or CS2MapChange is installed. `.map` always works. |
-| `matchzy_asay_console_enabled` :fontawesome-solid-code-fork: | `true` | N | Register `css_asay` / `!asay`. Set `false` when another plugin owns it. |
+| `matchzy_asay_console_enabled` :fontawesome-solid-code-fork: | `true` | Y | Register `css_asay` / `!asay`. Set `false` when another plugin owns it. |
 | `matchzy_dot_trigger_dedupe` :fontawesome-solid-code-fork: | `true` | Y | When `.` is a CounterStrikeSharp chat trigger in `core.json`, let CounterStrikeSharp handle dot commands so they do not run twice. |
 
 ## Ready and warmup
@@ -47,14 +47,14 @@ Legend: **cfg** = present in the generated `config.cfg`. :fontawesome-solid-code
 
 | Setting | Default | cfg | Description |
 |---|---|---|---|
-| `matchzy_allow_pause` :fontawesome-solid-code-fork: | `true` | N | Enable `.pause`. |
-| `matchzy_allow_unpause` :fontawesome-solid-code-fork: | `true` | N | Enable `.unpause`. |
+| `matchzy_allow_pause` :fontawesome-solid-code-fork: | `true` | Y | Enable `.pause`. |
+| `matchzy_allow_unpause` :fontawesome-solid-code-fork: | `true` | Y | Enable `.unpause`. Admin force unpause is not affected. |
 | `matchzy_use_pause_command_for_tactical_pause` | `false` | Y | `.pause` starts a tactical timeout instead of a normal pause. |
 | `matchzy_enable_tech_pause` | `true` | Y | Enable `.tech`. |
-| `matchzy_tech_pause_duration` | `300` | Y | Tech pause length in seconds. `-1` = unlimited. |
-| `matchzy_max_tech_pauses_allowed` | `2` | Y | Tech pauses per team. |
+| `matchzy_tech_pause_duration` | `300` | Y | Tech pause length in seconds; the match unpauses on its own when it runs out. `-1` = unlimited. |
+| `matchzy_max_tech_pauses_allowed` | `2` | Y | Tech pauses per team per map. |
 | `matchzy_autopause_enabled` :fontawesome-solid-code-fork: | `true` | Y | Pause automatically when a team drops below the minimum player count. |
-| `matchzy_autopause_minplayers` :fontawesome-solid-code-fork: | `5` | Y | Players per team below which autopause triggers. |
+| `matchzy_autopause_minplayers` :fontawesome-solid-code-fork: | `5` | Y | Players per team below which autopause triggers. Autopause is active once the map has had at least twice this many players. |
 | `matchzy_autopause_resume_delay` :fontawesome-solid-code-fork: | `3` | Y | Seconds before resuming once teams are full again. |
 
 ## Match and series
@@ -65,6 +65,14 @@ Legend: **cfg** = present in the generated `config.cfg`. :fontawesome-solid-code
 | `matchzy_reset_cvars_on_series_end` | `true` | Y | Restore cvars changed by a match config's `cvars` block when the series ends. |
 | `matchzy_match_start_message` | `""` | Y | Chat message at match start. `$$$` = new line. Supports `{TIME}`, `{MATCH_ID}`, `{MAP}`, `{MAPNUMBER}`, `{TEAM1}`, `{TEAM2}` and color tags. |
 | `matchzy_match_end_auto_changelevel` :fontawesome-solid-code-fork: | `true` | Y | Change map automatically after a match ends. Disable for panel-driven servers (G5API). |
+
+## Tournament timeouts :fontawesome-solid-code-fork:
+
+| Setting | Default | cfg | Description |
+|---|---|---|---|
+| `matchzy_forfeit_ready_timeout` | `0` | Y | Loaded matches: seconds after a map's ready phase begins before a team that is not ready forfeits the series. Neither team ready: the match is cancelled. `0` = off. |
+| `matchzy_forfeit_leave_timeout` | `0` | Y | Loaded matches: seconds a team may have nobody on its side during a live map before it forfeits the series. `0` = off. |
+| `matchzy_veto_step_timeout` | `0` | Y | Seconds a veto captain has per ban, pick or side choice; then it is made at random (side: CT). `0` = off. |
 
 ## Demos (GOTV)
 
@@ -92,7 +100,7 @@ Legend: **cfg** = present in the generated `config.cfg`. :fontawesome-solid-code
 | Setting | Default | cfg | Description |
 |---|---|---|---|
 | `matchzy_stop_command_available` | `true` | Y | Enable `.stop` (both teams vote to replay the current round). |
-| `matchzy_stop_command_no_damage` | `false` | N | `.stop` is refused once an opponent has been damaged that round. |
+| `matchzy_stop_command_no_damage` | `false` | Y | `.stop` is refused once an opponent has been damaged that round. |
 | `matchzy_pause_after_restore` | `true` | Y | Pause the match after a round restore. |
 | `matchzy_restore_auto_unpause` :fontawesome-solid-code-fork: | `false` | Y | Unpause on its own after a restore instead of waiting for both teams. |
 | `matchzy_restore_unpause_delay` :fontawesome-solid-code-fork: | `5` | Y | Countdown in seconds for the automatic unpause. |

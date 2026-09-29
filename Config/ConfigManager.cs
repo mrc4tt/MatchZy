@@ -100,8 +100,8 @@ matchzy_whitelist_enabled_default false
 // This is the default value, but knife can be toggled by admin using .knife command
 matchzy_knife_enabled_default true
 
-// Minimum ready players required to start the match. If set to 0, all connected players have to ready-up to start the match. Default: 10
-matchzy_minimum_ready_required 10
+// Minimum ready players required to start the match. If set to 0, all connected players have to ready-up to start the match. Default: 2
+matchzy_minimum_ready_required 2
 
 // Path of folder in which demos will be saved. If defined, it must not start with a slash and must end with a slash. Set to empty string to use the csgo root.
 matchzy_demo_path demos/
@@ -127,9 +127,18 @@ matchzy_demo_upload_s3 false
 // But in some cases, this may not be reliable hence default value is false
 matchzy_stop_command_available true
 
+// Whether !stop/.stop becomes unavailable once a player has damaged an opponent in the current round. Default value: false
+matchzy_stop_command_no_damage false
+
 // Whether to use !pause/.pause command for tactical pause or normal pause (unpauses only when both teams use unpause command, for admin force-unpauses the game)
 // Default value: false
 matchzy_use_pause_command_for_tactical_pause false
+
+// Whether players can use .pause. Admin force pause is not affected. Default value: true
+matchzy_allow_pause true
+
+// Whether players can use .unpause. Admin force unpause is not affected. Default value: true
+matchzy_allow_unpause true
 
 // Whether to keep .tech command enabled or not
 // Default value: true
@@ -154,6 +163,18 @@ matchzy_autopause_minplayers 5
 // Delay in seconds before auto-resuming when teams are balanced
 // Default value: 3
 matchzy_autopause_resume_delay 3
+
+// Loaded matches only. Seconds after the ready phase of a map begins before a team that is not
+// ready forfeits the series (if neither team is ready, the match is cancelled). 0 = off. Default value: 0
+matchzy_forfeit_ready_timeout 0
+
+// Loaded matches only. Seconds a team may have no players on its side during a live map before it
+// forfeits the series. 0 = off. Default value: 0
+matchzy_forfeit_leave_timeout 0
+
+// Seconds a veto captain has for each ban, pick or side choice. When it runs out, the step is made
+// at random (a random map, or CT for a side choice). 0 = no limit. Default value: 0
+matchzy_veto_step_timeout 0
 
 // Set a fixed scoreboard teamname for the CT starting side in scrim mode.
 // """" does NOT keep the game's own names: it falls back to automatic team_<playername> naming.
@@ -198,7 +219,7 @@ matchzy_chat_prefix {Green}[MatchZy]{Default}
 matchzy_admin_chat_prefix [{Red}ADMIN{Default}]
 
 // Number of seconds of delay before sending reminder messages from MatchZy (like unready message, paused message, etc).
-// Default: 13 (Because each message is kept in chat for ~13 seconds)
+// Default: 21
 // Note: Changing this timer wont affect the active timer, so if you change this setting in warmup, you will have to restart warmup to make the change effective
 matchzy_chat_messages_timer_delay 21
 
@@ -235,6 +256,9 @@ matchzy_max_saved_last_grenades 512
 // Whether player-specific smoke color is enabled or not. Default: false
 matchzy_smoke_color_enabled false
 
+// Whether players can become a coach with .coach. Coaches can only coach the team they are on. Default: true
+matchzy_coach_enabled true
+
 // Coach viewing-spot source: 1 = use a spawns/coach/<map>.json spot if present (hand-tuned via
 // .savecoachspawn) else compute it, 2 = always compute behind the team (ignore JSON). Default: 1
 matchzy_coaching_mode 1
@@ -244,9 +268,6 @@ matchzy_everyone_is_admin false
 
 // The server hostname to use. Set to """" to disable/use existing.
 // Example matchzy_hostname_format ""MatchZy | {TEAM1} vs {TEAM2}""
-// Whether players can become a coach with .coach. Coaches can only coach the team they are on. Default: true
-matchzy_coach_enabled true
-
 matchzy_hostname_format """"
 
 // Whether to show damage report after each round or not. Default: true.
@@ -282,6 +303,11 @@ matchzy_match_end_auto_changelevel 1
 // can block players from connecting. Set to false to never register it.
 // The .map chat command stays available regardless of this setting.
 matchzy_map_console_command_enabled true
+
+// Whether MatchZy handles the css_asay console command (!asay). Default value: true
+// Set to false if another plugin such as CS2-SimpleAdmin owns css_asay, to avoid duplicate chat output.
+// The .asay chat command stays available regardless of this setting.
+matchzy_asay_console_enabled true
 
 // Only matters if you added a dot as a chat trigger in CounterStrikeSharp's configs/core.json,
 // for example: ""PublicChatTrigger"": [ ""!"", ""."" ]

@@ -124,8 +124,76 @@ namespace MatchZy
             }
         }
 
+        // matchzy_veto_step_timeout: the current ban/pick/side step is decided automatically when
+        // the captain does not act in time. The token ties the timer to the step that armed it.
+        private CounterStrikeSharp.API.Modules.Timers.Timer? vetoStepTimer = null;
+        private int vetoStepToken = 0;
+
+        private void CancelVetoStepTimer()
+        {
+            vetoStepTimer?.Kill();
+            vetoStepTimer = null;
+            vetoStepToken++;
+        }
+
+        private void ArmVetoStepTimer()
+        {
+            CancelVetoStepTimer();
+            int timeout = vetoStepTimeout.Value;
+            if (timeout <= 0)
+                return;
+            int token = vetoStepToken;
+            PrintToAllChat($"The captain has {ChatColors.Green}{timeout}{ChatColors.Default} seconds. After that a random map is chosen (or CT for a side choice).");
+            vetoStepTimer = AddTimer(timeout, () =>
+            {
+                vetoStepTimer = null;
+                if (token != vetoStepToken || !isVeto)
+                    return;
+                AutoVetoStep();
+            }, TimerFlags.STOP_ON_MAPCHANGE);
+        }
+
+        // Does the pending veto step for the captain who ran out of time, through the same code
+        // paths as the chat commands (so the usual chat lines and veto events are sent).
+        private void AutoVetoStep()
+        {
+            try
+            {
+                if (SidePickPending())
+                {
+                    Team team = matchzyTeam1;
+                    if (lastVetoTeam == CsTeam.Terrorist)
+                        team = reverseTeamSides["CT"];
+                    else if (lastVetoTeam == CsTeam.CounterTerrorist)
+                        team = reverseTeamSides["TERRORIST"];
+                    string pickingTeam = team == matchzyTeam1 ? "team1" : "team2";
+                    PrintToAllChat($"{ChatColors.Green}{team.teamName}{ChatColors.Default} did not pick a side in time.");
+                    PickSide(CsTeam.CounterTerrorist, pickingTeam);
+                    HandleVetoStep();
+                    return;
+                }
+
+                string option = GetCurrentMapSelectionOption();
+                if (option == "invalid" || matchConfig.MapsLeftInVetoPool.Count == 0)
+                    return;
+                string teamKey = option.StartsWith("team1") ? "team1" : "team2";
+                Team stepTeam = teamKey == "team1" ? matchzyTeam1 : matchzyTeam2;
+                int teamSide = teamSides[stepTeam] == "CT" ? (int)CsTeam.CounterTerrorist : (int)CsTeam.Terrorist;
+                string map = matchConfig.MapsLeftInVetoPool[new Random().Next(matchConfig.MapsLeftInVetoPool.Count)];
+                PrintToAllChat($"{ChatColors.Green}{stepTeam.teamName}{ChatColors.Default} did not choose in time.");
+                bool done = option.EndsWith("_ban") ? BanMap(map, teamSide) : PickMap(map, teamSide);
+                if (done)
+                    HandleVetoStep();
+            }
+            catch (Exception e)
+            {
+                Log($"[AutoVetoStep] {e.Message}");
+            }
+        }
+
         public void PromptForMapSelectionInChat(string option)
         {
+            ArmVetoStepTimer();
             string action = "";
             int client = -1;
             string stepMessage = "";
@@ -280,7 +348,8 @@ namespace MatchZy
             {
                 MatchId = liveMatchId,
                 MapName = mapRemovedName,
-                MapNumber = matchConfig.Maplist.Count,
+                // 0-based like every other event (map_result, going_live, ...); the map was just added.
+                MapNumber = matchConfig.Maplist.Count - 1,
                 Team = (matchzyTeam == matchzyTeam1) ? "team1" : "team2",
             };
 
@@ -326,8 +395,39 @@ namespace MatchZy
             return true;
         }
 
+        private void HandleVetoCaptainLeft(int userId)
+        {
+            foreach (string teamKey in new[] { "team1", "team2" })
+            {
+                if (!vetoCaptains.TryGetValue(teamKey, out int captain) || captain != userId)
+                    continue;
+
+                int newCaptain = GetTeamCaptain(teamKey);
+                if (newCaptain == -1)
+                {
+                    Log($"[Veto] Captain of {teamKey} left and no teammate is available - aborting the veto.");
+                    AbortVeto();
+                    return;
+                }
+
+                vetoCaptains[teamKey] = newCaptain;
+                Team team = teamKey == "team1" ? matchzyTeam1 : matchzyTeam2;
+                if (playerData.TryGetValue(newCaptain, out var newCaptainPlayer) && newCaptainPlayer.IsValid)
+                    PrintToAllChat($"{ChatColors.Green}{newCaptainPlayer.PlayerName}{ChatColors.Default} is now the veto captain of {ChatColors.Green}{team.teamName}{ChatColors.Default}.");
+                Log($"[Veto] Captain of {teamKey} left; new captain userid {newCaptain}.");
+                // Re-prompt whatever the veto is waiting for (ban, pick or side) for the new captain.
+                // Not during the "veto commencing" countdown: it prompts the first step itself.
+                Server.NextFrame(() =>
+                {
+                    if (isVeto && vetoStateTimer == null)
+                        HandleVetoStep();
+                });
+            }
+        }
+
         public void AbortVeto()
         {
+            CancelVetoStepTimer();
             // Todo: Add AbortVeto() when captain is disconnecting in-between veto
             PrintLocalizedToAll("matchzy.veto.captainleft");
             PrintLocalizedToAll("matchzy.veto.captainleft.ready");
@@ -351,6 +451,7 @@ namespace MatchZy
 
         public void FinishVeto()
         {
+            CancelVetoStepTimer();
             PrintLocalizedToAll("matchzy.veto.mapsdecided");
             matchConfig.MapsLeftInVetoPool.Clear();
 
@@ -392,6 +493,13 @@ namespace MatchZy
                 Console.WriteLine("Changing map to: " + nextMap);
                 ChangeMap(nextMap, 10);
                 Console.WriteLine("Map change initiated.");
+            }
+            else
+            {
+                // Same map: the sides the veto decided (SetMapSides above) may differ from where
+                // players were placed before the veto, so move them now. With a map change,
+                // OnMapStart places them on the new map.
+                PlaceMatchPlayers();
             }
 
             isWarmup = true;
@@ -513,6 +621,7 @@ namespace MatchZy
 
         public void PromptForSideSelectionInChat(CsTeam team)
         {
+            ArmVetoStepTimer();
             string mapName = matchConfig.Maplist[^1];
             Team matchzyTeam = (team == CsTeam.CounterTerrorist) ? reverseTeamSides["CT"] : reverseTeamSides["TERRORIST"];
             string teamString = (matchzyTeam == matchzyTeam1) ? "team1" : "team2";
@@ -613,7 +722,7 @@ namespace MatchZy
             {
                 MatchId = liveMatchId,
                 MapName = mapName,
-                MapNumber = matchConfig.Maplist.Count,
+                MapNumber = mapNumber, // 0-based, like the other events
                 Team = (matchzyTeam == matchzyTeam1) ? "team1" : "team2",
                 Side = sideFormatted.ToLower(),
             };
@@ -623,10 +732,17 @@ namespace MatchZy
             });
         }
 
+        // Set from the match config's veto_first (null = decide as before).
+        private Team? vetoFirstTeam = null;
+
         public void GenerateDefaultVetoSetup()
         {
-            Team startingVetoTeam = matchzyTeam1;
-            if (lastVetoTeam == CsTeam.CounterTerrorist)
+            Team startingVetoTeam = vetoFirstTeam ?? matchzyTeam1;
+            if (vetoFirstTeam != null)
+            {
+                // veto_first from the match config wins.
+            }
+            else if (lastVetoTeam == CsTeam.CounterTerrorist)
             {
                 if (reverseTeamSides["CT"] == matchzyTeam1)
                     startingVetoTeam = matchzyTeam2;
