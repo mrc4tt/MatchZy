@@ -1449,6 +1449,7 @@ namespace MatchZy
                 readyPhaseStartedAt = null;
 
                 isSleep = false;
+                overtimePausesUsed.Clear();
                 ClearPracticeTimers();
                 ResetGGVotes();
                 // The previous match's last veto action must not decide who starts the next veto.
@@ -2673,6 +2674,10 @@ namespace MatchZy
                     lastMatchZyBackupFileName = $"matchzy_{liveMatchId}_{matchConfig.CurrentMapNumber}_round{round}.json";
                     Log($"[HandlePostRoundEndEvent] Setting lastBackupFileName to {lastBackupFileName} and lastMatchZyBackupFileName to {lastMatchZyBackupFileName}");
 
+                    // A new overtime period starts next: every team gets its overtime pause budget.
+                    if (!isRoundRestoring && IsOvertimeStartingNext(t1score, t2score))
+                        StartOvertimePeriod();
+
                     // One of the team did not use .stop command hence display the proper message after the round has ended.
                     if (stopData["ct"] && !stopData["t"])
                     {
@@ -2702,6 +2707,48 @@ namespace MatchZy
             {
                 Log($"[HandlePostRoundEndEvent FATAL] An error occurred: {e.Message}");
             }
+        }
+
+        // .pause uses per team in the current overtime period (matchzy_overtime_pauses_per_team).
+        private readonly Dictionary<Team, int> overtimePausesUsed = new();
+        // A new overtime period starts: reset the .pause budget and tell the players. Tactical
+        // timeouts in overtime are the engine's (mp_team_timeout_ot_add_once / _ot_add_each /
+        // _ot_max in live.cfg).
+        private void StartOvertimePeriod()
+        {
+            overtimePausesUsed.Clear();
+            int pauses = overtimePausesPerTeam.Value;
+            PrintToAllChat($"{ChatColors.Green}Overtime is next.{ChatColors.Default}" +
+                (pauses > 0 ? $" Each team may use {ChatColors.Green}.pause{ChatColors.Default} {pauses} time(s) in this overtime." : ""));
+        }
+
+        private bool IsInOvertime()
+        {
+            if (!isMatchLive || ConVar.Find("mp_overtime_enable")?.GetPrimitiveValue<bool>() != true)
+                return false;
+            int maxRounds = ConVar.Find("mp_maxrounds")?.GetPrimitiveValue<int>() ?? 0;
+            (int t1, int t2) = GetTeamsScore();
+            return maxRounds > 0 && t1 + t2 >= maxRounds;
+        }
+
+        /// <summary>
+        /// True right after the round that ends regulation, or an overtime period, level: the next
+        /// round starts (another) overtime.
+        /// </summary>
+        private bool IsOvertimeStartingNext(int t1score, int t2score)
+        {
+            if (t1score != t2score)
+                return false;
+            if (ConVar.Find("mp_overtime_enable")?.GetPrimitiveValue<bool>() != true)
+                return false;
+            int maxRounds = ConVar.Find("mp_maxrounds")?.GetPrimitiveValue<int>() ?? 0;
+            int otMaxRounds = ConVar.Find("mp_overtime_maxrounds")?.GetPrimitiveValue<int>() ?? 0;
+            int played = t1score + t2score;
+            if (maxRounds <= 0 || played < maxRounds)
+                return false;
+            if (played == maxRounds)
+                return true;
+            return otMaxRounds > 0 && (played - maxRounds) % otMaxRounds == 0;
         }
 
         public bool IsTeamSwapRequired()
@@ -2764,11 +2811,9 @@ namespace MatchZy
                 return;
             }
 
-            if (!techPauseEnabled.Value && player != null)
-            {
-                PrintToPlayerChat(player, Localizer["matchzy.pause.techpausenotenabled"]);
-                return;
-            }
+            // (A regular pause is governed by matchzy_allow_pause, checked in OnPauseCommand. This
+            // used to also require matchzy_enable_tech_pause, so disabling tech pauses disabled
+            // .pause as well.)
 
             // Allow pausing during match or knife round
             if ((isMatchLive || isKnifeRound) && !isPaused)
@@ -2789,6 +2834,18 @@ namespace MatchZy
                 {
                     return;
                 }
+
+                // matchzy_overtime_pauses_per_team: limited .pause uses per team in each overtime period.
+                Team pausingTeam = player.TeamNum == 2 ? reverseTeamSides["TERRORIST"] : reverseTeamSides["CT"];
+                int otPauseLimit = overtimePausesPerTeam.Value;
+                bool inOvertime = otPauseLimit > 0 && IsInOvertime();
+                if (inOvertime && overtimePausesUsed.GetValueOrDefault(pausingTeam) >= otPauseLimit)
+                {
+                    ReplyToUserCommand(player, $"Your team has used its {otPauseLimit} pause(s) for this overtime.");
+                    return;
+                }
+                if (inOvertime)
+                    overtimePausesUsed[pausingTeam] = overtimePausesUsed.GetValueOrDefault(pausingTeam) + 1;
 
                 PrintToAllChat(Localizer["matchzy.pause.pausedthematch", pauseTeamName]);
                 SetMatchPausedFlags("pause");

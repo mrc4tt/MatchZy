@@ -10,6 +10,16 @@
 | Admin | `.forcepause` | An admin types `.forceunpause`. |
 | Auto :fontawesome-solid-code-fork: | A team drops below `matchzy_autopause_minplayers` | The team is full again; the game resumes after `matchzy_autopause_resume_delay` seconds. |
 
+**Overtime** :fontawesome-solid-code-fork:: tactical timeouts (`.tac`) follow the engine settings in live.cfg: 4 per team in regulation (`mp_team_timeout_max`) and one more when overtime starts (`mp_team_timeout_ot_add_once 1`, up to `mp_team_timeout_ot_max 5`). In every overtime period each team may also use `.pause` `matchzy_overtime_pauses_per_team` times (1 by default). Admin pauses are not limited.
+
+!!! tip "Adjust to your needs"
+    These are defaults. Both `config.cfg` and `live.cfg` can be edited to your needs:
+
+    - `matchzy_overtime_pauses_per_team` goes in `config.cfg`.
+    - The `mp_team_timeout_*` lines go in `cfg/MatchZy/live.cfg` (it runs when the match goes live, so the same lines in `config.cfg` would be overridden), or per match in the match config's `cvars` block.
+
+    `live.cfg` is part of the release zip, so extracting an update over the server replaces it. Keep a copy of your edits. `config.cfg` is never replaced.
+
 Autopause replaces the game's own `sv_matchpause_auto_5v5` and ignores bot teams. Every pause and unpause is sent as a `match_paused` / `match_unpaused` [event](../reference/events.md). :fontawesome-solid-code-fork:
 
 ## Round backups

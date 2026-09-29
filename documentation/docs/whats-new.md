@@ -2,6 +2,12 @@
 
 A short summary of each release. The [full changelog](changelog.md) has the details and background for every change.
 
+## 0.8.89 <small>September 29, 2026</small>
+
+- **Fixed:** Teams get a tactical timeout in overtime (live.cfg: `mp_team_timeout_ot_add_once 1`, `mp_team_timeout_ot_max 5`; `mp_team_timeout_max 4`).
+- **Added:** `matchzy_overtime_pauses_per_team` (default 1): `.pause` uses per team per overtime period.
+- **Fixed:** `.pause` refused when tech pauses were disabled.
+
 ## 0.8.88 <small>September 29, 2026</small>
 
 - **Added:** Documentation site.

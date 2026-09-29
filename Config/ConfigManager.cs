@@ -164,6 +164,11 @@ matchzy_autopause_minplayers 5
 // Default value: 3
 matchzy_autopause_resume_delay 3
 
+// How many times each team may use .pause in each overtime period. 0 = no limit.
+// Tactical timeouts (.tac) in overtime come from live.cfg (mp_team_timeout_ot_add_once / _ot_add_each / _ot_max).
+// Default value: 1
+matchzy_overtime_pauses_per_team 1
+
 // Loaded matches only. Seconds after the ready phase of a map begins before a team that is not
 // ready forfeits the series (if neither team is ready, the match is cancelled). 0 = off. Default value: 0
 matchzy_forfeit_ready_timeout 0
@@ -686,14 +691,15 @@ sv_infinite_ammo 0
 sv_talk_enemy_dead 0
 sv_talk_enemy_living 0
 sv_voiceenable 1
-mp_team_timeout_max 3
+mp_team_timeout_max 4
 mp_team_timeout_time 30
 sv_vote_command_delay 0
 cash_team_bonus_shorthanded 0
 mp_spectators_max 10
 mp_team_intro_time 0
-mp_team_timeout_ot_max 1
-mp_team_timeout_ot_add_each 1
+mp_team_timeout_ot_add_once 1
+mp_team_timeout_ot_add_each 0
+mp_team_timeout_ot_max 5
 mp_weapons_allow_typecount 5
 mp_warmup_end
 sv_hide_roundtime_until_seconds 0

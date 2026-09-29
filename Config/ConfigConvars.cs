@@ -36,6 +36,8 @@ namespace MatchZy
 
         public FakeConVar<int> autoPauseMinPlayers = new("matchzy_autopause_minplayers", "Minimum players required per team before auto-pause triggers. Default: 5", 5);
 
+        public FakeConVar<int> overtimePausesPerTeam = new("matchzy_overtime_pauses_per_team", "How many times each team may use .pause in each overtime period. 0 = no limit. Admin pauses are not counted. Default: 1", 1);
+
         public FakeConVar<int> forfeitReadyTimeout = new("matchzy_forfeit_ready_timeout", "Seconds after the ready phase of a loaded match begins before a team that is not ready forfeits the series (neither ready: the match is cancelled). 0 = off. Default: 0", 0);
 
         public FakeConVar<int> forfeitLeaveTimeout = new("matchzy_forfeit_leave_timeout", "Seconds a team may have no players left during a live map of a loaded match before it forfeits the series. 0 = off. Default: 0", 0);

@@ -53,6 +53,7 @@ Legend: **cfg** = present in the generated `config.cfg`. :fontawesome-solid-code
 | `matchzy_enable_tech_pause` | `true` | Y | Enable `.tech`. |
 | `matchzy_tech_pause_duration` | `300` | Y | Tech pause length in seconds; the match unpauses on its own when it runs out. `-1` = unlimited. |
 | `matchzy_max_tech_pauses_allowed` | `2` | Y | Tech pauses per team per map. |
+| `matchzy_overtime_pauses_per_team` :fontawesome-solid-code-fork: | `1` | Y | `.pause` uses per team in each overtime period. `0` = no limit. Tactical timeouts in overtime are set in live.cfg (`mp_team_timeout_ot_add_once`, `mp_team_timeout_ot_add_each`, `mp_team_timeout_ot_max`). |
 | `matchzy_autopause_enabled` :fontawesome-solid-code-fork: | `true` | Y | Pause automatically when a team drops below the minimum player count. |
 | `matchzy_autopause_minplayers` :fontawesome-solid-code-fork: | `5` | Y | Players per team below which autopause triggers. Autopause is active once the map has had at least twice this many players. |
 | `matchzy_autopause_resume_delay` :fontawesome-solid-code-fork: | `3` | Y | Seconds before resuming once teams are full again. |
