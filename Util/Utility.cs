@@ -483,6 +483,11 @@ namespace MatchZy
             // plugin unloads/reloads while it is active, that per-tick upkeep stops but the gamerules
             // are left mid-override, so the round instantly times out ("penalty for running out of
             // time", the score jumps). Restore normal warmup so unload/reload leaves a sane state.
+            // A plain unload (server quit, css_plugins unload) announces itself before the queue
+            // closes; quit already did so from its command listener. Not on a hot reload: the new
+            // instance sends server_ready.
+            if (!hotReload)
+                AnnounceShutdown("plugin_unload");
             CloseEventQueue();
             if (_fakeWarmupActive)
             {

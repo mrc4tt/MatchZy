@@ -8,6 +8,7 @@ Fork version numbering is independent of upstream. Upstream changelog: <https://
 
 #### October 1, 2026
 
+- New remote log events `server_ready` (plugins loaded and `config.cfg` applied), `map_change` (before a map change, with the target map when a map command requested it) and `server_shutdown` (`quit`, `_restart`, fatal error or plugin unload). They are sent with or without a loaded match.
 - Fixed a server crash in practice when switching from `.spec` back to `.t` or `.ct`: the Linux signature for the engine team-join handler matched the wrong function since CS2 build 14182 and is updated in `gamedata/matchzy.json`.
 - Security: a match config's `cvars` block (and a backup that carries it) can now only set real convars and MatchZy/Get5 settings. Action commands such as `matchzy_loadmatch_url`, `matchzy_loadbackup` and `get5_endmatch`, and `matchzy_everyone_is_admin`, are ignored and logged. `matchzy_demo_path` and `matchzy_demo_name_format` must be relative paths without `..`.
 - Security: team names, tags and flags loaded from a round backup are cleaned the same way as match config team names.

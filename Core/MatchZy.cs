@@ -655,6 +655,7 @@ namespace MatchZy
             RegisterEventHandler<EventPlayerPing>(EventPlayerPingHandler);
             //RegisterEventHandler<EventCsIntermission>(OnEventCsIntermissionPost);
             RegisterListener<Listeners.OnMapEnd>(OnMapEndHandler);
+            RegisterServerLifecycleHooks();
             RegisterListener<Listeners.OnClientDisconnectPost>(playerSlot =>
             {
                 // May not be required, but just to be on safe side so that player data is properly updated in dictionaries

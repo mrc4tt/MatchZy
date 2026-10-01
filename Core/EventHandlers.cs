@@ -266,6 +266,10 @@ public partial class MatchZy
 
     private void OnMapEndHandler()
     {
+        // Before anything resets: receivers learn the map is changing (the map command's listener
+        // already sent it when the change was requested by command).
+        try { AnnounceMapEndIfUnannounced(); } catch (Exception e) { Log($"[map_change] {e.Message}"); }
+
         try
         {
             // If this changelevel was triggered by a match load whose map differs from the current

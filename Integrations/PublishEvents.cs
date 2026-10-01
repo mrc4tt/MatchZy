@@ -54,6 +54,8 @@ namespace MatchZy
         private const int EventFailuresBeforeBackoff = 3;
         private static readonly TimeSpan LiveEventBackoff = TimeSpan.FromSeconds(30);
         private static readonly TimeSpan LiveEventTimeout = TimeSpan.FromSeconds(10);
+        // server_shutdown is sent while the process is about to exit; keep the lifecycle events short.
+        private static readonly TimeSpan LifecycleEventTimeout = TimeSpan.FromSeconds(3);
 
         // The scorebot's per-action events (class names ending in LiveEvent) are many per round and
         // only useful in real time; everything else is a match event that must arrive.
@@ -75,7 +77,9 @@ namespace MatchZy
                             _droppedLiveEvents++;
                             continue;
                         }
-                        bool ok = await SendEventCoreAsync(item.Event, item.Target, item.MatchId, live ? LiveEventTimeout : null, token).ConfigureAwait(false);
+                        TimeSpan? timeout = live ? LiveEventTimeout
+                            : item.Event is ServerLifecycleEvent ? LifecycleEventTimeout : null;
+                        bool ok = await SendEventCoreAsync(item.Event, item.Target, item.MatchId, timeout, token).ConfigureAwait(false);
                         if (ok)
                         {
                             if (_droppedLiveEvents > 0)
@@ -144,8 +148,9 @@ namespace MatchZy
 
                 long eventMatchId = @event is MatchZyMatchEvent matchEvent ? matchEvent.MatchId : currentMatchId;
 
-                // Never send events with an invalid matchId
-                if (eventMatchId == -1)
+                // Never send match events with an invalid matchId. Server lifecycle events
+                // (server_ready, map_change, server_shutdown) are not about a match.
+                if (eventMatchId == -1 && @event is not ServerLifecycleEvent)
                     return true;
 
                 string json = JsonSerializer.Serialize(@event, @event.GetType());

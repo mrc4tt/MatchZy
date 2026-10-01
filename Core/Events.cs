@@ -727,3 +727,56 @@ public class BombExplodedLiveEvent : MatchZyMapEvent
     public BombExplodedLiveEvent()
         : base("bomb_exploded") { }
 }
+
+// Server lifecycle events (server_ready, map_change, server_shutdown). Not tied to a match: they
+// are sent with or without a loaded match, and matchid is null when there is none.
+public abstract class ServerLifecycleEvent : MatchZyEvent
+{
+    [JsonPropertyName("matchid")]
+    public long? MatchId { get; init; }
+
+    [JsonPropertyName("map_name")]
+    public required string MapName { get; init; }
+
+    [JsonPropertyName("plugin_version")]
+    public required string PluginVersion { get; init; }
+
+    protected ServerLifecycleEvent(string eventName)
+        : base(eventName) { }
+}
+
+public class ServerReadyEvent : ServerLifecycleEvent
+{
+    // true when only the plugin was reloaded, false on a server boot.
+    [JsonPropertyName("hot_reload")]
+    public bool HotReload { get; init; }
+
+    public ServerReadyEvent()
+        : base("server_ready") { }
+}
+
+public class MapChangeEvent : ServerLifecycleEvent
+{
+    // The requested map (map name or workshop id), or null when the change did not come from a
+    // map command (mapcycle, nextlevel, another plugin calling the engine directly).
+    [JsonPropertyName("next_map")]
+    public string? NextMap { get; init; }
+
+    // The command that requested the change ("changelevel", "map", "ds_workshop_changelevel",
+    // "host_workshop_map"), or "map_end" when only the map end was seen.
+    [JsonPropertyName("trigger")]
+    public required string Trigger { get; init; }
+
+    public MapChangeEvent()
+        : base("map_change") { }
+}
+
+public class ServerShutdownEvent : ServerLifecycleEvent
+{
+    // "quit", "restart", "fatal" or "plugin_unload".
+    [JsonPropertyName("reason")]
+    public required string Reason { get; init; }
+
+    public ServerShutdownEvent()
+        : base("server_shutdown") { }
+}

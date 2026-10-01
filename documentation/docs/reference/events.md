@@ -35,6 +35,18 @@ Player stats objects (`team1.players[].stats` on `round_end` and `map_result`) u
 | `demo_upload_ended` | A demo upload finished | `map_number`, `filename`, `success` |
 | `player_disconnect` | A player leaves while a match is loaded | `player` (user id), `player_steamid`, `player_name`, `player_team`, `reason` |
 
+## Server lifecycle :fontawesome-solid-code-fork:
+
+Sent with or without a loaded match, to `matchzy_remote_log_url` from `config.cfg`. While a loaded match uses its own remote log URL, they go there as well. All three carry `matchid` (`null` without a match), `map_name` (the current map) and `plugin_version`.
+
+| Event | When | Fields |
+|---|---|---|
+| `server_ready` | All plugins are loaded and `config.cfg` is applied (about 2 seconds after load; on a boot, once the first map runs) | `hot_reload` (`true` when only MatchZy was reloaded) |
+| `map_change` | Before the map changes. Sent when a map command runs (`changelevel`, `map`, `ds_workshop_changelevel`, `host_workshop_map`), otherwise when the map ends | `next_map` (map name or workshop id, `null` when not known), `trigger` (the command, or `map_end`) |
+| `server_shutdown` | The server is about to stop: `quit` / `exit`, `_restart`, a fatal error, or MatchZy being unloaded | `reason` (`quit`, `restart`, `fatal`, `plugin_unload`) |
+
+`server_shutdown` is sent while the server waits up to 3 seconds for it. A server that is killed (crash, `SIGKILL`, a panel's force stop) sends nothing; use `server_ready` on the next start to notice it.
+
 ## Live scorebot :fontawesome-solid-code-fork:
 
 | Event | When | Fields |

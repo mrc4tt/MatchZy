@@ -4,6 +4,7 @@ A short summary of each release. The [full changelog](changelog.md) has the deta
 
 ## 0.8.93 <small>October 1, 2026</small>
 
+- **New:** Remote log events `server_ready`, `map_change` and `server_shutdown`, also without a loaded match. See [Events](reference/events.md).
 - **Security:** Match config `cvars` only accept real convars and MatchZy/Get5 settings; action commands and `matchzy_everyone_is_admin` are ignored.
 - **Security:** Team names from round backups are cleaned.
 - **Fixed:** `1` / `0` for `skip_veto`, `clinch_series` and `wingman` in match configs.
