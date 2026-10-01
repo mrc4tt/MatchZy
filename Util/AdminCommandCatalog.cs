@@ -32,6 +32,9 @@ namespace MatchZy
             new("Modes", ".warmup", "Back to warmup", "css_warmup", PermConfig),
             new("Modes", ".sleep", "Sleep mode", "css_sleep", PermMapOrPrac),
             new("Modes", ".warmupbots", "Toggle warmup bots", "css_warmupbots", PermMapOrPrac),
+            new("Modes", ".rs", "Practice: restart the game for everyone", "css_rs", PermMapOrPrac),
+            new("Modes", ".grt / .globalrethrow", "Practice: rethrow every player's last grenade", "css_grt", PermMapOrPrac),
+            new("Modes", ".fas / .watchme", "Practice: move every other player to spectator", "css_fas", PermMapOrPrac),
 
             // Setup
             new("Setup", ".ma / .matchadmin", "Admin menu", "css_matchadmin", PermConfig),

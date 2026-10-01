@@ -5,7 +5,8 @@
 | File | Location | Purpose |
 |---|---|---|
 | `config.cfg` | `<cfg>` | All settings. Generated on first load, new settings appended on updates. |
-| `warmup.cfg`, `knife.cfg`, `live.cfg`, `live_wingman.cfg`, `scrim.cfg`, `hill.cfg`, `prac.cfg`, `dryrun.cfg`, `sleep.cfg` | `<cfg>` | Executed when the matching phase or mode starts. Regenerated from built-in templates if missing. |
+| `warmup.cfg`, `knife.cfg`, `live.cfg`, `live_wingman.cfg`, `scrim.cfg`, `hill.cfg`, `prac.cfg`, `dryrun.cfg`, `sleep.cfg` | `<cfg>` | Executed when the matching phase or mode starts. Written from the built-in defaults when missing, never overwritten. |
+| `defaults/cfg/*.cfg`, `defaults/database.json.example` | plugin folder | Reference copies of the current defaults, replaced on every update and never executed. Compare your own files with them after an update. |
 | `matchzymaps.cfg` | `<cfg>` | Map list for automatic map changes and the `.matchsetup` wizard. One map per line, `#` for comments, `workshop/<id>` for workshop maps. |
 | `database.json` | `<cfg>` | Database backend. See below. |
 | `admins.json` | `<cfg>` | Extra admins by SteamID64. See below. |
@@ -45,4 +46,4 @@
 }
 ```
 
-Keys must be SteamID64s. An empty value means full admin. A value such as `"@css/chat"` or `"@css/map, @css/config"` grants only the commands that accept one of those flags. Players are also admins when they hold `@css/root` or the permission a command checks in CounterStrikeSharp's own admin system, or when `matchzy_everyone_is_admin` is on. `.mhelp` shows each admin exactly which commands they can run.
+Keys must be SteamID64s. Every listed player is a full MatchZy admin. The value is free text (for example the player's name) and is not used. For admins with limited rights, use CounterStrikeSharp's own admin system with flags. Players are also admins when they hold `@css/root` or the permission a command checks in CounterStrikeSharp's own admin system, or when `matchzy_everyone_is_admin` is on. `.mhelp` shows each admin exactly which commands they can run.

@@ -2,13 +2,13 @@
 
 Extract the new release zip over the old install and restart the server (or `css_plugins reload MatchZy`).
 
-The release zip is built so an update never overwrites anything you edited:
+The release zip contains nothing under `cfg/`, so an update never overwrites anything you edited and never creates a second `cfg/MatchZy/` folder next to a `cfg/matchzy/` one:
 
 | File | What happens on update |
 |---|---|
 | `config.cfg` | Not in the zip. New settings from the update are **appended** to your existing file under a `// --- Added by MatchZy update ---` header. Your edits are never changed, and a setting you commented out is not added back. Retired settings are removed automatically so the server does not log "Unknown command". |
-| `database.json` | Not in the zip, so your MySQL login is kept. `database.json.example` is shipped for reference. |
-| `live.cfg`, `scrim.cfg`, `prac.cfg`, ... | Replaced by the new versions. Keep custom mode settings in your own cfg if you do not want them overwritten. |
+| `database.json` | Not in the zip, so your MySQL login is kept. A reference copy is in `plugins/MatchZy/defaults/database.json.example`. |
+| `live.cfg`, `scrim.cfg`, `prac.cfg`, ... | Not in the zip, never touched. They are only written when missing. When a release changes a default in one of them, the changelog says so: compare your file with `plugins/MatchZy/defaults/cfg/` and copy the lines you want, or delete your file to get the new default on the next restart. |
 | `savednades.json`, `botpositions.json`, `whitelist.cfg`, `admins.json` | Not in the zip, never touched. |
 | `gamedata/matchzy.json` | Replaced. Always deploy it together with the plugin. |
 

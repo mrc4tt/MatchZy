@@ -80,7 +80,7 @@ namespace MatchZy
         private void RemoveBotTeamBots()
         {
             if (HasBotTeam())
-                Server.ExecuteCommand("bot_kick; bot_quota 0");
+                KickAllBotsProtectCSTV();
         }
     }
 }

@@ -105,13 +105,13 @@ namespace MatchZy
             string headerValue = command.ArgCount > 3 ? command.ArgByIndex(3) : "";
 
             // The header value is usually an auth token: never write it to the log.
-            Log($"[LoadMatchDataCommand] Match setup request received with URL: {url} headerName: {headerName}{(headerValue != "" ? " (header value set)" : "")}");
+            Log($"[LoadMatchDataCommand] Match setup request received with URL: {RedactUrl(url)} headerName: {headerName}{(headerValue != "" ? " (header value set)" : "")}");
 
             if (!IsValidUrl(url))
             {
                 // command.ReplyToCommand($"[LoadMatchDataCommand] Invalid URL: {url}. Please provide a valid URL to load the match!");
-                ReplyToUserCommand(player, Localizer.ForPlayer(player, "matchzy.mm.invalidurl", url));
-                Log($"[LoadMatchDataCommand] Invalid URL: {url}. Please provide a valid URL to load the match!");
+                ReplyToUserCommand(player, Localizer.ForPlayer(player, "matchzy.mm.invalidurl", RedactUrl(url)));
+                Log($"[LoadMatchDataCommand] Invalid URL: {RedactUrl(url)}. Please provide a valid URL to load the match!");
                 return;
             }
 
@@ -141,6 +141,9 @@ namespace MatchZy
                             // LoadMatchFromJSON uses native APIs - must run on game thread
                             Server.NextFrame(() =>
                             {
+                                // The issuer may have left during the fetch; reply to the console then.
+                                if (player != null && !player.IsValid)
+                                    player = null;
                                 bool success = LoadMatchFromJSON(jsonData);
                                 if (!success)
                                 {
@@ -156,9 +159,12 @@ namespace MatchZy
                         }
                         else
                         {
+                            var statusCode = response.StatusCode;
                             Server.NextFrame(() =>
                             {
-                                ReplyToUserCommand(player, Localizer.ForPlayer(player, "matchzy.mm.httprequestfailed", response.StatusCode));
+                                if (player != null && !player.IsValid)
+                                    player = null;
+                                ReplyToUserCommand(player, Localizer.ForPlayer(player, "matchzy.mm.httprequestfailed", statusCode));
                             });
                             Log($"[LoadMatchFromURL] HTTP request failed with status code: {response.StatusCode}");
                         }
@@ -305,9 +311,12 @@ namespace MatchZy
                     case "skip_veto":
                     case "clinch_series":
                     case "wingman":
-                        if (!bool.TryParse(jsonData[field]!.ToString(), out bool result))
+                        // Same forms the loader accepts (ParseCvarBool): true/false and 1/0. bool.TryParse
+                        // alone refused 1/0, so a config the loader could read was rejected here.
+                        string boolText = jsonData[field]!.ToString().Trim();
+                        if (!bool.TryParse(boolText, out _) && boolText != "1" && boolText != "0")
                         {
-                            return $"{field} should be a boolean!";
+                            return $"{field} should be a boolean (true/false or 1/0)!";
                         }
 
                         break;
@@ -344,6 +353,11 @@ namespace MatchZy
                 Log($"[LoadMatchDataCommand] {validationError}");
                 return false;
             }
+
+            // A new match: the previous series' end state must not block this one.
+            matchLoadGeneration++;
+            seriesEnded = false;
+            currentMapFinished = false;
 
             if (jsonDataObject["matchid"] != null)
             {
@@ -397,23 +411,20 @@ namespace MatchZy
                 return false;
             }
 
-            matchConfig = new()
+            var loadedConfig = new MatchConfig
             {
                 MatchId = liveMatchId,
                 MapsPool = maplist.ToObject<List<string>>()!,
                 MapsLeftInVetoPool = maplist.ToObject<List<string>>()!,
                 NumMaps = jsonDataObject["num_maps"]!.Value<int>(),
                 MinPlayersToReady = minimumReadyRequired,
-                // The remote log settings come from config.cfg / the console, not the match JSON.
-                // Carry them over (as ResetMatch does) or a URL set in config.cfg stops receiving
-                // events as soon as a match is loaded. A "cvars" block in the JSON still overrides
-                // them when it runs.
-                RemoteLogURL = matchConfig.RemoteLogURL,
-                RemoteLogHeaderKey = matchConfig.RemoteLogHeaderKey,
-                RemoteLogHeaderValue = matchConfig.RemoteLogHeaderValue,
-                RemoteLogAuthKey = matchConfig.RemoteLogAuthKey,
-                RemoteLogAuthValue = matchConfig.RemoteLogAuthValue,
             };
+            // The remote log settings come from config.cfg / the console, not the match JSON. Start
+            // from the server's own settings (not the previous match's, which a "cvars" block may
+            // have changed); this match's "cvars" block can still override them when it runs.
+            // Applied before publishing, so a concurrent event send never sees an empty URL.
+            ApplyDefaultRemoteLog(loadedConfig);
+            matchConfig = loadedConfig;
 
             GetOptionalMatchValues(jsonDataObject);
 
@@ -556,6 +567,9 @@ namespace MatchZy
             string matchzyTeam1Name = matchzyTeam1.teamName;
             string matchzyTeam2Name = matchzyTeam2.teamName;
 
+            int loadGeneration = matchLoadGeneration;
+            // Taken now: series_start is sent after the database round trip.
+            var seriesStartTarget = CurrentRemoteLogTarget();
             Task.Run(async () =>
             {
                 long allocatedId = preassignedId;
@@ -583,6 +597,28 @@ namespace MatchZy
 
                 Server.NextFrame(() =>
                 {
+                    if (loadGeneration != matchLoadGeneration)
+                    {
+                        Log($"[LoadMatchFromJSON] Discarding matchid {allocatedId}: the match was reset or replaced while it was being allocated.");
+                        return;
+                    }
+                    // series_start only for a load that is still current (queued here, on the game
+                    // thread, in order with the match's other events).
+                    SendEventAsync(new MatchZySeriesStartedEvent
+                    {
+                        // The id the match actually runs under: a ready-up can have allocated one
+                        // before this arrived (that one wins, see below).
+                        MatchId = liveMatchId > 0 && liveMatchId != allocatedId ? liveMatchId : allocatedId,
+                        NumberOfMaps = seriesNumMaps,
+                        Team1 = new(matchzyTeam1Id, matchzyTeam1Name),
+                        Team2 = new(matchzyTeam2Id, matchzyTeam2Name),
+                    }, seriesStartTarget);
+                    // HandleMatchStart may already have allocated one (ready-up before this finished).
+                    if (liveMatchId > 0 && liveMatchId != allocatedId)
+                    {
+                        Log($"[LoadMatchFromJSON] Keeping matchid {liveMatchId}; the early allocation {allocatedId} arrived after the match had started.");
+                        return;
+                    }
                     if (allocatedId > 0)
                     {
                         liveMatchId = allocatedId;
@@ -594,15 +630,6 @@ namespace MatchZy
                     }
                 });
 
-                await SendEventAsync(
-                    new MatchZySeriesStartedEvent
-                    {
-                        MatchId = allocatedId,
-                        NumberOfMaps = seriesNumMaps,
-                        Team1 = new(matchzyTeam1Id, matchzyTeam1Name),
-                        Team2 = new(matchzyTeam2Id, matchzyTeam2Name),
-                    }
-                );
             });
 
             return true;
@@ -789,11 +816,11 @@ namespace MatchZy
             // After swap: mp_teamname_1 → T scoreboard, mp_teamname_2 → CT scoreboard
             if (isConvarMappingSwapped)
             {
-                Server.ExecuteCommand($"mp_teamname_1 {tName}; mp_teamname_2 {ctName}");
+                Server.ExecuteCommand($"mp_teamname_1 {TeamNameArg(tName)}; mp_teamname_2 {TeamNameArg(ctName)}");
             }
             else
             {
-                Server.ExecuteCommand($"mp_teamname_1 {ctName}; mp_teamname_2 {tName}");
+                Server.ExecuteCommand($"mp_teamname_1 {TeamNameArg(ctName)}; mp_teamname_2 {TeamNameArg(tName)}");
             }
 
             // Also set directly on CCSTeam entities for reliability.
@@ -845,7 +872,11 @@ namespace MatchZy
                     matchConfig.ChangedCvars[cvarName] = cvarValue;
                     if (cvar != null)
                     {
-                        matchConfig.OriginalCvars[cvarName] = GetConvarStringValue(cvar);
+                        // An empty read of a non-string convar means the value could not be read;
+                        // restoring "" would set it to 0 after the series, so keep the server value.
+                        string original = GetConvarStringValue(cvar);
+                        if (original != "" || cvar.Type == ConVarType.String)
+                            matchConfig.OriginalCvars[cvarName] = original;
                     }
                     else if (PluginSettingAccessors.TryGetValue(cvarName, out var accessor))
                     {
@@ -853,6 +884,12 @@ namespace MatchZy
                         // remember the server's own value; otherwise the match's value stayed on the
                         // server after the series (e.g. matchzy_kick_when_no_match_loaded).
                         matchConfig.OriginalCvars[cvarName] = accessor.Get();
+                    }
+                    else if (GetFakeConVarValue(cvarName) is string fakeValue)
+                    {
+                        // FakeConVar settings (matchzy_enable_tech_pause, ...) are not engine convars
+                        // either; without this their match value stayed on the server after the series.
+                        matchConfig.OriginalCvars[cvarName] = fakeValue;
                     }
                 }
             }
@@ -1139,19 +1176,38 @@ namespace MatchZy
             return false;
         }
 
+        // Set by EndSeries until the match is reset: the series is over and must not be ended again
+        // (a second series_end, and the winner in the database overwritten).
+        public bool seriesEnded = false;
+
+        // Bumped by every match load and reset. Async work started for one match (the matchid
+        // allocation at load) compares it before writing match state, so a .stopmatch or a new load
+        // during the database round trip cannot receive the previous match's id.
+        private int matchLoadGeneration = 0;
+
+        // True from the end of a map until the next map goes live. Between the maps of a series there
+        // is no map in progress, so ending the series then must not write end data for a map row.
+        private bool currentMapFinished = false;
+
         public void EndSeries(string? winnerName, int restartDelay, int t1score, int t2score, bool writeEndData = true)
         {
+            if (seriesEnded)
+            {
+                Log($"[EndSeries] Series {liveMatchId} has already ended; ignoring the second end.");
+                return;
+            }
+            seriesEnded = true;
             long matchId = liveMatchId;
             (int team1Score, int team2Score) = (matchzyTeam1.seriesScore, matchzyTeam2.seriesScore);
             if (winnerName == "Draw")
                 winnerName = null;
             if (winnerName == null)
             {
-                PrintToAllChat($"{ChatColors.Green}{matchzyTeam1.teamName}{ChatColors.Default} and {ChatColors.Green}{matchzyTeam2.teamName}{ChatColors.Default} have tied the match");
+                PrintLocalizedToAll("matchzy.matchmsg.seriestied", matchzyTeam1.teamName, matchzyTeam2.teamName);
             }
             else
             {
-                Server.PrintToChatAll($"{chatPrefix} {ChatColors.Green}{winnerName}{ChatColors.Default} has won the match");
+                PrintLocalizedToAll("matchzy.matchmsg.serieswon", winnerName);
             }
 
             var seriesResultEvent = new MatchZySeriesResultEvent()
@@ -1167,7 +1223,11 @@ namespace MatchZy
                 TimeUntilRestore = 10,
             };
 
-            int currentMapNumber = matchConfig.CurrentMapNumber;
+            // -1 = no map in progress (between maps): SetMatchEndDataAsync then leaves the map rows alone.
+            // Queued now, on the game thread: the event queue sends it after the map_result queued
+            // before it (it used to wait for that task plus 500 ms on a background thread).
+            PublishEvent(seriesResultEvent);
+            int currentMapNumber = currentMapFinished ? -1 : matchConfig.CurrentMapNumber;
             Task.Run(async () =>
             {
                 // HandleMatchEnd already wrote end data for this map; writing again here
@@ -1178,15 +1238,6 @@ namespace MatchZy
                     // (both used to receive the series score).
                     await database.SetMatchEndDataAsync(matchId, currentMapNumber, winnerName ?? "Draw", t1score, t2score, winnerName ?? "Draw", team1Score, team2Score);
                 }
-                // Making sure that map end event is fired first: wait for the map_result task
-                // itself (a fixed 2 s was shorter than a slow HTTP send).
-                Task? mapResult = lastMapResultTask;
-                if (mapResult != null)
-                {
-                    try { await mapResult.WaitAsync(TimeSpan.FromSeconds(30)); } catch { }
-                }
-                await Task.Delay(500);
-                await SendEventAsync(seriesResultEvent);
             });
 
             // FIRST: Disable engine auto-change BEFORE restoring cvars - prevents race condition
@@ -1237,7 +1288,7 @@ namespace MatchZy
             if (mapRotationList.Count == 0)
             {
                 Log("[EndSeries] WARNING: Map rotation list is empty! Cannot auto-changelevel. Resetting match on current map.");
-                PrintToAllChat($"{ChatColors.Red}No maps in rotation - staying on current map.");
+                PrintLocalizedToAll("matchzy.matchmsg.norotationmaps");
                 AddTimer(
                     restartDelay,
                     () =>
@@ -1256,7 +1307,7 @@ namespace MatchZy
             Log($"[EndSeries] Current map: {currentMap}, Next map: {nextMap}, Change in {mapChangeDelay}s");
 
             // Notify players
-            PrintToAllChat($"Next map: {ChatColors.Green}{nextMap}{ChatColors.Default} - changing in {(int)mapChangeDelay} seconds.");
+            PrintLocalizedToAll("matchzy.matchmsg.nextmap", nextMap, (int)mapChangeDelay);
 
             matchEndMapChangeTimer = AddTimer(
                 mapChangeDelay,
@@ -1286,7 +1337,7 @@ namespace MatchZy
             Server.ExecuteCommand("mp_match_end_changelevel 0");
             Server.ExecuteCommand("mp_match_end_restart 0");
             Server.ExecuteCommand("mp_endmatch_votenextmap 0");
-            Server.ExecuteCommand("bot_kick");
+            KickAllBotsProtectCSTV();
 
             // Check if it's a workshop map (starts with "workshop/" or is just a numeric ID)
             bool isWorkshopMap = mapName.StartsWith("workshop/") || long.TryParse(mapName, out _);

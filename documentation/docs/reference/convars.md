@@ -30,7 +30,7 @@ Legend: **cfg** = present in the generated `config.cfg`. :fontawesome-solid-code
 | `matchzy_warmup_enabled` :fontawesome-solid-code-fork: | `true` | Y | Use warmup (execute `warmup.cfg`) before a match. |
 | `matchzy_minimum_ready_required` | `2` | Y | Ready players needed to start. `0` = every connected player. Also `.readyrequired <n>`. |
 | `matchzy_allow_force_ready` | `true` | Y | Allow `.forceready` (match setup only). Alias `get5_allow_force_ready`. |
-| `matchzy_ready_hint_style` :fontawesome-solid-code-fork: | `0` | Y | `0` classic center text, `1` HTML ready-up panel (progress bar, team split, own status; hides the native warmup banner). |
+| `matchzy_ready_hint_style` :fontawesome-solid-code-fork: | `0` | Y | `0` classic center text, `1` HTML ready-up panel (progress bar, team split, own status; hides the native warmup banner), `2` no center text: a chat reminder like upstream MatchZy lists the players who are not ready every `matchzy_chat_messages_timer_delay` seconds. |
 | `matchzy_ready_hint_blink` :fontawesome-solid-code-fork: | `false` | Y | Blink the "NOT READY" line on the HTML panel. |
 | `matchzy_loaded_match_hide_mode_hints` :fontawesome-solid-code-fork: | `true` | Y | In a match loaded from a match config, joining players only see the ready-up hint (no `.scrim` / `.prac` / `.knife` hints or admin help line). |
 | `matchzy_ready_clantag_enabled` :fontawesome-solid-code-fork: | `true` | Y | Show `[READY]` / `[UNREADY]` scoreboard clan tags. |

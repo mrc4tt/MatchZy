@@ -74,7 +74,7 @@ namespace MatchZy
 
             string missingTeamName = ffwMissingMatchTeam!.teamName;
 
-            PrintToAllChat($"FFW timer started! {ChatColors.Green}{missingTeamName}{ChatColors.Default} has {ChatColors.Green}4{ChatColors.Default} minutes to return!");
+            PrintLocalizedToAll("matchzy.matchmsg.ffwstarted", missingTeamName, 4);
 
             ffwTimer = AddTimer(
                 240.0f,
@@ -95,7 +95,7 @@ namespace MatchZy
                     {
                         if (ffwActive && ffwMissingMatchTeam != null)
                         {
-                            PrintToAllChat($"{ChatColors.Green}{ffwMissingMatchTeam.teamName}{ChatColors.Default} has {ChatColors.Green}3{ChatColors.Default} minutes left to return!");
+                            PrintLocalizedToAll("matchzy.matchmsg.ffwminutesleft", ffwMissingMatchTeam.teamName, 3);
                         }
                     }
                 )
@@ -108,7 +108,7 @@ namespace MatchZy
                     {
                         if (ffwActive && ffwMissingMatchTeam != null)
                         {
-                            PrintToAllChat($"{ChatColors.Green}{ffwMissingMatchTeam.teamName}{ChatColors.Default} has {ChatColors.Green}2{ChatColors.Default} minutes left to return!");
+                            PrintLocalizedToAll("matchzy.matchmsg.ffwminutesleft", ffwMissingMatchTeam.teamName, 2);
                         }
                     }
                 )
@@ -121,7 +121,7 @@ namespace MatchZy
                     {
                         if (ffwActive && ffwMissingMatchTeam != null)
                         {
-                            PrintToAllChat($"{ChatColors.Green}{ffwMissingMatchTeam.teamName}{ChatColors.Default} has {ChatColors.Green}1{ChatColors.Default} minute left to return!");
+                            PrintLocalizedToAll("matchzy.matchmsg.ffwoneminuteleft", ffwMissingMatchTeam.teamName);
                         }
                     }
                 )
@@ -134,7 +134,7 @@ namespace MatchZy
                     {
                         if (ffwActive && ffwMissingMatchTeam != null)
                         {
-                            PrintToAllChat($"{ChatColors.Green}{ffwMissingMatchTeam.teamName}{ChatColors.Default} has {ChatColors.Green}30{ChatColors.Default} seconds left to return!");
+                            PrintLocalizedToAll("matchzy.matchmsg.ffwsecondsleft", ffwMissingMatchTeam.teamName, 30);
                         }
                     }
                 )
@@ -182,7 +182,7 @@ namespace MatchZy
 
                 if (!missingTeamStillEmpty)
                 {
-                    PrintToAllChat($"{ChatColors.Green}{ffwMissingMatchTeam.teamName}{ChatColors.Default} has returned at the last moment! FFW cancelled.");
+                    PrintLocalizedToAll("matchzy.matchmsg.ffwreturnedlast", ffwMissingMatchTeam.teamName);
                     ffwRequestingTeam = CsTeam.None;
                     ffwMissingTeam = CsTeam.None;
                     ffwRequestingMatchTeam = null;
@@ -193,35 +193,17 @@ namespace MatchZy
                 string winnerName = ffwRequestingMatchTeam.teamName;
                 string loserName = ffwMissingMatchTeam.teamName;
 
-                PrintToAllChat($"{ChatColors.Green}{loserName}{ChatColors.Default} failed to return! {ChatColors.Green}{winnerName}{ChatColors.Default} wins by forfeit!");
+                PrintLocalizedToAll("matchzy.matchmsg.ffwforfeit", loserName, winnerName);
 
                 StopFFWMonitoring();
 
-                (int currentT1score, int currentT2score) = GetTeamsScore();
-
-                int t1score,
-                    t2score;
-
-                if (ffwRequestingMatchTeam == matchzyTeam1)
-                {
-                    t1score = Math.Max(currentT1score, 16);
-                    t2score = currentT2score;
-                    matchzyTeam1.seriesScore++;
-                }
-                else
-                {
-                    t1score = currentT1score;
-                    t2score = Math.Max(currentT2score, 16);
-                    matchzyTeam2.seriesScore++;
-                }
-
-                EndSeries(winnerName, 5, t1score, t2score);
+                EndSeriesWithWinner(ffwRequestingMatchTeam);
             }
             else
             {
                 if (ffwMissingMatchTeam != null)
                 {
-                    PrintToAllChat($"{ChatColors.Green}{ffwMissingMatchTeam.teamName}{ChatColors.Default} has returned! FFW cancelled.");
+                    PrintLocalizedToAll("matchzy.matchmsg.ffwreturned", ffwMissingMatchTeam.teamName);
                 }
             }
 

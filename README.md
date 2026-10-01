@@ -1,91 +1,72 @@
-## A forked MatchZy plugin - customized
+# MikZy (MatchZy)
 
-Customized [MatchZy](https://github.com/shobhit-pathak/MatchZy) fork for CS2 competitive servers. Adds a remote log API, G5API compatibility, auto changelevel, advanced stats, a coach system, pause overhauls, and in-game admin and match-setup menus.
+[![Latest release](https://img.shields.io/badge/release-latest-2ea44f)](https://git.miksen.me/mikkel/matchzy/releases/latest)
+[![CS2](https://img.shields.io/badge/game-CS2-orange)](https://www.counter-strike.net/)
+[![CounterStrikeSharp](https://img.shields.io/badge/CounterStrikeSharp-.NET%2010-512bd4)](https://github.com/roflmuffin/CounterStrikeSharp)
+[![Docs](https://img.shields.io/badge/docs-matchzy.miksen.me-blue)](https://matchzy.miksen.me/)
 
-## In-game commands
+MikZy is a CounterStrikeSharp plugin for running CS2 matches, scrims, pugs and practice on your own server. It is a customized fork of [MatchZy](https://github.com/shobhit-pathak/MatchZy) built for game-server hosting. The plugin still loads as `MatchZy`, so file names, folders, commands and settings (`MatchZy.dll`, `cfg/MatchZy/`, `matchzy_*`) are unchanged.
 
-Type in chat with a dot prefix (the `!` / `css_` prefixes work too, e.g. `!ready` / `css_ready`).
+**Documentation:** <https://matchzy.miksen.me/>
 
-**Help & admin (admins only):**
+## What the fork adds
 
-- `.help` - commands available in the current phase.
-- `.mhelp` - summary of admin commands.
-- `.ma` / `.matchadmin` - in-game admin menu (needs CS2MenuManager).
-- `.matchsetup` - in-game match-setup wizard (needs CS2MenuManager).
-- `.map <name/id>` - change map (name or workshop id; auto-yields to a dedicated map plugin if one is installed).
-- Match flow: `.match`, `.scrim`, `.prac`, `.dry`, `.warmup`, and the ready commands (`.ready` / `.r`, `.forceready`).
+- **Live events API:** every round, kill, pause and map result posted as JSON to `matchzy_remote_log_url`, for panels, bots and scoreboards.
+- **Get5 / G5API compatibility:** load matches from a URL, `get5_status`, `get5_endmatch` and the Get5 match config format.
+- **Advanced stats:** HLTV 2.0 rating, KAST, clutches and opening duels, saved to SQLite or MySQL and exported as CSV and JSON.
+- **Coaches:** per-team coach lists in the match config, invisible coach slots and hand-tuned viewing spots per map.
+- **Pauses:** tactical and technical pauses with per-team budgets, overtime timeouts and automatic pausing when a player disconnects.
+- **In-game menus:** `.ma` admin menu and a `.matchsetup` wizard that builds a match without writing JSON.
+- **Practice:** grenade history with rethrow, saved and shared lineups, bots, spawns, timers and fast forward.
+- **Players vs bots:** a match config can put a bot team against an open team of humans.
 
-## Players vs bots matches
+## Install
 
-A match config can make one team open to any human and the other a bot team:
+1. Install [CounterStrikeSharp](https://github.com/roflmuffin/CounterStrikeSharp) on the server.
+2. Download the latest `MatchZy-<version>.zip` from the [releases page](https://git.miksen.me/mikkel/matchzy/releases/latest).
+3. Extract it into `game/csgo/` and restart the server.
 
-```json
-{
-  "matchid": 0,
-  "num_maps": 1,
-  "maplist": ["de_dust2"],
-  "players_per_team": 5,
-  "team1": { "name": "Players", "players": "any" },
-  "team2": { "name": "Bots", "bots": true, "bot_difficulty": 2 }
-}
-```
+MatchZy writes its config files to `csgo/cfg/MatchZy/` on first load. Edit `config.cfg` there to tune the server.
 
-- `"players": "any"` - any human who is not on another roster (or the spectators) joins this team. No SteamIDs needed. Named rosters keep working on the other team.
-- `"bots": true` - the team is played by bots, filled up to `players_per_team`. `bot_difficulty` 0-3, default 2. Humans cannot join it; the bots follow their side through halftime and overtime.
-- Bots cannot veto, knife or type commands, so a bot match needs a fixed map list (exactly `num_maps` maps, or `"skip_veto": true`) and the load is refused otherwise. A `knife` side is drawn at random instead. The bot side always counts as ready and agrees to unpause, and autopause never counts it short.
-- Player stats include the bots automatically (see `matchzy_stats_include_bots`). `.warmupbots` is disabled in these matches.
+*Optional:* install [CS2MenuManager](https://git.miksen.me/mikkel/CS2MenuManager/releases) (1.0.42 or newer) for the in-game menus. Everything else works without it.
 
-## Coaches
+Full guide: [Installation](https://matchzy.miksen.me/getting-started/installation/)
 
-A team in the match config can list its coaches next to its players. Same shape as `"players"`: an object keyed by SteamID64, or an array of SteamID64s.
+## Update
 
-```json
-"team1": {
-  "name": "Team A",
-  "players": { "76561198000000001": "Player1", "76561198000000002": "Player2" },
-  "coaches": { "76561198000000009": "CoachA" }
-}
-```
+Extract the new zip over the old one and restart. The zip contains nothing under `cfg/`, so your config files, admins, database settings and saved lineups are never overwritten. New settings are added to the bottom of your `config.cfg` automatically, and reference copies of the current default cfgs are in `addons/counterstrikesharp/plugins/MatchZy/defaults/`.
 
-- A listed coach may join that team (and is not kicked by `matchzy_kick_when_no_match_loaded`) and becomes its coach automatically. They cannot `.uncoach` into a player.
-- When a team has a `coaches` list, only the SteamIDs on it can `.coach` that team. Without a list, anyone on the team can `.coach`, as before.
-- `.coach` only works for the team you are on. `matchzy_coach_enabled false` turns coaching off entirely, including the listed coaches.
-- Coaches do not count toward `players_per_team` in the ready check and do not need to `.ready`.
+Details: [Updating](https://matchzy.miksen.me/getting-started/updating/)
 
 ## Requirements
 
-- **CS2 dedicated server** (Windows/Linux)
-- **[CounterStrikeSharp](https://github.com/roflmuffin/CounterStrikeSharp)**: the plugin framework. This fork targets API 1.0.369 on .NET 10.0.
-- **[CS2MenuManager](https://git.miksen.me/mikkel/CS2MenuManager/releases) (1.0.42+)**: OPTIONAL, required only for the in-game menus. The `.matchadmin` / `.ma` admin menu and the `.matchsetup` wizard use its `WasdMenu` UI. MatchZy loads and runs normally without it; only those two menu commands are unavailable and will reply with a notice instead. Install it if you want the in-game menus.
+| Component | Required | Notes |
+|---|---|---|
+| CS2 dedicated server | Yes | Linux or Windows. |
+| CounterStrikeSharp | Yes | Stock CounterStrikeSharp works. Developed against a .NET 10 build. |
+| CS2MenuManager 1.0.42+ | No | Only for `.ma`, `.matchsetup` and `.nades`. |
+| MySQL / MariaDB | No | SQLite is used by default. |
 
-## Installation
+## Documentation
 
-1. Install **CounterStrikeSharp** into the server at `game/csgo/addons/counterstrikesharp/`.
-2. (Optional, for the in-game menus) Install **CS2MenuManager** as a separate shared plugin at `game/csgo/addons/counterstrikesharp/plugins/CS2MenuManager/`. Download the latest release from its [releases page](https://git.miksen.me/mikkel/CS2MenuManager/releases). Skip this if you do not use `.matchadmin` / `.matchsetup`.
-3. Build this plugin:
-   ```bash
-   dotnet build -c Release
-   ```
-4. Copy the build output (`bin/Release/net10.0/MatchZy.dll` and its dependencies) to:
-   ```
-   game/csgo/addons/counterstrikesharp/plugins/MatchZy/
-   ```
-5. Copy `gamedata/matchzy.json` to the CounterStrikeSharp gamedata directory:
-   ```
-   game/csgo/addons/counterstrikesharp/gamedata/matchzy.json
-   ```
-   (The release `.zip` already includes it at this path.)
-6. Restart the server, or run `css_plugins reload MatchZy`.
+- [Commands](https://matchzy.miksen.me/reference/commands/)
+- [Settings (convars)](https://matchzy.miksen.me/reference/convars/)
+- [Match config](https://matchzy.miksen.me/reference/match-config/)
+- [Events](https://matchzy.miksen.me/reference/events/)
+- [Coaching](https://matchzy.miksen.me/guides/coaching/)
+- [Practice mode](https://matchzy.miksen.me/guides/practice/)
+- [What's new](https://matchzy.miksen.me/whats-new/) and the [changelog](CHANGELOG.md)
 
-## Gamedata
+## Build from source
 
-MatchZy resolves a few game functions by key from CounterStrikeSharp's gamedata (CounterStrikeSharp merges every `*.json` in its `gamedata/` directory). The shipped `gamedata/matchzy.json` provides them, so nothing needs to be added to the core `gamedata.json`, and the plugin works on both stock upstream CounterStrikeSharp and the fork. The required keys are:
+```bash
+git clone https://git.miksen.me/mikkel/matchzy.git
+cd matchzy
+dotnet build -c Release
+```
 
-- `CCSGameRules_PostCleanUp` - `.breakrestore` (respawn breakable props in practice).
-- `CSmokeGrenadeProjectile_Create`, `CHEGrenadeProjectile_Create`, `CMolotovProjectile_Create`, `CDecoyProjectile_Create` - practice grenade rethrow (`.rt` / `.last` / `.back`).
-- `CBasePlayerController_HandleCommand_JoinTeam` - spectator-to-team switch in practice (`.t` / `.ct` from spec). The older key name `CCSPlayerController_HandleCommandJoinTeam` is also accepted.
-- `CCSPlayer_WeaponServices_SelectItem` (vtable offset) - putting a restored grenade or weapon in hand (`.last` / `.back` / `.ln`).
+The output is `bin/Release/net10.0/MatchZy.dll` with its dependencies. The project compiles against a local CounterStrikeSharp API DLL; point it at yours with `-p:CssApiDir=/path/to/CounterStrikeSharp.API/bin/Release/net10.0`, and build against the same CounterStrikeSharp version the server runs.
 
-Signatures shift when Valve updates CS2. If a rethrow or `.breakrestore` stops working after a game update, regenerate the signatures for the new `libserver.so` (Linux) / `server.dll` (Windows) and update `gamedata/matchzy.json`. Missing or stale keys degrade gracefully (the feature no-ops), they do not crash the plugin.
+## Credits
 
-> **Note on CS2MenuManager:** it is a build-time NuGet reference but only a runtime dependency of the menu commands. The menu assembly is resolved lazily on first use, so the plugin loads without it and only `.matchadmin` / `.matchsetup` are affected. If you install it, place it before MatchZy in the load order.
+Based on [MatchZy](https://github.com/shobhit-pathak/MatchZy) by Shobhit Pathak (WD-). Upstream changes are merged into this fork from time to time; see the [upstream changelog](https://github.com/shobhit-pathak/MatchZy/blob/main/CHANGELOG.md) for theirs.

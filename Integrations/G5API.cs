@@ -219,13 +219,15 @@ namespace MatchZy
             {
                 state = Get5GameState.PostGame;
             }
-            else if (isMatchLive)
-            {
-                state = Get5GameState.Live;
-            }
+            // Restoring first: isMatchLive is also true while a round restore loads, which made
+            // pending_restore unreachable.
             else if (isRoundRestoring)
             {
                 state = Get5GameState.PendingRestore;
+            }
+            else if (isMatchLive)
+            {
+                state = Get5GameState.Live;
             }
             else if (matchStarted)
             {

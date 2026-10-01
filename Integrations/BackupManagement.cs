@@ -75,7 +75,9 @@ namespace MatchZy
             // in gameinfo.gi, which is csgo/addons/metamod on Metamod servers. An absolute prefix keeps the
             // round files in csgo/, where the backup and restore code reads them.
             string backupFilePrefix = Path.Join(Server.GameDirectory, "csgo", $"matchzy_{liveMatchId}_{matchConfig.CurrentMapNumber}").Replace('\\', '/');
-            string prefixArg = backupFilePrefix.Contains(' ') ? $"\"{backupFilePrefix}\"" : backupFilePrefix;
+            // Always quoted: the console tokenizer splits an unquoted argument at a space and at the
+            // ':' of a Windows drive letter (C:/...).
+            string prefixArg = $"\"{backupFilePrefix}\"";
             Server.ExecuteCommand($"mp_backup_round_file {prefixArg}");
         }
 
@@ -118,7 +120,7 @@ namespace MatchZy
                 var timeElapsed = (DateTime.Now - lastUse).TotalSeconds;
                 if (timeElapsed < STOP_COMMAND_COOLDOWN_SECONDS)
                 {
-                    ReplyToUserCommand(player, $"Please wait {STOP_COMMAND_COOLDOWN_SECONDS - (int)timeElapsed}s before using .stop again");
+                    ReplyToUserCommand(player, Localizer.ForPlayer(player, "matchzy.backupmsg.stopcooldown", STOP_COMMAND_COOLDOWN_SECONDS - (int)timeElapsed));
                     return;
                 }
             }
@@ -165,7 +167,7 @@ namespace MatchZy
             // Check if this team already voted
             if (stopData[stopTeamKey])
             {
-                ReplyToUserCommand(player, $"{stopTeamName} has already voted to restore. Waiting for {remainingStopTeam}...");
+                ReplyToUserCommand(player, Localizer.ForPlayer(player, "matchzy.backupmsg.alreadyvoted", stopTeamName, remainingStopTeam));
                 return;
             }
 
@@ -202,7 +204,7 @@ namespace MatchZy
                 // One team voted, waiting for other
                 int remainingSeconds = STOP_VOTE_TIMEOUT_SECONDS - (int)(DateTime.Now - stopVoteStartTime).TotalSeconds;
 
-                PrintToAllChat(Localizer["matchzy.restore.teamwantstorestore", stopTeamName, remainingStopTeam]);
+                PrintLocalizedToAll("matchzy.restore.teamwantstorestore", stopTeamName, remainingStopTeam);
                 PrintLocalizedToAll("matchzy.backup.votepending", remainingSeconds);
             }
         }
@@ -230,19 +232,19 @@ namespace MatchZy
 
             if (!isMatchLive)
             {
-                ReplyToUserCommand(player, "Match is not live!");
+                ReplyToUserCommand(player, Localizer.ForPlayer(player, "matchzy.backupmsg.matchnotlive"));
                 return;
             }
 
             if (IsHalfTimePhase())
             {
-                ReplyToUserCommand(player, "Cannot restore during halftime.");
+                ReplyToUserCommand(player, Localizer.ForPlayer(player, "matchzy.backup.restoreduringhalftime"));
                 return;
             }
 
             if (IsPostGamePhase())
             {
-                ReplyToUserCommand(player, "Cannot restore after match has ended.");
+                ReplyToUserCommand(player, Localizer.ForPlayer(player, "matchzy.backup.restorematchended"));
                 return;
             }
 
@@ -250,7 +252,7 @@ namespace MatchZy
             var gameRules = GetGameRules();
             if (gameRules == null)
             {
-                ReplyToUserCommand(player, "Failed to get game rules.");
+                ReplyToUserCommand(player, Localizer.ForPlayer(player, "matchzy.backupmsg.nogamerules"));
                 return;
             }
 
@@ -263,8 +265,8 @@ namespace MatchZy
 
             if (!File.Exists(backupPath))
             {
-                ReplyToUserCommand(player, $"Backup for round {currentRound} not found!");
-                ReplyToUserCommand(player, $"The round may have just started. Try using !restore {currentRound} instead.");
+                ReplyToUserCommand(player, Localizer.ForPlayer(player, "matchzy.backupmsg.roundbackupnotfound", currentRound));
+                ReplyToUserCommand(player, Localizer.ForPlayer(player, "matchzy.backupmsg.tryrestoreround", currentRound));
                 return;
             }
 
@@ -304,18 +306,18 @@ namespace MatchZy
 
             if (!isMatchLive)
             {
-                ReplyToUserCommand(player, "Match is not live!");
+                ReplyToUserCommand(player, Localizer.ForPlayer(player, "matchzy.backupmsg.matchnotlive"));
                 return;
             }
 
             if (!string.IsNullOrEmpty(lastMatchZyBackupFileName))
             {
-                ReplyToUserCommand(player, "Restoring last round...");
+                ReplyToUserCommand(player, Localizer.ForPlayer(player, "matchzy.backupmsg.restoringlast"));
                 RestoreRoundBackup(player, lastMatchZyBackupFileName);
             }
             else
             {
-                ReplyToUserCommand(player, "No previous backup found!");
+                ReplyToUserCommand(player, Localizer.ForPlayer(player, "matchzy.backupmsg.noprevbackup"));
             }
         }
 
@@ -382,22 +384,27 @@ namespace MatchZy
             return string.Empty;
         }
 
-        private void RestoreRoundBackup(CCSPlayerController? player, string fileName)
+        /// <summary>
+        /// Restores (or queues) a round backup. Returns false when the restore was refused, in which
+        /// case nothing about the running match has been changed: every check that can refuse runs
+        /// before the backup's match id, config, teams, sides and timeouts are applied.
+        /// </summary>
+        private bool RestoreRoundBackup(CCSPlayerController? player, string fileName)
         {
             if (IsHalfTimePhase())
             {
                 ReplyToUserCommand(player, Localizer.ForPlayer(player, "matchzy.backup.restoreduringhalftime"));
-                return;
+                return false;
             }
             if (IsPostGamePhase())
             {
                 ReplyToUserCommand(player, Localizer.ForPlayer(player, "matchzy.backup.restorematchended"));
-                return;
+                return false;
             }
             if (IsTacticalTimeoutActive())
             {
                 ReplyToUserCommand(player, Localizer.ForPlayer(player, "matchzy.backup.restoretacticaltimeout"));
-                return;
+                return false;
             }
             string backupFolder = Path.Combine(Server.GameDirectory, "csgo", "MatchZyDataBackup");
 
@@ -406,20 +413,16 @@ namespace MatchZy
             if (!File.Exists(filePath))
             {
                 ReplyToUserCommand(player, Localizer.ForPlayer(player, "matchzy.backup.restoredoesntexist", fileName));
-                return;
+                return false;
             }
 
             var gameRules = GetGameRules();
             if (gameRules == null)
             {
-                ReplyToUserCommand(player, "Failed to get game rules.");
-                return;
+                ReplyToUserCommand(player, Localizer.ForPlayer(player, "matchzy.backupmsg.nogamerules"));
+                return false;
             }
             bool liveSetupRequired = false;
-
-            // We set active timeouts to false so that timeout does not start after the round has been restored.
-            // This is to prevent any buggish behaviour with timeouts (like incorrect timeout used showing, or force-unpausing the match once timeout ends)
-            gameRules.CTTimeOutActive = gameRules.TerroristTimeOutActive = false;
 
             // Server.ExecuteCommand($"mp_backup_restore_load_file {fileName}");
 
@@ -441,6 +444,21 @@ namespace MatchZy
                     }
                 }
 
+                // Refuse a backup without usable round data BEFORE anything is applied. It used to be
+                // checked only after the match id, config, teams, sides and timeouts had been
+                // overwritten, so a refused restore still changed the running match (and a refused
+                // queued restore left the server in warmup with everyone ready).
+                if (!HasUsableValveRoundData(backupData, fileName))
+                {
+                    Log($"[RestoreRoundBackup] {fileName} has no usable valve_backup data and no complete .txt in csgo/, nothing to restore.");
+                    ReplyToUserCommand(player, Localizer.ForPlayer(player, "matchzy.backupmsg.nousabledata", fileName));
+                    return false;
+                }
+
+                // We set active timeouts to false so that timeout does not start after the round has been restored.
+                // This is to prevent any buggish behaviour with timeouts (like incorrect timeout used showing, or force-unpausing the match once timeout ends)
+                gameRules.CTTimeOutActive = gameRules.TerroristTimeOutActive = false;
+
                 // MatchID is set first to avoid generating a new one.
                 if (backupData.TryGetValue("matchid", out var matchId) && long.TryParse(matchId, out var parsedBackupId) && parsedBackupId > 0)
                 {
@@ -456,7 +474,12 @@ namespace MatchZy
                 }
                 if (backupData.TryGetValue("match_config", out var matchConfigValue))
                 {
-                    matchConfig = Newtonsoft.Json.JsonConvert.DeserializeObject<MatchConfig>(matchConfigValue)!;
+                    var restoredConfig = Newtonsoft.Json.JsonConvert.DeserializeObject<MatchConfig>(matchConfigValue)!;
+                    // A backup without remote log settings (older or hand-made) would stop the match
+                    // from reporting; fall back to the server's own settings.
+                    if (string.IsNullOrEmpty(restoredConfig.RemoteLogURL))
+                        ApplyDefaultRemoteLog(restoredConfig);
+                    matchConfig = restoredConfig;
                     SetupRoundBackupFile();
                 }
                 // Copy the restored values INTO the existing Team objects rather than replacing the
@@ -482,6 +505,15 @@ namespace MatchZy
                         CopyTeamData(_t2, matchzyTeam2);
                     else
                         Console.WriteLine("[MatchZy] [RestoreRoundBackup] team2 deserialization returned null.");
+                }
+                // Backup files can be loaded from anywhere (matchzy_loadbackup), and the team name and
+                // tag end up in console commands (mp_teamname_N), so clean them the same way a match
+                // config's team names are cleaned.
+                foreach (var team in new[] { matchzyTeam1, matchzyTeam2 })
+                {
+                    team.teamName = RemoveSpecialCharacters(team.teamName ?? "");
+                    team.teamTag = RemoveSpecialCharacters(team.teamTag ?? "");
+                    team.teamFlag = RemoveSpecialCharacters(team.teamFlag ?? "");
                 }
                 if (backupData.TryGetValue("team1_side", out var team1Side))
                 {
@@ -510,7 +542,7 @@ namespace MatchZy
                         isRoundRestorePending = true;
                         pendingRestoreFileName = fileName;
                         // Returning from here, backup will be restored again once the map is changed.
-                        return;
+                        return true;
                     }
                 }
 
@@ -521,15 +553,13 @@ namespace MatchZy
                     {
                         isRoundRestorePending = true;
                         pendingRestoreFileName = fileName;
-                        PrintToAllChat(Localizer["matchzy.restore.loadedsuccessfully", fileName]);
                         // Nothing has been restored yet. In warmup the backup is only QUEUED here and
-                        // applied by HandleMatchStart once the match goes live. The line above reads
-                        // like the round is already back, so people ran the command a second time -
-                        // which takes the else branch and forces the restore immediately, making it
-                        // look like the command "only works if you type it twice". Spell out both.
-                        PrintToAllChat($"{ChatColors.Green}The backup is queued{ChatColors.Default} and will be restored when the match goes live. Ready up, or run the command again to restore right now.");
+                        // applied by HandleMatchStart once the match goes live. It used to print
+                        // "loaded successfully" first, which read like the round was already back, so
+                        // people ran the command a second time (forcing the restore immediately).
+                        PrintLocalizedToAll("matchzy.restore.queued", fileName);
                         Log($"[RestoreRoundBackup] Queued {fileName} during warmup; it will be applied when the match starts. Repeat the command to restore immediately.");
-                        return;
+                        return true;
                     }
                     else
                     {
@@ -621,8 +651,8 @@ namespace MatchZy
                             // Nothing to load: the round would stay exactly as it is while we announce a
                             // successful restore and pause the match. Report it instead.
                             Log($"[RestoreRoundBackup] {fileName} has no usable valve_backup data and no complete .txt in csgo/, nothing to restore.");
-                            ReplyToUserCommand(player, $"Backup {fileName} contains no usable round data, nothing was restored.");
-                            return;
+                            ReplyToUserCommand(player, Localizer.ForPlayer(player, "matchzy.backupmsg.nousabledata", fileName));
+                            return false;
                         }
 
                         tempFilePath = diskBackup;
@@ -633,10 +663,22 @@ namespace MatchZy
                     int restoreTimer = liveSetupRequired ? 2 : 0;
                     if (liveSetupRequired)
                     {
-                        SetupLiveFlagsAndCfg();
+                        string gameMode = backupData.GetValueOrDefault("game_mode", "live");
+                        if (gameMode == "scrim")
+                            SetupScrimFlagsAndCfg();
+                        else if (gameMode == "hill")
+                            SetupHillFlagsAndCfg();
+                        else
+                            SetupLiveFlagsAndCfg();
+                        // The match goes live here instead of through StartLive/StartScrim/StartHill,
+                        // which is where the GOTV recording is armed: without this the rest of the
+                        // map after a queued (warmup / crash recovery) restore had no demo.
+                        if (!isDemoRecording)
+                            ArmDemoStart();
                     }
                     // Scoreboard state belonging to the restored round, applied once the engine is done.
                     string scoreboardJson = backupData.GetValueOrDefault("scoreboard", "");
+                    string advancedStatsJson = backupData.GetValueOrDefault("advanced_stats", "");
                     int restoredRoundsPlayed = 0;
                     if (backupData.TryGetValue("round", out var restoredRound))
                     {
@@ -663,8 +705,11 @@ namespace MatchZy
                                 $"[RestoreRoundBackup] Loading {loadFileName}. Rounds played: {preRoundsPlayed}, score: {preTeam1Score}-{preTeam2Score}, target round: {restoredRoundsPlayed}."
                             );
                             Server.ExecuteCommand($"mp_backup_restore_load_file {loadFileName}");
-                            Server.ExecuteCommand($"mp_teamname_1 {matchzyTeam1.teamName}");
-                            Server.ExecuteCommand($"mp_teamname_2 {matchzyTeam2.teamName}");
+                            // Put the advanced stats back to the start of the restored round (also undoes
+                            // the reset that setting the match live again does).
+                            RestoreAdvancedStatsSnapshot(advancedStatsJson);
+                            Server.ExecuteCommand($"mp_teamname_1 {TeamNameArg(matchzyTeam1.teamName)}");
+                            Server.ExecuteCommand($"mp_teamname_2 {TeamNameArg(matchzyTeam2.teamName)}");
                             // Settle the pause state after the load, not before it: the live cfgs set
                             // mp_backup_restore_load_autopause 1, so the engine pauses on its own here and
                             // our own pause/unpause has to be the last thing that touches it.
@@ -682,10 +727,31 @@ namespace MatchZy
             catch (Exception e)
             {
                 Console.WriteLine($"[MatchZy] [RestoreRoundBackup - FATAL] {e}");
-                return;
+                return false;
             }
             // The result is announced from VerifyRoundRestore instead of here: at this point the load
             // command has only been queued, so announcing a successful restore now is a guess.
+            return true;
+        }
+
+        /// <summary>
+        /// Whether a backup has round data mp_backup_restore_load_file can load: a complete embedded
+        /// valve_backup, or a complete .txt on disk under one of the names the restore looks for. Uses
+        /// the backup's own match id and map number, which is what the restore applies before it
+        /// builds the file name, so this check needs no state change.
+        /// </summary>
+        private bool HasUsableValveRoundData(Dictionary<string, string> backupData, string fileName)
+        {
+            backupData.TryGetValue("valve_backup", out var valveBackup);
+            if (IsCompleteValveBackup(SanitizeValveBackup(valveBackup)))
+                return true;
+
+            long matchId = backupData.TryGetValue("matchid", out var idText) && long.TryParse(idText, out var parsedId) && parsedId > 0 ? parsedId : liveMatchId;
+            int mapNumber = backupData.TryGetValue("mapnumber", out var mapText) && int.TryParse(mapText, out var parsedMap) ? parsedMap : matchConfig.CurrentMapNumber;
+            string tempFileName = fileName.Replace(".json", ".txt");
+            if (backupData.TryGetValue("round", out var roundNumber))
+                tempFileName = $"matchzy_{matchId}_{mapNumber}_round{roundNumber}.txt";
+            return FindValveRoundBackupOnDisk(Path.Combine(Server.GameDirectory, "csgo"), tempFileName, fileName) != null;
         }
 
         // Locates the round file the engine wrote itself (mp_backup_round_auto) for a MatchZy JSON backup
@@ -791,7 +857,7 @@ namespace MatchZy
             // check. Same when the counter did land on the round the backup was taken at.
             if (preRoundsPlayed == expectedRoundsPlayed || roundsPlayed == expectedRoundsPlayed)
             {
-                PrintToAllChat(Localizer["matchzy.restore.restoredsuccessfully", fileName]);
+                PrintLocalizedToAll("matchzy.restore.restoredsuccessfully", fileName);
                 return;
             }
 
@@ -801,10 +867,10 @@ namespace MatchZy
             isRoundRestoring = false;
             isSpawnKeeping = false;
             Log($"[RestoreRoundBackup FATAL] Engine did not load {fileName}. Rounds played is still {roundsPlayed}, expected {expectedRoundsPlayed}.");
-            PrintToAllChat($"{ChatColors.Red}Restore of {fileName} failed.{ChatColors.Default} The server did not load the round backup, match state is unchanged.");
+            PrintLocalizedToAll("matchzy.backupmsg.restorefailed", fileName);
             if (IsPlayerValid(player))
             {
-                ReplyToUserCommand(player, "mp_backup_restore_load_file did not take effect. See the server console for the backup file details.");
+                ReplyToUserCommand(player, Localizer.ForPlayer(player, "matchzy.backupmsg.restorefaileddetails"));
             }
         }
 
@@ -848,7 +914,7 @@ namespace MatchZy
 
             int delay = Math.Max(1, restoreUnpauseDelay.Value);
             restoreUnpauseSecondsLeft = delay;
-            PrintToAllChat($"Round restored. Match unpauses in {ChatColors.Green}{delay}{ChatColors.Default} seconds. Use {ChatColors.Green}.pause{ChatColors.Default} if you are not ready.");
+            PrintLocalizedToAll("matchzy.backupmsg.restoredunpausein", delay);
             restoreUnpauseTimer = AddTimer(
                 1.0f,
                 () =>
@@ -866,7 +932,7 @@ namespace MatchZy
                     {
                         if (restoreUnpauseSecondsLeft <= 5 || restoreUnpauseSecondsLeft % 10 == 0)
                         {
-                            PrintToAllChat($"Unpausing in {ChatColors.Green}{restoreUnpauseSecondsLeft}{ChatColors.Default}...");
+                            PrintLocalizedToAll("matchzy.backupmsg.unpausingin", restoreUnpauseSecondsLeft);
                         }
                         return;
                     }
@@ -881,7 +947,7 @@ namespace MatchZy
                     unpauseData["pauseTeam"] = "";
                     pausedStateTimer?.Kill();
                     pausedStateTimer = null;
-                    PrintToAllChat($"{ChatColors.Green}Match is live!{ChatColors.Default}");
+                    PrintLocalizedToAll("matchzy.backupmsg.matchlive");
                 },
                 TimerFlags.REPEAT | TimerFlags.STOP_ON_MAPCHANGE
             );
@@ -1085,6 +1151,9 @@ namespace MatchZy
                     { "timestamp", DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss") },
                     { "map_name", Server.MapName },
                     { "mapnumber", matchConfig.CurrentMapNumber.ToString() },
+                    // Game mode, so a restore that has to set the round up again uses the same cfg
+                    // (a scrim or hill game used to come back as a match, with overtime and clinch on).
+                    { "game_mode", isPlayOutEnabled2 ? "hill" : isPlayOutEnabled ? "scrim" : "live" },
                     { "round", round },
                     { "team1", "" },
                     { "team2", "" },
@@ -1110,6 +1179,8 @@ namespace MatchZy
                     // strip as they were when the backup is loaded, so we have to put them back ourselves.
                     // Gathered here, JSON-encoded off-thread.
                     { "scoreboard", "" },
+                    // Advanced stats (rating, KAST, opening duels, clutches) at the start of this round.
+                    { "advanced_stats", CaptureAdvancedStatsSnapshot() },
                 };
                 List<ScoreboardSnapshot> scoreboard = CaptureScoreboardSnapshot();
                 MatchConfig configSnapshot = matchConfig.SnapshotForBackup();
@@ -1400,7 +1471,7 @@ namespace MatchZy
             if (string.IsNullOrWhiteSpace(fileName))
             {
                 Log($"[OnLoadBackupCommand] No .json file name could be read from '{rawArgs}'.");
-                ReplyToUserCommand(player, $"Could not read a backup file name from '{rawArgs}'. Usage: !loadbackup <backup_file_name>");
+                ReplyToUserCommand(player, Localizer.ForPlayer(player, "matchzy.backupmsg.loadbackupbadname", rawArgs));
                 return;
             }
 
@@ -1431,14 +1502,14 @@ namespace MatchZy
 
             if (backups.Count == 0)
             {
-                ReplyToUserCommand(player, "No backups found for this match.");
+                ReplyToUserCommand(player, Localizer.ForPlayer(player, "matchzy.backupmsg.nobackupsformatch"));
                 return;
             }
 
             // Show current match context
             (int t1score, int t2score) = GetTeamsScore();
             int currentRound = t1score + t2score;
-            ReplyToUserCommand(player, $"Current: Round {currentRound} - {ChatColors.Green}{matchzyTeam1.teamName} {t1score}-{t2score} {matchzyTeam2.teamName}");
+            ReplyToUserCommand(player, Localizer.ForPlayer(player, "matchzy.backupmsg.menucurrent", currentRound, matchzyTeam1.teamName, t1score, t2score, matchzyTeam2.teamName));
             ReplyToUserCommand(player, "───────────────────────────────────");
 
             int displayed = 0;
@@ -1476,20 +1547,19 @@ namespace MatchZy
                 int totalScore = int.Parse(score1) + int.Parse(score2);
                 int maxRounds = ConVar.Find("mp_maxrounds")?.GetPrimitiveValue<int>() ?? 24;
                 int halfRounds = maxRounds / 2;
-                string halfLabel =
-                    totalScore <= halfRounds ? "1st"
-                    : totalScore <= maxRounds ? "2nd"
-                    : "OT";
+                string halfLabel = Localizer.ForPlayer(
+                    player,
+                    totalScore <= halfRounds ? "matchzy.backupmsg.halffirst"
+                    : totalScore <= maxRounds ? "matchzy.backupmsg.halfsecond"
+                    : "matchzy.backupmsg.halfovertime"
+                );
 
                 // Time ago
                 string timeAgo = "";
                 if (DateTime.TryParse(timestamp, out DateTime backupTime))
                 {
                     var diff = DateTime.Now - backupTime;
-                    timeAgo =
-                        diff.TotalMinutes < 1 ? "just now"
-                        : diff.TotalMinutes < 60 ? $"{(int)diff.TotalMinutes}m ago"
-                        : $"{(int)diff.TotalHours}h {diff.Minutes}m ago";
+                    timeAgo = BackupTimeAgo(player, diff, false);
                 }
 
                 ReplyToUserCommand(player, $"  {ChatColors.Yellow}R{roundNum}{ChatColors.Default}" + $" | {score1}-{score2}" + $" ({halfLabel})" + $" {ChatColors.Grey}{timeAgo}{ChatColors.Default}" + $" → {ChatColors.Green}!restore {roundNum}");
@@ -1499,12 +1569,12 @@ namespace MatchZy
 
             if (displayed == 0)
             {
-                ReplyToUserCommand(player, "No valid round backups found.");
+                ReplyToUserCommand(player, Localizer.ForPlayer(player, "matchzy.backupmsg.novalidbackups"));
             }
             else
             {
                 ReplyToUserCommand(player, "───────────────────────────────────");
-                ReplyToUserCommand(player, $"Tip: {ChatColors.Green}!restore <round>{ChatColors.Default}" + $" or {ChatColors.Green}!restorelast{ChatColors.Default} for previous round");
+                ReplyToUserCommand(player, Localizer.ForPlayer(player, "matchzy.backupmsg.menutip"));
             }
         }
 
@@ -1517,7 +1587,7 @@ namespace MatchZy
             string backupDir = Path.Combine(Server.GameDirectory, "csgo", "MatchZyDataBackup");
             if (!Directory.Exists(backupDir))
             {
-                ReplyToUserCommand(player, "No backups found (backup folder does not exist).");
+                ReplyToUserCommand(player, Localizer.ForPlayer(player, "matchzy.backupmsg.nobackupfolder"));
                 return;
             }
 
@@ -1529,11 +1599,11 @@ namespace MatchZy
 
             if (files.Count == 0)
             {
-                ReplyToUserCommand(player, "No backups found.");
+                ReplyToUserCommand(player, Localizer.ForPlayer(player, "matchzy.backupmsg.nobackups"));
                 return;
             }
 
-            ReplyToUserCommand(player, "Recent backups (newest first):");
+            ReplyToUserCommand(player, Localizer.ForPlayer(player, "matchzy.backupmsg.recentheader"));
             ReplyToUserCommand(player, "───────────────────────────────────");
 
             int displayed = 0;
@@ -1561,11 +1631,7 @@ namespace MatchZy
                 if (DateTime.TryParse(timestamp, out DateTime backupTime))
                 {
                     var diff = DateTime.Now - backupTime;
-                    timeAgo =
-                        diff.TotalMinutes < 1 ? "just now"
-                        : diff.TotalMinutes < 60 ? $"{(int)diff.TotalMinutes}m ago"
-                        : diff.TotalHours < 24 ? $"{(int)diff.TotalHours}h {diff.Minutes}m ago"
-                        : $"{(int)diff.TotalDays}d ago";
+                    timeAgo = BackupTimeAgo(player, diff, true);
                 }
 
                 ReplyToUserCommand(player, $"  {ChatColors.Yellow}#{matchId} R{round}{ChatColors.Default} | {team1} {ChatColors.Green}{score1}-{score2}{ChatColors.Default} {team2} | {mapName} {ChatColors.Grey}{timeAgo}");
@@ -1575,8 +1641,20 @@ namespace MatchZy
 
             if (displayed == 0)
             {
-                ReplyToUserCommand(player, "No valid round backups found.");
+                ReplyToUserCommand(player, Localizer.ForPlayer(player, "matchzy.backupmsg.novalidbackups"));
             }
+        }
+
+        // Localized "time since backup" label for the backup listings.
+        private string BackupTimeAgo(CCSPlayerController? player, TimeSpan diff, bool includeDays)
+        {
+            if (diff.TotalMinutes < 1)
+                return Localizer.ForPlayer(player, "matchzy.backupmsg.justnow");
+            if (diff.TotalMinutes < 60)
+                return Localizer.ForPlayer(player, "matchzy.backupmsg.minutesago", (int)diff.TotalMinutes);
+            if (!includeDays || diff.TotalHours < 24)
+                return Localizer.ForPlayer(player, "matchzy.backupmsg.hoursago", (int)diff.TotalHours, diff.Minutes);
+            return Localizer.ForPlayer(player, "matchzy.backupmsg.daysago", (int)diff.TotalDays);
         }
 
         // Add this helper method to parse backup files directly
@@ -1633,12 +1711,12 @@ namespace MatchZy
 
             if (backups.Count == 0)
             {
-                reply($"Found no backup files for match ID: {matchId}");
+                reply(Localizer.ForPlayer(player, "matchzy.backupmsg.listnone", matchId));
                 return; // FIX: Add return here
             }
 
             // Header
-            reply($"=== Backups for Match {matchId} ({backups.Count} found) ===");
+            reply(Localizer.ForPlayer(player, "matchzy.backupmsg.listheader", matchId, backups.Count));
 
             int index = 1;
             foreach (string backup in backups)
@@ -1665,7 +1743,7 @@ namespace MatchZy
                         string roundNum = roundMatch.Success ? int.Parse(roundMatch.Groups[1].Value).ToString() : "?";
 
                         // Format: "#1 | Round 5 | Team1 2 - 3 Team2 | de_dust2 | 2024-01-15 14:30:22"
-                        reply($"#{index} | Round {roundNum} | {team1} {score1} - {score2} {team2} | {map} | {timestamp}");
+                        reply(Localizer.ForPlayer(player, "matchzy.backupmsg.listrow", index, roundNum, team1, score1, score2, team2, map, timestamp));
                     }
                     else
                     {
@@ -1682,7 +1760,7 @@ namespace MatchZy
                 index++;
             }
 
-            reply($"Use '!restore <round>' to restore a specific round");
+            reply(Localizer.ForPlayer(player, "matchzy.backupmsg.listfooter"));
         }
     }
 }

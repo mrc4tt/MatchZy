@@ -246,6 +246,21 @@ namespace MatchZy
 
         private async Task CreateRequiredTablesSQLiteAsync(IDbConnection conn)
         {
+            // WAL lets reads run while a write is in progress and makes overlapping writes (round end,
+            // map end and series end at the end of the last round) wait less for the file lock. The
+            // mode is stored in the database file, so setting it once at startup is enough.
+            try
+            {
+                string? mode = await conn.ExecuteScalarAsync<string>("PRAGMA journal_mode=WAL;");
+                // SQLite falls back silently (e.g. on a filesystem without shared-memory locking).
+                if (!string.Equals(mode, "wal", StringComparison.OrdinalIgnoreCase))
+                    Log($"[CreateRequiredTablesSQLite] SQLite journal mode is '{mode}', not WAL.");
+            }
+            catch (Exception ex)
+            {
+                Log($"[CreateRequiredTablesSQLite] Could not enable WAL mode: {ex.Message}");
+            }
+
             await conn.ExecuteAsync(
                 $@"
             CREATE TABLE IF NOT EXISTS matchzy_stats_matches (
@@ -427,11 +442,24 @@ namespace MatchZy
                     // up on MySQL. Make the parent exist first, idempotently.
                     await EnsureMatchRowAsync(conn, matchId, team1Name, team2Name, winner, seriesType, serverIp);
 
+                    // The first map of a reused matchid starts the match again (a config loaded a
+                    // second time, or a match restarted after a bad setup): reopen the match row, or
+                    // it kept the old end_time and winner and read as finished while being played.
+                    if (currentMapNumber == 0)
+                    {
+                        await conn.ExecuteAsync(
+                            @"
+                            UPDATE matchzy_stats_matches
+                            SET end_time = NULL, winner = '', team1_score = 0, team2_score = 0
+                            WHERE matchid = @MatchId AND end_time IS NOT NULL",
+                            new { MatchId = matchId }
+                        );
+                    }
+
                     // Insert new map data. Upsert rather than plain INSERT: reloading the same
                     // matchid (e.g. restarting a match after a bad setup) otherwise violates
-                    // PRIMARY KEY (matchid, mapnumber) and fails the same way. Result columns
-                    // (winner/scores/end_time) are deliberately left alone - SetMatchEndData owns
-                    // those, and a series' earlier maps must not be reset by a later map's start.
+                    // PRIMARY KEY (matchid, mapnumber) and fails the same way. Only THIS map's
+                    // result is cleared when it is replayed; a series' earlier maps are not touched.
                     await conn.ExecuteAsync(
                         conn is SqliteConnection
                             ? @"
@@ -439,13 +467,21 @@ namespace MatchZy
                             VALUES (@MatchId, @MapNumber, @StartTime, @MapName)
                             ON CONFLICT(matchid, mapnumber) DO UPDATE SET
                                 start_time = excluded.start_time,
-                                mapname = excluded.mapname"
+                                mapname = excluded.mapname,
+                                end_time = NULL,
+                                winner = '',
+                                team1_score = 0,
+                                team2_score = 0"
                             : @"
                             INSERT INTO matchzy_stats_maps (matchid, mapnumber, start_time, mapname)
                             VALUES (@MatchId, @MapNumber, @StartTime, @MapName)
                             ON DUPLICATE KEY UPDATE
                                 start_time = VALUES(start_time),
-                                mapname = VALUES(mapname)",
+                                mapname = VALUES(mapname),
+                                end_time = NULL,
+                                winner = '',
+                                team1_score = 0,
+                                team2_score = 0",
                         new
                         {
                             MatchId = matchId,
@@ -600,25 +636,36 @@ namespace MatchZy
                 using IDbConnection conn = CreateNewConnection();
                 conn.Open();
 
-                // Update map data
-                await conn.ExecuteAsync(
-                    @"
-                    UPDATE matchzy_stats_maps
-                    SET end_time = @EndTime,
-                        winner = @Winner,
-                        team1_score = @Team1Score,
-                        team2_score = @Team2Score
-                    WHERE matchid = @MatchId AND mapnumber = @MapNumber",
-                    new
+                // Update map data (mapNumber -1: the series ended between maps, no map to close).
+                // In its own try: a failed map row update used to skip the series score below.
+                if (mapNumber >= 0)
+                {
+                    try
                     {
-                        EndTime = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"),
-                        Winner = mapWinner,
-                        Team1Score = team1Score,
-                        Team2Score = team2Score,
-                        MatchId = matchId,
-                        MapNumber = mapNumber,
+                        await conn.ExecuteAsync(
+                            @"
+                            UPDATE matchzy_stats_maps
+                            SET end_time = @EndTime,
+                                winner = @Winner,
+                                team1_score = @Team1Score,
+                                team2_score = @Team2Score
+                            WHERE matchid = @MatchId AND mapnumber = @MapNumber",
+                            new
+                            {
+                                EndTime = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"),
+                                Winner = mapWinner,
+                                Team1Score = team1Score,
+                                Team2Score = team2Score,
+                                MatchId = matchId,
+                                MapNumber = mapNumber,
+                            }
+                        );
                     }
-                );
+                    catch (Exception mapEx)
+                    {
+                        Log($"[SetMatchEndData - ERROR] Map {mapNumber} row of match {matchId} could not be updated: {mapEx.Message}");
+                    }
+                }
 
                 // Update match data
                 if (matchWinner != null)

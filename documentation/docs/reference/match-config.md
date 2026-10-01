@@ -77,7 +77,7 @@ Prefer an in-game flow? Admins can build the same config with the [`.matchsetup`
 | `spectators` | object | `{}` | `{ "players": { "<steamid64>": "<name>" } }`. |
 | `clinch_series` | bool | `true` | End the series once a team has won the majority of maps. |
 | `wingman` | bool | `false` | Wingman game mode, uses `live_wingman.cfg`. |
-| `cvars` | object | - | Cvars applied when the match loads and before each map goes live, e.g. `{ "mp_overtime_enable": "1" }`. Only existing convars and `matchzy_` / `get5_` settings are accepted, with plain values (no quotes or `;`). Restored at series end when `matchzy_reset_cvars_on_series_end` is on. |
+| `cvars` | object | - | Cvars applied when the match loads and before each map goes live, e.g. `{ "mp_overtime_enable": "1" }`. Only existing convars and MatchZy/Get5 settings are accepted, with plain values (no quotes or `;`). Action commands (`matchzy_loadmatch_url`, `matchzy_loadbackup`, `get5_endmatch`, ...), `rcon_password` and `matchzy_everyone_is_admin` are ignored and logged. Restored at series end when `matchzy_reset_cvars_on_series_end` is on. |
 
 ## Team fields
 

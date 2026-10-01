@@ -1,6 +1,7 @@
 using CounterStrikeSharp.API;
 using CounterStrikeSharp.API.Core;
 using CounterStrikeSharp.API.Core.Attributes.Registration;
+using CounterStrikeSharp.API.Core.Translations;
 using CounterStrikeSharp.API.Modules.Commands;
 using CounterStrikeSharp.API.Modules.Utils;
 using CS2MenuManager.API.Class;
@@ -39,17 +40,17 @@ namespace MatchZy
             }
             if (matchStarted || isMatchLive)
             {
-                ReplyToUserCommand(player, "A match is already running. Use .stopmatch first.");
+                ReplyToUserCommand(player, Localizer.ForPlayer(player, "matchzy.menu.setupmatchrunning"));
                 return;
             }
             if (isMatchSetup)
             {
-                ReplyToUserCommand(player, $"A match is already configured (id {liveMatchId}). Use .stopmatch first.");
+                ReplyToUserCommand(player, Localizer.ForPlayer(player, "matchzy.menu.setupalreadyconfigured", liveMatchId));
                 return;
             }
             if (mapRotationList.Count == 0)
             {
-                ReplyToUserCommand(player, "matchzymaps.cfg has no maps - add some before running .matchsetup.");
+                ReplyToUserCommand(player, Localizer.ForPlayer(player, "matchzy.menu.setupnomaps"));
                 return;
             }
             // The lock used to be released only by Cancel / Start / Back, so an admin who closed the
@@ -63,7 +64,7 @@ namespace MatchZy
             }
             if (activeSetup != null && activeSetup.AdminSteamId != player.SteamID)
             {
-                ReplyToUserCommand(player, "Another admin is already in the setup wizard. Wait for them to finish or cancel.");
+                ReplyToUserCommand(player, Localizer.ForPlayer(player, "matchzy.menu.setupinuse"));
                 return;
             }
 
@@ -79,7 +80,7 @@ namespace MatchZy
         {
             if (!ValidateSetupOwner(player))
                 return;
-            var menu = new WasdMenu($"{chatPrefix} Match Setup - Series", this);
+            var menu = new WasdMenu($"Match Setup - Series", this);
             menu.AddItem(
                 "Best of 1 (BO1)",
                 (p, _) =>
@@ -151,7 +152,7 @@ namespace MatchZy
                 return;
             var s = activeSetup!;
             int poolSize = mapRotationList.Count;
-            var menu = new WasdMenu($"{chatPrefix} Map Selection (BO{s.NumMaps})", this);
+            var menu = new WasdMenu($"Map Selection (BO{s.NumMaps})", this);
             menu.AddItem("« Back", (p, _) => OpenSeriesMenu(p));
             menu.AddItem(
                 $"Pre-pick {s.NumMaps} map(s) - no veto",
@@ -189,7 +190,7 @@ namespace MatchZy
             if (!ValidateSetupOwner(player))
                 return;
             var s = activeSetup!;
-            var menu = new WasdMenu($"{chatPrefix} Pick Maps - {s.SelectedMaps.Count}/{s.NumMaps}", this);
+            var menu = new WasdMenu($"Pick Maps - {s.SelectedMaps.Count}/{s.NumMaps}", this);
             foreach (var map in mapRotationList)
             {
                 int pickIdx = s.SelectedMaps.IndexOf(map);
@@ -223,7 +224,7 @@ namespace MatchZy
         {
             if (!ValidateSetupOwner(player))
                 return;
-            var menu = new WasdMenu($"{chatPrefix} Side Selection", this);
+            var menu = new WasdMenu($"Side Selection", this);
             menu.AddItem(
                 "Knife round decides sides",
                 (p, _) =>
@@ -259,7 +260,7 @@ namespace MatchZy
             string team1 = ResolveTeam1Name();
             string team2 = ResolveTeam2Name();
 
-            var menu = new WasdMenu($"{chatPrefix} Confirm Match", this);
+            var menu = new WasdMenu($"Confirm Match", this);
             menu.AddItem($"BO{s.NumMaps} - change", (p, _) => OpenSeriesMenu(p));
             string mapSummary = s.SkipVeto ? $"Maps ({s.SelectedMaps.Count}/{s.NumMaps}): {string.Join(" → ", s.SelectedMaps)}" : $"Veto pool: {s.SelectedMaps.Count} maps";
             menu.AddItem(mapSummary, (p, _) => OpenMapModeMenu(p));
@@ -271,7 +272,7 @@ namespace MatchZy
                     // The wizard can be reclaimed by another admin; a stale menu must not touch it.
                     if (!ValidateSetupOwner(p))
                         return;
-                    ReplyToUserCommand(p, "Type .team1 <name> / .team2 <name> in chat - menu refreshes automatically.");
+                    ReplyToUserCommand(p, Localizer.ForPlayer(p, "matchzy.menu.setupteamnamehint"));
                     o.PostSelectAction = CS2MenuManager.API.Enum.PostSelectAction.Nothing;
                 }
             );
@@ -323,17 +324,17 @@ namespace MatchZy
             catch (Exception ex)
             {
                 Log($"[MatchSetup FATAL] {ex.Message}");
-                ReplyToUserCommand(player, $"Setup failed: {ex.Message}");
+                ReplyToUserCommand(player, Localizer.ForPlayer(player, "matchzy.menu.setupfailed", ex.Message));
                 return;
             }
 
             if (ok)
             {
-                PrintToAllChat($"{ChatColors.Green}Match configured by admin: BO{s.NumMaps} ({(s.SkipVeto ? "no veto" : "veto")})");
+                PrintLocalizedToAll(s.SkipVeto ? "matchzy.menu.setupconfigurednoveto" : "matchzy.menu.setupconfiguredveto", s.NumMaps);
             }
             else
             {
-                ReplyToUserCommand(player, "LoadMatchFromJSON returned false - check server log for validation errors.");
+                ReplyToUserCommand(player, Localizer.ForPlayer(player, "matchzy.menu.setuploadfailed"));
             }
         }
 
@@ -344,19 +345,19 @@ namespace MatchZy
             if (!ValidateSetupOwner(player))
                 return;
             activeSetup = null;
-            ReplyToUserCommand(player, "Match setup cancelled.");
+            ReplyToUserCommand(player, Localizer.ForPlayer(player, "matchzy.menu.setupcancelled"));
         }
 
         private bool ValidateSetupOwner(CCSPlayerController player)
         {
             if (activeSetup == null)
             {
-                ReplyToUserCommand(player, "No active match setup. Type .matchsetup to start.");
+                ReplyToUserCommand(player, Localizer.ForPlayer(player, "matchzy.menu.setupnoactive"));
                 return false;
             }
             if (activeSetup.AdminSteamId != player.SteamID)
             {
-                ReplyToUserCommand(player, "This setup belongs to another admin.");
+                ReplyToUserCommand(player, Localizer.ForPlayer(player, "matchzy.menu.setupnotowner"));
                 return false;
             }
             activeSetup.StartedAt = DateTime.UtcNow;

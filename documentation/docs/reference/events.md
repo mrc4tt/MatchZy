@@ -29,7 +29,7 @@ Player stats objects (`team1.players[].stats` on `round_end` and `map_result`) u
 | `round_end` | A live round ends | `round_number`, `reason`, `winner{side,team}` (the team that won this round), `team1`, `team2` (scores and player stats) |
 | `map_result` | The map ends | `map_number`, `winner`, `team1`, `team2`, `demo_filename` |
 | `series_end` | The series ends | `winner`, `team1_series_score`, `team2_series_score`, `time_until_restore` |
-| `match_cancelled` :fontawesome-solid-code-fork: | A loaded or running match is stopped, surrendered, restarted or cancelled for a no-show | `reason` (`ended_early`, `surrendered`, `restarted`, `no_show`), `demo_filename`, `team1`, `team2`, `team1_score`, `team2_score` |
+| `match_cancelled` :fontawesome-solid-code-fork: | A loaded or running match is stopped, surrendered, restarted, cancelled for a no-show, or ended by a map change from outside MatchZy | `reason` (`ended_early`, `surrendered`, `restarted`, `no_show`, `map_changed`), `demo_filename`, `team1`, `team2`, `team1_score`, `team2_score` |
 | `match_paused` :fontawesome-solid-code-fork: | Any pause starts | `round_number`, `pause_type` (`pause`, `tech`, `admin`, `auto`), `team_name`, `max_duration` |
 | `match_unpaused` :fontawesome-solid-code-fork: | Any pause ends | `round_number` |
 | `demo_upload_ended` | A demo upload finished | `map_number`, `filename`, `success` |

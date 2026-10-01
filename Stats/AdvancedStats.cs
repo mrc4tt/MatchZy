@@ -142,7 +142,8 @@ public partial class MatchZy
 
     private void OnAdvancedStatsRoundEnd(CsTeam winnerTeam)
     {
-        if (!isMatchLive)
+        // A round restore loading: the stats were just put back to the restored round's start.
+        if (!isMatchLive || isRoundRestoring)
             return;
 
         totalRoundsPlayed++;
@@ -532,6 +533,55 @@ public partial class MatchZy
     // Reset stats for new match
     // ═══════════════════════════════════════════════════════════════════
 
+    private sealed class AdvancedStatsSnapshot
+    {
+        public Dictionary<ulong, AdvancedPlayerStats> Players { get; set; } = new();
+        public int TotalRoundsPlayed { get; set; }
+    }
+
+    /// <summary>
+    /// The advanced stats as they are at the start of the current round, stored in each round
+    /// backup. A round restore puts them back: the opening kills, trades, clutches and KAST of the
+    /// rounds being replayed used to stay counted and were then counted a second time.
+    /// </summary>
+    private string CaptureAdvancedStatsSnapshot()
+    {
+        try
+        {
+            return JsonSerializer.Serialize(new AdvancedStatsSnapshot { Players = advancedStats, TotalRoundsPlayed = totalRoundsPlayed });
+        }
+        catch (Exception ex)
+        {
+            Log($"[AdvancedStats] Could not capture the snapshot: {ex.Message}");
+            return "";
+        }
+    }
+
+    private void RestoreAdvancedStatsSnapshot(string json)
+    {
+        if (string.IsNullOrWhiteSpace(json))
+            return; // older backup without the snapshot: keep the current stats
+        try
+        {
+            var snapshot = JsonSerializer.Deserialize<AdvancedStatsSnapshot>(json);
+            if (snapshot == null)
+                return;
+            advancedStats = snapshot.Players ?? new();
+            totalRoundsPlayed = snapshot.TotalRoundsPlayed;
+            // The round being restored starts again from scratch.
+            playerRoundStats.Clear();
+            roundDeaths.Clear();
+            roundFirstKillOccurred = false;
+            clutchInProgress = false;
+            clutchPlayer = null;
+            clutchOpponents = 0;
+        }
+        catch (Exception ex)
+        {
+            Log($"[AdvancedStats] Could not restore the snapshot: {ex.Message}");
+        }
+    }
+
     private void ResetAdvancedStats()
     {
         ResetLiveKillCounters();
@@ -599,7 +649,8 @@ public partial class MatchZy
                     Score = t2score,
                     Players = allPlayers.Where(p => p.Team == matchzyTeam2.teamName).OrderByDescending(p => p.Rating).ToList(),
                 },
-                Winner = t1score > t2score ? matchzyTeam1.teamName : matchzyTeam2.teamName,
+                // Empty on a draw (it used to name team2).
+                Winner = t1score > t2score ? matchzyTeam1.teamName : t2score > t1score ? matchzyTeam2.teamName : "",
             };
         }
         catch (Exception ex)

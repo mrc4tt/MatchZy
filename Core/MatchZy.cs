@@ -16,7 +16,7 @@ namespace MatchZy
     public partial class MatchZy : BasePlugin
     {
         public override string ModuleName => "MatchZy";
-        public override string ModuleVersion => "0.8.92";
+        public override string ModuleVersion => "0.8.93";
         public override string ModuleAuthor => "Miksen/mrc4tt (based on MatchZy by WD-)";
         public override string ModuleDescription => "A plugin for running and managing CS2 practice/pugs/scrims/matches!";
         public string chatPrefix = $"{ChatColors.Green}[MatchZy]{ChatColors.Default}";
@@ -148,7 +148,6 @@ namespace MatchZy
 
         // Ready status hint - event-driven with dirty flag to avoid per-second recomputation
         private bool _readyStatusDirty = true;
-        private string _cachedReadyHintMessage = "";
 
         // Each message is kept in chat display for ~13 seconds, hence setting default chat timer to 13 seconds.
         // Configurable using matchzy_chat_messages_timer_delay <seconds>
@@ -248,7 +247,7 @@ namespace MatchZy
                         if (!isSideSelectionPhase)
                             return;
 
-                        PrintToAllChat(Localizer["matchzy.knife.decidedtostay", knifeWinnerName]);
+                        PrintLocalizedToAll("matchzy.knife.decidedtostay", knifeWinnerName);
                         StartLive();
                     });
                 }
@@ -263,7 +262,7 @@ namespace MatchZy
                     {
                         Server.NextFrame(() =>
                         {
-                            PrintToAllChat($"{ChatColors.Green}{knifeWinnerName}{ChatColors.Default} has 40 seconds left to choose side!");
+                            PrintLocalizedToAll("matchzy.cmd.sidechoicetimeleft", knifeWinnerName, 40);
                         });
                     }
                 }
@@ -277,7 +276,7 @@ namespace MatchZy
                     {
                         Server.NextFrame(() =>
                         {
-                            PrintToAllChat($"{ChatColors.Green}{knifeWinnerName}{ChatColors.Default} has 20 seconds left to choose side!");
+                            PrintLocalizedToAll("matchzy.cmd.sidechoicetimeleft", knifeWinnerName, 20);
                         });
                     }
                 }
@@ -291,7 +290,7 @@ namespace MatchZy
                     {
                         Server.NextFrame(() =>
                         {
-                            PrintToAllChat($"{ChatColors.Green}{knifeWinnerName}{ChatColors.Default} has 10 seconds left to choose side!");
+                            PrintLocalizedToAll("matchzy.cmd.sidechoicetimeleft", knifeWinnerName, 10);
                         });
                     }
                 }
@@ -758,6 +757,43 @@ namespace MatchZy
                 HookMode.Pre
             );
 
+            // A veto captain who changes team can no longer ban or pick for their team (the
+            // ban/pick checks only look at the captain's userid), which hung the veto. Hand the
+            // captaincy to a teammate, or abort the veto when nobody is left on that side.
+            RegisterEventHandler<EventPlayerTeam>(
+                (@event, info) =>
+                {
+                    if (!isVeto)
+                        return HookResult.Continue;
+                    CCSPlayerController? player = @event.Userid;
+                    if (player == null || !player.IsValid || !player.UserId.HasValue)
+                        return HookResult.Continue;
+                    int userId = player.UserId.Value;
+                    if (!vetoCaptains.ContainsValue(userId))
+                        return HookResult.Continue;
+                    // Next frame: TeamNum still holds the old team while the event fires.
+                    Server.NextFrame(() =>
+                    {
+                        if (!isVeto)
+                            return;
+                        foreach (string teamKey in new[] { "team1", "team2" })
+                        {
+                            if (vetoCaptains[teamKey] != userId)
+                                continue;
+                            Team team = teamKey == "team1" ? matchzyTeam1 : matchzyTeam2;
+                            if (!teamSides.TryGetValue(team, out string? side))
+                                continue;
+                            int teamSide = side == "CT" ? (int)CsTeam.CounterTerrorist : (int)CsTeam.Terrorist;
+                            bool stillOnSide = player.IsValid && player.TeamNum == teamSide;
+                            if (!stillOnSide)
+                                HandleVetoCaptainLeft(userId);
+                        }
+                    });
+                    return HookResult.Continue;
+                },
+                HookMode.Post
+            );
+
             RegisterEventHandler<EventPlayerTeam>(
                 (@event, info) =>
                 {
@@ -796,7 +832,7 @@ namespace MatchZy
                     bool isJoin = @event.Oldteam <= (int)CsTeam.Spectator;
                     if (isJoin && playerTeam is CsTeam.Terrorist or CsTeam.CounterTerrorist && !IsMatchCoach(player) && IsSideFull(playerTeam, player))
                     {
-                        PrintToPlayerChat(player, $"Your team already has {matchConfig.PlayersPerTeam} players. You are placed as a spectator.");
+                        PrintToPlayerChat(player, Localizer.ForPlayer(player, "matchzy.cmd.teamfullspectator", matchConfig.PlayersPerTeam));
                         playerTeam = CsTeam.Spectator;
                     }
                     if (joinedTeam == playerTeam || joinedTeam == CsTeam.None)
@@ -876,7 +912,7 @@ namespace MatchZy
                             // ...and only while it has room (players_per_team; coaches excluded).
                             if (!IsMatchCoach(player) && IsSideFull((CsTeam)joiningTeam, player))
                             {
-                                PrintToPlayerChat(player, $"Your team already has {matchConfig.PlayersPerTeam} players.");
+                                PrintToPlayerChat(player, Localizer.ForPlayer(player, "matchzy.cmd.teamfull", matchConfig.PlayersPerTeam));
                                 return HookResult.Stop;
                             }
                         }
@@ -927,7 +963,7 @@ namespace MatchZy
                         if (isPractice && !isDryRun && !matchStarted)
                         {
                             Server.NextFrame(() => ClearRoundHistory());
-                            AddTimer(2.0f, () => ClearRoundHistory());
+                            AddTimer(2.0f, () => ClearRoundHistory(), TimerFlags.STOP_ON_MAPCHANGE);
                         }
 
                         // Dryrun does NOT auto-end on round end: it keeps playing rounds (add bots, play
@@ -952,6 +988,7 @@ namespace MatchZy
             {
                 // The cached cs_gamerules proxy belongs to the previous map's entity system.
                 InvalidateGameRulesCache();
+                ClearCoachSpawnCache();
 
                 // Re-arm AutoStart latch: allow exactly one AutoStart for this new map.
                 autoStartLatched = false;
@@ -1158,10 +1195,7 @@ namespace MatchZy
                         TAlive = tAlive,
                     };
 
-                    Task.Run(async () =>
-                    {
-                        await SendEventAsync(deathEvent);
-                    });
+                    PublishEvent(deathEvent);
                     return HookResult.Continue;
                 },
                 HookMode.Post
@@ -1190,15 +1224,12 @@ namespace MatchZy
                         RoundNumber = GetRoundNumer(),
                         PlayerName = player.PlayerName,
                         PlayerSteamId = player.SteamID.ToString(),
-                        Site = GetPlantedBombSite(),
+                        Site = GetPlantedBombSite(refresh: true),
                         CtAlive = ctAlive,
                         TAlive = tAlive,
                     };
 
-                    Task.Run(async () =>
-                    {
-                        await SendEventAsync(plantEvent);
-                    });
+                    PublishEvent(plantEvent);
                     return HookResult.Continue;
                 }
             );
@@ -1231,10 +1262,7 @@ namespace MatchZy
                         TAlive = tAlive,
                     };
 
-                    Task.Run(async () =>
-                    {
-                        await SendEventAsync(defuseEvent);
-                    });
+                    PublishEvent(defuseEvent);
                     return HookResult.Continue;
                 }
             );
@@ -1306,10 +1334,7 @@ namespace MatchZy
                         Players = players,
                     };
 
-                    Task.Run(async () =>
-                    {
-                        await SendEventAsync(freezeEndEvent);
-                    });
+                    PublishEvent(freezeEndEvent);
                     return HookResult.Continue;
                 }
             );
@@ -1388,10 +1413,7 @@ namespace MatchZy
                         Hitgroup = @event.Hitgroup,
                     };
 
-                    Task.Run(async () =>
-                    {
-                        await SendEventAsync(hurtEvent);
-                    });
+                    PublishEvent(hurtEvent);
                     return HookResult.Continue;
                 }
             );
@@ -1425,27 +1447,26 @@ namespace MatchZy
 
                     if (player == null)
                     {
-                        // Somehow we did not have the player in playerData, hence updating the maps again before getting the player
-                        UpdatePlayersMap();
-
-                        // Add validation before accessing the dictionary
-                        if (playerData.TryGetValue(playerUserId, out CCSPlayerController? playerValue))
+                        // playerData intentionally excludes team==None players during match setup /
+                        // match-mode-only (the ready/whitelist gate). But that must NOT kill chat
+                        // command dispatch, else a spectator/unassigned admin loses EVERY dot command
+                        // (.ma, .match, .stopmatch, ...) - !ma still works only because CSS's ! trigger
+                        // bypasses this path. Resolve the controller directly so dot commands dispatch;
+                        // each handler still runs its own admin/state checks. The direct lookup comes
+                        // first: rebuilding playerData (a scan of every controller) on each such chat
+                        // line was pure overhead, since those players are excluded on purpose.
+                        var directPlayer = Utilities.GetPlayerFromUserid(playerUserId);
+                        if (directPlayer != null && directPlayer.IsValid && !directPlayer.IsBot && !directPlayer.IsHLTV)
                         {
-                            player = playerValue;
+                            player = directPlayer;
                         }
                         else
                         {
-                            // playerData intentionally excludes team==None players during match setup /
-                            // match-mode-only (the ready/whitelist gate). But that must NOT kill chat
-                            // command dispatch, else a spectator/unassigned admin loses EVERY dot command
-                            // (.ma, .match, .stopmatch, ...) - !ma still works only because CSS's ! trigger
-                            // bypasses this path. Resolve the controller directly so dot commands dispatch;
-                            // each handler still runs its own admin/state checks.
-                            var directPlayer = Utilities.GetPlayerFromUserid(playerUserId);
-                            if (directPlayer != null && directPlayer.IsValid && !directPlayer.IsBot && !directPlayer.IsHLTV)
-                                player = directPlayer;
-                            else
+                            // Not resolvable directly: playerData may be stale, rebuild and retry.
+                            UpdatePlayersMap();
+                            if (!playerData.TryGetValue(playerUserId, out CCSPlayerController? playerValue))
                                 return HookResult.Continue;
+                            player = playerValue;
                         }
                     }
 
@@ -1481,12 +1502,18 @@ namespace MatchZy
                         return HookResult.Continue;
                     }
 
-                    if (message.StartsWith(".readyrequired"))
+                    // Commands that take arguments are matched on the exact command word. A prefix
+                    // match ran the wrong command: ".mapx" ran .map, ".spec x" ran .spawn (".sp"),
+                    // ".banana" ran .ban. A trailing space in the old prefix meant "argument
+                    // required"; that is kept as an explicit non-empty argument check.
+                    string cmdWord = messageCommand.ToLowerInvariant();
+
+                    if (cmdWord == ".readyrequired")
                     {
                         HandleReadyRequiredCommand(player, messageCommandArg);
                     }
 
-                    if (message.StartsWith(".teamsize"))
+                    if (cmdWord == ".teamsize")
                     {
                         HandleReadyRequiredCommand(player, messageCommandArg);
                     }
@@ -1494,17 +1521,17 @@ namespace MatchZy
                     // ".restore " with the space, so the argument-less aliases (.restorelast,
                     // .restorecurrent, .rrestore) that already matched exactly above are not also
                     // routed here and answered with "invalid value for restore command".
-                    if (message.StartsWith(".restore "))
+                    if ((cmdWord == ".restore" && messageCommandArg != ""))
                     {
                         HandleRestoreCommand(player, messageCommandArg);
                     }
 
-                    if (message.StartsWith(".listbackups"))
+                    if (cmdWord == ".listbackups")
                     {
                         HandleListBackupsChatCommand(player, messageCommandArg);
                     }
 
-                    if (message.StartsWith(".asay"))
+                    if (cmdWord == ".asay")
                     {
                         HandleAdminSayCommand(player, messageCommandArg);
                     }
@@ -1516,171 +1543,171 @@ namespace MatchZy
                     // which covers servers that DO add . as a chat trigger (then .map hits both this
                     // dispatch and css_map) - without it the map would change twice and disconnect
                     // players (NETWORK_DISCONNECT_CREATE_SERVER_FAILED).
-                    if (message.StartsWith(".map") && mapConsoleCommandEnabled.Value && _conflictingMapPlugin == null)
+                    if (cmdWord == ".map" && mapConsoleCommandEnabled.Value && _conflictingMapPlugin == null)
                     {
                         HandleMapChangeCommand(player, messageCommandArg);
                     }
 
-                    if (message.StartsWith(".savenade") || message.StartsWith(".sn"))
+                    if (cmdWord == ".savenade" || cmdWord == ".sn")
                     {
                         HandleSaveNadeCommand(player, messageCommandArg);
                     }
 
-                    if (message.StartsWith(".delnade") || message.StartsWith(".dn"))
+                    if (cmdWord == ".delnade" || cmdWord == ".dn")
                     {
                         HandleDeleteNadeCommand(player, messageCommandArg);
                     }
 
-                    if (message.StartsWith(".deletenade"))
+                    if (cmdWord == ".deletenade")
                     {
                         HandleDeleteNadeCommand(player, messageCommandArg);
                     }
 
-                    if (message.StartsWith(".importnade"))
+                    if (cmdWord == ".importnade")
                     {
                         HandleImportNadeCommand(player, messageCommandArg);
                     }
 
-                    if (message.StartsWith(".listnades") || message.StartsWith(".lin"))
+                    if (cmdWord == ".listnades" || cmdWord == ".lin")
                     {
                         HandleListNadesCommand(player, messageCommandArg);
                     }
 
-                    if (message.StartsWith(".libadd"))
+                    if (cmdWord == ".libadd")
                     {
                         HandleLibAddCommand(player, messageCommandArg);
                     }
 
-                    if (message.StartsWith(".libremove"))
+                    if (cmdWord == ".libremove")
                     {
                         HandleLibRemoveCommand(player, messageCommandArg);
                     }
 
-                    if (message.StartsWith(".liblist"))
+                    if (cmdWord == ".liblist")
                     {
                         HandleLibListCommand(player, messageCommandArg);
                     }
 
-                    if (message.StartsWith(".loadnade") || message.StartsWith(".ln"))
+                    if (cmdWord == ".loadnade" || cmdWord == ".ln")
                     {
                         HandleLoadNadeCommand(player, messageCommandArg);
                     }
 
-                    if (message.StartsWith(".warmupbots "))
+                    if ((cmdWord == ".warmupbots" && messageCommandArg != ""))
                     {
                         HandleWarmupBotsCommand(player, messageCommandArg);
                     }
                     // Named bot positions (arg forms). Order: longer prefixes first.
-                    if (message.StartsWith(".savebotpos") || message.StartsWith(".sbp"))
+                    if (cmdWord == ".savebotpos" || cmdWord == ".sbp")
                     {
                         HandleSaveBotPosCommand(player, messageCommandArg);
                     }
-                    else if (message.StartsWith(".loadbotpos") || message.StartsWith(".lbp"))
+                    else if (cmdWord == ".loadbotpos" || cmdWord == ".lbp")
                     {
                         HandleLoadBotPosCommand(player, messageCommandArg);
                     }
-                    else if (message.StartsWith(".delbotpos") || message.StartsWith(".dbp"))
+                    else if (cmdWord == ".delbotpos" || cmdWord == ".dbp")
                     {
                         HandleDelBotPosCommand(player, messageCommandArg);
                     }
 
                     // Named position slots (#2). No-arg .savepos/.loadpos/.listpos/.delpos hit the
                     // exact-match block above (returns early); these fire only for the arg forms.
-                    if (message.StartsWith(".savepos "))
+                    if ((cmdWord == ".savepos" && messageCommandArg != ""))
                     {
                         HandleSavePosCommand(player, messageCommandArg);
                     }
 
-                    if (message.StartsWith(".loadpos "))
+                    if ((cmdWord == ".loadpos" && messageCommandArg != ""))
                     {
                         HandleLoadPosCommand(player, messageCommandArg);
                     }
 
-                    if (message.StartsWith(".delpos "))
+                    if ((cmdWord == ".delpos" && messageCommandArg != ""))
                     {
                         HandleDelPosCommand(player, messageCommandArg);
                     }
 
-                    if (message.StartsWith(".spawn") || message.StartsWith(".sp"))
+                    if (cmdWord == ".spawn" || cmdWord == ".sp")
                     {
                         HandleSpawnCommand(player, messageCommandArg, player.TeamNum, "spawn");
                     }
 
-                    if (message.StartsWith(".ctspawn") || message.StartsWith(".cts"))
+                    if (cmdWord == ".ctspawn" || cmdWord == ".cts")
                     {
                         HandleSpawnCommand(player, messageCommandArg, (byte)CsTeam.CounterTerrorist, "ctspawn");
                     }
 
-                    if (message.StartsWith(".tspawn") || message.StartsWith(".ts"))
+                    if (cmdWord == ".tspawn" || cmdWord == ".ts")
                     {
                         HandleSpawnCommand(player, messageCommandArg, (byte)CsTeam.Terrorist, "tspawn");
                     }
 
-                    if (message.StartsWith(".team1") || message.StartsWith(".ctname"))
+                    if (cmdWord == ".team1" || cmdWord == ".ctname")
                     {
                         HandleTeamNameChangeCommand(player, messageCommandArg, 1);
                     }
 
-                    if (message.StartsWith(".team2") || message.StartsWith(".tname"))
+                    if (cmdWord == ".team2" || cmdWord == ".tname")
                     {
                         HandleTeamNameChangeCommand(player, messageCommandArg, 2);
                     }
 
-                    if (message.StartsWith(".savecoachspawn"))
+                    if (cmdWord == ".savecoachspawn")
                     {
                         HandleSaveCoachSpawnCommand(player, messageCommandArg);
                     }
 
-                    if (message.StartsWith(".clearcoachspawns"))
+                    if (cmdWord == ".clearcoachspawns")
                     {
                         HandleClearCoachSpawnsCommand(player);
                     }
 
-                    if (message.StartsWith(".showcoachspawns"))
+                    if (cmdWord == ".showcoachspawns")
                     {
                         OnShowCoachSpawnsCommand(player, null);
                     }
-                    else if (message.StartsWith(".listcoachspawns"))
+                    else if (cmdWord == ".listcoachspawns")
                     {
                         HandleListCoachSpawnsCommand(player);
                     }
 
                     // Order matters: .coachtest must not be swallowed by the .coach prefix.
-                    if (message.StartsWith(".coachtest"))
+                    if (cmdWord == ".coachtest")
                     {
                         OnCoachTestCommand(player, null);
                     }
-                    else if (message.StartsWith(".coach"))
+                    else if (cmdWord == ".coach")
                     {
                         HandleCoachCommand(player, messageCommandArg);
                     }
 
-                    if (message.StartsWith(".ban"))
+                    if (cmdWord == ".ban")
                     {
                         HandeMapBanCommand(player, messageCommandArg);
                     }
 
-                    if (message.StartsWith(".pick"))
+                    if (cmdWord == ".pick")
                     {
                         HandeMapPickCommand(player, messageCommandArg);
                     }
 
-                    if (message.StartsWith(".back"))
+                    if (cmdWord == ".back")
                     {
                         HandleBackCommand(player, messageCommandArg);
                     }
 
-                    if (message.StartsWith(".delay"))
+                    if (cmdWord == ".delay")
                     {
                         HandleDelayCommand(player, messageCommandArg);
                     }
 
-                    if (message.StartsWith(".throwindex"))
+                    if (cmdWord == ".throwindex")
                     {
                         HandleThrowIndexCommand(player, messageCommandArg);
                     }
 
-                    if (message.StartsWith(".throwidx"))
+                    if (cmdWord == ".throwidx")
                     {
                         HandleThrowIndexCommand(player, messageCommandArg);
                     }

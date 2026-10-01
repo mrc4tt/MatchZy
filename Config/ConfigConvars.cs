@@ -75,7 +75,7 @@ namespace MatchZy
         //   1 = HTML READY-UP panel, warmup suppressed: own WARMUP badge, no native 'Warmup' pill,
         //       but a frozen 1:00 round timer top-center (hiding warmup forces the client to draw the
         //       round timer; no netvar can blank it)
-        public FakeConVar<int> readyHintStyle = new("matchzy_ready_hint_style", "Ready-status display mode. 0 = classic center text. 1 = HTML READY-UP panel (progress bar, per-player status) with the native warmup suppressed: own WARMUP badge, no native 'Warmup' pill, frozen 1:00 top timer. Default: 0", 0);
+        public FakeConVar<int> readyHintStyle = new("matchzy_ready_hint_style", "Ready-status display mode. 0 = classic center text. 1 = HTML READY-UP panel (progress bar, per-player status) with the native warmup suppressed: own WARMUP badge, no native 'Warmup' pill, frozen 1:00 top timer. 2 = no center text, upstream MatchZy's chat reminder listing the players who are not ready (every matchzy_chat_messages_timer_delay seconds). Default: 0", 0, ConVarFlags.FCVAR_NONE, new CounterStrikeSharp.API.Modules.Cvars.Validators.RangeValidator<int>(0, 2));
 
         public FakeConVar<bool> readyHintBlinkEnabled = new("matchzy_ready_hint_blink", "Blink the 'YOU ARE NOT READY' line on the HTML READY-UP panel to grab attention. ONLY applies when matchzy_ready_hint_style is 1 (the HTML panel); no effect in classic style (0). Default: false", false);
 
@@ -275,7 +275,7 @@ namespace MatchZy
                 return;
             if (!IsValidUrl(url))
             {
-                Log($"[MatchZyDemoUploadURL] Invalid URL: {url}. Please provide a valid URL for uploading the demo!");
+                Log($"[MatchZyDemoUploadURL] Invalid URL: {RedactUrl(url)}. Please provide a valid URL for uploading the demo!");
                 return;
             }
 

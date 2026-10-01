@@ -43,20 +43,20 @@ namespace MatchZy
 
         private void OpenNadesListMenu(CCSPlayerController player, string typeFilter, WasdMenu prev)
         {
-            List<(string Name, string Type, string Throw)> entries = new();
+            List<(string Steam, string Name, string Type, string Throw)> entries = new();
             try
             {
                 string path = Path.Join(Server.GameDirectory + "/csgo/cfg", MatchZyCfgRel("savednades.json"));
                 var dict = File.Exists(path)
                     ? JsonSerializer.Deserialize<Dictionary<string, Dictionary<string, Dictionary<string, string>>>>(ReadSavedNadesJson(path)) ?? new()
                     : new Dictionary<string, Dictionary<string, Dictionary<string, string>>>();
-                foreach (var (_, name, info) in OrderedLineupsForMap(player, dict, ""))
+                foreach (var (steam, name, info) in OrderedLineupsForMap(player, dict, ""))
                 {
                     string type = info.TryGetValue("Type", out var ty) ? ty : "";
                     if (typeFilter != "All" && !string.Equals(type, typeFilter, StringComparison.OrdinalIgnoreCase))
                         continue;
                     string thr = info.TryGetValue("Throw", out var th) ? th : "";
-                    entries.Add((name, type, thr));
+                    entries.Add((steam, name, type, thr));
                 }
             }
             catch (Exception e)
@@ -71,16 +71,17 @@ namespace MatchZy
             }
             else
             {
-                foreach (var (name, type, thr) in entries)
+                foreach (var (steam, name, type, thr) in entries)
                 {
                     string label = string.IsNullOrEmpty(type) ? name : $"[{type}] {name}";
                     if (!string.IsNullOrEmpty(thr))
                         label += $" - {thr}";
                     string loadName = name;
+                    string loadGroup = steam;
                     sub.AddItem(label, (p, _) =>
                     {
                         // Same load path as .loadnade: teleport to the lineup + equip the grenade.
-                        HandleLoadNadeCommand(p, loadName);
+                        HandleLoadNadeCommand(p, loadName, loadGroup);
                     });
                 }
             }

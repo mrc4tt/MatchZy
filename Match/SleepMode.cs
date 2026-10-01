@@ -14,6 +14,9 @@ namespace MatchZy
         {
             if (matchStarted)
                 return;
+            // See StartPracticeMode: a queued restore does not survive a switch to sleep.
+            isRoundRestorePending = false;
+            pendingRestoreFileName = "";
             isSleep = true;
 
             // Reset player settings before leaving practice

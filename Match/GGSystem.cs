@@ -1,4 +1,5 @@
 using CounterStrikeSharp.API.Core;
+using CounterStrikeSharp.API.Core.Translations;
 using CounterStrikeSharp.API.Core.Attributes.Registration;
 using CounterStrikeSharp.API.Modules.Commands;
 using CounterStrikeSharp.API.Modules.Utils;
@@ -18,27 +19,27 @@ namespace MatchZy
                 return;
             if (!isMatchLive)
             {
-                ReplyToUserCommand(player, "GG can only be used during a live match!");
+                ReplyToUserCommand(player, Localizer.ForPlayer(player, "matchzy.matchmsg.ggnotlive"));
                 return;
             }
 
             if (IsHalfTimePhase())
             {
-                ReplyToUserCommand(player, "GG can't be used during a halftime process");
+                ReplyToUserCommand(player, Localizer.ForPlayer(player, "matchzy.matchmsg.gghalftime"));
                 return;
             }
 
             var playerTeam = player!.Team;
             if (playerTeam != CsTeam.Terrorist && playerTeam != CsTeam.CounterTerrorist)
             {
-                ReplyToUserCommand(player, "You must be on a team to vote for GG!");
+                ReplyToUserCommand(player, Localizer.ForPlayer(player, "matchzy.matchmsg.ggnoteam"));
                 return;
             }
 
             // Coaches do not play and do not vote.
             if (IsMatchCoach(player))
             {
-                ReplyToUserCommand(player, "Coaches cannot vote to surrender.");
+                ReplyToUserCommand(player, Localizer.ForPlayer(player, "matchzy.matchmsg.ggcoach"));
                 return;
             }
 
@@ -46,7 +47,7 @@ namespace MatchZy
             // maps too, so it is only allowed in a single-map match.
             if (isMatchSetup && matchConfig.NumMaps > 1)
             {
-                ReplyToUserCommand(player, "Surrender is not available in a multi-map series. Ask an admin.");
+                ReplyToUserCommand(player, Localizer.ForPlayer(player, "matchzy.matchmsg.ggseries"));
                 return;
             }
 
@@ -91,7 +92,7 @@ namespace MatchZy
             int scoreDifference = opponentTeamScore - playerTeamScore;
             if (scoreDifference < 6)
             {
-                ReplyToUserCommand(player, $"Your team must be losing by at least 6 rounds to surrender! Current score: {playerTeamScore}-{opponentTeamScore}");
+                ReplyToUserCommand(player, Localizer.ForPlayer(player, "matchzy.matchmsg.ggnotlosing", playerTeamScore, opponentTeamScore));
                 return;
             }
 
@@ -104,7 +105,7 @@ namespace MatchZy
 
             if (ggVotes[playerTeam].Contains(player.UserId.Value))
             {
-                ReplyToUserCommand(player, "You have already voted for GG!");
+                ReplyToUserCommand(player, Localizer.ForPlayer(player, "matchzy.matchmsg.ggalreadyvoted"));
                 return;
             }
 
@@ -117,7 +118,7 @@ namespace MatchZy
 
             int currentVotes = ggVotes[playerTeam].Count;
 
-            PrintToAllChat($"{ChatColors.Green}{player.PlayerName}{ChatColors.Default} voted to surrender. {ChatColors.Green}({currentVotes}/{votesNeeded}){ChatColors.Default} votes from {ChatColors.Green}{playerTeamName}{ChatColors.Default} [Score: {playerTeamScore}-{opponentTeamScore}]");
+            PrintLocalizedToAll("matchzy.matchmsg.ggvoted", player.PlayerName, currentVotes, votesNeeded, playerTeamName, playerTeamScore, opponentTeamScore);
 
             // Проверяем, достаточно ли голосов
             if (currentVotes >= votesNeeded)
@@ -158,7 +159,7 @@ namespace MatchZy
                 int finalScoreDifference = finalOpponentTeamScore - finalPlayerTeamScore;
                 if (finalScoreDifference < 6)
                 {
-                    PrintToAllChat($"{ChatColors.Red}GG cancelled!{ChatColors.Default} {ChatColors.Green}{playerTeamName}{ChatColors.Default} is no longer losing by 6+ rounds. Current score: {finalPlayerTeamScore}-{finalOpponentTeamScore}");
+                    PrintLocalizedToAll("matchzy.matchmsg.ggcancelled", playerTeamName, finalPlayerTeamScore, finalOpponentTeamScore);
                     ResetGGVotes();
                     return;
                 }
@@ -167,44 +168,10 @@ namespace MatchZy
                 CsTeam winnerTeam = playerTeam == CsTeam.CounterTerrorist ? CsTeam.Terrorist : CsTeam.CounterTerrorist;
                 string winnerTeamName = GetTeamName(winnerTeam);
 
-                PrintToAllChat($"{ChatColors.Green}{playerTeamName}{ChatColors.Default} has surrendered! {ChatColors.Green}{winnerTeamName}{ChatColors.Default} wins!");
+                PrintLocalizedToAll("matchzy.matchmsg.ggsurrendered", playerTeamName, winnerTeamName);
 
-                // Используем такую же логику как в FFWSystem
-                (int currentT1score, int currentT2score) = GetTeamsScore();
-
-                int t1score_final,
-                    t2score_final;
-
-                // Определяем команду-победителя (противник сдавшейся команды)
-                Team? winnerMatchTeam = null;
-                if (playerMatchTeam == matchzyTeam1)
-                {
-                    winnerMatchTeam = matchzyTeam2;
-                }
-                else
-                {
-                    winnerMatchTeam = matchzyTeam1;
-                }
-
-                // Увеличиваем серию счет команды-победителя
-                if (winnerMatchTeam != null)
-                {
-                    winnerMatchTeam.seriesScore++;
-                }
-
-                // Устанавливаем финальный счет (как в FFWSystem)
-                if (winnerMatchTeam == matchzyTeam1)
-                {
-                    t1score_final = Math.Max(currentT1score, 16);
-                    t2score_final = currentT2score;
-                }
-                else
-                {
-                    t1score_final = currentT1score;
-                    t2score_final = Math.Max(currentT2score, 16);
-                }
-
-                EndSeries(winnerTeamName, 5, t1score_final, t2score_final);
+                Team winnerMatchTeam = playerMatchTeam == matchzyTeam1 ? matchzyTeam2 : matchzyTeam1;
+                EndSeriesWithWinner(winnerMatchTeam);
                 ResetGGVotes();
             }
             else
@@ -217,7 +184,7 @@ namespace MatchZy
                     {
                         if (ggVotes[playerTeam].Count > 0)
                         {
-                            PrintToAllChat($"GG vote for {ChatColors.Green}{playerTeamName}{ChatColors.Default} has expired!");
+                            PrintLocalizedToAll("matchzy.matchmsg.ggexpired", playerTeamName);
                             ggVotes[playerTeam].Clear();
                         }
                     }

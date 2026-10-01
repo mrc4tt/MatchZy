@@ -191,11 +191,15 @@ namespace MatchZy
             // gameinfo.gi, which is csgo/addons/metamod on Metamod servers. An absolute path keeps the
             // demo in csgo/, where the folder above was created and the checks and upload look for it.
             string recordPath = Path.Join(Server.GameDirectory, "csgo", tempDemoPath).Replace('\\', '/');
-            string recordArg = recordPath.Contains(' ') ? $"\"{recordPath}\"" : recordPath;
+            // Always quoted: the console tokenizer splits an unquoted argument at a space and at the
+            // ':' of a Windows drive letter (C:/...).
+            string recordArg = $"\"{recordPath}\"";
             // tv_record_immediate 1 makes GOTV write the .dem while the match runs instead of buffering
             // it, so the file is on disk (which is what the verification below checks) and survives a
-            // server crash mid-match.
-            Server.ExecuteCommand($"tv_record_immediate 1;tv_record {recordArg}");
+            // server crash mid-match. Only sent when the build has the convar.
+            if (ConVar.Find("tv_record_immediate") != null)
+                Server.ExecuteCommand("tv_record_immediate 1");
+            Server.ExecuteCommand($"tv_record {recordArg}");
             isDemoRecording = true;
             Log($"[StartDemoRecording] tv_record {recordArg} (attempt {demoStartAttempts}/{DemoStartMaxAttempts})");
             VerifyDemoRecording(tempDemoPath);
@@ -394,6 +398,11 @@ namespace MatchZy
             string headerKey = demoUploadHeaderKey;
             string headerValue = demoUploadHeaderValue;
             bool useS3 = isDemoUploadS3Enabled;
+            // Also the event target: the upload (15 s plus the transfer) usually finishes after the
+            // series ended and the match was reset, when the remote log URL is back to the server's
+            // own. (liveMatchId here is this method's parameter, so it is already fixed.)
+            long uploadMatchId = liveMatchId;
+            var eventTarget = CurrentRemoteLogTarget();
 
             if (isDemoRecording)
             {
@@ -415,7 +424,7 @@ namespace MatchZy
                     {
                         foreach (string segmentPath in segmentPaths)
                         {
-                            bool uploadSuccess = await UploadFileAsync(segmentPath, uploadURL, headerKey, headerValue, liveMatchId, currentMapNumber, roundNumber, useS3);
+                            bool uploadSuccess = await UploadFileAsync(segmentPath, uploadURL, headerKey, headerValue, uploadMatchId, currentMapNumber, roundNumber, useS3);
 
                             // Only report the result when an upload was actually configured, otherwise every
                             // server without a demo upload URL would emit a failed demo_upload_ended per map.
@@ -423,11 +432,11 @@ namespace MatchZy
 
                             await SendEventAsync(new MatchZyDemoUploadedEvent
                             {
-                                MatchId = liveMatchId,
+                                MatchId = uploadMatchId,
                                 MapNumber = currentMapNumber,
                                 FileName = Path.GetFileName(segmentPath),
                                 Success = uploadSuccess,
-                            });
+                            }, eventTarget);
                         }
                     });
                 });

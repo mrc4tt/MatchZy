@@ -22,11 +22,6 @@ public class PlayerPracticeTimer
         TimerType = timerType;
     }
 
-    public void DisplayTimerCenter(CCSPlayerController player)
-    {
-        player.PrintToCenter($"Timer: {GetTimerResult()}s");
-    }
-
     public double GetTimerResult()
     {
         double totalSeconds = (DateTime.Now - StartTime).TotalSeconds;

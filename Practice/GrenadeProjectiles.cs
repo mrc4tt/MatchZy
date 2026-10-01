@@ -1,4 +1,5 @@
 using System.Runtime.InteropServices;
+using CounterStrikeSharp.API;
 using CounterStrikeSharp.API.Core;
 using CounterStrikeSharp.API.Modules.Memory.DynamicFunctions;
 
@@ -18,7 +19,15 @@ public static class GrenadeFunctions
     // key degrades a factory to null (the caller skips the rethrow) instead of taking MatchZy down.
     private static TFunc? Guard<TFunc>(Func<TFunc> make) where TFunc : class
     {
-        try { return make(); }
+        try
+        {
+            TFunc func = make();
+            // A stale signature can resolve to a zero address without throwing; invoking that fails
+            // with "Invalid function pointer". Treat it as unresolved so the caller uses its fallback.
+            if (func is NativeObject native && native.Handle == IntPtr.Zero)
+                return null;
+            return func;
+        }
         catch { return null; }
     }
 

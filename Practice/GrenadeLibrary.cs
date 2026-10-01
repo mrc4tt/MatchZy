@@ -118,6 +118,8 @@ namespace MatchZy
         private (int R, int G, int B)? SmokeColorForThrow(CCSPlayerController player)
         {
             if (!smokeColorEnabled.Value) return null;
+            // Called from delayed rethrow timers: the player may have left during the .delay window.
+            if (player == null || !player.IsValid) return null;
             var c = GetPlayerTeammateColor(player);
             return (c.R, c.G, c.B);
         }
@@ -466,12 +468,7 @@ namespace MatchZy
         private static bool TryParseVector(string s, out Vector v)
         {
             v = new Vector(0, 0, 0);
-            var p = s.Split(' ');
-            if (p.Length != 3) return false;
-            if (!float.TryParse(p[0], NumberStyles.Float, CultureInfo.InvariantCulture, out float x)) return false;
-            if (!float.TryParse(p[1], NumberStyles.Float, CultureInfo.InvariantCulture, out float y)) return false;
-            if (!float.TryParse(p[2], NumberStyles.Float, CultureInfo.InvariantCulture, out float z)) return false;
-            if (!float.IsFinite(x) || !float.IsFinite(y) || !float.IsFinite(z)) return false;
+            if (!LineupFormat.TryParse(s, out float x, out float y, out float z)) return false;
             v = new Vector(x, y, z);
             return true;
         }
@@ -479,12 +476,7 @@ namespace MatchZy
         private static bool TryParseAngle(string s, out QAngle a)
         {
             a = new QAngle(0, 0, 0);
-            var p = s.Split(' ');
-            if (p.Length != 3) return false;
-            if (!float.TryParse(p[0], NumberStyles.Float, CultureInfo.InvariantCulture, out float x)) return false;
-            if (!float.TryParse(p[1], NumberStyles.Float, CultureInfo.InvariantCulture, out float y)) return false;
-            if (!float.TryParse(p[2], NumberStyles.Float, CultureInfo.InvariantCulture, out float z)) return false;
-            if (!float.IsFinite(x) || !float.IsFinite(y) || !float.IsFinite(z)) return false;
+            if (!LineupFormat.TryParse(s, out float x, out float y, out float z)) return false;
             a = new QAngle(x, y, z);
             return true;
         }
@@ -661,7 +653,7 @@ namespace MatchZy
                 mapSlots[name] = new Dictionary<string, string>(info);
                 if (!SaveGlobalPack(pack))
                 {
-                    ReplyToUserCommand(player, "The grenade library file is unreadable, not saving (a backup copy was made; check the server log).");
+                    ReplyToUserCommand(player, Localizer.ForPlayer(player, "matchzy.pracmisc.libraryunreadable"));
                     return;
                 }
                 RefreshNadeMarkersIfActive(player);
@@ -690,7 +682,7 @@ namespace MatchZy
                     if (mapSlots.Count == 0) pack.Remove(map);
                     if (!SaveGlobalPack(pack))
                     {
-                        ReplyToUserCommand(player, "The grenade library file is unreadable, not saving (a backup copy was made; check the server log).");
+                        ReplyToUserCommand(player, Localizer.ForPlayer(player, "matchzy.pracmisc.libraryunreadable"));
                         return;
                     }
                     RefreshNadeMarkersIfActive(player);

@@ -1,6 +1,7 @@
 using System.Text.Json.Serialization;
 using CounterStrikeSharp.API;
 using CounterStrikeSharp.API.Core;
+using CounterStrikeSharp.API.Core.Translations;
 using CounterStrikeSharp.API.Core.Attributes.Registration;
 using CounterStrikeSharp.API.Modules.Commands;
 using Newtonsoft.Json.Linq;
@@ -79,7 +80,7 @@ namespace MatchZy
                 return;
             if (isPractice)
             {
-                ReplyToUserCommand(player, "Uncoach command can only be used in match mode!");
+                ReplyToUserCommand(player, Localizer.ForPlayer(player, "matchzy.matchmsg.uncoachmatchonly"));
                 return;
             }
             // Listed only as a coach (not as a player): uncoaching would put an extra player on the team.
@@ -87,7 +88,7 @@ namespace MatchZy
                 && !LookupRosterEntry(matchzyTeam1.teamPlayers, player.SteamID)
                 && !LookupRosterEntry(matchzyTeam2.teamPlayers, player.SteamID))
             {
-                ReplyToUserCommand(player, "You are listed as a coach in the match config and cannot play.");
+                ReplyToUserCommand(player, Localizer.ForPlayer(player, "matchzy.matchmsg.uncoachlisted"));
                 return;
             }
 
@@ -105,7 +106,7 @@ namespace MatchZy
             }
             else
             {
-                ReplyToUserCommand(player, "You are not coaching any team!");
+                ReplyToUserCommand(player, Localizer.ForPlayer(player, "matchzy.matchmsg.notcoaching"));
                 return;
             }
 
@@ -115,7 +116,7 @@ namespace MatchZy
             // Give the ex-coach a competitive teammate color back (they were forced to -1).
             Server.NextFrame(EnforceCompetitiveTeammateColors);
 
-            ReplyToUserCommand(player, "You are now not coaching any team!");
+            ReplyToUserCommand(player, Localizer.ForPlayer(player, "matchzy.matchmsg.uncoached"));
         }
 
         [ConsoleCommand("matchzy_addplayer", "Adds player to the provided team")]

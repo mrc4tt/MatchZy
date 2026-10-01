@@ -1,6 +1,7 @@
 using CounterStrikeSharp.API;
 using CounterStrikeSharp.API.Core;
 using CounterStrikeSharp.API.Core.Attributes.Registration;
+using CounterStrikeSharp.API.Core.Translations;
 using CounterStrikeSharp.API.Modules.Commands;
 using CounterStrikeSharp.API.Modules.Cvars;
 using CounterStrikeSharp.API.Modules.Timers;
@@ -30,7 +31,40 @@ public partial class MatchZy
 
     // Auto-pause tracking
     private bool isAutoPaused = false;
+
+    // Set when both teams (or an admin) lift an auto-pause while a team is still short: they agreed
+    // to play on. The 10 s check used to pause again straight away, so .unpause could never end an
+    // auto-pause. Holds the player counts they agreed to; only a further drop pauses again, and it
+    // clears once both teams are full again.
+    private bool autoPauseShortAccepted = false;
+    // Per match team, not per side: the counts must follow the teams through halftime.
+    private readonly Dictionary<Team, int> autoPauseAcceptedCounts = new();
+
+    /// <summary>
+    /// Called when an auto-pause is lifted by the teams or an admin: remember the short-handed
+    /// counts they accepted so the auto-pause check does not pause again for the same shortage.
+    /// </summary>
+    private void AcceptShortHandedAfterAutoPause()
+    {
+        if (!IsCurrentPauseAuto())
+            return;
+        int minPlayers = autoPauseMinPlayers.Value;
+        int ct = IsBotSide(3) ? minPlayers : GetTeamPlayerCount(CsTeam.CounterTerrorist);
+        int t = IsBotSide(2) ? minPlayers : GetTeamPlayerCount(CsTeam.Terrorist);
+        autoPauseAcceptedCounts.Clear();
+        if (reverseTeamSides.TryGetValue("CT", out var ctTeam))
+            autoPauseAcceptedCounts[ctTeam] = ct;
+        if (reverseTeamSides.TryGetValue("TERRORIST", out var tTeam))
+            autoPauseAcceptedCounts[tTeam] = t;
+        autoPauseShortAccepted = true;
+        isAutoPaused = false;
+        autoPauseReason = null;
+        unpauseData["pauseTeam"] = "";
+        Log($"[AutoPause] Lifted by agreement; playing on with CT {ct}, T {t}.");
+    }
     private string? autoPauseReason = null;
+    // Arguments for the localized auto-pause reason (team side, player count, minimum players).
+    private object[] autoPauseReasonArgs = Array.Empty<object>();
     private CounterStrikeSharp.API.Modules.Timers.Timer? autoPauseCheckTimer = null;
 
     public void TechPause(CCSPlayerController? player, CommandInfo? command)
@@ -48,25 +82,25 @@ public partial class MatchZy
 
         if (isPaused)
         {
-            ReplyToUserCommand(player, Localizer["matchzy.pause.ispaused"]);
+            ReplyToUserCommand(player, Localizer.ForPlayer(player, "matchzy.pause.ispaused"));
             return;
         }
 
         if (IsHalfTimePhase())
         {
-            ReplyToUserCommand(player, Localizer["matchzy.pause.duringhalftime"]);
+            ReplyToUserCommand(player, Localizer.ForPlayer(player, "matchzy.pause.duringhalftime"));
             return;
         }
 
         if (IsPostGamePhase())
         {
-            ReplyToUserCommand(player, Localizer["matchzy.pause.matchended"]);
+            ReplyToUserCommand(player, Localizer.ForPlayer(player, "matchzy.pause.matchended"));
             return;
         }
 
         if (IsTacticalTimeoutActive())
         {
-            ReplyToUserCommand(player, Localizer["matchzy.pause.tacticaltimeout"]);
+            ReplyToUserCommand(player, Localizer.ForPlayer(player, "matchzy.pause.tacticaltimeout"));
             return;
         }
 
@@ -75,7 +109,7 @@ public partial class MatchZy
 
         if (!techPauseEnabled.Value && player != null)
         {
-            PrintToPlayerChat(player, Localizer["matchzy.ready.techpausenotenabled"]);
+            PrintToPlayerChat(player, Localizer.ForPlayer(player, "matchzy.pause.techpausenotenabled"));
             return;
         }
 
@@ -85,7 +119,7 @@ public partial class MatchZy
         // Initialize team if it doesn't exist yet in the dictionary
         if (!reverseTeamSides.ContainsKey("CT") || !reverseTeamSides.ContainsKey("TERRORIST"))
         {
-            ReplyToUserCommand(player, "Team sides not properly initialized. Cannot pause.");
+            ReplyToUserCommand(player, Localizer.ForPlayer(player, "matchzy.pausemsg.sidesnotinitialized"));
             return;
         }
 
@@ -101,7 +135,7 @@ public partial class MatchZy
         // never compared or incremented.
         if (technicalPauseUsed[playerTeam] >= maxTechPausesAllowed.Value)
         {
-            ReplyToUserCommand(player, $"Your team has used all {maxTechPausesAllowed.Value} technical pauses.");
+            ReplyToUserCommand(player, Localizer.ForPlayer(player, "matchzy.pausemsg.techpauseslimitreached", maxTechPausesAllowed.Value));
             return;
         }
         technicalPauseUsed[playerTeam]++;
@@ -131,7 +165,7 @@ public partial class MatchZy
 
         // Announce the technical pause
         int techPausesLeft = maxTechPausesAllowed.Value - technicalPauseUsed[playerTeam];
-        PrintToAllChat($"{teamName} called for a technical pause ({techPausesLeft} left).");
+        PrintLocalizedToAll("matchzy.pause.techpause.started", teamName, techPausesLeft, maxTechPausesAllowed.Value);
 
         // matchzy_tech_pause_duration (-1 = no limit) ends the pause on its own.
         techPauseTimer?.Kill();
@@ -148,7 +182,7 @@ public partial class MatchZy
                     return;
                 if (!unpauseData.TryGetValue("pauseTeam", out var current) || current is not string currentTeam || currentTeam != pauseTeamName)
                     return;
-                PrintToAllChat($"The technical pause of {pauseTeamName} has run out ({duration}s). Unpausing.");
+                PrintLocalizedToAll("matchzy.pausemsg.techpauseexpired", pauseTeamName, duration);
                 UnpauseMatch();
                 unpauseData["pauseTeam"] = "";
             }, TimerFlags.STOP_ON_MAPCHANGE);
@@ -167,10 +201,7 @@ public partial class MatchZy
                 RoundNumber = GetRoundNumer(),
             };
 
-            Task.Run(async () =>
-            {
-                await SendEventAsync(pauseEvent);
-            });
+            PublishEvent(pauseEvent);
         }
     }
 #pragma warning restore CS0162 // Unreachable code detected
@@ -227,6 +258,20 @@ public partial class MatchZy
         int ctPlayerCount = IsBotSide(3) ? minPlayers : GetTeamPlayerCount(CsTeam.CounterTerrorist);
         int tPlayerCount = IsBotSide(2) ? minPlayers : GetTeamPlayerCount(CsTeam.Terrorist);
 
+        if (autoPauseShortAccepted)
+        {
+            if (ctPlayerCount >= minPlayers && tPlayerCount >= minPlayers)
+                autoPauseShortAccepted = false; // full again: back to normal auto-pausing
+            else
+            {
+                // Map the accepted counts (kept per team) to the sides the teams are on now.
+                int acceptedCt = reverseTeamSides.TryGetValue("CT", out var ctTeam) && autoPauseAcceptedCounts.TryGetValue(ctTeam, out int a1) ? a1 : minPlayers;
+                int acceptedT = reverseTeamSides.TryGetValue("TERRORIST", out var tTeam) && autoPauseAcceptedCounts.TryGetValue(tTeam, out int a2) ? a2 : minPlayers;
+                if (ctPlayerCount >= acceptedCt && tPlayerCount >= acceptedT)
+                    return; // still the shortage the teams agreed to play with
+            }
+        }
+
         // Check if we need to auto-pause (team has < min players)
         if (!isPaused && (ctPlayerCount < minPlayers || tPlayerCount < minPlayers))
         {
@@ -239,14 +284,15 @@ public partial class MatchZy
             isPaused = true;
             isAutoPaused = true;
             autoPauseReason = $"{teamWithIssue} team has only {playerCount}/{minPlayers} players";
+            autoPauseReasonArgs = new object[] { teamWithIssue, playerCount, minPlayers };
 
             // Reset unpause data
             unpauseData["ct"] = false;
             unpauseData["t"] = false;
             unpauseData["pauseTeam"] = "AUTO";
 
-            PrintToAllChat($"{ChatColors.Gold}[AUTO-PAUSE]{ChatColors.Default} Match paused - {autoPauseReason}");
-            PrintToAllChat($"{ChatColors.Grey}Match will auto-resume when both teams have {minPlayers} players, or use {ChatColors.Green}.unpause{ChatColors.Default}");
+            PrintLocalizedToAll("matchzy.pausemsg.autopaused", teamWithIssue, playerCount, minPlayers);
+            PrintLocalizedToAll("matchzy.pausemsg.autoresumehint", minPlayers);
 
             // Send webhook for live scorebot
             if (!string.IsNullOrEmpty(matchConfig.RemoteLogURL))
@@ -260,10 +306,7 @@ public partial class MatchZy
                     MaxDuration = null,
                     RoundNumber = GetRoundNumer(),
                 };
-                Task.Run(async () =>
-                {
-                    await SendEventAsync(pauseEvent);
-                });
+                PublishEvent(pauseEvent);
             }
         }
         // Check if we can auto-resume (both teams back to min players)
@@ -272,7 +315,7 @@ public partial class MatchZy
             Log($"[AutoPause] Auto-resuming - both teams now have {minPlayers} players (CT: {ctPlayerCount}, T: {tPlayerCount})");
 
             int resumeDelay = autoResumeDelay.Value;
-            PrintToAllChat($"{ChatColors.Green}[AUTO-RESUME]{ChatColors.Default} Both teams now have {minPlayers} players. Match resuming in {resumeDelay} seconds...");
+            PrintLocalizedToAll("matchzy.pausemsg.autoresuming", minPlayers, resumeDelay);
 
             AddTimer(
                 (float)resumeDelay,
@@ -292,7 +335,7 @@ public partial class MatchZy
                     unpauseData["t"] = false;
                     unpauseData["pauseTeam"] = "";
 
-                    PrintToAllChat($"{ChatColors.Green}Match resumed!{ChatColors.Default}");
+                    PrintLocalizedToAll("matchzy.pausemsg.autoresumed");
 
                     // Send webhook for live scorebot
                     if (!string.IsNullOrEmpty(matchConfig.RemoteLogURL))
@@ -303,10 +346,7 @@ public partial class MatchZy
                             MapNumber = matchConfig.CurrentMapNumber,
                             RoundNumber = GetRoundNumer(),
                         };
-                        Task.Run(async () =>
-                        {
-                            await SendEventAsync(unpauseEvent);
-                        });
+                        PublishEvent(unpauseEvent);
                     }
                 }
             );
@@ -356,7 +396,7 @@ public partial class MatchZy
 
             if (ctCount < minPlayers || tCount < minPlayers)
             {
-                ReplyToUserCommand(player, $"Cannot unpause - teams still unbalanced (CT: {ctCount}/{minPlayers}, T: {tCount}/{minPlayers})");
+                ReplyToUserCommand(player, Localizer.ForPlayer(player, "matchzy.pausemsg.cannotunpauseunbalanced", ctCount, minPlayers, tCount, minPlayers));
                 return false;
             }
         }
@@ -364,7 +404,7 @@ public partial class MatchZy
         else if (IsCurrentPauseAuto() && !IsAutoPauseActive())
         {
             // Autopause inactive for small player counts - allow unpause
-            ReplyToUserCommand(player, $"Match paused. You may now use .unpause to continue (players may be unbalanced).");
+            ReplyToUserCommand(player, Localizer.ForPlayer(player, "matchzy.pausemsg.unpauseallowedunbalanced"));
         }
 
         string teamKey = player.Team == CsTeam.CounterTerrorist ? "ct" : "t";
@@ -392,7 +432,7 @@ public partial class MatchZy
             isAutoPaused = false;
             autoPauseReason = null;
 
-            PrintToAllChat($"{ChatColors.Green}Match unpaused!{ChatColors.Default} Both teams ready.");
+            PrintLocalizedToAll("matchzy.pausemsg.unpausedbothready");
 
             // Reset unpause data
             unpauseData["ct"] = false;
@@ -408,10 +448,7 @@ public partial class MatchZy
                     MapNumber = matchConfig.CurrentMapNumber,
                     RoundNumber = GetRoundNumer(),
                 };
-                Task.Run(async () =>
-                {
-                    await SendEventAsync(unpauseEvent);
-                });
+                PublishEvent(unpauseEvent);
             }
 
             return true;
@@ -420,7 +457,7 @@ public partial class MatchZy
         {
             // Waiting for other team
             string waitingFor = ctReady ? "Terrorists" : "Counter-Terrorists";
-            PrintToAllChat($"{teamName} is ready to unpause. Waiting for {waitingFor}...");
+            PrintLocalizedToAll("matchzy.pausemsg.teamreadytounpause", teamName, waitingFor);
             return false;
         }
     }
@@ -479,6 +516,7 @@ public partial class MatchZy
 
         isAutoPaused = false;
         autoPauseReason = null;
+        autoPauseShortAccepted = false;
     }
 
     public void ResetTechPauses()
@@ -497,6 +535,7 @@ public partial class MatchZy
         // Reset auto-pause state
         isAutoPaused = false;
         autoPauseReason = null;
+        autoPauseShortAccepted = false;
 
         if (pausedStateTimer != null)
         {

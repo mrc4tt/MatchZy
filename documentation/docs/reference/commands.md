@@ -163,7 +163,7 @@ Everything here works **only in practice mode** (`.prac`). No admin rights neede
 | Command | What it does |
 |---|---|
 | `.ct` / `.t` / `.spec` | Switches your team. You respawn on the new side and it does not count as a death. |
-| `.fas` `.watchme` | Moves every other player to spectator so they can watch you. |
+| `.fas` `.watchme` | Moves every other player to spectator so they can watch you. Admin only. |
 | `.spawn <n>` `.sp` | Teleports you to your team's competitive spawn number N. `.ctspawn <n>` / `.tspawn <n>` pick the side. |
 | `.bestspawn` / `.worstspawn` | Teleports you to the spawn nearest to / furthest from where you stand. Side variants: `.bestctspawn`, `.besttspawn`, `.worstctspawn`, `.worsttspawn`. |
 | `.showspawns` / `.hidespawns` | Draws markers on all competitive spawns. Aim at one and press ++e++ to teleport to it :fontawesome-solid-code-fork:. |
@@ -193,7 +193,7 @@ Every grenade you throw is recorded (position, view, how it was thrown).
 | `.last` | Teleports you to where you threw your last grenade, with that grenade in hand. |
 | `.back [n]` | Steps back through your history: each `.back` goes one older. `.back 3` jumps to entry 3. |
 | `.rethrow` `.rt` `.throw` | Throws your last grenade again from the same spot, without you moving. |
-| `.grt` `.globalrethrow` :fontawesome-solid-code-fork: | Rethrows the last grenade of **every** player at once, to see a full team execute. |
+| `.grt` `.globalrethrow` :fontawesome-solid-code-fork: | Rethrows the last grenade of **every** player at once, to see a full team execute. Admin only. |
 | `.throwsmoke` / `.throwflash` / `.thrownade` / `.throwmolotov` / `.throwdecoy` | Rethrows your last grenade of that type. |
 | `.throwindex <n...>` / `.lastindex` | Throws history entries by number / shows the number of your last one. |
 | `.delay <seconds>` | Adds a delay to your last grenade when rethrown (for timing executes with `.grt`). |
@@ -234,7 +234,7 @@ Every grenade you throw is recorded (position, view, how it was thrown).
 | `.ff` `.fastforward` | Speeds up time for 10 seconds (wait out smokes and fires). |
 | `.break` | Breaks all breakable glass, doors and props. |
 | `.breakrestore` :fontawesome-solid-code-fork: | Restores everything `.break` destroyed. |
-| `.rs` `.rr` :fontawesome-solid-code-fork: | Restarts the practice round. |
+| `.rs` `.rr` :fontawesome-solid-code-fork: | Restarts the practice round for everyone. Admin only. |
 
 ## Dryrun
 

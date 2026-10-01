@@ -4,6 +4,7 @@ using System.Text.Json;
 using CounterStrikeSharp.API;
 using CounterStrikeSharp.API.Core;
 using CounterStrikeSharp.API.Core.Attributes.Registration;
+using CounterStrikeSharp.API.Core.Translations;
 using CounterStrikeSharp.API.Modules.Commands;
 using CounterStrikeSharp.API.Modules.Cvars;
 using CounterStrikeSharp.API.Modules.Memory;
@@ -141,12 +142,20 @@ public partial class MatchZy
             return;
         if (isPractice)
         {
-            ReplyToUserCommand(player, "Coach command can only be used in match mode!");
+            ReplyToUserCommand(player, Localizer.ForPlayer(player, "matchzy.coach.matchonly"));
             return;
         }
         if (!coachEnabled.Value)
         {
-            ReplyToUserCommand(player, "Coaching is disabled on this server.");
+            ReplyToUserCommand(player, Localizer.ForPlayer(player, "matchzy.coach.disabled"));
+            return;
+        }
+        // Not in the middle of a live round: an alive player becoming a coach mid-round had their
+        // money zeroed and left their team a player short for the rest of the round.
+        var coachRules = GetGameRules();
+        if ((isMatchLive || isKnifeRound) && coachRules != null && !coachRules.FreezePeriod && !coachRules.WarmupPeriod)
+        {
+            ReplyToUserCommand(player, Localizer.ForPlayer(player, "matchzy.coach.notinliveround"));
             return;
         }
 
@@ -165,14 +174,14 @@ public partial class MatchZy
             }
             else
             {
-                ReplyToUserCommand(player, "Usage: .coach t or .coach ct (or join a team first and use .coach)");
+                ReplyToUserCommand(player, Localizer.ForPlayer(player, "matchzy.coach.usage"));
                 return;
             }
         }
 
         if (side != "t" && side != "ct")
         {
-            ReplyToUserCommand(player, "Usage: .coach t or .coach ct");
+            ReplyToUserCommand(player, Localizer.ForPlayer(player, "matchzy.coach.usage"));
             return;
         }
 
@@ -182,13 +191,13 @@ public partial class MatchZy
         byte wantedTeam = side == "t" ? (byte)CsTeam.Terrorist : (byte)CsTeam.CounterTerrorist;
         if (player!.TeamNum != wantedTeam)
         {
-            ReplyToUserCommand(player, "You can only coach the team you are on. Join that team first, then use .coach");
+            ReplyToUserCommand(player, Localizer.ForPlayer(player, "matchzy.coach.ownteamonly"));
             return;
         }
 
         if (matchzyTeam1.coach.Contains(player!) || matchzyTeam2.coach.Contains(player!))
         {
-            ReplyToUserCommand(player, "You are already coaching a team!");
+            ReplyToUserCommand(player, Localizer.ForPlayer(player, "matchzy.coach.alreadycoaching"));
             return;
         }
 
@@ -210,7 +219,7 @@ public partial class MatchZy
         // A team with a "coaches" list in the match config only takes the coaches listed there.
         if (RosterSize(matchZyCoachTeam.teamCoaches) > 0 && !LookupRosterEntry(matchZyCoachTeam.teamCoaches, player!.SteamID))
         {
-            ReplyToUserCommand(player, $"Only the coaches listed in the match config can coach {matchZyCoachTeam.teamName}.");
+            ReplyToUserCommand(player, Localizer.ForPlayer(player, "matchzy.coach.notlisted", matchZyCoachTeam.teamName));
             return;
         }
 
@@ -218,7 +227,7 @@ public partial class MatchZy
         // coach it; a team without a list has no coach.
         if (isMatchSetup && coachListedOnly.Value && RosterSize(matchZyCoachTeam.teamCoaches) == 0)
         {
-            ReplyToUserCommand(player, $"Only coaches listed in the match config can coach, and {matchZyCoachTeam.teamName} has none.");
+            ReplyToUserCommand(player, Localizer.ForPlayer(player, "matchzy.coach.nolistedcoaches", matchZyCoachTeam.teamName));
             return;
         }
 
@@ -228,7 +237,7 @@ public partial class MatchZy
         if (RosterSize(matchZyCoachTeam.teamCoaches) == 0 && RosterSize(matchZyCoachTeam.teamPlayers) > 0
             && !LookupRosterEntry(matchZyCoachTeam.teamPlayers, player!.SteamID))
         {
-            ReplyToUserCommand(player, $"Only players on the {matchZyCoachTeam.teamName} roster can coach {matchZyCoachTeam.teamName}.");
+            ReplyToUserCommand(player, Localizer.ForPlayer(player, "matchzy.coach.notonroster", matchZyCoachTeam.teamName));
             return;
         }
 
@@ -237,8 +246,8 @@ public partial class MatchZy
         if (player.InGameMoneyServices != null)
             player.InGameMoneyServices.Account = 0;
         Server.NextFrame(EnforceCompetitiveTeammateColors);
-        ReplyToUserCommand(player, $"You are now coaching {matchZyCoachTeam.teamName}! Use .uncoach to stop coaching");
-        PrintToAllChat($"{ChatColors.Green}{player.PlayerName}{ChatColors.Default} is now coaching {ChatColors.Green}{matchZyCoachTeam.teamName}{ChatColors.Default}!");
+        ReplyToUserCommand(player, Localizer.ForPlayer(player, "matchzy.coach.nowcoaching", matchZyCoachTeam.teamName));
+        PrintLocalizedToAll("matchzy.coach.announce", player.PlayerName, matchZyCoachTeam.teamName);
     }
 
     public void HandleCoaches()
@@ -643,7 +652,36 @@ public partial class MatchZy
     /// filter) and ordered by (Priority, Index) ascending, with the Priority retained so callers
     /// can reason about priority tiers (the engine fills the lowest tier first).
     /// </summary>
+    // Spawn points are static for a map, but this scan walks the whole entity list and used to run
+    // once per spawning player (plus per side) at every round start with a coach present: up to ~10
+    // full scans in one tick. Cached per map and side; cleared on map start (ClearCoachSpawnCache).
+    private readonly Dictionary<byte, List<CoachSpawnCandidate>> _coachSpawnCache = new();
+    private string _coachSpawnCacheMap = "";
+
+    public void ClearCoachSpawnCache()
+    {
+        _coachSpawnCache.Clear();
+        _coachSpawnCacheMap = "";
+    }
+
     private List<CoachSpawnCandidate> GetCompetitiveSpawnCandidates(byte side)
+    {
+        string map = Server.MapName;
+        if (_coachSpawnCacheMap != map)
+        {
+            _coachSpawnCache.Clear();
+            _coachSpawnCacheMap = map;
+        }
+        if (_coachSpawnCache.TryGetValue(side, out var cached))
+            return cached;
+        var scanned = ScanCompetitiveSpawnCandidates(side);
+        // An empty result (scan failed, or spawns not created yet) is not cached, so it is retried.
+        if (scanned.Count > 0)
+            _coachSpawnCache[side] = scanned;
+        return scanned;
+    }
+
+    private List<CoachSpawnCandidate> ScanCompetitiveSpawnCandidates(byte side)
     {
         string designerName = side == (byte)CsTeam.CounterTerrorist ? "info_player_counterterrorist" : "info_player_terrorist";
         // MATERIALIZE the native entity enumeration first and guard the whole scan: under the
@@ -910,23 +948,30 @@ public partial class MatchZy
             pawn.MoveType = MoveType_t.MOVETYPE_WALK;
             pawn.ActualMoveType = MoveType_t.MOVETYPE_WALK;
             pawn.TakesDamage = true;
-            ReplyToUserCommand(player, "[CoachTest] released - you are a normal player again.");
+            ReplyToUserCommand(player, Localizer.ForPlayer(player, "matchzy.coachmsg.testreleased"));
             return;
         }
 
         if (player.TeamNum != (byte)CsTeam.Terrorist && player.TeamNum != (byte)CsTeam.CounterTerrorist)
         {
-            ReplyToUserCommand(player, "[CoachTest] join T or CT first.");
+            ReplyToUserCommand(player, Localizer.ForPlayer(player, "matchzy.coachmsg.testjointeam"));
             return;
         }
         if (!TryGetBehindTeamCoachSpawn(player.TeamNum, 0, out Position spot))
         {
-            ReplyToUserCommand(player, "[CoachTest] could not compute a behind-team spot (no team spawns found).");
+            ReplyToUserCommand(player, Localizer.ForPlayer(player, "matchzy.coachmsg.testnospot"));
             return;
         }
-        MoveCoachToPosition(player, spot, "coachtest");
+        // Off the command-dispatch stack: MoveCoachToPosition strips weapons (the engine path other
+        // plugins' weapon hooks re-enter) and teleports, which must not run inside the handler.
+        Server.NextFrame(() =>
+        {
+            if (!IsPlayerValid(player))
+                return;
+            MoveCoachToPosition(player, spot, "coachtest");
+        });
         _coachTestActive.Add(uid);
-        ReplyToUserCommand(player, $"[CoachTest] placed at ({spot.PlayerPosition.X:0}, {spot.PlayerPosition.Y:0}, {spot.PlayerPosition.Z:0}) - run .coachtest again to release.");
+        ReplyToUserCommand(player, Localizer.ForPlayer(player, "matchzy.coachmsg.testplaced", spot.PlayerPosition.X.ToString("0"), spot.PlayerPosition.Y.ToString("0"), spot.PlayerPosition.Z.ToString("0")));
     }
 
     private void MoveCoachToPosition(CCSPlayerController coach, Position position, string timing)
@@ -1164,12 +1209,12 @@ public partial class MatchZy
     {
         if (!IsPlayerAdmin(player, "css_savecoachspawn", "@css/config"))
         {
-            ReplyToUserCommand(player, "You do not have permission to use this command!");
+            ReplyToUserCommand(player, Localizer.ForPlayer(player, "matchzy.utility.dontpermission"));
             return;
         }
         if (!IsPlayerValid(player) || !player!.PlayerPawn.IsValid || player.PlayerPawn.Value?.CBodyComponent?.SceneNode == null)
         {
-            ReplyToUserCommand(player, "You must be alive and in-game to save a coach spawn.");
+            ReplyToUserCommand(player, Localizer.ForPlayer(player, "matchzy.coachmsg.mustbealive"));
             return;
         }
 
@@ -1184,7 +1229,7 @@ public partial class MatchZy
             team = player.TeamNum;
         else
         {
-            ReplyToUserCommand(player, "Usage: .savecoachspawn t|ct (or join a team first)");
+            ReplyToUserCommand(player, Localizer.ForPlayer(player, "matchzy.coachmsg.saveusage"));
             return;
         }
 
@@ -1204,12 +1249,12 @@ public partial class MatchZy
         if (SaveCoachSpawnsFile())
         {
             string sideName = team == (byte)CsTeam.Terrorist ? "T" : "CT";
-            ReplyToUserCommand(player, $"Saved {sideName} coach spot on {Server.MapName} ({origin.X:F0}, {origin.Y:F0}, {origin.Z:F0}). Verify with .showcoachspawns.");
+            ReplyToUserCommand(player, Localizer.ForPlayer(player, "matchzy.coachmsg.spawnsaved", sideName, Server.MapName, origin.X.ToString("F0"), origin.Y.ToString("F0"), origin.Z.ToString("F0")));
             _coachSpawnsLoadedMap = "";   // force reload on next placement
         }
         else
         {
-            ReplyToUserCommand(player, "Failed to write coach spawn file - check server logs.");
+            ReplyToUserCommand(player, Localizer.ForPlayer(player, "matchzy.coachmsg.spawnsavefailed"));
         }
     }
 
@@ -1228,7 +1273,7 @@ public partial class MatchZy
     {
         if (!IsPlayerAdmin(player, "css_clearcoachspawns", "@css/config"))
         {
-            ReplyToUserCommand(player, "You do not have permission to use this command!");
+            ReplyToUserCommand(player, Localizer.ForPlayer(player, "matchzy.utility.dontpermission"));
             return;
         }
 
@@ -1239,12 +1284,12 @@ public partial class MatchZy
             string path = Path.Combine(CoachSpawnsDir(), $"{Server.MapName}.json");
             if (File.Exists(path))
                 File.Delete(path);
-            ReplyToUserCommand(player, $"Cleared all coach spawns for {Server.MapName}.");
+            ReplyToUserCommand(player, Localizer.ForPlayer(player, "matchzy.coachmsg.spawnscleared", Server.MapName));
         }
         catch (Exception ex)
         {
             Log($"[OnClearCoachSpawnsCommand] Error deleting coach spawn file: {ex.Message}");
-            ReplyToUserCommand(player, "Failed to delete coach spawn file - check server logs.");
+            ReplyToUserCommand(player, Localizer.ForPlayer(player, "matchzy.coachmsg.spawnsclearfailed"));
         }
     }
 
@@ -1262,7 +1307,7 @@ public partial class MatchZy
     {
         if (!IsPlayerAdmin(player, "css_listcoachspawns", "@css/config"))
         {
-            ReplyToUserCommand(player, "You do not have permission to use this command!");
+            ReplyToUserCommand(player, Localizer.ForPlayer(player, "matchzy.utility.dontpermission"));
             return;
         }
 
@@ -1271,7 +1316,7 @@ public partial class MatchZy
 
         int ct = coachSpawns.TryGetValue((byte)CsTeam.CounterTerrorist, out List<Position>? ctList) ? ctList.Count : 0;
         int t = coachSpawns.TryGetValue((byte)CsTeam.Terrorist, out List<Position>? tList) ? tList.Count : 0;
-        ReplyToUserCommand(player, $"Coach spawns for {Server.MapName}: {ct} CT, {t} T.");
+        ReplyToUserCommand(player, Localizer.ForPlayer(player, "matchzy.coachmsg.spawnslist", Server.MapName, ct, t));
     }
 
     /// <summary>
@@ -1387,7 +1432,7 @@ public partial class MatchZy
         if (_coachSpawnVizOn)
         {
             ClearCoachSpawnViz();
-            ReplyToUserCommand(player, "Coach spawn markers hidden.");
+            ReplyToUserCommand(player, Localizer.ForPlayer(player, "matchzy.coachmsg.markershidden"));
             return;
         }
 
@@ -1406,8 +1451,8 @@ public partial class MatchZy
         }
         _coachSpawnVizOn = shown > 0;
         ReplyToUserCommand(player, shown > 0
-            ? $"Showing {shown} coach spot(s). Run .showcoachspawns again to hide."
-            : "No coach spot resolved for this map.");
+            ? Localizer.ForPlayer(player, "matchzy.coachmsg.markersshowing", shown)
+            : Localizer.ForPlayer(player, "matchzy.coachmsg.nospot"));
     }
 
     private void DrawCoachSpawnMarker(Vector pos, QAngle ang, string label, System.Drawing.Color color)
@@ -1625,6 +1670,6 @@ public partial class MatchZy
         if (player.InGameMoneyServices != null)
             player.InGameMoneyServices.Account = 0;
         Server.NextFrame(EnforceCompetitiveTeammateColors);
-        PrintToAllChat($"{ChatColors.Green}{player.PlayerName}{ChatColors.Default} is now coaching {ChatColors.Green}{coachTeam.teamName}{ChatColors.Default}!");
+        PrintLocalizedToAll("matchzy.coach.announce", player.PlayerName, coachTeam.teamName);
     }
 }

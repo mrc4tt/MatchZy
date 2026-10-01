@@ -41,7 +41,7 @@ namespace MatchZy
             // over bot_quota and bot_join_team.
             if (HasBotTeam())
             {
-                PrintToPlayerChat(player!, "Warmup bots are not available in a match with a bot team.");
+                PrintToPlayerChat(player!, Localizer.ForPlayer(player, "matchzy.matchmsg.warmupbotsbotteam"));
                 return;
             }
             // Same guard the practice bot commands use: with -nobots the engine creates a modelless,
@@ -64,8 +64,9 @@ namespace MatchZy
                 count = Math.Clamp(n, 1, 10);
 
             // Normal bot AI (they buy, move, shoot) split over both teams; balanced fill.
+            KickAllBotsProtectCSTV();
             Server.ExecuteCommand(
-                $"bot_kick; bot_difficulty 2; bot_dont_shoot 0; bot_stop 0; bot_zombie 0; " +
+                $"bot_difficulty 2; bot_dont_shoot 0; bot_stop 0; bot_zombie 0; " +
                 $"mp_autoteambalance 1; bot_quota_mode normal; bot_quota {count}");
             warmupBotsActive = true;
             PrintToPlayerChat(player!, Localizer.ForPlayer(player, "matchzy.wb.on", $"{count}"));
@@ -78,7 +79,7 @@ namespace MatchZy
             if (!warmupBotsActive)
                 return;
             warmupBotsActive = false;
-            Server.ExecuteCommand("bot_kick; bot_quota 0");
+            KickAllBotsProtectCSTV();
             Log("[WarmupBots] removed (match leaving warmup)");
         }
     }

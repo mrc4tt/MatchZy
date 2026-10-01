@@ -6,7 +6,7 @@ hide:
 
 <div class="mz-hero" markdown>
 
-# MatchZy <span class="mz-pill">Miksen fork · @@MATCHZY_VERSION@@</span>
+# MikZy <span class="mz-pill">MatchZy fork · @@MATCHZY_VERSION@@</span>
 
 <p class="mz-lead">Match management, practice mode, coaching, live events and stats for CS2 servers running CounterStrikeSharp. Built on MatchZy, extended for hosted competitive servers.</p>
 
@@ -84,4 +84,4 @@ Full steps in [Installation](getting-started/installation.md).
 
 ## Credits
 
-MatchZy was created by [Shobhit Pathak](https://github.com/shobhit-pathak/MatchZy). This fork is maintained by Miksen and keeps the upstream command names and match config format, so upstream guides and Get5 panels keep working.
+MikZy is based on MatchZy, created by [Shobhit Pathak](https://github.com/shobhit-pathak/MatchZy). It is maintained by Miksen and keeps the upstream command names and match config format, so upstream guides and Get5 panels keep working.

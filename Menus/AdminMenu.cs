@@ -3,6 +3,7 @@ using System.IO;
 using CounterStrikeSharp.API;
 using CounterStrikeSharp.API.Core;
 using CounterStrikeSharp.API.Core.Attributes.Registration;
+using CounterStrikeSharp.API.Core.Translations;
 using CounterStrikeSharp.API.Modules.Commands;
 using CS2MenuManager.API.Class;
 using CS2MenuManager.API.Menu;
@@ -27,7 +28,7 @@ namespace MatchZy
             }
             catch (Exception e) when (e is FileNotFoundException || e is TypeLoadException || e is FileLoadException)
             {
-                ReplyToUserCommand(player, "In-game menus require the CS2MenuManager plugin, which is not installed on this server.");
+                ReplyToUserCommand(player, Localizer.ForPlayer(player, "matchzy.menu.menumanagermissing"));
                 Log($"[Menu] CS2MenuManager not available: {e.Message}");
             }
         }
@@ -97,7 +98,7 @@ namespace MatchZy
 
         private void OpenMatchControlMenu(CCSPlayerController player, WasdMenu parent)
         {
-            var menu = new WasdMenu($"{chatPrefix} Match Control", this) { PrevMenu = parent };
+            var menu = new WasdMenu($"Match Control", this) { PrevMenu = parent };
             menu.AddItem("Force Start", (p, _) => OnStartCommand(p, null));
             menu.AddItem("Knife Round", (p, _) => OnKnifeCommand(p, null));
             // Restore the current round from its backup. OnRestartRoundCommand is the practice-only
@@ -111,7 +112,7 @@ namespace MatchZy
 
         private void OpenPauseMenu(CCSPlayerController player, WasdMenu parent)
         {
-            var menu = new WasdMenu($"{chatPrefix} Pause Control", this) { PrevMenu = parent };
+            var menu = new WasdMenu($"Pause Control", this) { PrevMenu = parent };
             menu.AddItem("Pause", (p, _) => OnPauseCommand(p, null));
             menu.AddItem("Unpause", (p, _) => OnUnpauseCommand(p, null));
             menu.AddItem("Force Pause", (p, _) => OnForcePauseCommand(p, null));
@@ -123,7 +124,7 @@ namespace MatchZy
 
         private void OpenModesMenu(CCSPlayerController player, WasdMenu parent)
         {
-            var menu = new WasdMenu($"{chatPrefix} Modes", this) { PrevMenu = parent };
+            var menu = new WasdMenu($"Modes", this) { PrevMenu = parent };
             menu.AddItem("Warmup", (p, _) => OnWarmupCommand(p, null));
             menu.AddItem("Match Setup", (p, _) => OnMatchCommand(p, null));
             menu.AddItem("Practice", (p, _) => OnPracCommand(p, null));

@@ -118,7 +118,7 @@ namespace MatchZy
                     CtAlive = ctAlive,
                     TAlive = tAlive,
                 };
-                Task.Run(async () => await SendEventAsync(killEvent));
+                PublishEvent(killEvent);
             }
             catch (Exception e)
             {
@@ -153,7 +153,7 @@ namespace MatchZy
                         PlayerTeam = GetTeamSide(player),
                         Grenade = NormalizeGrenadeName(@event.Weapon),
                     };
-                    Task.Run(async () => await SendEventAsync(liveEvent));
+                    PublishEvent(liveEvent);
                 }
                 catch (Exception e)
                 {
@@ -201,7 +201,7 @@ namespace MatchZy
                         Duration = MathF.Round(@event.BlindDuration, 2),
                         TeamFlash = attackerValid && attacker != victim && attacker!.TeamNum == victim.TeamNum,
                     };
-                    Task.Run(async () => await SendEventAsync(liveEvent));
+                    PublishEvent(liveEvent);
                 }
                 catch (Exception e)
                 {
@@ -232,7 +232,7 @@ namespace MatchZy
                         CtAlive = ctAlive,
                         TAlive = tAlive,
                     };
-                    Task.Run(async () => await SendEventAsync(liveEvent));
+                    PublishEvent(liveEvent);
                 }
                 catch (Exception e)
                 {
@@ -268,7 +268,7 @@ namespace MatchZy
                     Y = y,
                     Z = z,
                 };
-                Task.Run(async () => await SendEventAsync(liveEvent));
+                PublishEvent(liveEvent);
             }
             catch (Exception e)
             {
@@ -294,7 +294,7 @@ namespace MatchZy
                     PlayerName = player.PlayerName,
                     PlayerSteamId = player.SteamID.ToString(),
                 };
-                Task.Run(async () => await SendEventAsync(liveEvent));
+                PublishEvent(liveEvent);
             }
             catch (Exception e)
             {
@@ -320,12 +320,17 @@ namespace MatchZy
 
         // The bomb_planted / bomb_defused / bomb_exploded "site" field is the entity index of the
         // bombsite trigger, not 0/1, so read A/B from the planted_c4 entity instead.
-        private static string GetPlantedBombSite()
+        // The site of the bomb planted this round, read once at bomb_planted. Finding planted_c4
+        // walks the entity list; defuse and explode (explode runs in an already heavy frame) reuse it.
+        private string? plantedBombSite;
+
+        private string GetPlantedBombSite(bool refresh = false)
         {
+            if (!refresh && plantedBombSite != null)
+                return plantedBombSite;
             var c4 = Utilities.FindAllEntitiesByDesignerName<CPlantedC4>("planted_c4").FirstOrDefault();
-            if (c4 == null || !c4.IsValid)
-                return "unknown";
-            return c4.BombSite == 0 ? "A" : "B";
+            plantedBombSite = c4 == null || !c4.IsValid ? null : c4.BombSite == 0 ? "A" : "B";
+            return plantedBombSite ?? "unknown";
         }
     }
 }

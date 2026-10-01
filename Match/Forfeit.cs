@@ -33,6 +33,10 @@ namespace MatchZy
         {
             readyPhaseStartedAt = isMatchSetup ? DateTime.UtcNow : null;
             forfeitWarnedSecondsLeft = -1;
+            // A force-ready belongs to one ready phase. It used to be cleared only by ResetMatch, so
+            // a team forced ready before the veto or on map 1 stayed forced on the next map.
+            foreach (var team in teamReadyOverride.Keys.ToList())
+                teamReadyOverride[team] = false;
         }
 
         private void CheckForfeits()
@@ -84,7 +88,7 @@ namespace MatchZy
                     if (secondsLeft <= mark && secondsLeft > mark - ForfeitCheckInterval && forfeitWarnedSecondsLeft != mark)
                     {
                         forfeitWarnedSecondsLeft = mark;
-                        PrintToAllChat($"A team that is not ready in {ChatColors.Green}{secondsLeft}{ChatColors.Default} seconds forfeits the match.");
+                        PrintLocalizedToAll("matchzy.matchmsg.forfeitreadywarning", secondsLeft);
                         break;
                     }
                 }
@@ -95,14 +99,14 @@ namespace MatchZy
             if (!team1Ready && !team2Ready)
             {
                 Log("[Forfeit] Neither team was ready in time - cancelling the match.");
-                PrintToAllChat("Neither team was ready in time. The match is cancelled.");
+                PrintLocalizedToAll("matchzy.matchmsg.forfeitnoneready");
                 ResetMatch(true, "no_show");
                 return;
             }
 
             Team winner = team1Ready ? matchzyTeam1 : matchzyTeam2;
             Team loser = team1Ready ? matchzyTeam2 : matchzyTeam1;
-            ForfeitSeries(winner, $"{loser.teamName} was not ready in time");
+            ForfeitSeries(winner, $"{loser.teamName} was not ready in time", "matchzy.matchmsg.forfeitnotready", loser.teamName);
         }
 
         private void CheckLeaveForfeit()
@@ -137,7 +141,7 @@ namespace MatchZy
                 if (!teamEmptySince.TryGetValue(team, out DateTime since))
                 {
                     teamEmptySince[team] = DateTime.UtcNow;
-                    PrintToAllChat($"{ChatColors.Green}{team.teamName}{ChatColors.Default} has no players left. They forfeit in {ChatColors.Green}{timeout}{ChatColors.Default} seconds unless someone returns.");
+                    PrintLocalizedToAll("matchzy.matchmsg.forfeitteamempty", team.teamName, timeout);
                     continue;
                 }
 
@@ -145,21 +149,56 @@ namespace MatchZy
                 {
                     teamEmptySince.Clear();
                     Team winner = team == matchzyTeam1 ? matchzyTeam2 : matchzyTeam1;
-                    ForfeitSeries(winner, $"{team.teamName} left the match");
+                    ForfeitSeries(winner, $"{team.teamName} left the match", "matchzy.matchmsg.forfeitleft", team.teamName);
                     return;
                 }
             }
         }
 
         /// <summary>Ends the series with <paramref name="winner"/> as the winner (walkover).</summary>
-        private void ForfeitSeries(Team winner, string reason)
+        private void ForfeitSeries(Team winner, string reason, string reasonKey, string loserName)
         {
             Log($"[Forfeit] {reason}. {winner.teamName} wins by forfeit.");
-            PrintToAllChat($"{reason}. {ChatColors.Green}{winner.teamName}{ChatColors.Default} wins by forfeit.");
+            PrintLocalizedToAll(reasonKey, loserName, winner.teamName);
+            EndSeriesWithWinner(winner);
+        }
+
+        /// <summary>
+        /// Ends the series now with <paramref name="winner"/> as the winner: forfeit, .ffw, .gg and
+        /// get5_endmatch team1|team2 all go through here so they report the same way. Stops the demo
+        /// (so it is uploaded), sends map_result for a map in progress before series_end, gives the
+        /// winner a series majority and writes the real map score (a hardcoded 16 used to be written,
+        /// wrong under MR12). Between maps there is no map to report.
+        /// </summary>
+        private void EndSeriesWithWinner(Team winner)
+        {
             (int t1score, int t2score) = GetTeamsScore();
-            if (isDemoRecording)
+            // Only a demo stopped here belongs to this map; lastStoppedDemoFile can still hold the
+            // previous map's file. previousDemoSegments: a failed watchdog restart leaves earlier
+            // parts to finalise and upload even when isDemoRecording is false.
+            bool demoWasRecording = isDemoRecording || previousDemoSegments.Count > 0;
+            if (demoWasRecording)
                 StopDemoRecording(activeDemoFile, liveMatchId, matchConfig.CurrentMapNumber);
             winner.seriesScore = Math.Max(winner.seriesScore, (matchConfig.NumMaps / 2) + 1);
+
+            if (isMatchLive && !currentMapFinished)
+            {
+                var (_, statsTeam1, statsTeam2) = GetPlayerStatsDict();
+                string? demoFilename = demoWasRecording && !string.IsNullOrEmpty(lastStoppedDemoFile) ? Path.GetFileName(lastStoppedDemoFile) : null;
+                var mapResultEvent = new MapResultEvent
+                {
+                    MatchId = liveMatchId,
+                    MapNumber = matchConfig.CurrentMapNumber,
+                    Winner = BuildWinnerFor(winner),
+                    StatsTeam1 = new MatchZyStatsTeam(matchzyTeam1.id, matchzyTeam1.teamName, matchzyTeam1.seriesScore, t1score, 0, 0, statsTeam1),
+                    StatsTeam2 = new MatchZyStatsTeam(matchzyTeam2.id, matchzyTeam2.teamName, matchzyTeam2.seriesScore, t2score, 0, 0, statsTeam2),
+                    DemoFilename = demoFilename,
+                };
+                // Queued on the game thread before EndSeries queues series_end, so the event queue
+                // sends map_result first.
+                lastMapResultTask = SendEventAsync(mapResultEvent);
+            }
+
             // The series is over: nobody may ready up into a knife round or veto before the reset.
             readyAvailable = false;
             isPreVeto = false;

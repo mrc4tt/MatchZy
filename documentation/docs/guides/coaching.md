@@ -19,6 +19,7 @@ The rules depend on whether the match config gives the team a `coaches` list.
     - **Only whitelisted coaches:** `matchzy_coach_listed_only true`, then list each team's coaches in `"coaches"`. A team without a list has no coach.
 
 - `.coach` only works for the team you are on. :fontawesome-solid-code-fork:
+- `.coach` works in warmup and during freeze time, not in the middle of a live round.
 - `.uncoach` goes back to playing (not for a coach who is only in the `coaches` list).
 - Someone who is in no roster of a loaded match is moved to Spectator and cannot coach, admins included. To let an admin coach, put their SteamID in the team's `players` or `coaches`.
 

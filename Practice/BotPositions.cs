@@ -137,7 +137,7 @@ namespace MatchZy
                 slots[name] = new BotPos { X = o.X, Y = o.Y, Z = o.Z, Pitch = a.X, Yaw = a.Y, Team = player.TeamNum, Crouch = crouch };
                 if (!SaveBotPositions(data))
                 {
-                    ReplyToUserCommand(player, "botpositions.json is unreadable, not saving (a backup copy was made; check the server log).");
+                    ReplyToUserCommand(player, Localizer.ForPlayer(player, "matchzy.pracmisc.botposunreadable"));
                     return;
                 }
                 ReplyToUserCommand(player, Localizer.ForPlayer(player, "matchzy.bp.saved", name));
@@ -175,8 +175,8 @@ namespace MatchZy
             }
             else
             {
-                string nearest = StringSimilarity.FindNearestName(name, slots.Keys.ToList());
-                if (!slots.TryGetValue(nearest, out var bp))
+                string? nearest = StringSimilarity.FindMatchingName(name, slots.Keys.ToList());
+                if (nearest == null || !slots.TryGetValue(nearest, out var bp))
                 {
                     ReplyToUserCommand(player, Localizer.ForPlayer(player, "matchzy.bp.notfound", name));
                     return;
@@ -238,8 +238,10 @@ namespace MatchZy
                     ReplyToUserCommand(player, Localizer.ForPlayer(player, "matchzy.bp.none"));
                     return;
                 }
-                string nearest = StringSimilarity.FindNearestName(name, slots.Keys.ToList());
-                if (!slots.Remove(nearest))
+                // Delete only on an exact (case-insensitive) name: the closest-name match deleted a
+                // different saved spot after a typo.
+                string? nearest = slots.Keys.FirstOrDefault(k => string.Equals(k, name, StringComparison.OrdinalIgnoreCase));
+                if (nearest == null || !slots.Remove(nearest))
                 {
                     ReplyToUserCommand(player, Localizer.ForPlayer(player, "matchzy.bp.notfound", name));
                     return;
@@ -248,7 +250,7 @@ namespace MatchZy
                     data.Remove(Server.MapName);
                 if (!SaveBotPositions(data))
                 {
-                    ReplyToUserCommand(player, "botpositions.json is unreadable, not saving (a backup copy was made; check the server log).");
+                    ReplyToUserCommand(player, Localizer.ForPlayer(player, "matchzy.pracmisc.botposunreadable"));
                     return;
                 }
                 ReplyToUserCommand(player, Localizer.ForPlayer(player, "matchzy.bp.deleted", nearest));

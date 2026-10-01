@@ -46,7 +46,7 @@ public partial class MatchZy
                     if (matchModeOnly && !IsPlayerAdmin(player, "", "@css/config"))
                     {
                         Log($"[EventPlayerConnectFull] KICKING PLAYER STEAMID: {steamId}, Name: {player.PlayerName} (NOT ALLOWED!)");
-                        PrintToAllChat($"Kicking player {player.PlayerName} - Not a player in this game.");
+                        PrintLocalizedToAll("matchzy.cmd.kicknotinmatch", player.PlayerName);
                         KickPlayerDeferred(player);
                     }
                     return HookResult.Continue;
@@ -99,13 +99,13 @@ public partial class MatchZy
                     PrintToPlayerChat(player, Localizer.ForPlayer(player, "matchzy.eh.start"));
                     if (!hideModeHints)
                     {
-                        PrintToAdmins(Localizer.ForPlayer(player, "matchzy.eh.prac"));
-                        PrintToAdmins(Localizer.ForPlayer(player, "matchzy.eh.knife"));
+                        PrintLocalizedToAdmins("matchzy.eh.prac");
+                        PrintLocalizedToAdmins("matchzy.eh.knife");
                     }
                 }
                 else if (isPractice && !readyAvailable)
                 {
-                    PrintToAdmins(Localizer.ForPlayer(player, "matchzy.eh.quitprac"));
+                    PrintLocalizedToAdmins("matchzy.eh.quitprac");
                 }
             }
 
@@ -125,7 +125,7 @@ public partial class MatchZy
                     return;
                 if (IsPlayerAdmin(player, "", "@css/config", "@css/map", "@custom/prac"))
                 {
-                    PrintToPlayerChat(player, $"{ChatColors.Gold}Admin:{ChatColors.Default} type {ChatColors.Green}.help{ChatColors.Default} for the current mode's commands, {ChatColors.Green}.mhelp{ChatColors.Default} for the full admin guide, {ChatColors.Green}.ma{ChatColors.Default} for the admin menu.");
+                    PrintToPlayerChat(player, Localizer.ForPlayer(player, "matchzy.cmd.adminjoinhint"));
                 }
             });
 
@@ -164,12 +164,12 @@ public partial class MatchZy
                     PlayerTeam = player.TeamNum switch { 2 => "T", 3 => "CT", 1 => "SPEC", _ => "none" },
                     Reason = @event.Reason,
                 };
-                Task.Run(async () => await SendEventAsync(disconnectEvent));
+                PublishEvent(disconnectEvent);
             }
 
             // Practice orphaned-pawn cleanup: in practice the round is kept alive (buddha /
             // ignore_round_win_conditions), so a disconnecting human's pawn can linger as a
-            // ghost collision body instead of being reaped. Capture its handle now and Remove()
+            // ghost collision body instead of being reaped. Capture its handle now and Kill
             // it next frame, but only if the handle still resolves to that same pawn (guards
             // against the engine having already freed it -> Remove on a dead entity crashes).
             if (isPractice && !player.IsBot && !player.IsHLTV && player.PlayerPawn?.IsValid == true && player.PlayerPawn.Value != null)
@@ -178,8 +178,10 @@ public partial class MatchZy
                 uint orphanRaw = orphanPawn.EntityHandle.Raw;
                 Server.NextFrame(() =>
                 {
+                    // Entity-IO Kill, not Remove(): the pawn can still own networked weapons, and
+                    // freeing those mid-tick is the WriteEnterPVS crash class.
                     if (orphanPawn.IsValid && orphanPawn.EntityHandle.Raw == orphanRaw)
-                        orphanPawn.Remove();
+                        orphanPawn.AcceptInput("Kill");
                 });
             }
 
@@ -282,7 +284,9 @@ public partial class MatchZy
             // 2 of a BO3 came up as an empty server. The same goes for a round restore that needs a
             // different map. A map change in the middle of a live map (another plugin, a plain
             // changelevel) still resets, since the match cannot continue from there.
-            if (isMatchSetup && (!matchStarted || isRoundRestorePending))
+            // isRoundRestorePending on its own too: a .match game (no match config, isMatchSetup
+            // false) that restores a backup from another map was wiped here, pending restore included.
+            if ((isMatchSetup && !matchStarted) || isRoundRestorePending)
             {
                 Log($"[OnMapEndHandler] Keeping the loaded match across the map change (map {matchConfig.CurrentMapNumber + 1}/{matchConfig.NumMaps}, restorePending: {isRoundRestorePending})");
                 KillPhaseTimers();
@@ -306,7 +310,11 @@ public partial class MatchZy
                 return;
             }
 
-            ResetMatch();
+            // A map change in the middle of a loaded or started match (another plugin, a plain
+            // changelevel) ends it: report it as cancelled so the panel and the database close it
+            // instead of leaving it open forever. Not after a finished series: a panel may change
+            // map before the post-series reset runs.
+            ResetMatch(true, (matchStarted || isMatchSetup) && !seriesEnded ? "map_changed" : null);
             // isKnifeRequired is set explicitly by ResetMatch() - never toggle blindly
         }
         catch (Exception e)
@@ -319,6 +327,8 @@ public partial class MatchZy
     {
         try
         {
+            // A new round has no planted bomb: the cached site must not leak into this round.
+            plantedBombSite = null;
             // Re-assert the bot team every round: follows halftime/overtime side swaps and
             // round restores, and refills bots the engine dropped.
             if (isMatchSetup)
@@ -486,26 +496,34 @@ public partial class MatchZy
                             {
                                 var ent2 = Utilities.GetEntityFromIndex<CBaseCSGrenadeProjectile>((int)projIndex);
                                 if (ent2 == null || !ent2.IsValid || ent2.AbsOrigin == null)
+                                {
+                                    Log($"[GrenadeRecord] {nadeType} from userid {client} not recorded: the projectile was gone one frame after the throw.");
                                     return;
+                                }
                                 var o = ent2.AbsOrigin;
                                 // (p1 - p0) per tick -> units/sec (CS2 default 64 tick).
                                 Vector recovered = new((o.X - p0.X) * 64f, (o.Y - p0.Y) * 64f, (o.Z - p0.Z) * 64f);
                                 // A zero-velocity record is useless: Throw() refuses it, so .rt would
                                 // silently spawn nothing. Leave the previous history entry in place.
                                 if (recovered.X * recovered.X + recovered.Y * recovered.Y + recovered.Z * recovered.Z < 2500f)
+                                {
+                                    Log($"[GrenadeRecord] {nadeType} from userid {client} not recorded: no launch velocity (dropped, not thrown).");
                                     return;
+                                }
                                 RecordThrownNade(client, nadeType, p0, angle, playerOrigin, eyeAngles, itemIndex, duckAmount, recovered, angularVelocity);
                             }
-                            catch (Exception)
+                            catch (Exception ex)
                             {
-                                // Projectile detonated/freed between frames - ignore.
+                                // Projectile detonated/freed between frames.
+                                Log($"[GrenadeRecord] {nadeType} from userid {client} not recorded: {ex.Message}");
                             }
                         });
                     }
                 }
-                catch (Exception)
+                catch (Exception ex)
                 {
-                    // Entity was destroyed between frames - silently ignore
+                    // Entity was destroyed between frames.
+                    Log($"[GrenadeRecord] A thrown grenade was not recorded: {ex.Message}");
                 }
             });
         }

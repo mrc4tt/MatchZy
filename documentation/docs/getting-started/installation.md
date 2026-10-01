@@ -19,19 +19,22 @@
 3. Extract the zip into `game/csgo/`. It contains:
 
     ```text
-    addons/counterstrikesharp/plugins/MatchZy/      # plugin and its dependencies
-    addons/counterstrikesharp/gamedata/matchzy.json # signatures used by practice mode
-    cfg/MatchZy/*.cfg                               # mode configs (live, scrim, prac, ...)
-    cfg/MatchZy/database.json.example               # MySQL settings reference
+    addons/counterstrikesharp/plugins/MatchZy/            # plugin and its dependencies
+    addons/counterstrikesharp/plugins/MatchZy/defaults/   # reference copies of the default cfgs and database.json
+    addons/counterstrikesharp/gamedata/matchzy.json       # signatures used by practice mode
     ```
+
+    The zip contains nothing under `cfg/`. MatchZy writes its cfg files itself on first load.
 
 4. *(Optional)* Install **CS2MenuManager** as its own plugin under `addons/counterstrikesharp/plugins/CS2MenuManager/` if you want the in-game menus.
 5. Restart the server, or run `css_plugins load MatchZy`.
 
-On first load MatchZy writes `cfg/MatchZy/config.cfg` (all settings, with comments) and `cfg/MatchZy/database.json` (SQLite). Edit `config.cfg` to tune the server; see [Configuration](../reference/convars.md).
+On first load MatchZy writes `cfg/MatchZy/config.cfg` (all settings, with comments), the mode configs (`live.cfg`, `scrim.cfg`, `prac.cfg`, ...), `admins.json` and `database.json` (SQLite). Edit `config.cfg` to tune the server; see [Configuration](../reference/convars.md).
+
+To update later, see [Updating](updating.md).
 
 !!! tip "Admins"
-    MatchZy accepts CounterStrikeSharp admin flags (for example `@css/config`, `@css/map`). You can also list SteamID64s in `cfg/MatchZy/admins.json`. See [Files and folders](../reference/files.md#adminsjson).
+    MatchZy accepts CounterStrikeSharp admin flags (for example `@css/config`, `@css/map`). You can also list SteamID64s in `cfg/MatchZy/admins.json`; every player listed there is a full MatchZy admin. See [Files and folders](../reference/files.md#adminsjson).
 
 ## Build from source
 

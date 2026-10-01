@@ -43,9 +43,12 @@ namespace MatchZy
         {
             foreach (var player in Utilities.GetPlayers())
             {
-                if (player == null || !player.IsValid || player.IsBot || player.IsHLTV)
+                if (player == null || !player.IsValid || player.IsBot)
                     continue;
-                player.PrintToChat($"{chatPrefix} {Localizer.ForPlayer(player, key, args)}");
+                // CSTV gets it too, in the server language, so it shows in demos and the broadcast
+                // (Server.PrintToChatAll used to reach it).
+                string text = player.IsHLTV ? Localizer[key, args] : Localizer.ForPlayer(player, key, args);
+                player.PrintToChat($"{chatPrefix} {text}");
             }
         }
 
@@ -62,6 +65,18 @@ namespace MatchZy
                 {
                     player.PrintToChat($"{chatPrefix} {message}");
                 }
+            }
+        }
+
+        // Like PrintToAdmins, but each admin gets the message in their own language.
+        private void PrintLocalizedToAdmins(string key, params object[] args)
+        {
+            foreach (var player in Utilities.GetPlayers())
+            {
+                if (player == null || !player.IsValid || player.IsBot || player.IsHLTV)
+                    continue;
+                if (AdminManager.PlayerHasPermissions(player, "@css/generic"))
+                    player.PrintToChat($"{chatPrefix} {Localizer.ForPlayer(player, key, args)}");
             }
         }
 
@@ -148,7 +163,13 @@ namespace MatchZy
                 {
                     string sid = kvp.Key.Trim();
                     if (sid.Length == 17 && ulong.TryParse(sid, out _))
-                        loadedAdmins[sid] = kvp.Value;
+                    {
+                        loadedAdmins[sid] = kvp.Value ?? "";
+                        // Flags in the value were honored in 0.8.89 - 0.8.92 and limited that admin.
+                        // They are ignored now, so such an entry is a FULL admin: say so loudly.
+                        if ((kvp.Value ?? "").Contains('@'))
+                            Log($"[LoadAdmins] WARNING: admins.json entry {sid} has '{kvp.Value}' as its value. Flags are no longer read there, so this player is a FULL MatchZy admin. For a limited admin, remove the entry and use CounterStrikeSharp's admins.json with flags.");
+                    }
                 }
 
                 Log($"[LoadAdmins] Loaded {loadedAdmins.Count} admin(s).");
@@ -169,20 +190,10 @@ namespace MatchZy
                 return true; // Admin exists in admins.json of CSSharp
             if (player == null)
                 return true; // Sent via server, hence should be treated as an admin.
-            if (loadedAdmins.TryGetValue(player.SteamID.ToString(), out var adminFlags))
-            {
-                // MatchZy's admins.json: an empty value (the upstream format) means full admin. A
-                // value lists flags (e.g. "@css/chat" or "@css/map, @css/config") and then only grants
-                // commands that accept one of them. It used to grant everything whatever it said.
-                var flags = (adminFlags ?? "").Split(new[] { ',', ' ', ';' }, StringSplitOptions.RemoveEmptyEntries)
-                    .Where(f => f.StartsWith('@')).ToArray();
-                // No flags in the value (empty, or free text such as the player's name): full admin,
-                // as before.
-                if (flags.Length == 0)
-                    return true;
-                return flags.Any(f => updatedPermissions.Contains(f, StringComparer.OrdinalIgnoreCase));
-            }
-            return false;
+            // MatchZy's admins.json lists SteamID64s only: every listed player is a full MatchZy admin.
+            // The value is free text (e.g. the player's name) and is not read as flags; limited
+            // admins belong in CounterStrikeSharp's own admin system, which is checked above.
+            return loadedAdmins.ContainsKey(player.SteamID.ToString());
         }
 
         private int GetRealPlayersCount()
@@ -190,31 +201,32 @@ namespace MatchZy
             return playerData.Count;
         }
 
+        // matchzy_ready_hint_style 2: upstream MatchZy's ready reminder. No center text; every
+        // matchzy_chat_messages_timer_delay seconds the chat lists who is not ready yet, or how many
+        // are ready once everyone is. Each player reads it in their own language.
         private void SendUnreadyPlayersMessage()
         {
-            if (!isWarmup || matchStarted)
+            if (!isWarmup || matchStarted || !readyAvailable || isDryRun || readyHintStyle.Value != 2)
                 return;
             List<string> unreadyPlayers = new();
 
             foreach (var key in playerReadyStatus.Keys)
             {
-                if (playerReadyStatus[key] == false)
+                if (playerReadyStatus[key] == false && playerData.TryGetValue(key, out var p) && p != null && p.IsValid)
                 {
-                    unreadyPlayers.Add(playerData[key].PlayerName);
+                    unreadyPlayers.Add(p.PlayerName);
                 }
             }
             if (unreadyPlayers.Count > 0)
             {
                 string unreadyPlayerList = string.Join(", ", unreadyPlayers);
-                string minimumReadyRequiredMessage = isMatchSetup ? "" : Localizer["matchzy.minimum.ready.required", $"{ChatColors.Green}{minimumReadyRequired}{ChatColors.Default}"];
-
-                if (isRoundRestorePending)
+                string key = isRoundRestorePending ? "matchzy.ready.readytotestorebackupinfomessage" : "matchzy.utility.unreadyplayers";
+                foreach (var player in Utilities.GetPlayers())
                 {
-                    //PrintToAllChat(Localizer["matchzy.ready.readytotestorebackupinfomessage", unreadyPlayerList, minimumReadyRequiredMessage]);
-                }
-                else
-                {
-                    //PrintToAllChat(Localizer["matchzy.utility.unreadyplayers", unreadyPlayerList, minimumReadyRequiredMessage]);
+                    if (player == null || !player.IsValid || player.IsBot || player.IsHLTV)
+                        continue;
+                    string minimumReadyRequiredMessage = isMatchSetup ? "" : Localizer.ForPlayer(player, "matchzy.minimum.ready.required", $"{ChatColors.Green}{minimumReadyRequired}{ChatColors.Default}");
+                    player.PrintToChat($"{chatPrefix} {Localizer.ForPlayer(player, key, unreadyPlayerList, minimumReadyRequiredMessage)}");
                 }
             }
             else
@@ -222,12 +234,29 @@ namespace MatchZy
                 int countOfReadyPlayers = playerReadyStatus.Count(kv => kv.Value == true);
                 if (isMatchSetup)
                 {
-                    PrintToAllChat(Localizer["matchzy.utility.readyplayers", countOfReadyPlayers]);
+                    PrintLocalizedToAll("matchzy.utility.readyplayers", countOfReadyPlayers);
                 }
                 else
                 {
-                    PrintToAllChat(Localizer["matchzy.utility.minimumreadyplayers", minimumReadyRequired, countOfReadyPlayers]);
+                    PrintLocalizedToAll("matchzy.utility.minimumreadyplayers", minimumReadyRequired, countOfReadyPlayers);
                 }
+            }
+        }
+
+        // Arms the style-2 chat reminder while it is selected, and stops it otherwise. Called from
+        // the 1 s ready timer, so changing matchzy_ready_hint_style mid-warmup takes effect at once.
+        private void SyncUnreadyChatReminder()
+        {
+            if (readyHintStyle.Value == 2 && readyAvailable && !matchStarted && !isDryRun)
+            {
+                // No STOP_ON_MAPCHANGE: that kills the timer but leaves this field set, so ??= would never
+                // re-arm it on the next map. StartWarmup and the match-start paths kill and null it.
+                unreadyPlayerMessageTimer ??= AddTimer(Math.Max(5, chatTimerDelay), SendUnreadyPlayersMessage, TimerFlags.REPEAT);
+            }
+            else if (unreadyPlayerMessageTimer != null)
+            {
+                unreadyPlayerMessageTimer.Kill();
+                unreadyPlayerMessageTimer = null;
             }
         }
 
@@ -260,10 +289,20 @@ namespace MatchZy
                 playerReadyStatus.Remove(key);
             }
 
-            if (unreadyPlayers.Count > 0)
+            // Style 2 (upstream-style chat reminder) shows no center text.
+            if (unreadyPlayers.Count > 0 && readyHintStyle.Value != 2)
             {
                 string unreadyPlayerList = string.Join(", ", unreadyPlayers);
-                PrintWrappedLine(HudDestination.Center, $"NotReady: {unreadyPlayerList}");
+                // The center HUD does not wrap: keep the list short, as the ready hint does.
+                if (unreadyPlayerList.Length > 64)
+                    unreadyPlayerList = unreadyPlayerList.Substring(0, 64) + "...";
+                // Per player, in their own language.
+                foreach (var p in Utilities.GetPlayers())
+                {
+                    if (p == null || !p.IsValid || p.IsBot || p.IsHLTV)
+                        continue;
+                    p.PrintToCenter($" {Localizer.ForPlayer(p, "matchzy.hint.notready", unreadyPlayerList)}");
+                }
             }
         }
 
@@ -345,12 +384,6 @@ namespace MatchZy
             // entity-encodes it via PanelSafe at render; the classic center text wants it plain.
             _rpWaiting = notReady.Count > 0 ? list : "";
 
-            // Classic plain-center message (style 0) - built here so the 1s timer just broadcasts it.
-            string line1 = Localizer["matchzy.hint.waitingforplayers", _rpReady, _rpTotal];
-            string line2 = Localizer["matchzy.hint.usereadycommand"];
-            _cachedReadyHintMessage = _rpWaiting.Length > 0
-                ? $"{line1}\n{line2}\nNotReady: {list}"
-                : $"{line1}\n{line2}";
 
             _readyStatusDirty = false;
             _rpVersion++;
@@ -413,14 +446,34 @@ namespace MatchZy
             {
                 ComputeReadyData();
                 HandleClanTags();
+                SyncUnreadyChatReminder();
 
                 if (readyHintStyle.Value == 0)
-                    VirtualFunctions.ClientPrintAll(HudDestination.Center, _cachedReadyHintMessage, 0, 0, 0, 0, 0);
+                {
+                    // Classic plain-center hint, built per player so everyone reads it in their own
+                    // language (it used to be one broadcast in the server's language). Built from
+                    // the cached numbers: a few localizer lookups per player once a second.
+                    foreach (var p in Utilities.GetPlayers())
+                    {
+                        if (p == null || !p.IsValid || p.IsBot || p.IsHLTV)
+                            continue;
+                        p.PrintToCenter(BuildClassicReadyHint(p));
+                    }
+                }
             }
             catch (Exception)
             {
                 // Server not ready yet; retried on the next tick.
             }
+        }
+
+        private string BuildClassicReadyHint(CCSPlayerController player)
+        {
+            string line1 = Localizer.ForPlayer(player, "matchzy.hint.waitingforplayers", _rpReady, _rpTotal);
+            string line2 = Localizer.ForPlayer(player, "matchzy.hint.usereadycommand");
+            return _rpWaiting.Length > 0
+                ? $"{line1}\n{line2}\n{Localizer.ForPlayer(player, "matchzy.hint.notready", _rpWaiting)}"
+                : $"{line1}\n{line2}";
         }
 
         public override void Unload(bool hotReload)
@@ -430,6 +483,7 @@ namespace MatchZy
             // plugin unloads/reloads while it is active, that per-tick upkeep stops but the gamerules
             // are left mid-override, so the round instantly times out ("penalty for running out of
             // time", the score jumps). Restore normal warmup so unload/reload leaves a sane state.
+            CloseEventQueue();
             if (_fakeWarmupActive)
             {
                 Server.ExecuteCommand("mp_ignore_round_win_conditions 0; mp_respawn_on_death_ct 0; mp_respawn_on_death_t 0; mp_warmup_start; mp_warmup_pausetimer 1");
@@ -695,23 +749,23 @@ namespace MatchZy
                 var pauseTeamName = unpauseData["pauseTeam"];
                 if ((string)pauseTeamName == "Admin")
                 {
-                    PrintToAllChat(Localizer["matchzy.pause.adminpausedthematch"]);
+                    PrintLocalizedToAll("matchzy.pause.adminpausedthematch");
                 }
                 else if ((string)pauseTeamName == "RoundRestore" && !(bool)unpauseData["t"] && !(bool)unpauseData["ct"])
                 {
-                    PrintToAllChat(Localizer["matchzy.pause.pausedbecauserestore"]);
+                    PrintLocalizedToAll("matchzy.pause.pausedbecauserestore");
                 }
                 else if ((bool)unpauseData["t"] && !(bool)unpauseData["ct"])
                 {
-                    PrintToAllChat(Localizer["matchzy.pause.teamwantstounpause", reverseTeamSides["TERRORIST"].teamName, reverseTeamSides["CT"].teamName]);
+                    PrintLocalizedToAll("matchzy.pause.teamwantstounpause", reverseTeamSides["TERRORIST"].teamName, reverseTeamSides["CT"].teamName);
                 }
                 else if (!(bool)unpauseData["t"] && (bool)unpauseData["ct"])
                 {
-                    PrintToAllChat(Localizer["matchzy.pause.teamwantstounpause", reverseTeamSides["CT"].teamName, reverseTeamSides["TERRORIST"].teamName]);
+                    PrintLocalizedToAll("matchzy.pause.teamwantstounpause", reverseTeamSides["CT"].teamName, reverseTeamSides["TERRORIST"].teamName);
                 }
                 else if (!(bool)unpauseData["t"] && !(bool)unpauseData["ct"])
                 {
-                    PrintToAllChat(Localizer["matchzy.pause.pausedthematch", pauseTeamName]);
+                    PrintLocalizedToAll("matchzy.pause.pausedthematch", pauseTeamName);
                 }
             }
         }
@@ -723,19 +777,19 @@ namespace MatchZy
                 var pauseTeamName = unpauseData["pauseTeam"];
                 if ((string)pauseTeamName == "Admin")
                 {
-                    PrintToAllChat(Localizer["matchzy.pause.adminpausedthematch"]);
+                    PrintLocalizedToAll("matchzy.pause.adminpausedthematch");
                 }
                 else if ((string)pauseTeamName == "RoundRestore" && !(bool)unpauseData["t"] && !(bool)unpauseData["ct"])
                 {
-                    PrintToAllChat(Localizer["matchzy.pause.pausedbecauserestore"]);
+                    PrintLocalizedToAll("matchzy.pause.pausedbecauserestore");
                 }
                 else if ((bool)unpauseData["t"] && !(bool)unpauseData["ct"])
                 {
-                    PrintToAllChat(Localizer["matchzy.pause.teamwantstounpause", reverseTeamSides["TERRORIST"].teamName, reverseTeamSides["CT"].teamName]);
+                    PrintLocalizedToAll("matchzy.pause.teamwantstounpause", reverseTeamSides["TERRORIST"].teamName, reverseTeamSides["CT"].teamName);
                 }
                 else if (!(bool)unpauseData["t"] && (bool)unpauseData["ct"])
                 {
-                    PrintToAllChat(Localizer["matchzy.pause.teamwantstounpause", reverseTeamSides["CT"].teamName, reverseTeamSides["TERRORIST"].teamName]);
+                    PrintLocalizedToAll("matchzy.pause.teamwantstounpause", reverseTeamSides["CT"].teamName, reverseTeamSides["TERRORIST"].teamName);
                 }
             }
         }
@@ -755,7 +809,8 @@ namespace MatchZy
             }
             else
             {
-                Server.ExecuteCommand("bot_kick;bot_quota 0;mp_autokick 0;mp_autoteambalance 0;mp_buy_anywhere 0;mp_buytime 15;mp_death_drop_gun 0;mp_free_armor 0;mp_ignore_round_win_conditions 0;mp_limitteams 0;mp_radar_showall 0;mp_respawn_on_death_ct 0;mp_respawn_on_death_t 0;mp_solid_teammates 0;mp_spectators_max 20;mp_maxmoney 16000;mp_startmoney 16000;mp_timelimit 0;sv_alltalk 0;sv_auto_full_alltalk_during_warmup_half_end 0;sv_deadtalk 1;sv_full_alltalk 0;sv_grenade_trajectory 0;sv_hibernate_when_empty 0;mp_weapons_allow_typecount -1;sv_infinite_ammo 0;sv_showimpacts 0;sv_voiceenable 1;sm_cvar sv_mute_players_with_social_penalties 0;sv_mute_players_with_social_penalties 0;tv_relayvoice 1;sv_cheats 0;mp_ct_default_melee weapon_knife;mp_ct_default_secondary weapon_hkp2000;mp_ct_default_primary \"\";mp_t_default_melee weapon_knife;mp_t_default_secondary weapon_glock;mp_t_default_primary \"\";mp_maxrounds 24;mp_warmuptime 9999;cash_team_bonus_shorthanded 0;mp_restartgame 1;mp_warmup_online_enabled 1;mp_warmup_start;mp_warmup_pausetimer 1");
+                KickAllBotsProtectCSTV();
+                Server.ExecuteCommand("mp_autokick 0;mp_autoteambalance 0;mp_buy_anywhere 0;mp_buytime 15;mp_death_drop_gun 0;mp_free_armor 0;mp_ignore_round_win_conditions 0;mp_limitteams 0;mp_radar_showall 0;mp_respawn_on_death_ct 0;mp_respawn_on_death_t 0;mp_solid_teammates 0;mp_spectators_max 20;mp_maxmoney 16000;mp_startmoney 16000;mp_timelimit 0;sv_alltalk 0;sv_auto_full_alltalk_during_warmup_half_end 0;sv_deadtalk 1;sv_full_alltalk 0;sv_grenade_trajectory 0;sv_hibernate_when_empty 0;mp_weapons_allow_typecount -1;sv_infinite_ammo 0;sv_showimpacts 0;sv_voiceenable 1;sm_cvar sv_mute_players_with_social_penalties 0;sv_mute_players_with_social_penalties 0;tv_relayvoice 1;sv_cheats 0;mp_ct_default_melee weapon_knife;mp_ct_default_secondary weapon_hkp2000;mp_ct_default_primary \"\";mp_t_default_melee weapon_knife;mp_t_default_secondary weapon_glock;mp_t_default_primary \"\";mp_maxrounds 24;mp_warmuptime 9999;cash_team_bonus_shorthanded 0;mp_restartgame 1;mp_warmup_online_enabled 1;mp_warmup_start;mp_warmup_pausetimer 1");
             }
             // The warmup cfg sets bot_quota 0; put a bot team back.
             ApplyBotTeam();
@@ -867,11 +922,10 @@ namespace MatchZy
             {
                 var rules = GetGameRules();
                 var proxy = Utilities.FindAllEntitiesByDesignerName<CCSGameRulesProxy>("cs_gamerules").FirstOrDefault();
+                // No game rules during a map change or shutdown: the delayed wipes can land there,
+                // and there is nothing to wipe, so skip without logging.
                 if (rules == null || proxy == null)
-                {
-                    Log("[ClearRoundHistory] Game rules not available yet.");
                     return;
-                }
 
                 rules.MatchStats_RoundResults.Clear();
                 rules.MatchStats_PlayersAlive_CT.Clear();
@@ -894,9 +948,9 @@ namespace MatchZy
         private void ScheduleRoundHistoryWipe()
         {
             ClearRoundHistory();
-            AddTimer(2.0f, () => ClearRoundHistory());
-            AddTimer(5.0f, () => ClearRoundHistory());
-            AddTimer(8.0f, () => ClearRoundHistory());
+            AddTimer(2.0f, () => ClearRoundHistory(), TimerFlags.STOP_ON_MAPCHANGE);
+            AddTimer(5.0f, () => ClearRoundHistory(), TimerFlags.STOP_ON_MAPCHANGE);
+            AddTimer(8.0f, () => ClearRoundHistory(), TimerFlags.STOP_ON_MAPCHANGE);
         }
 
         private void StartKnifeRound()
@@ -937,16 +991,16 @@ namespace MatchZy
             }
             ApplyBotTeam();
 
-            PrintToAllChat($"{ChatColors.Olive}KNIFE!");
-            PrintToAllChat($"{ChatColors.Lime}KNIFE!");
-            PrintToAllChat($"{ChatColors.Green}KNIFE!");
+            PrintLocalizedToAll("matchzy.liveknife2");
+            PrintLocalizedToAll("matchzy.liveknife3");
+            PrintLocalizedToAll("matchzy.liveknife1");
         }
 
         private void SendSideSelectionMessage()
         {
             if (!isSideSelectionPhase)
                 return;
-            PrintToAllChat(Localizer["matchzy.knife.sidedecisionpending", knifeWinnerName]);
+            PrintLocalizedToAll("matchzy.knife.sidedecisionpending", knifeWinnerName);
         }
 
         private void StartAfterKnifeWarmup()
@@ -956,7 +1010,7 @@ namespace MatchZy
             ExecWarmupCfg();
             knifeWinnerName = knifeWinner == 3 ? reverseTeamSides["CT"].teamName : reverseTeamSides["TERRORIST"].teamName;
             ShowDamageInfo();
-            PrintToAllChat(Localizer["matchzy.knife.sidedecisionpending", knifeWinnerName]);
+            PrintLocalizedToAll("matchzy.knife.sidedecisionpending", knifeWinnerName);
             sideSelectionMessageTimer ??= AddTimer(chatTimerDelay, SendSideSelectionMessage, TimerFlags.REPEAT);
 
             DrawSideSelection();
@@ -966,29 +1020,29 @@ namespace MatchZy
         {
             if (isKnifeRound)
             {
-                PrintToAllChat(Localizer["matchzy.utility.roundknife"]);
-                PrintToAllChat(Localizer["matchzy.utility.roundknife"]);
-                PrintToAllChat(Localizer["matchzy.utility.roundknife"]);
+                PrintLocalizedToAll("matchzy.utility.roundknife");
+                PrintLocalizedToAll("matchzy.utility.roundknife");
+                PrintLocalizedToAll("matchzy.utility.roundknife");
             }
             else if (isMatchLive)
             {
-                PrintToAllChat(Localizer["matchzy.utility.matchlive"]);
-                PrintToAllChat(Localizer["matchzy.utility.matchlive"]);
-                PrintToAllChat(Localizer["matchzy.utility.matchlive"]);
-                PrintToAllChat($"{ChatColors.Green}.tac {ChatColors.Default} - Tactical pause (4 x 30 seconds per team)");
-                PrintToAllChat($"{ChatColors.Green}.tech/.pause {ChatColors.Default} - Technical pause (indefinite)");
+                PrintLocalizedToAll("matchzy.utility.matchlive");
+                PrintLocalizedToAll("matchzy.utility.matchlive");
+                PrintLocalizedToAll("matchzy.utility.matchlive");
+                PrintLocalizedToAll("matchzy.util.tachint");
+                PrintLocalizedToAll("matchzy.util.techhint");
 
                 // Re-announcing LIVE (unpause / resume): report the ACTUAL recording state rather than
                 // tv_enable, which only says GOTV exists on this server.
                 if (isDemoRecording)
                 {
-                    PrintToAllChat($"{ChatColors.Green}CSTV Recording...");
+                    PrintLocalizedToAll("matchzy.util.cstvrecording");
                 }
 
                 // Only show OT notice for match mode (scrim/hill have OT disabled)
                 if (!isPlayOutEnabled && !isPlayOutEnabled2)
                 {
-                    PrintToAllChat($"{ChatColors.Green}Please be aware that this match has overtime enabled, there is no tie.");
+                    PrintLocalizedToAll("matchzy.util.overtimenotie");
                 }
             }
         }
@@ -999,6 +1053,7 @@ namespace MatchZy
             isSideSelectionPhase = false;
             matchStarted = true;
             isMatchLive = true;
+            currentMapFinished = false;
             isPlayOutEnabled = false;
             readyAvailable = false;
             isDryRun = false;
@@ -1017,6 +1072,7 @@ namespace MatchZy
             isSideSelectionPhase = false;
             matchStarted = true;
             isMatchLive = true;
+            currentMapFinished = false;
             readyAvailable = false;
             isPlayOutEnabled = true;
             isDryRun = false;
@@ -1037,6 +1093,7 @@ namespace MatchZy
             isSideSelectionPhase = false;
             matchStarted = true;
             isMatchLive = true;
+            currentMapFinished = false;
             readyAvailable = false;
             isPlayOutEnabled = false;
             isPlayOutEnabled2 = true;
@@ -1167,17 +1224,17 @@ namespace MatchZy
             lastBackupFileName = $"matchzy_{liveMatchId}_{matchConfig.CurrentMapNumber}_round00.txt";
             lastMatchZyBackupFileName = $"matchzy_{liveMatchId}_{matchConfig.CurrentMapNumber}_round00.json";
 
-            PrintToAllChat($"{ChatColors.Olive}LIVE!");
-            PrintToAllChat($"{ChatColors.Lime}LIVE!");
-            PrintToAllChat($"{ChatColors.Green}LIVE!");
+            PrintLocalizedToAll("matchzy.util.live1");
+            PrintLocalizedToAll("matchzy.util.live2");
+            PrintLocalizedToAll("matchzy.util.live3");
 
-            PrintToAllChat($"{ChatColors.Green}.tac {ChatColors.Default} - Tactical pause (4 x 30 seconds per team)");
-            PrintToAllChat($"{ChatColors.Green}.tech/.pause {ChatColors.Default} - Technical pause (indefinite)");
+            PrintLocalizedToAll("matchzy.util.tachint");
+            PrintLocalizedToAll("matchzy.util.techhint");
 
             // Only show OT notice for match mode (scrim/hill have OT disabled)
             if (!isPlayOutEnabled && !isPlayOutEnabled2)
             {
-                PrintToAllChat($"{ChatColors.Green}Please be aware that this match has overtime enabled, there is no tie.");
+                PrintLocalizedToAll("matchzy.util.overtimenotie");
             }
 
             // "CSTV Recording..." is no longer printed here. tv_enable being 1 only means GOTV exists,
@@ -1186,10 +1243,7 @@ namespace MatchZy
 
             var goingLiveEvent = new GoingLiveEvent { MatchId = liveMatchId, MapNumber = matchConfig.CurrentMapNumber };
 
-            Task.Run(async () =>
-            {
-                await SendEventAsync(goingLiveEvent);
-            });
+            PublishEvent(goingLiveEvent);
         }
 
         private void StartScrim()
@@ -1212,12 +1266,12 @@ namespace MatchZy
             lastBackupFileName = $"matchzy_{liveMatchId}_{matchConfig.CurrentMapNumber}_round00.txt";
             lastMatchZyBackupFileName = $"matchzy_{liveMatchId}_{matchConfig.CurrentMapNumber}_round00.json";
 
-            PrintToAllChat($"{ChatColors.Olive}LIVE!");
-            PrintToAllChat($"{ChatColors.Lime}LIVE!");
-            PrintToAllChat($"{ChatColors.Green}LIVE!");
+            PrintLocalizedToAll("matchzy.util.live1");
+            PrintLocalizedToAll("matchzy.util.live2");
+            PrintLocalizedToAll("matchzy.util.live3");
 
-            PrintToAllChat($"{ChatColors.Green}.tac {ChatColors.Default} - Tactical pause (4 x 30 seconds per team)");
-            PrintToAllChat($"{ChatColors.Green}.tech/.pause {ChatColors.Default} - Technical pause (indefinite)");
+            PrintLocalizedToAll("matchzy.util.tachint");
+            PrintLocalizedToAll("matchzy.util.techhint");
 
             // "CSTV Recording..." is no longer printed here. tv_enable being 1 only means GOTV exists,
             // not that the demo survived the cfg's mp_restartgame - the announcement now comes from
@@ -1225,10 +1279,7 @@ namespace MatchZy
 
             var goingLiveEvent = new GoingLiveEvent { MatchId = liveMatchId, MapNumber = matchConfig.CurrentMapNumber };
 
-            Task.Run(async () =>
-            {
-                await SendEventAsync(goingLiveEvent);
-            });
+            PublishEvent(goingLiveEvent);
         }
 
         private void StartHill()
@@ -1250,12 +1301,12 @@ namespace MatchZy
             lastBackupFileName = $"matchzy_{liveMatchId}_{matchConfig.CurrentMapNumber}_round00.txt";
             lastMatchZyBackupFileName = $"matchzy_{liveMatchId}_{matchConfig.CurrentMapNumber}_round00.json";
 
-            PrintToAllChat($"{ChatColors.Olive}HILL LIVE!");
-            PrintToAllChat($"{ChatColors.Lime}HILL LIVE!");
-            PrintToAllChat($"{ChatColors.Green}HILL LIVE!");
+            PrintLocalizedToAll("matchzy.util.hilllive1");
+            PrintLocalizedToAll("matchzy.util.hilllive2");
+            PrintLocalizedToAll("matchzy.util.hilllive3");
 
-            PrintToAllChat($"{ChatColors.Green}.tac {ChatColors.Default} - Tactical pause (4 x 30 seconds per team)");
-            PrintToAllChat($"{ChatColors.Green}.tech/.pause {ChatColors.Default} - Technical pause (indefinite)");
+            PrintLocalizedToAll("matchzy.util.tachint");
+            PrintLocalizedToAll("matchzy.util.techhint");
 
             // "CSTV Recording..." is no longer printed here. tv_enable being 1 only means GOTV exists,
             // not that the demo survived the cfg's mp_restartgame - the announcement now comes from
@@ -1263,10 +1314,7 @@ namespace MatchZy
 
             var goingLiveEvent = new GoingLiveEvent { MatchId = liveMatchId, MapNumber = matchConfig.CurrentMapNumber };
 
-            Task.Run(async () =>
-            {
-                await SendEventAsync(goingLiveEvent);
-            });
+            PublishEvent(goingLiveEvent);
         }
 
         // Bumps m_nRoundEndCount netvar so client re-evaluates scoreboard UI
@@ -1340,6 +1388,9 @@ namespace MatchZy
         {
             try
             {
+                seriesEnded = false;
+                currentMapFinished = false;
+                matchLoadGeneration++;
                 // Send match_cancelled whenever a loaded or started match is stopped with a reason:
                 // also in warmup, veto, knife and between the maps of a series, where the panel
                 // otherwise never learnt that the match it created was gone.
@@ -1360,10 +1411,8 @@ namespace MatchZy
                         Team2Score = t2score,
                     };
 
-                    Task.Run(async () =>
-                    {
-                        await SendEventAsync(cancelledEvent);
-                    });
+                    // Target taken now: matchConfig is reset (to the server's remote log settings) below.
+                    PublishEvent(cancelledEvent);
                 }
 
                 // Close the database rows of a match that is being stopped before it could finish.
@@ -1495,8 +1544,8 @@ namespace MatchZy
 
                 if (autoTeamNamesEnabled.Value)
                 {
-                    Server.ExecuteCommand($"mp_teamname_1 {matchzyTeam1.teamName}");
-                    Server.ExecuteCommand($"mp_teamname_2 {matchzyTeam2.teamName}");
+                    Server.ExecuteCommand($"mp_teamname_1 {TeamNameArg(matchzyTeam1.teamName)}");
+                    Server.ExecuteCommand($"mp_teamname_2 {TeamNameArg(matchzyTeam2.teamName)}");
                 }
                 else
                 {
@@ -1508,14 +1557,13 @@ namespace MatchZy
                 reverseTeamSides["CT"] = matchzyTeam1;
                 reverseTeamSides["TERRORIST"] = matchzyTeam2;
 
-                matchConfig = new()
-                {
-                    RemoteLogURL = matchConfig.RemoteLogURL,
-                    RemoteLogHeaderKey = matchConfig.RemoteLogHeaderKey,
-                    RemoteLogHeaderValue = matchConfig.RemoteLogHeaderValue,
-                    RemoteLogAuthKey = matchConfig.RemoteLogAuthKey,
-                    RemoteLogAuthValue = matchConfig.RemoteLogAuthValue,
-                };
+                // Back to the server's own remote log settings: a URL from the previous match's
+                // "cvars" block must not keep receiving the next match's events.
+                // Built complete before it is published: an event sent from a thread-pool task in
+                // between must never see a config without the remote log URL.
+                var resetConfig = new MatchConfig();
+                ApplyDefaultRemoteLog(resetConfig);
+                matchConfig = resetConfig;
 
                 KillPhaseTimers();
                 matchEndMapChangeTimer?.Kill();
@@ -1658,7 +1706,7 @@ namespace MatchZy
                 Swapped = side != knifeWinnerSide,
             };
             knifeWinnerTeam = null;
-            Task.Run(async () => await SendEventAsync(knifeWonEvent));
+            PublishEvent(knifeWonEvent);
         }
 
         private void HandleKnifeWinner(EventCsWinPanelRound @event)
@@ -1699,7 +1747,7 @@ namespace MatchZy
             if (matchStarted)
             {
                 // ReplyToUserCommand(player, $"Map cannot be changed once the match is started!");
-                ReplyToUserCommand(player, Localizer["matchzy.utility.matchstarted"]);
+                ReplyToUserCommand(player, Localizer.ForPlayer(player, "matchzy.utility.matchstarted"));
                 return;
             }
 
@@ -1719,7 +1767,7 @@ namespace MatchZy
                 string idPart = mapName["ws/".Length..];
                 if (!long.TryParse(idPart, out _))
                 {
-                    ReplyToUserCommand(player, Localizer["matchzy.cc.invalidmap"]);
+                    ReplyToUserCommand(player, Localizer.ForPlayer(player, "matchzy.cc.invalidmap"));
                     return;
                 }
                 mapName = idPart;
@@ -1734,7 +1782,7 @@ namespace MatchZy
             string targetMap = isWorkshopName ? mapName["ws:".Length..].Trim() : mapName.ToLower();
             if ((isWorkshopName && string.IsNullOrEmpty(targetMap)) || !IsSafeMapName(targetMap))
             {
-                ReplyToUserCommand(player, Localizer["matchzy.cc.invalidmap"]);
+                ReplyToUserCommand(player, Localizer.ForPlayer(player, "matchzy.cc.invalidmap"));
                 return;
             }
 
@@ -1754,7 +1802,7 @@ namespace MatchZy
                     }
                     else
                     {
-                        ReplyToUserCommand(player, Localizer["matchzy.cc.invalidmap"]);
+                        ReplyToUserCommand(player, Localizer.ForPlayer(player, "matchzy.cc.invalidmap"));
                         return;
                     }
                 }
@@ -1783,9 +1831,9 @@ namespace MatchZy
                 Server.ExecuteCommand("tv_stoprecord");
                 isDemoRecording = false;
             }
-            Server.ExecuteCommand("bot_kick");
+            KickAllBotsProtectCSTV();
 
-            PrintToAllChat(Localizer["matchzy.utility.changingmap", targetMap]);
+            PrintLocalizedToAll("matchzy.utility.changingmap", targetMap);
 
             // Capture for lambda
             string finalMap = targetMap;
@@ -1864,7 +1912,24 @@ namespace MatchZy
             }
         }
 
+        // A throw anywhere in the match start used to leave matchStartInProgress set, and every later
+        // ready-up then returned at the re-entry guard: the match could not start until a map change
+        // or .stopmatch. Both the synchronous part and the deferred part reset the flag on a throw.
         private void HandleMatchStart()
+        {
+            try
+            {
+                HandleMatchStartCore();
+            }
+            catch (Exception e)
+            {
+                Log($"[HandleMatchStart FATAL] {e}");
+                if (!matchStarted)
+                    matchStartInProgress = false;
+            }
+        }
+
+        private void HandleMatchStartCore()
         {
             // Re-entry guard: knife/live start is deferred (Task.Run → NextFrame), so matchStarted
             // isn't set yet when a second CheckLiveRequired fires. Without this the match starts
@@ -1877,11 +1942,20 @@ namespace MatchZy
             isDryRun = false;
             if (isRoundRestorePending)
             {
-                RestoreRoundBackup(null, pendingRestoreFileName);
+                string restoreFile = pendingRestoreFileName;
+                // isRoundRestorePending must still be set during the call: in warmup it is what makes
+                // RestoreRoundBackup apply the queued backup instead of queueing it again.
+                bool restoreStarted = RestoreRoundBackup(null, restoreFile);
                 isRoundRestorePending = false;
                 pendingRestoreFileName = "";
-                matchStartInProgress = false;
-                return;
+                if (restoreStarted)
+                {
+                    matchStartInProgress = false;
+                    return;
+                }
+                // The queued restore was refused (its round data is gone or incomplete). Start the
+                // match normally instead of leaving the server in warmup with everyone ready.
+                Log($"[HandleMatchStart] Queued restore of {restoreFile} was refused; starting the match normally.");
             }
 
             // Auto-naming disabled and both teams still on the scrim defaults (a Get5/JSON match has
@@ -1966,8 +2040,8 @@ namespace MatchZy
 
             if (!vanillaTeamNames)
             {
-                Server.ExecuteCommand($"mp_teamname_1 {reverseTeamSides["CT"].teamName}");
-                Server.ExecuteCommand($"mp_teamname_2 {reverseTeamSides["TERRORIST"].teamName}");
+                Server.ExecuteCommand($"mp_teamname_1 {TeamNameArg(reverseTeamSides["CT"].teamName)}");
+                Server.ExecuteCommand($"mp_teamname_2 {TeamNameArg(reverseTeamSides["TERRORIST"].teamName)}");
             }
 
             HandleClanTags();
@@ -2003,67 +2077,76 @@ namespace MatchZy
                 // Continue match start on game thread
                 Server.NextFrame(() =>
                 {
-                    // The DB retries above can take a few seconds. If the match was reset or
-                    // stopped meanwhile (ResetMatch clears matchStartInProgress), do not start a
-                    // knife round or go live on a server that has moved on.
-                    if (!matchStartInProgress || matchStarted)
+                    try
                     {
-                        Log("[HandleMatchStart] Match start abandoned: the match was reset while the database was being initialized.");
-                        return;
-                    }
-
-                    // Keep a matchid we already have (from the match config or the allocation at load)
-                    // when the database is unreachable: -1 silenced every event for the whole map.
-                    if (newMatchId > 0)
-                        liveMatchId = newMatchId;
-                    else if (currentMatchId > 0)
-                        liveMatchId = currentMatchId;
-                    else
-                        liveMatchId = -1;
-
-                    if (liveMatchId == -1)
-                    {
-                        Log("[HandleMatchStart] CRITICAL: Database initialization failed! Match stats will NOT be recorded.");
-                    }
-                    else
-                    {
-                        Log($"[HandleMatchStart] Match initialized successfully with matchId: {liveMatchId}");
-                    }
-
-                    SetupRoundBackupFile();
-                    GetSpawns();
-
-                    if (isPreVeto)
-                    {
-                        // The veto is not the match start: the players ready up again afterwards and
-                        // HandleMatchStart runs a second time. Leaving the re-entry guard set made
-                        // that second call return at once, so warmup never ended after a veto.
-                        matchStartInProgress = false;
-                        CreateVeto();
-                    }
-                    else if (isKnifeRequired)
-                    {
-                        StartKnifeRound();
-                    }
-                    else if (isPlayOutEnabled)
-                    {
-                        StartScrim();
-                    }
-                    else if (isPlayOutEnabled2)
-                    {
-                        StartHill();
-                    }
-                    else
-                    {
-                        StartLive();
-                    }
-                    if (matchStartMessage.Value.Trim() != "" && matchStartMessage.Value.Trim() != "\"\"")
-                    {
-                        List<string> matchStartMessages = [.. matchStartMessage.Value.Split("$$$")];
-                        foreach (string message in matchStartMessages)
+                        // The DB retries above can take a few seconds. If the match was reset or
+                        // stopped meanwhile (ResetMatch clears matchStartInProgress), do not start a
+                        // knife round or go live on a server that has moved on.
+                        if (!matchStartInProgress || matchStarted)
                         {
-                            PrintToAllChat(GetColorTreatedString(FormatCvarValue(message.Trim())));
+                            Log("[HandleMatchStart] Match start abandoned: the match was reset while the database was being initialized.");
+                            return;
                         }
+
+                        // Keep a matchid we already have (from the match config or the allocation at load)
+                        // when the database is unreachable: -1 silenced every event for the whole map.
+                        if (newMatchId > 0)
+                            liveMatchId = newMatchId;
+                        else if (currentMatchId > 0)
+                            liveMatchId = currentMatchId;
+                        else
+                            liveMatchId = -1;
+
+                        if (liveMatchId == -1)
+                        {
+                            Log("[HandleMatchStart] CRITICAL: Database initialization failed! Match stats will NOT be recorded.");
+                        }
+                        else
+                        {
+                            Log($"[HandleMatchStart] Match initialized successfully with matchId: {liveMatchId}");
+                        }
+
+                        SetupRoundBackupFile();
+                        GetSpawns();
+
+                        if (isPreVeto)
+                        {
+                            // The veto is not the match start: the players ready up again afterwards and
+                            // HandleMatchStart runs a second time. Leaving the re-entry guard set made
+                            // that second call return at once, so warmup never ended after a veto.
+                            matchStartInProgress = false;
+                            CreateVeto();
+                        }
+                        else if (isKnifeRequired)
+                        {
+                            StartKnifeRound();
+                        }
+                        else if (isPlayOutEnabled)
+                        {
+                            StartScrim();
+                        }
+                        else if (isPlayOutEnabled2)
+                        {
+                            StartHill();
+                        }
+                        else
+                        {
+                            StartLive();
+                        }
+                        if (matchStartMessage.Value.Trim() != "" && matchStartMessage.Value.Trim() != "\"\"")
+                        {
+                            List<string> matchStartMessages = [.. matchStartMessage.Value.Split("$$$")];
+                            foreach (string message in matchStartMessages)
+                            {
+                                PrintToAllChat(GetColorTreatedString(FormatCvarValue(message.Trim())));
+                            }
+                        }
+                    }
+                    catch (Exception e)
+                    {
+                        Log($"[HandleMatchStart FATAL] deferred start: {e}");
+                        if (!matchStarted)
+                            matchStartInProgress = false;
                     }
                 }); // Server.NextFrame
             }); // Task.Run
@@ -2184,8 +2267,11 @@ namespace MatchZy
 
         private void HandleMatchEnd()
         {
-            if (!isMatchLive)
+            // currentMapFinished: isMatchLive stays true for a while after the map ends, and a second
+            // cs_win_panel_match would count the map in the series score twice.
+            if (!isMatchLive || currentMapFinished)
                 return;
+            currentMapFinished = true;
 
             // Get restart delay from server config (no GOTV broadcast delay needed)
             // With tv_record_immediate 1, demo writes in real-time, no flush delay needed
@@ -2215,10 +2301,12 @@ namespace MatchZy
             // Count maps played, not maps won: a drawn map is played but adds to no series score,
             // so the old NumMaps - wins formula ran past the end of the map list after a draw.
             int remainingMaps = matchConfig.NumMaps - (currentMapNumber + 1);
-            int mapsToWinSeries = (matchConfig.NumMaps / 2) + 1;
+            // Clinched once the trailing team can no longer catch up. Comparing a score with
+            // NumMaps/2+1 ignored drawn maps: a BO5 at W,W,D,D (2-0, one map left) still played
+            // map 5 for nothing.
             bool seriesOver = !isMatchSetup
                 || remainingMaps <= 0
-                || (matchConfig.SeriesCanClinch && (team1SeriesScore == mapsToWinSeries || team2SeriesScore == mapsToWinSeries));
+                || (matchConfig.SeriesCanClinch && Math.Abs(team1SeriesScore - team2SeriesScore) > remainingMaps);
             string? seriesWinnerName = !isMatchSetup
                 ? (winnerName == "Draw" ? null : winnerName)
                 : team1SeriesScore > team2SeriesScore ? matchzyTeam1.teamName
@@ -2241,9 +2329,10 @@ namespace MatchZy
             // Capture matchId before async context - liveMatchId may be reset to -1 by ResetMatch
             long matchId = liveMatchId;
 
-            lastMapResultTask = Task.Run(async () =>
+            // Queued now, in order with round_end; EndSeries queues series_end after it.
+            lastMapResultTask = SendEventAsync(mapResultEvent);
+            Task.Run(async () =>
             {
-                await SendEventAsync(mapResultEvent);
                 // Write this round's player stats before exporting the CSV. The round_end task does
                 // the same upsert, but it runs independently and could still be in flight here.
                 await database.UpdatePlayerStatsAsync(matchId, currentMapNumber, playerStatsDictionary.ToDictionary(kvp => (long)kvp.Key, kvp => kvp.Value));
@@ -2267,15 +2356,15 @@ namespace MatchZy
 
             if (matchzyTeam1.seriesScore > matchzyTeam2.seriesScore)
             {
-                Server.PrintToChatAll($"{chatPrefix} {ChatColors.Green}{matchzyTeam1.teamName}{ChatColors.Default} is winning the series {ChatColors.Green}{matchzyTeam1.seriesScore}-{matchzyTeam2.seriesScore}{ChatColors.Default}");
+                PrintLocalizedToAll("matchzy.util.serieswinning", matchzyTeam1.teamName, matchzyTeam1.seriesScore, matchzyTeam2.seriesScore);
             }
             else if (matchzyTeam2.seriesScore > matchzyTeam1.seriesScore)
             {
-                Server.PrintToChatAll($"{chatPrefix} {ChatColors.Green}{matchzyTeam2.teamName}{ChatColors.Default} is winning the series {ChatColors.Green}{matchzyTeam2.seriesScore}-{matchzyTeam1.seriesScore}{ChatColors.Default}");
+                PrintLocalizedToAll("matchzy.util.serieswinning", matchzyTeam2.teamName, matchzyTeam2.seriesScore, matchzyTeam1.seriesScore);
             }
             else
             {
-                Server.PrintToChatAll($"{chatPrefix} The series is tied at {ChatColors.Green}{matchzyTeam1.seriesScore}-{matchzyTeam2.seriesScore}{ChatColors.Default}");
+                PrintLocalizedToAll("matchzy.util.seriestied", matchzyTeam1.seriesScore, matchzyTeam2.seriesScore);
             }
 
             matchConfig.CurrentMapNumber += 1;
@@ -2364,7 +2453,7 @@ namespace MatchZy
                     Server.ExecuteCommand("mp_match_end_changelevel 0");
                     Server.ExecuteCommand("mp_match_end_restart 0");
                     Server.ExecuteCommand("mp_endmatch_votenextmap 0");
-                    Server.ExecuteCommand("bot_kick");
+                    KickAllBotsProtectCSTV();
 
                     // Execute actual map change on next frame for engine state safety
                     Server.NextFrame(() =>
@@ -2599,10 +2688,7 @@ namespace MatchZy
                     MapNumber = matchConfig.CurrentMapNumber,
                     RoundNumber = GetRoundNumer(),
                 };
-                Task.Run(async () =>
-                {
-                    await SendEventAsync(roundStartEvent);
-                });
+                PublishEvent(roundStartEvent);
             }
             Stage("remotelog");
 
@@ -2662,9 +2748,10 @@ namespace MatchZy
                         StatsTeam2 = new MatchZyStatsTeam(matchzyTeam2.id, matchzyTeam2.teamName, matchzyTeam2.seriesScore, t2score, 0, 0, playerStatsListTeam2),
                     };
 
+                    // Queued now, on the game thread, so it is sent in order with the other events.
+                    PublishEvent(roundEndEvent);
                     Task.Run(async () =>
                     {
-                        await SendEventAsync(roundEndEvent);
                         var playerStatsDictInt = playerStatsDictionary.ToDictionary(kvp => (long)kvp.Key, kvp => kvp.Value);
                         await database.UpdatePlayerStatsAsync(matchId, currentMapNumber, playerStatsDictInt);
                     });
@@ -2681,11 +2768,11 @@ namespace MatchZy
                     // One of the team did not use .stop command hence display the proper message after the round has ended.
                     if (stopData["ct"] && !stopData["t"])
                     {
-                        Server.PrintToChatAll($"{chatPrefix} The round restore request by {ChatColors.Green}{reverseTeamSides["CT"].teamName}{ChatColors.Default} was cancelled as the round ended");
+                        PrintLocalizedToAll("matchzy.util.restorecancelled", reverseTeamSides["CT"].teamName);
                     }
                     else if (!stopData["ct"] && stopData["t"])
                     {
-                        Server.PrintToChatAll($"{chatPrefix} The round restore request by {ChatColors.Green}{reverseTeamSides["TERRORIST"].teamName}{ChatColors.Default} was cancelled as the round ended");
+                        PrintLocalizedToAll("matchzy.util.restorecancelled", reverseTeamSides["TERRORIST"].teamName);
                     }
 
                     // Invalidate .stop requests after a round is completed.
@@ -2718,8 +2805,10 @@ namespace MatchZy
         {
             overtimePausesUsed.Clear();
             int pauses = overtimePausesPerTeam.Value;
-            PrintToAllChat($"{ChatColors.Green}Overtime is next.{ChatColors.Default}" +
-                (pauses > 0 ? $" Each team may use {ChatColors.Green}.pause{ChatColors.Default} {pauses} time(s) in this overtime." : ""));
+            if (pauses > 0)
+                PrintLocalizedToAll("matchzy.util.overtimenextpauses", pauses);
+            else
+                PrintLocalizedToAll("matchzy.util.overtimenext");
         }
 
         private bool IsInOvertime()
@@ -2841,13 +2930,13 @@ namespace MatchZy
                 bool inOvertime = otPauseLimit > 0 && IsInOvertime();
                 if (inOvertime && overtimePausesUsed.GetValueOrDefault(pausingTeam) >= otPauseLimit)
                 {
-                    ReplyToUserCommand(player, $"Your team has used its {otPauseLimit} pause(s) for this overtime.");
+                    ReplyToUserCommand(player, Localizer.ForPlayer(player, "matchzy.util.otpausesused", otPauseLimit));
                     return;
                 }
                 if (inOvertime)
                     overtimePausesUsed[pausingTeam] = overtimePausesUsed.GetValueOrDefault(pausingTeam) + 1;
 
-                PrintToAllChat(Localizer["matchzy.pause.pausedthematch", pauseTeamName]);
+                PrintLocalizedToAll("matchzy.pause.pausedthematch", pauseTeamName);
                 SetMatchPausedFlags("pause");
             }
         }
@@ -2891,7 +2980,7 @@ namespace MatchZy
             }
 
             unpauseData["pauseTeam"] = "Admin";
-            PrintToAllChat(Localizer["matchzy.pause.adminpausedthematch"]);
+            PrintLocalizedToAll("matchzy.pause.adminpausedthematch");
             // Server.PrintToChatAll($"{chatPrefix} {ChatColors.Green}Admin{ChatColors.Default} has paused the match.");
             if (player == null)
             {
@@ -2914,7 +3003,9 @@ namespace MatchZy
 
             if (isKnifeRound || isMatchLive)
                 // Handle force unpause for both technical and regular pauses
-                PrintToAllChat(Localizer["matchzy.pause.adminunpausedthematch"]);
+                PrintLocalizedToAll("matchzy.pause.adminunpausedthematch");
+            // An admin lifting an auto-pause means playing on short-handed (see AcceptShortHandedAfterAutoPause).
+            AcceptShortHandedAfterAutoPause();
             Server.ExecuteCommand("mp_unpause_match");
             CancelTechPauseTimer();
             isPaused = false;
@@ -2941,10 +3032,7 @@ namespace MatchZy
                     RoundNumber = GetRoundNumer(),
                 };
 
-                Task.Run(async () =>
-                {
-                    await SendEventAsync(unpauseEvent);
-                });
+                PublishEvent(unpauseEvent);
             }
         }
 
@@ -2971,10 +3059,7 @@ namespace MatchZy
                     RoundNumber = GetRoundNumer(),
                 };
 
-                Task.Run(async () =>
-                {
-                    await SendEventAsync(unpauseEvent);
-                });
+                PublishEvent(unpauseEvent);
             }
         }
 
@@ -3003,10 +3088,7 @@ namespace MatchZy
                 RoundNumber = GetRoundNumer(),
             };
 
-            Task.Run(async () =>
-            {
-                await SendEventAsync(pauseEvent);
-            });
+            PublishEvent(pauseEvent);
         }
 
         private void SetTechMatchPausedFlags()
@@ -3030,10 +3112,7 @@ namespace MatchZy
                 RoundNumber = GetRoundNumer(),
             };
 
-            Task.Run(async () =>
-            {
-                await SendEventAsync(pauseEvent);
-            });
+            PublishEvent(pauseEvent);
         }
 
         private void StartHillMode()
@@ -3215,7 +3294,7 @@ namespace MatchZy
         {
             // ReplyToUserCommand(player, "You do not have permission to use this command!");
             ReplyToUserCommand(player, Localizer.ForPlayer(player, "matchzy.utility.dontpermission"));
-            ReplyToUserCommand(player, "You are not an admin. Make sure you has been added as Admin!");
+            ReplyToUserCommand(player, Localizer.ForPlayer(player, "matchzy.util.notadmin"));
         }
 
         private string GetColorTreatedString(string message)
@@ -3251,40 +3330,43 @@ namespace MatchZy
             // ── PRACTICE MODE ──
             if (isPractice)
             {
-                player!.PrintToChat($"{chatPrefix} {ChatColors.Gold}Practice Mode Commands:");
-                player.PrintToChat($" {ChatColors.Green}Spawns:{ChatColors.Default} .spawn .ctspawn .tspawn .bestspawn .worstspawn");
-                player.PrintToChat($" {ChatColors.Green}Bots:{ChatColors.Default} .bot .cbot .boost .nobot .clearbots");
-                player.PrintToChat($" {ChatColors.Green}Positions:{ChatColors.Default} .sbp .lbp .listbotpos .delbotpos .showbotpos .botjiggle");
-                player.PrintToChat($" {ChatColors.Green}Nades:{ChatColors.Default} .savenade .loadnade .listnades .rethrow .throwindex");
-                player.PrintToChat($" {ChatColors.Green}Utility:{ChatColors.Default} .clear .ff .god .traj .impacts .break .cam .timer");
-                player.PrintToChat($" {ChatColors.Green}Teams:{ChatColors.Default} .ct .t .spec .fas");
+                // Chat summary in the player's language; the command names themselves are not translated.
+                string L(string key, params object[] a) => Localizer.ForPlayer(player!, key, a);
+                player!.PrintToChat($"{chatPrefix} {L("matchzy.help.practice.title")}");
+                player.PrintToChat(L("matchzy.help.line", L("matchzy.help.label.spawns"), ".spawn .ctspawn .tspawn .bestspawn .worstspawn"));
+                player.PrintToChat(L("matchzy.help.line", L("matchzy.help.label.bots"), ".bot .cbot .boost .nobot .clearbots"));
+                player.PrintToChat(L("matchzy.help.line", L("matchzy.help.label.positions"), ".sbp .lbp .listbotpos .delbotpos .showbotpos .botjiggle"));
+                player.PrintToChat(L("matchzy.help.line", L("matchzy.help.label.nades"), ".savenade .loadnade .listnades .rethrow .throwindex"));
+                player.PrintToChat(L("matchzy.help.line", L("matchzy.help.label.utility"), ".clear .ff .god .traj .impacts .break .cam .timer"));
+                player.PrintToChat(L("matchzy.help.line", L("matchzy.help.label.teams"), ".ct .t .spec"));
                 if (isAdmin)
                 {
-                    player.PrintToChat($" {ChatColors.Red}Admin:{ChatColors.Default} .exitprac .match .scrim .dryrun");
+                    player.PrintToChat(L("matchzy.help.adminline", L("matchzy.help.label.admin"), ".exitprac .match .scrim .dryrun .fas .grt .rs"));
                 }
-                player.PrintToChat($" {ChatColors.Grey}Full list in console → .mhelp");
+                player.PrintToChat($" {L(isAdmin ? "matchzy.help.fulllist.admin" : "matchzy.help.fulllist")}");
 
                 // Console output (unchanged - detailed practice docs)
                 player.PrintToConsole("=== Practice Mode Command List ===\n");
                 player.PrintToConsole("\n【Spawn Point Operations】\n" + ".spawn <number>  Teleport to the specified competitive spawn point of your team\n" + ".ctspawn <number>  Teleport to the specified CT competitive spawn point (alias: .cts)\n" + ".tspawn <number>  Teleport to the specified T competitive spawn point (alias: .ts)\n" + ".bestspawn  Teleport to the nearest team spawn point\n" + ".worstspawn  Teleport to the farthest team spawn point\n" + ".bestctspawn  Teleport to the nearest CT spawn point\n" + ".worstctspawn  Teleport to the farthest CT spawn point\n" + ".besttspawn  Teleport to the nearest T spawn point\n" + ".worsttspawn  Teleport to the farthest T spawn point\n" + ".showspawns  Highlight all competitive spawn points\n" + ".hidespawns  Hide highlighted spawn points\n");
-                player.PrintToConsole("\n【Bot Control】\n" + ".bot  Add a bot at the player's current position\n" + ".crouchbot  Add a crouching bot and boost the player on top of it (alias: .cbot)\n" + ".boost  Add a bot at the current position and boost the player on top of it\n" + ".crouchboost  Add a crouching bot and boost the player on top of it\n" + ".nobot  Remove the bot under the crosshair\n" + ".clearbots  Remove all bots\n");
+                player.PrintToConsole("\n【Bot Control】\n" + ".bot  Add a bot at the player's current position\n" + ".crouchbot  Add a crouching bot at the player's current position (alias: .cbot)\n" + ".boost  Add a bot at the current position and boost the player on top of it\n" + ".crouchboost  Add a crouching bot and boost the player on top of it\n" + ".nobot  Remove the bot under the crosshair\n" + ".clearbots  Remove all bots\n");
                 player.PrintToConsole("\n【Bot Positions】\n" + ".savebotpos <name>  Save your current spot as a named bot placement for this map (alias: .sbp)\n" + ".loadbotpos <name>  Spawn a bot at that saved spot; no name spawns all saved for this map (alias: .lbp)\n" + ".listbotpos  List saved bot placement names on this map (alias: .listbp)\n" + ".delbotpos <name>  Delete a saved bot placement (alias: .dbp)\n" + ".showbotpos  Toggle in-world markers at every saved bot placement (alias: .showbp)\n" + ".botjiggle  Toggle all practice bots strafing side-to-side (matchzy_botjiggle_range tunes width)\n");
                 player.PrintToConsole("\n【Teams & Modes】\n" + ".ct, .t, .spec  Switch the player to the requested team\n" + ".fas /.watchme  Force all players into spectator mode except the one issuing the command\n" + ".dryrun  Enable Dryrun Mode (alias: .dry)\n" + ".god  Enable God Mode\n");
-                player.PrintToConsole("\n【Grenade Management】\n" + ".savenade <n> <optional description>  Save a grenade crosshair (alias: .sn)\n" + ".loadnade <n>  Load a grenade crosshair (alias: .ln)\n" + ".deletenade <n>  Delete a saved grenade crosshair from file (alias: .dn)\n" + ".importnade <code>  Save a crosshair using a code printed in chat or from savednades.cfg (alias: .in)\n" + ".listnades <optional filter>  List all saved crosshairs, filter optional (alias: .lin)\n");
+                player.PrintToConsole("\n【Grenade Management】\n" + ".savenade <n> <optional description>  Save a grenade crosshair (alias: .sn)\n" + ".loadnade <n>  Load a grenade crosshair (alias: .ln)\n" + ".deletenade <n>  Delete a saved grenade crosshair from file (alias: .dn)\n" + ".importnade <code>  Save a crosshair using a code printed in chat or from savednades.cfg\n" + ".listnades <optional filter>  List all saved crosshairs, filter optional (alias: .lin)\n");
                 player.PrintToConsole("\n【Grenade Throwing】\n" + ".rethrow  Re-throw your last thrown grenade (alias: .rt)\n" + ".last  Teleport to where you threw your last grenade\n" + ".back <number>  Teleport to a specific grenade history position\n" + ".delay <delay_in_seconds>  Set delay on last grenade (used with .rethrow or .throwindex)\n" + ".throwindex <index> <optional index> <optional index>  Throw grenade(s) from specific history index(es)\n" + ".lastindex  Print the index of your last thrown grenade\n" + ".rethrowsmoke  Throw your last smoke grenade\n" + ".rethrownade  Throw your last HE grenade\n" + ".rethrowflash  Throw your last flashbang\n" + ".rethrowmolotov  Throw your last molotov/incendiary\n" + ".rethrowdecoy  Throw your last decoy\n");
-                player.PrintToConsole("\n【Utilities】\n" + ".clear  Clear all active smokes, molotovs, and incendiaries\n" + ".fastforward  Fast forward server time to 20 seconds (alias: .ff)\n" + ".noflash  Toggle flash immunity (players without noflash still get blinded, alias: .noblind)\n" + ".timer  Start a timer immediately; use .timer again to stop and show duration\n" + ".break  Break all breakable entities (windows, wooden doors, vents, etc.)\n" + ".nobreak  Restore all breakable entities ");
+                player.PrintToConsole("\n【Utilities】\n" + ".clear  Clear all active smokes, molotovs, and incendiaries\n" + ".fastforward  Fast forward server time by 10 seconds (alias: .ff)\n" + ".noflash  Toggle flash immunity (players without noflash still get blinded, alias: .noblind)\n" + ".timer  Start a timer immediately; use .timer again to stop and show duration\n" + ".break  Break all breakable entities (windows, wooden doors, vents, etc.)\n" + ".nobreak  Restore all breakable entities ");
                 player.PrintToConsole("\n【Display & Toggles】\n" + ".solid  Toggle mp_solid_teammates (teammate collision) - Current: " + ConVar.Find("mp_solid_teammates")!.GetPrimitiveValue<int>() + "\n" + ".impacts  Toggle sv_showimpacts (show bullet impacts) - Current: " + ConVar.Find("sv_showimpacts")!.GetPrimitiveValue<int>() + "\n" + ".traj  Toggle sv_grenade_trajectory_prac_pipreview (grenade trajectory preview) - Current: " + ConVar.Find("sv_grenade_trajectory_prac_pipreview")!.GetPrimitiveValue<bool>() + "\n");
                 return;
             }
 
             // ── DRY RUN ──
+            string H(string key, params object[] a) => Localizer.ForPlayer(player!, key, a);
             if (isDryRun)
             {
-                player!.PrintToChat($"{chatPrefix} {ChatColors.Gold}Dryrun Mode:");
-                player.PrintToChat($" {ChatColors.Green}Exit:{ChatColors.Default} .exitdry .stopdry .enddry");
+                player!.PrintToChat($"{chatPrefix} {H("matchzy.help.dryrun.title")}");
+                player.PrintToChat(H("matchzy.help.line", H("matchzy.help.label.exit"), ".exitdry .stopdry .enddry"));
                 if (isAdmin)
                 {
-                    player.PrintToChat($" {ChatColors.Red}Admin:{ChatColors.Default} .match .prac");
+                    player.PrintToChat(H("matchzy.help.adminline", H("matchzy.help.label.admin"), ".match .prac"));
                 }
                 return;
             }
@@ -3292,22 +3374,22 @@ namespace MatchZy
             // ── VETO ──
             if (isVeto)
             {
-                player!.PrintToChat($"{chatPrefix} {ChatColors.Gold}Map Veto in progress:");
-                player.PrintToChat($" {ChatColors.Green}Ban/Pick:{ChatColors.Default} .ban <map> .pick <map>");
-                player.PrintToChat($" {ChatColors.Default}Only team captains can ban/pick.");
+                player!.PrintToChat($"{chatPrefix} {H("matchzy.help.veto.title")}");
+                player.PrintToChat(H("matchzy.help.line", H("matchzy.help.label.banpick"), ".ban <map> .pick <map>"));
+                player.PrintToChat($" {H("matchzy.help.veto.captains")}");
                 return;
             }
 
             // ── WARMUP (not ready phase) ──
             if (isWarmup && !readyAvailable)
             {
-                player!.PrintToChat($"{chatPrefix} {ChatColors.Gold}Warmup:");
-                player.PrintToChat($" {ChatColors.Default}.match {ChatColors.Green}Match Mode");
-                player.PrintToChat($" {ChatColors.Default}.scrim {ChatColors.Green}Playout/Scrim Mode");
-                player.PrintToChat($" {ChatColors.Default}.prac {ChatColors.Green}Practice Mode");
-                player.PrintToChat($" {ChatColors.Default}.dry {ChatColors.Green}Dryrun Mode");
+                player!.PrintToChat($"{chatPrefix} {H("matchzy.help.warmup.title")}");
+                player.PrintToChat(H("matchzy.help.mode", ".match", H("matchzy.help.mode.match")));
+                player.PrintToChat(H("matchzy.help.mode", ".scrim", H("matchzy.help.mode.scrim")));
+                player.PrintToChat(H("matchzy.help.mode", ".prac", H("matchzy.help.mode.prac")));
+                player.PrintToChat(H("matchzy.help.mode", ".dry", H("matchzy.help.mode.dry")));
                 if (isAdmin)
-                    player.PrintToChat($" {ChatColors.Green}Available commands:{ChatColors.Default} .start, .knife, .playout, .coach <side>, .endmatch");
+                    player.PrintToChat(H("matchzy.help.line", H("matchzy.help.label.available"), ".start, .knife, .playout, .coach <side>, .endmatch"));
                 return;
             }
 
@@ -3318,40 +3400,40 @@ namespace MatchZy
             // Playout: Enabled.
             if (readyAvailable && !matchStarted)
             {
-                string on = $"{ChatColors.Green}Enabled{ChatColors.Default}";
-                string off = $"{ChatColors.Red}Disabled{ChatColors.Default}";
+                string on = H("matchzy.cc.statuson");
+                string off = H("matchzy.cc.statusoff");
                 bool isScrim = !isMatchModeEnabled;
                 string knife = isKnifeRequired ? on : off;
                 string demorec = IsGOTVEnabled() ? on : off;
                 string playout = isPlayOutEnabled ? on : off;
 
-                player!.PrintToChat($"{chatPrefix} {ChatColors.Gold}{(isScrim ? "Scrim Mode" : "Match Mode")}");
-                player.PrintToChat($" Knife: {knife}, DemoRec: {demorec}, Playout: {playout}");
+                player!.PrintToChat($"{chatPrefix} {H(isScrim ? "matchzy.help.title.scrim" : "matchzy.help.title.match")}");
+                player.PrintToChat(H("matchzy.help.status", knife, demorec, playout));
                 string cmds = isScrim
                     ? ".start, .playout, .coach <side>, .endmatch"
                     : ".start, .knife, .playout, .coach <side>, .endmatch";
-                player.PrintToChat($" {ChatColors.Green}Available commands:{ChatColors.Default} {cmds}");
+                player.PrintToChat(H("matchzy.help.line", H("matchzy.help.label.available"), cmds));
                 return;
             }
 
             // ── KNIFE ROUND - SIDE SELECTION ──
             if (isSideSelectionPhase)
             {
-                player!.PrintToChat($"{chatPrefix} {ChatColors.Gold}Knife Winner - Pick your side:");
-                player.PrintToChat($" {ChatColors.Green}.stay{ChatColors.Default} - Keep current side");
-                player.PrintToChat($" {ChatColors.Green}.switch{ChatColors.Default} - Swap sides");
-                player.PrintToChat($" {ChatColors.Green}.ct{ChatColors.Default} / {ChatColors.Green}.t{ChatColors.Default} - Choose specific side");
+                player!.PrintToChat($"{chatPrefix} {H("matchzy.help.knife.title")}");
+                player.PrintToChat(H("matchzy.help.knife.stay"));
+                player.PrintToChat(H("matchzy.help.knife.switch"));
+                player.PrintToChat(H("matchzy.help.knife.side"));
                 return;
             }
 
             // ── MATCH LIVE - PAUSED ──
             if (matchStarted && isMatchLive && isPaused)
             {
-                player!.PrintToChat($"{chatPrefix} {ChatColors.Gold}Match Paused:");
-                player.PrintToChat($" {ChatColors.Green}.unpause{ChatColors.Default} - Request unpause (both teams must agree)");
+                player!.PrintToChat($"{chatPrefix} {H("matchzy.help.paused.title")}");
+                player.PrintToChat(H("matchzy.help.paused.unpause"));
                 if (isAdmin)
                 {
-                    player.PrintToChat($" {ChatColors.Red}Admin:{ChatColors.Default} .fup (force unpause) .restore <round> .backupmenu");
+                    player.PrintToChat(H("matchzy.help.adminline", H("matchzy.help.label.admin"), H("matchzy.help.paused.admin")));
                 }
                 return;
             }
@@ -3359,21 +3441,21 @@ namespace MatchZy
             // ── MATCH LIVE - PLAYING ──
             if (matchStarted && isMatchLive)
             {
-                player!.PrintToChat($"{chatPrefix} {ChatColors.Gold}Match Live:");
-                player.PrintToChat($" {ChatColors.Green}Pause:{ChatColors.Default} .pause .tac .tech");
+                player!.PrintToChat($"{chatPrefix} {H("matchzy.help.live.title")}");
+                player.PrintToChat(H("matchzy.help.line", H("matchzy.help.label.pause"), ".pause .tac .tech"));
                 if (isStopCommandAvailable)
                 {
-                    player.PrintToChat($" {ChatColors.Green}Round:{ChatColors.Default} .stop (restore round - both teams agree)");
+                    player.PrintToChat(H("matchzy.help.line", H("matchzy.help.label.round"), H("matchzy.help.live.round")));
                 }
                 if (isAdmin)
                 {
-                    player.PrintToChat($" {ChatColors.Red}Admin:{ChatColors.Default} .fp (force pause) .restore <round> .backupmenu");
+                    player.PrintToChat(H("matchzy.help.adminline", H("matchzy.help.label.admin"), H("matchzy.help.live.admin")));
                 }
                 return;
             }
 
             // ── FALLBACK ──
-            player!.PrintToChat($"{chatPrefix} No commands available in current state.");
+            player!.PrintToChat($"{chatPrefix} {Localizer.ForPlayer(player, "matchzy.util.nocommands")}");
         }
 
         public void LoadClientNames()
@@ -3420,6 +3502,27 @@ namespace MatchZy
             }
         }
 
+        // A team name as one console argument: quoted, so a name with spaces is not cut at the first
+        // space on the scoreboard, and without '"' or ';', which would end the argument or the command.
+        static string TeamNameArg(string? name)
+        {
+            return "\"" + (name ?? "").Replace("\"", "").Replace(";", "") + "\"";
+        }
+
+        // URLs can carry credentials (user:pass@host, API keys or presigned signatures in the query
+        // string), so logs and chat replies only show scheme, host, port and path.
+        static string RedactUrl(string url)
+        {
+            if (string.IsNullOrEmpty(url))
+                return url;
+            if (!Uri.TryCreate(url, UriKind.Absolute, out Uri? uri))
+                return "<invalid url>";
+            string redacted = $"{uri.Scheme}://{uri.Host}{(uri.IsDefaultPort ? "" : $":{uri.Port}")}{uri.AbsolutePath}";
+            if (!string.IsNullOrEmpty(uri.Query))
+                redacted += "?<redacted>";
+            return redacted;
+        }
+
         static bool IsValidUrl(string url)
         {
             if (Uri.TryCreate(url, UriKind.Absolute, out Uri? result))
@@ -3445,12 +3548,13 @@ namespace MatchZy
                     return fallback;
                 float value = cvar.Type switch
                 {
-                    ConVarType.Float32 or ConVarType.Float64 => cvar.GetPrimitiveValue<float>(),
+                    ConVarType.Float32 => cvar.GetPrimitiveValue<float>(),
+                    ConVarType.Float64 => float.TryParse(cvar.StringValue, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out float f64) ? f64 : fallback,
                     ConVarType.Int32 => cvar.GetPrimitiveValue<int>(),
                     ConVarType.Int16 => cvar.GetPrimitiveValue<short>(),
                     ConVarType.UInt32 => cvar.GetPrimitiveValue<uint>(),
                     ConVarType.UInt16 => cvar.GetPrimitiveValue<ushort>(),
-                    _ => float.TryParse(GetConvarStringValue(cvar), out float parsed) ? parsed : fallback,
+                    _ => float.TryParse(GetConvarStringValue(cvar), System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out float parsed) ? parsed : fallback,
                 };
                 return value >= 0f ? value : fallback;
             }
@@ -3467,16 +3571,23 @@ namespace MatchZy
             {
                 if (cvar == null)
                     return "";
+                // Written back later as a console command ("name value"), so the value must be in the
+                // form the engine parses: 1/0 for bools (not True/False) and '.' decimals on every
+                // server locale.
+                var inv = System.Globalization.CultureInfo.InvariantCulture;
                 string convarValue = cvar.Type switch
                 {
-                    ConVarType.Bool => cvar.GetPrimitiveValue<bool>().ToString(),
-                    ConVarType.Float32 or ConVarType.Float64 => cvar.GetPrimitiveValue<float>().ToString(),
-                    ConVarType.UInt16 => cvar.GetPrimitiveValue<ushort>().ToString(),
-                    ConVarType.Int16 => cvar.GetPrimitiveValue<short>().ToString(),
-                    ConVarType.UInt32 => cvar.GetPrimitiveValue<uint>().ToString(),
-                    ConVarType.Int32 => cvar.GetPrimitiveValue<int>().ToString(),
-                    ConVarType.Int64 => cvar.GetPrimitiveValue<long>().ToString(),
-                    ConVarType.UInt64 => cvar.GetPrimitiveValue<ulong>().ToString(),
+                    ConVarType.Bool => cvar.GetPrimitiveValue<bool>() ? "1" : "0",
+                    ConVarType.Float32 => cvar.GetPrimitiveValue<float>().ToString(inv),
+                    // GetPrimitiveValue only accepts float for Float64 and reads 4 of its 8 bytes; the
+                    // native string form is exact and always uses '.'.
+                    ConVarType.Float64 => cvar.StringValue,
+                    ConVarType.UInt16 => cvar.GetPrimitiveValue<ushort>().ToString(inv),
+                    ConVarType.Int16 => cvar.GetPrimitiveValue<short>().ToString(inv),
+                    ConVarType.UInt32 => cvar.GetPrimitiveValue<uint>().ToString(inv),
+                    ConVarType.Int32 => cvar.GetPrimitiveValue<int>().ToString(inv),
+                    ConVarType.Int64 => cvar.GetPrimitiveValue<long>().ToString(inv),
+                    ConVarType.UInt64 => cvar.GetPrimitiveValue<ulong>().ToString(inv),
                     ConVarType.String => cvar.StringValue,
                     _ => "",
                 };
@@ -3502,8 +3613,9 @@ namespace MatchZy
                     // "String '0' was not recognized as a valid Boolean".
                     v => cvar.SetValue(int.TryParse(v, out int intValue) ? intValue >= 1 : Convert.ToBoolean(v))
                 },
-                { ConVarType.Float32, v => cvar.SetValue(Convert.ToSingle(v)) },
-                { ConVarType.Float64, v => cvar.SetValue(Convert.ToSingle(v)) },
+                // Invariant: values are stored with '.' decimals; the server locale may use ','.
+                { ConVarType.Float32, v => cvar.SetValue(Convert.ToSingle(v, System.Globalization.CultureInfo.InvariantCulture)) },
+                { ConVarType.Float64, v => cvar.SetValue(Convert.ToDouble(v, System.Globalization.CultureInfo.InvariantCulture)) },
                 { ConVarType.UInt16, v => cvar.SetValue(Convert.ToUInt16(v)) },
                 { ConVarType.Int16, v => cvar.SetValue(Convert.ToInt16(v)) },
                 { ConVarType.UInt32, v => cvar.SetValue(Convert.ToUInt32(v)) },
@@ -3526,20 +3638,157 @@ namespace MatchZy
             }
         }
 
-        // Convars a match config may never set, even though they exist.
+        // Never settable from a match config, even though they are real convars / MatchZy settings.
         private static readonly HashSet<string> BlockedMatchCvars = new(StringComparer.OrdinalIgnoreCase)
         {
             "rcon_password",
+            "matchzy_everyone_is_admin",
         };
 
-        private static readonly System.Text.RegularExpressions.Regex MatchCvarNameRegex = new(@"^[A-Za-z0-9_\.]+$");
+        // MatchZy / Get5 settings implemented as console commands that only change a setting. Commands
+        // that perform an action (loading a match or backup, adding players, ending the match, ...) are
+        // deliberately not listed. PluginSettingAccessors and the FakeConVar settings are added on top.
+        private static readonly HashSet<string> MatchConfigSettingCommands = new(StringComparer.OrdinalIgnoreCase)
+        {
+            "matchzy_chat_prefix", "matchzy_admin_chat_prefix",
+            "matchzy_remote_log_url", "matchzy_remote_log_header_key", "matchzy_remote_log_header_value",
+            "matchzy_remote_log_auth_key", "matchzy_remote_log_auth_value",
+            "get5_remote_log_url", "get5_remote_log_header_key", "get5_remote_log_header_value",
+            "matchzy_reset_cvars_on_series_end", "matchzy_allow_pause", "matchzy_allow_unpause",
+            "matchzy_ct_name", "matchzy_t_name", "matchzy_nade_pose_flicker_free",
+        };
+
+        // Settings whose value is used as a file path or file name.
+        private static readonly HashSet<string> PathMatchCvars = new(StringComparer.OrdinalIgnoreCase)
+        {
+            "matchzy_demo_path", "matchzy_demo_name_format",
+        };
+
+        private static readonly System.Text.RegularExpressions.Regex MatchCvarNameRegex = new(@"^[A-Za-z0-9_]+$");
+
+        private HashSet<string>? _matchConfigPluginSettings;
+        private Dictionary<string, (object FakeConVar, System.Reflection.PropertyInfo Value)>? _fakeConVarsByName;
+
+        // Every FakeConVar field on the plugin, by convar name (found by reflection, so a new
+        // FakeConVar setting needs no list update).
+        private Dictionary<string, (object FakeConVar, System.Reflection.PropertyInfo Value)> FakeConVarsByName
+        {
+            get
+            {
+                if (_fakeConVarsByName != null)
+                    return _fakeConVarsByName;
+                var map = new Dictionary<string, (object, System.Reflection.PropertyInfo)>(StringComparer.OrdinalIgnoreCase);
+                foreach (var fieldInfo in GetType().GetFields(System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.NonPublic))
+                {
+                    if (!fieldInfo.FieldType.IsGenericType || fieldInfo.FieldType.GetGenericTypeDefinition() != typeof(FakeConVar<>))
+                        continue;
+                    object? fakeConVar = fieldInfo.GetValue(this);
+                    var valueProperty = fieldInfo.FieldType.GetProperty("Value");
+                    if (fakeConVar != null && valueProperty != null && fieldInfo.FieldType.GetProperty("Name")?.GetValue(fakeConVar) is string fakeName)
+                        map[fakeName] = (fakeConVar, valueProperty);
+                }
+                _fakeConVarsByName = map;
+                return map;
+            }
+        }
+
+        /// <summary>
+        /// Sets a FakeConVar setting directly. Running it as a console command does not work for a
+        /// match config value: the command is sent as name "value", and FakeConVar only strips the
+        /// quotes for string settings, so every bool/int/float setting failed to parse. Numbers are
+        /// read with a '.' decimal separator on every server locale.
+        /// Returns false when the name is not a FakeConVar; logs and returns true when the value is
+        /// invalid (it was handled, just not applied).
+        /// </summary>
+        private bool TrySetFakeConVar(string name, string value)
+        {
+            if (!FakeConVarsByName.TryGetValue(name, out var entry))
+                return false;
+            var inv = System.Globalization.CultureInfo.InvariantCulture;
+            Type type = entry.Value.PropertyType;
+            string v = value.Trim().Trim('"').Trim();
+            object? parsed = null;
+            if (type == typeof(string))
+                parsed = v;
+            else if (type == typeof(bool))
+            {
+                if (v == "1" || v.Equals("true", StringComparison.OrdinalIgnoreCase)) parsed = true;
+                else if (v == "0" || v.Equals("false", StringComparison.OrdinalIgnoreCase)) parsed = false;
+            }
+            else if (type == typeof(int) && int.TryParse(v, System.Globalization.NumberStyles.Integer, inv, out int i))
+                parsed = i;
+            else if (type == typeof(float) && float.TryParse(v.Replace(',', '.'), System.Globalization.NumberStyles.Float, inv, out float f) && float.IsFinite(f))
+                parsed = f;
+            else if (type == typeof(double) && double.TryParse(v.Replace(',', '.'), System.Globalization.NumberStyles.Float, inv, out double d) && double.IsFinite(d))
+                parsed = d;
+            else
+            {
+                try { parsed = System.ComponentModel.TypeDescriptor.GetConverter(type).ConvertFromInvariantString(v); }
+                catch { parsed = null; }
+            }
+
+            if (parsed == null)
+            {
+                Log($"[MatchConfigCvars] '{v}' is not a valid value for {name} ({type.Name}); ignored.");
+                return true;
+            }
+            try
+            {
+                entry.Value.SetValue(entry.FakeConVar, parsed);
+            }
+            catch (Exception ex)
+            {
+                Log($"[MatchConfigCvars] Could not set {name}: {ex.InnerException?.Message ?? ex.Message}");
+            }
+            return true;
+        }
+
+        // Current value of a FakeConVar setting in the form its console command accepts, or null.
+        private string? GetFakeConVarValue(string name)
+        {
+            if (!FakeConVarsByName.TryGetValue(name, out var entry))
+                return null;
+            object? value = entry.Value.GetValue(entry.FakeConVar);
+            return value is bool flag ? (flag ? "true" : "false") : Convert.ToString(value, System.Globalization.CultureInfo.InvariantCulture);
+        }
+
+        /// <summary>
+        /// Every matchzy_/get5_ name a match config may set: the setting commands above, the settings
+        /// in PluginSettingAccessors and every FakeConVar field on the plugin (found by reflection, so a
+        /// new FakeConVar setting is allowed without touching this list).
+        /// </summary>
+        private HashSet<string> MatchConfigPluginSettings
+        {
+            get
+            {
+                if (_matchConfigPluginSettings != null)
+                    return _matchConfigPluginSettings;
+                var names = new HashSet<string>(MatchConfigSettingCommands, StringComparer.OrdinalIgnoreCase);
+                names.UnionWith(PluginSettingAccessors.Keys);
+                names.UnionWith(FakeConVarsByName.Keys);
+                names.ExceptWith(BlockedMatchCvars);
+                _matchConfigPluginSettings = names;
+                return names;
+            }
+        }
+
+        private static bool IsSafeRelativePath(string value)
+        {
+            if (value == "")
+                return true;
+            if (value.StartsWith('/') || value.StartsWith('\\') || value.Contains(':'))
+                return false;
+            return !value.Split('/', '\\').Any(part => part == "..");
+        }
 
         /// <summary>
         /// Guards the match config "cvars" block (and backups that carry it), which is turned into
-        /// console commands. Accepts an existing convar or a matchzy_/get5_ setting, and a value
-        /// without quotes, ';' or line breaks, so the entry cannot run anything else.
+        /// console commands. Match configs can come from a URL, so only real engine convars and the
+        /// MatchZy/Get5 settings in MatchConfigPluginSettings are accepted, with a value that has no
+        /// quotes, ';' or line breaks. matchzy_/get5_ action commands (matchzy_loadmatch_url,
+        /// get5_endmatch, matchzy_loadbackup, ...) and matchzy_everyone_is_admin are refused.
         /// </summary>
-        private static bool IsAllowedMatchCvar(string name, string value, out string reason)
+        private bool IsAllowedMatchCvar(string name, string value, out string reason)
         {
             reason = "";
             if (string.IsNullOrWhiteSpace(name) || !MatchCvarNameRegex.IsMatch(name))
@@ -3552,15 +3801,27 @@ namespace MatchZy
                 reason = "not allowed from a match config";
                 return false;
             }
-            bool pluginSetting = name.StartsWith("matchzy_", StringComparison.OrdinalIgnoreCase) || name.StartsWith("get5_", StringComparison.OrdinalIgnoreCase);
-            if (!pluginSetting && ConVar.Find(name) == null)
-            {
-                reason = "not a convar";
-                return false;
-            }
             if (value.IndexOfAny(new[] { '"', ';', '\n', '\r' }) >= 0)
             {
                 reason = "value contains a quote, ';' or a line break";
+                return false;
+            }
+            if (PathMatchCvars.Contains(name) && !IsSafeRelativePath(value))
+            {
+                reason = "value must be a relative path without '..'";
+                return false;
+            }
+            bool pluginName = name.StartsWith("matchzy_", StringComparison.OrdinalIgnoreCase) || name.StartsWith("get5_", StringComparison.OrdinalIgnoreCase);
+            if (pluginName)
+            {
+                if (MatchConfigPluginSettings.Contains(name))
+                    return true;
+                reason = "not a MatchZy setting (action commands are not allowed)";
+                return false;
+            }
+            if (ConVar.Find(name) == null)
+            {
+                reason = "not a convar";
                 return false;
             }
             return true;
@@ -3574,6 +3835,14 @@ namespace MatchZy
                 if (!IsAllowedMatchCvar(key, value, out string reason))
                 {
                     Log($"[ExecuteChangedConvars] Skipping '{key}': {reason}");
+                    continue;
+                }
+                if (TrySetFakeConVar(key, value))
+                    continue;
+                if (RemoteLogCvars.Contains(key))
+                {
+                    // This match only; the server's own setting is untouched.
+                    ApplyMatchRemoteLogCvar(key, value);
                     continue;
                 }
                 Server.ExecuteCommand($"{key} \"{value}\"");
@@ -3651,6 +3920,8 @@ namespace MatchZy
                     Log($"[ResetChangedConvars] Skipping '{key}': {reason}");
                     continue;
                 }
+                if (TrySetFakeConVar(key, value))
+                    continue;
                 // Quoted: an original value with spaces used to be split into several arguments.
                 Server.ExecuteCommand($"{key} \"{value}\"");
             }
@@ -4563,29 +4834,25 @@ namespace MatchZy
 
         public bool HandlePlayerWhitelist(CCSPlayerController player, string steamId)
         {
+            // Whitelist off: no file access at all. It used to create and read whitelist.cfg on the
+            // game thread on every connect even when the whitelist was not in use.
+            if (!isWhitelistRequired)
+                return false;
+
             string whitelistfileName = MatchZyCfgRel("whitelist.cfg");
             string whitelistPath = Path.Join(Server.GameDirectory + "/csgo/cfg", whitelistfileName);
             string? directoryPath = Path.GetDirectoryName(whitelistPath);
-            if (directoryPath != null)
-            {
-                if (!Directory.Exists(directoryPath))
-                {
-                    Directory.CreateDirectory(directoryPath);
-                }
-            }
+            if (directoryPath != null && !Directory.Exists(directoryPath))
+                Directory.CreateDirectory(directoryPath);
             if (!File.Exists(whitelistPath))
                 File.WriteAllLines(whitelistPath, new[] { "Steamid1", "Steamid2" });
 
-            var whiteList = File.ReadAllLines(whitelistPath);
-
-            if (isWhitelistRequired == true)
+            var whiteList = File.ReadAllLines(whitelistPath).Select(line => line.Trim());
+            if (!whiteList.Contains(steamId))
             {
-                if (!whiteList.Contains(steamId.ToString()))
-                {
-                    Log($"[EventPlayerConnectFull] KICKING PLAYER STEAMID: {steamId}, Name: {player.PlayerName} (Not whitelisted!)");
-                    PrintToAllChat($"Kicking player {player.PlayerName} - Not whitelisted.");
-                    return true;
-                }
+                Log($"[EventPlayerConnectFull] KICKING PLAYER STEAMID: {steamId}, Name: {player.PlayerName} (Not whitelisted!)");
+                PrintLocalizedToAll("matchzy.util.kicknotwhitelisted", player.PlayerName);
+                return true;
             }
 
             return false;
@@ -4673,22 +4940,7 @@ namespace MatchZy
 
                 if (team == CsTeam.Spectator)
                 {
-                    // ChangeTeam on a LIVE pawn runs the weapon-strip path (other plugins' weapon
-                    // hooks re-enter -> SIGSEGV). Kill first so the weapons drop, then move the
-                    // dead player next frame.
-                    if (player.PawnIsAlive)
-                    {
-                        player.CommitSuicide(false, true);
-                        Server.NextFrame(() =>
-                        {
-                            if (IsPlayerValid(player) && player.Team != CsTeam.Spectator)
-                                player.ChangeTeam(CsTeam.Spectator);
-                        });
-                    }
-                    else
-                    {
-                        player.ChangeTeam(team);
-                    }
+                    MoveToSpectatorWhenDead(player, suicideSent: false);
                 }
                 else if (player.TeamNum == (byte)CsTeam.Spectator)
                 {
@@ -4701,8 +4953,11 @@ namespace MatchZy
                     }
                     catch (Exception joinEx)
                     {
-                        Log($"[SwitchPlayerTeam] HandleCommand_JoinTeam unavailable ({joinEx.Message}), falling back to ChangeTeam");
+                        // ChangeTeam leaves the controller observing; respawning that controller is
+                        // the never-respawn-a-spectator crash class, so no respawn on this path.
+                        Log($"[SwitchPlayerTeam] HandleCommand_JoinTeam unavailable ({joinEx.Message}), falling back to ChangeTeam without a respawn");
                         player.ChangeTeam(team);
+                        return;
                     }
                     RespawnWhenTeamApplied(player, team, RespawnRetryAttempts, keepGoing: () => isMatchSetup && !matchStarted && !IsMatchCoach(player) && !IsSideFull(team, player));
                 }
@@ -4716,6 +4971,64 @@ namespace MatchZy
                     }
                 }
             });
+        }
+
+        /// <summary>
+        /// Moves a player to Spectator only once their pawn is dead. ChangeTeam on a LIVE pawn runs
+        /// the engine's weapon-strip path, where other plugins' weapon hooks re-enter on a
+        /// half-destroyed weapon -> SIGSEGV. A suicide is not enough on its own: it is a no-op on a
+        /// pawn with TakesDamage=false (e.g. after .coachtest), and the death can land a few ticks
+        /// later, so the pawn is re-checked every frame (bounded) before ChangeTeam runs. Gives up
+        /// rather than ever calling ChangeTeam on a live pawn.
+        /// </summary>
+        private void MoveToSpectatorWhenDead(CCSPlayerController player, bool suicideSent, int attemptsLeft = 16)
+        {
+            if (player == null || !player.IsValid || player.Connected != PlayerConnectedState.Connected)
+                return;
+            if (player.Team == CsTeam.Spectator)
+                return;
+            if (player.PawnIsAlive)
+            {
+                if (!suicideSent)
+                {
+                    var pawn = player.PlayerPawn.Value;
+                    if (pawn != null && pawn.IsValid)
+                    {
+                        pawn.TakesDamage = true;
+                        pawn.CommitSuicide(explode: false, force: true);
+                    }
+                    suicideSent = true;
+                }
+                if (attemptsLeft <= 0)
+                {
+                    Log($"[MoveToSpectatorWhenDead] {player.PlayerName} is still alive; not moving them to Spectator (ChangeTeam on a live pawn crashes).");
+                    return;
+                }
+                bool sent = suicideSent;
+                Server.NextFrame(() => MoveToSpectatorWhenDead(player, sent, attemptsLeft - 1));
+                return;
+            }
+            // PawnIsAlive is a networked controller field that can lag the pawn by a tick (and practice
+            // respawns on death): also check the pawn itself before the team change.
+            var deadPawn = player.PlayerPawn.Value;
+            if (deadPawn != null && deadPawn.IsValid && deadPawn.LifeState == (byte)LifeState_t.LIFE_ALIVE)
+            {
+                if (attemptsLeft <= 0)
+                {
+                    Log($"[MoveToSpectatorWhenDead] {player.PlayerName}'s pawn is still alive; not moving them to Spectator.");
+                    return;
+                }
+                Server.NextFrame(() => MoveToSpectatorWhenDead(player, true, attemptsLeft - 1));
+                return;
+            }
+            try
+            {
+                player.ChangeTeam(CsTeam.Spectator);
+            }
+            catch (Exception ex)
+            {
+                Log($"[MoveToSpectatorWhenDead] ChangeTeam failed: {ex.Message}");
+            }
         }
 
         public void SetPlayerInvisible(CCSPlayerController player, bool setWeaponsInvisible)
