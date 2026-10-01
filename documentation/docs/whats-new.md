@@ -2,6 +2,43 @@
 
 A short summary of each release. The [full changelog](changelog.md) has the details and background for every change.
 
+## 0.8.93 <small>October 1, 2026</small>
+
+- **Security:** Match config `cvars` only accept real convars and MatchZy/Get5 settings; action commands and `matchzy_everyone_is_admin` are ignored.
+- **Security:** Team names from round backups are cleaned.
+- **Fixed:** `1` / `0` for `skip_veto`, `clinch_series` and `wingman` in match configs.
+- **Fixed:** `get5_endmatch` after a series ended sent a second `series_end` and overwrote the winner.
+- **Fixed:** Kicking bots could also kick the CSTV bot.
+- **Fixed:** A refused round restore changed the running match.
+- **Fixed:** Chat commands with arguments match the exact word (`.mapx` no longer runs `.map`).
+- **Fixed:** Drawn maps counted when deciding whether a series is clinched.
+- **Fixed:** `.forceend team1|team2` sends `map_result` for the live map.
+- **Fixed:** Veto hung when a captain changed team.
+- **Fixed:** MatchZy settings from match config `cvars` restored at series end; convars restored as `1`/`0`.
+- **Fixed:** Practice lineups on servers with a `,` decimal separator.
+- **Fixed:** `.last` / `.loadpos` / `.loadnade` moved dead players and spectators; `.fas` added deaths; ending practice during `.ff`.
+- **Fixed:** Team names with spaces cut off on the scoreboard.
+- **Fixed:** Demo and round backup paths on Windows servers.
+- **Changed:** SQLite uses WAL mode (back up `matchzy.db` with its `-wal` / `-shm` files).
+- **Fixed:** A restore queued in warmup announced itself as loaded.
+- **Changed:** The release zip contains nothing under `cfg/`; updates never touch your config files. Default cfgs for reference are in `plugins/MatchZy/defaults/`. See [Updating](getting-started/updating.md).
+- **Changed:** `admins.json` entries are always full admins; the value is no longer read as flags.
+- **Fixed:** A remote log URL from a match config's `cvars` stayed active for later matches.
+- **Fixed:** Reusing a `matchid` left the match marked as finished in the database.
+- **Fixed:** Several server-crash risks around team switches, spectators and removing dropped weapons.
+- **Fixed:** `.unpause` could not end an auto-pause while a team was short.
+- **Fixed:** Restores queued in warmup recorded no demo and turned scrims into matches.
+- **Changed:** A map change from outside MatchZy during a match sends `match_cancelled` (`map_changed`).
+- **Fixed:** Forfeit, `.ffw` and `.gg` now stop the demo, send `map_result` and write the real score.
+- **Fixed:** `.ln` and the nades menu loaded the wrong lineup; `.delbotpos` deleted the wrong position after a typo.
+- **Performance:** Less work per round in coach matches, per grenade with `.autoclear`, and on bomb events.
+- **Added:** `matchzy_ready_hint_style 2`: no center hint, upstream-style chat reminder of who is not ready.
+- **Changed:** `.coach` only in warmup and freeze time.
+- **Changed:** `.rs`, `.grt` and `.fas` need admin.
+- **Fixed:** Live events could arrive out of order.
+- **Fixed:** Advanced stats counted restored rounds twice.
+- **Changed:** About 250 more chat messages translated (Danish, Albanian); players get their own language.
+
 ## 0.8.92 <small>October 1, 2026</small>
 
 - **Fixed:** Round backup files written to `csgo/addons/metamod/` on Metamod servers, leaving `.stop` and `.restore` with nothing to load.

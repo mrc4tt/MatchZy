@@ -4,6 +4,76 @@ Customized fork of [MatchZy](https://github.com/shobhit-pathak/MatchZy) by Shobh
 
 Fork version numbering is independent of upstream. Upstream changelog: <https://github.com/shobhit-pathak/MatchZy/blob/main/CHANGELOG.md>
 
+# 0.8.93
+
+#### October 1, 2026
+
+- Fixed a server crash in practice when switching from `.spec` back to `.t` or `.ct`: the Linux signature for the engine team-join handler matched the wrong function since CS2 build 14182 and is updated in `gamedata/matchzy.json`.
+- Security: a match config's `cvars` block (and a backup that carries it) can now only set real convars and MatchZy/Get5 settings. Action commands such as `matchzy_loadmatch_url`, `matchzy_loadbackup` and `get5_endmatch`, and `matchzy_everyone_is_admin`, are ignored and logged. `matchzy_demo_path` and `matchzy_demo_name_format` must be relative paths without `..`.
+- Security: team names, tags and flags loaded from a round backup are cleaned the same way as match config team names.
+- Match configs with `1` / `0` for `skip_veto`, `clinch_series` or `wingman` are accepted (they were refused as "should be a boolean").
+- `get5_endmatch` / `.forceend` after a series has ended now replies that the series is over, instead of sending a second `series_end` and overwriting the winner in the database. Ending a series between two maps no longer writes a result for the next, unplayed map.
+- Bots are kicked one by one by user id instead of with `bot_kick` (warmup bots, bot teams, map changes, the warmup fallback config), so the CSTV bot is never kicked with them.
+- A round restore that is refused because the backup has no usable round data no longer changes the running match first (match id, teams, sides, timeouts). A queued restore that is refused when the match goes live now starts the match normally instead of leaving the server in warmup.
+- Chat commands that take an argument (`.map`, `.ban`, `.pick`, `.spawn`, `.sp`, `.team1`, `.back`, ...) only run when the command word matches exactly, so `.mapx` no longer runs `.map` and `.spec x` no longer runs `.spawn`.
+- A series is clinched once the trailing team can no longer catch up, so drawn maps are counted (a BO5 at 2-0 with two draws no longer plays a fifth map).
+- `get5_endmatch team1|team2` / `.forceend team1|team2` during a live map now sends `map_result` for that map (won by the named team) before `series_end`.
+- Veto: a captain who changes team is replaced by a teammate (the veto hung waiting for them), and a captain who left during the veto countdown is replaced instead of aborting the veto.
+- Match config `cvars` that set an on/off or number MatchZy setting such as `matchzy_enable_tech_pause` or `matchzy_tech_pause_duration` now take effect (they were rejected as "can't be converted") and are restored at series end.
+- Changed convars are restored as `1`/`0` instead of `True`/`False` and with a `.` decimal separator on every server locale. 64-bit float convars are read correctly.
+- Match load URLs are logged and shown without their query string or credentials.
+- The series score is still written to the database when the map row update fails.
+- Practice: `.savenade` and `.importnade` save positions with a `.` decimal separator on every server locale; lineups saved with `,` still load. A lineup with an invalid position is refused with a message instead of an error. `.importnade` no longer turns `1,5` into `15`.
+- Practice: `.last`, `.loadpos` and `.loadnade` no longer move dead players or spectators.
+- Practice: `.fas` no longer adds a death to the players it moves to spectator.
+- Practice: ending practice during `.ff` resets the timescale and unfreezes players right away.
+- Team names with spaces are shown in full on the scoreboard (`mp_teamname_1` / `mp_teamname_2` are now quoted).
+- Demo and round backup paths are always quoted, so they also work on Windows servers. `tv_record_immediate 1` is only sent when the server has that convar.
+- SQLite databases use WAL mode, so overlapping writes at the end of a map wait less for the file lock. Back up `matchzy.db` together with its `-wal` and `-shm` files.
+- A restore requested during warmup now only says that it is queued (it used to print "Backup file loaded successfully" first).
+- Practice: if a grenade signature in `gamedata/matchzy.json` resolves to an empty address, `.rethrow` / `.throwindex` use the entity fallback instead of failing with "Invalid function pointer".
+- Practice: the server log says why a thrown grenade was not recorded.
+- The release zip no longer contains anything under `cfg/`, so extracting an update never overwrites your `cfg/MatchZy/` files and no longer creates a second `cfg/MatchZy/` folder on servers that use `cfg/matchzy/`. MatchZy writes any missing cfg on load. Reference copies of the current defaults are in `addons/counterstrikesharp/plugins/MatchZy/defaults/`.
+- The default cfgs written on a fresh install are now the same files the release zip used to ship. The plugin's built-in copies had drifted from them (for example `mp_match_end_changelevel`, `mp_round_restart_delay`, `mp_win_panel_display_time`). Existing cfg files are not changed.
+- `admins.json`: every listed SteamID64 is a full MatchZy admin again. The value is free text (for example the player's name) and is no longer read as admin flags; use CounterStrikeSharp's own admin system for limited admins.
+- A remote log URL or header set in a match config's `cvars` now only applies to that match. The next match goes back to the server's own `matchzy_remote_log_url` settings instead of keeping the previous match's URL. `series_end` and `match_cancelled` still go to the URL of the match they belong to.
+- Events are sent with a 60 second timeout instead of 10 seconds, and a failed send names the event and host in the log.
+- Loading a match config with a `matchid` that was already used reopens that match in the database: the match row's end time and winner are cleared when its first map starts, and a replayed map's result is cleared when it starts again.
+- Stability: dropped grenades cleared after a practice `.t` / `.ct` switch, and the pawn of a player who leaves practice, are now removed with the engine's Kill input instead of being freed directly (the "WriteEnterPVS: GetEntServerClass failed" crash class).
+- Stability: moving a player to spectator (`.spec`, `.fas`, players outside a loaded match) waits until the player is actually dead before changing team, also for a player who cannot take damage. Changing team on a living player can crash the server.
+- Stability: the veto no longer moves spectators onto a team with a plain team switch (which left them stuck observing), and a spectator joining a team is never respawned when the server's team-join signature is missing.
+- Stability: `.coachtest` no longer strips weapons inside the chat command handler.
+- A match that failed to start (an error during the knife or go-live setup) no longer blocks every later ready-up until a map change.
+- A matchid allocated after the match was stopped or replaced is discarded instead of being given to the next match.
+- Live events read their target URL and match id when the event happens, not later on a background thread, so an event sent while a match resets is no longer lost or sent to the wrong place.
+- `.unpause` (both teams) or an admin unpause now ends an auto-pause even when a team is still short: the match plays on, and only a further drop in players pauses it again. Before, the match paused again within 10 seconds.
+- A round restore that has to set the round up again (a restore queued in warmup, or after a crash) now records a demo, and a scrim or hill game is restored as a scrim or hill game instead of a match.
+- A restore that needs another map no longer loses the match when it was started with `.match` instead of a match config.
+- A map change from outside MatchZy in the middle of a loaded match now sends `match_cancelled` with reason `map_changed` and closes the match in the database.
+- A force-ready only lasts for the ready phase it was given in (it carried over to the next map and after the veto).
+- Forfeits, `.ffw` walkovers and `.gg` surrenders now stop and upload the demo, send `map_result` for the map in progress before `series_end`, and write the real map score (a score of 16 was written before, wrong for MR12). All of them give the winner the series.
+- A second end-of-map event can no longer count the same map twice in the series score.
+- `get5_status` can report `pending_restore`.
+- The stats export JSON names no winner for a drawn map (it named team2).
+- Performance: coach matches no longer scan the whole entity list once per player at every round start (the spawn points are cached per map), `.autoclear` scans once per grenade instead of six times, bomb defuse and explode events reuse the site found at the plant, the whitelist file is only read when the whitelist is on, and chat from spectators during match setup no longer rebuilds the player list.
+- Practice: `.ln` and the nades menu load the lineup you picked. A shared lineup in the menu, `.ln #N`, or a name with a typo used to load your own closest-named lineup instead; a name that matches nothing now says so.
+- Practice: `.delbotpos` only deletes a saved bot position with exactly that name (a typo deleted another one). `.loadbotpos` no longer loads an unrelated position for a typo.
+- Practice: `.exitdry` only works during a dryrun (in practice it restarted the game). Starting `.dry` from practice turns off the practice markers, impacts and grenade preview first, and leaving practice stops `.botjiggle`.
+- Practice: a delayed rethrow no longer fails when the player left during the delay.
+- Practice: `.ln` always replies, also when savednades.json cannot be read.
+- Help texts: `.ff` skips 10 seconds, `.crouchbot` adds a crouching bot, `.importnade` has no `.in` chat alias, and non-admins are no longer pointed to `.mhelp`.
+- The technical pause "not enabled" message showed a raw translation key.
+- The admin and match setup menu titles no longer contain the chat prefix's colour codes.
+- New `matchzy_ready_hint_style 2`: no center text during the ready phase. Instead, like upstream MatchZy, the chat lists the players who are not ready every `matchzy_chat_messages_timer_delay` seconds (in each player's language). Styles 0 and 1 are unchanged.
+- `.coach` only works in warmup and during freeze time. Becoming a coach in the middle of a live round left the team a player short for the rest of the round.
+- Practice: `.rs`, `.grt` and `.fas` are admin commands now (they affect every player on the server).
+- Live events are sent through one queue in the order they happened, so a receiver no longer gets `round_end` after `map_result` or `match_unpaused` before `match_paused`. `series_end` no longer waits a fixed half second. When the receiver keeps failing, the high-volume live events (kills, damage, grenades, ...) are dropped for 30 seconds at a time so they cannot hold up match events; live events give up after 10 seconds, match events after 60.
+- Advanced stats (rating, KAST, opening duels, trades, clutches) are stored in each round backup and put back on a round restore, so the rounds that are replayed are no longer counted twice.
+- An auto-pause that both teams agreed to play through stays lifted after halftime (the agreed player counts followed the side, not the team).
+- `.t` / `.ct` while still in the team menu asks the player to pick a team first instead of forcing the join.
+- A queued restore from a `.match` game is dropped when the server switches to practice or sleep.
+- Translations: about 250 chat messages that were English-only (coach, practice, pauses, backups, forfeits, `.gg`, `.ffw`, admin replies and more) are now in the language files, with Danish and Albanian translations. Messages sent to one player use that player's language instead of the server's. The ready-phase center hint (classic style) and the "not ready" list are shown in each player's own language too. Practice toggles such as `.god`, `.impacts` and `.traj` now say On/Off instead of True/False.
+
 # 0.8.92
 
 #### October 1, 2026
