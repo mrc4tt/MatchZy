@@ -4,6 +4,12 @@ Customized fork of [MatchZy](https://github.com/shobhit-pathak/MatchZy) by Shobh
 
 Fork version numbering is independent of upstream. Upstream changelog: <https://github.com/shobhit-pathak/MatchZy/blob/main/CHANGELOG.md>
 
+# 0.8.92
+
+#### October 1, 2026
+
+- Fixed round backup files (`matchzy_<matchid>_<map>_roundNN.txt`) being written to `csgo/addons/metamod/` instead of `csgo/` on Metamod servers since the September 22 CS2 update. Backups were saved without round data, so `.stop` and `.restore` had nothing to load.
+
 # 0.8.91
 
 #### September 29, 2026
