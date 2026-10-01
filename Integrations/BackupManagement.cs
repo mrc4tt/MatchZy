@@ -71,8 +71,12 @@ namespace MatchZy
 
         public void SetupRoundBackupFile()
         {
-            string backupFilePrefix = $"matchzy_{liveMatchId}_{matchConfig.CurrentMapNumber}";
-            Server.ExecuteCommand($"mp_backup_round_file {backupFilePrefix}");
+            // The engine resolves a relative mp_backup_round_file prefix against the first Game search path
+            // in gameinfo.gi, which is csgo/addons/metamod on Metamod servers. An absolute prefix keeps the
+            // round files in csgo/, where the backup and restore code reads them.
+            string backupFilePrefix = Path.Join(Server.GameDirectory, "csgo", $"matchzy_{liveMatchId}_{matchConfig.CurrentMapNumber}").Replace('\\', '/');
+            string prefixArg = backupFilePrefix.Contains(' ') ? $"\"{backupFilePrefix}\"" : backupFilePrefix;
+            Server.ExecuteCommand($"mp_backup_round_file {prefixArg}");
         }
 
         [ConsoleCommand("css_stop", "Restore the backup of the current round (Both teams need to type .stop to restore the current round)")]

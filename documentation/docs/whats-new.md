@@ -2,6 +2,10 @@
 
 A short summary of each release. The [full changelog](changelog.md) has the details and background for every change.
 
+## 0.8.92 <small>October 1, 2026</small>
+
+- **Fixed:** Round backup files written to `csgo/addons/metamod/` on Metamod servers, leaving `.stop` and `.restore` with nothing to load.
+
 ## 0.8.91 <small>September 29, 2026</small>
 
 - **Added:** `matchzy_coach_listed_only` (default false): only coaches listed in the match config may coach.
