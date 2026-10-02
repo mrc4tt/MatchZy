@@ -4,6 +4,19 @@ Customized fork of [MatchZy](https://github.com/shobhit-pathak/MatchZy) by Shobh
 
 Fork version numbering is independent of upstream. Upstream changelog: <https://github.com/shobhit-pathak/MatchZy/blob/main/CHANGELOG.md>
 
+# 0.8.94
+
+#### October 2, 2026
+
+- `matchzy_minimum_ready_required` defaults to 10 again (was 2). Existing config.cfg files keep their value.
+- The reference copies of the default cfgs and `database.json.example` moved from `addons/counterstrikesharp/plugins/MatchZy/defaults/` to `cfg/MatchZy/defaults/` (in the folder your server uses, `matchzy` or `MatchZy`). MatchZy rewrites them on every load, with a README.txt that explains how to use them. They are never executed. The old `plugins/MatchZy/defaults/` folder can be deleted.
+- New convar `matchzy_ready_per_team` (default 0, off): a team is ready once that many of its players have typed `.ready`, and the match starts when both teams are ready. `1` means one player from CT and one from T. Works for pugs and loaded matches; in a loaded match it replaces the rule that every player must ready up.
+- warmup.cfg: `mp_respawn_immunitytime 5`, `mp_weapons_allow_typecount 0` and `ammo_grenade_limit_flashbang 0` (no flashbangs in warmup) and `sv_hide_roundtime_until_seconds 1`, which hides the top timer during warmup. The live configs set it back to 0.
+- `matchzy_ready_hint_style 2` now removes the native "Warmup" label in the middle of the screen, the same way style 1 does (the ready phase runs as a warmup that never ends, with respawns), without showing the HTML panel. The chat reminder is unchanged. live_wingman.cfg, scrim.cfg and hill.cfg now set `mp_weapons_allow_typecount 5` and scrim.cfg / hill.cfg set `mp_respawn_immunitytime 0`, so the warmup values never carry into a live game. Existing cfg files are not rewritten.
+- Practice: the grenade rethrow functions are resolved when practice starts, so the first `.rt` / `.throw` of each grenade type no longer stalls the server. A rethrow that takes unusually long is logged.
+- Shorter server-frame stall when config.cfg is executed at plugin load: its `matchzy_*` / `get5_*` command handlers are prepared in the background first.
+- No more `[ResetMatch - FATAL] [ERROR]: Global Variables not initialized yet` at server start (the map-end reset now waits until the server has loaded a map), and the repeated `[AutoStart] skipped` log lines are gone.
+
 # 0.8.93
 
 #### October 1, 2026

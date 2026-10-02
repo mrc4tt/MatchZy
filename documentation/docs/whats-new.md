@@ -2,6 +2,16 @@
 
 A short summary of each release. The [full changelog](changelog.md) has the details and background for every change.
 
+## 0.8.94 <small>October 2, 2026</small>
+
+- **New:** `matchzy_ready_per_team`: a team is ready once that many of its players are ready (`1` = one player per team). Works for pugs and loaded matches. See [Ready system](guides/ready-system.md).
+- **Changed:** `matchzy_ready_hint_style 2` removes the native "Warmup" label, like style 1, without the HTML panel.
+- **Changed:** warmup.cfg: spawn protection (`mp_respawn_immunitytime 5`), no purchase limit per weapon, no flashbangs, top timer hidden. The live configs reset all of it. Existing cfg files are not rewritten: compare with `defaults/`.
+- **Changed:** `matchzy_minimum_ready_required` defaults to 10 again.
+- **Changed:** Reference copies of the default cfgs moved to `cfg/MatchZy/defaults/`, written by MatchZy on every load, with a README. See [Updating](getting-started/updating.md).
+- **Fixed:** Server stall on the first `.rt` / `.throw` of each grenade type in practice.
+- **Fixed:** `Global Variables not initialized yet` error and repeated `[AutoStart] skipped` lines at server start; shorter stall when config.cfg loads.
+
 ## 0.8.93 <small>October 1, 2026</small>
 
 - **New:** Remote log events `server_ready`, `map_change` and `server_shutdown`, also without a loaded match. See [Events](reference/events.md).
