@@ -4593,14 +4593,14 @@ namespace MatchZy
         }
 
         // Engine weapon-select (CCSPlayer_WeaponServices::SelectItem(this, weapon,
-        // subType) - vtable slot 28/linux, 27/windows). This is the ONLY way to
+        // subType) - vtable slot from gamedata, e.g. 31/linux, 30/windows on 14186). This is the ONLY way to
         // deploy an already-owned weapon: it holsters the current weapon and
         // deploys the target (redraws viewmodel + plays the deploy anim, which
         // clears the frozen throw pose), with no GiveNamedItem (no-op when owned)
         // and no entity deletion (crashes). The vtable index comes from the gamedata
-        // key "CCSPlayer_WeaponServices_SelectItem" (offset entry), shipped both in
-        // the fork's gamedata.json and in the plugin's own gamedata/matchzy.json so
-        // stock upstream CounterStrikeSharp resolves it too. Cached lazily; -1 =
+        // key "CCSPlayer_WeaponServices_SelectItem" (offset entry), shipped only in
+        // the plugin's own gamedata/matchzy.json so both the fork and stock upstream
+        // CounterStrikeSharp resolve it. Cached lazily; -1 =
         // unavailable -> caller falls back to a pointer switch.
         private const int SelectItemOffsetUntried = -2;
         private const int SelectItemOffsetUnavailable = -1;
