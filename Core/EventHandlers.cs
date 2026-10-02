@@ -264,8 +264,30 @@ public partial class MatchZy
         }
     }
 
+    // CounterStrikeSharp throws "Global Variables not initialized yet" from Server.* properties
+    // until the engine has its globals (before the first map is loaded).
+    private static bool AreServerGlobalsReady()
+    {
+        try
+        {
+            _ = Server.MaxPlayers;
+            return true;
+        }
+        catch (Exception)
+        {
+            return false;
+        }
+    }
+
     private void OnMapEndHandler()
     {
+        // OnMapEnd also fires while the server is still starting up (the boot map is shut down before
+        // the first real map), when the engine's global variables do not exist yet. ResetMatch reads
+        // players and Server.* and failed there with "Global Variables not initialized yet". Nothing
+        // is loaded at that point, and OnMapStart / AutoStart set the state up on the real map.
+        if (!AreServerGlobalsReady())
+            return;
+
         // Before anything resets: receivers learn the map is changing (the map command's listener
         // already sent it when the change was requested by command).
         try { AnnounceMapEndIfUnannounced(); } catch (Exception e) { Log($"[map_change] {e.Message}"); }

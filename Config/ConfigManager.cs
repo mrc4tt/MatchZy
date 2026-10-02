@@ -125,6 +125,127 @@ namespace MatchZy
 
             // Create matchzymaps.cfg separately with default map rotation
             CreateMapRotationFile();
+
+            WriteReferenceDefaults();
+        }
+
+        private const string DefaultsFolderName = "defaults";
+        private const string CfgResourcePrefix = "MatchZy.cfg.";
+        private const string DatabaseExampleResource = "MatchZy.defaults.database.json.example";
+
+        private const string DefaultsReadme =
+"""
+MatchZy - reference defaults
+============================
+
+This folder holds the default config files of the MatchZy version that is
+currently installed. MatchZy rewrites it every time the plugin loads, so it
+always matches the running version.
+
+  - Nothing in this folder is executed or read by MatchZy.
+  - Do NOT edit files here. Your changes are overwritten on the next load.
+    Edit the files one folder up instead (the folder that contains this
+    "defaults" folder).
+
+What it is for
+--------------
+Your own config files are never overwritten by an update. When a release
+changes a default (the changelog says which file and which setting), compare
+your file with the copy in this folder and copy over the lines you want.
+
+  Linux:  diff ../live.cfg live.cfg
+
+Getting a fresh default
+-----------------------
+Delete (or rename) your own file, for example warmup.cfg, and restart the
+server or reload the plugin. MatchZy writes the current default in its place.
+
+config.cfg
+----------
+New settings are added to the bottom of your existing config.cfg
+automatically, under a "// --- Added by MatchZy update" header. Settings you
+already have, including commented-out ones, are left alone. Changed defaults of
+existing settings are not applied for you: compare with config.cfg here.
+
+database.json.example
+---------------------
+Example of database.json with the MySQL fields. MatchZy creates the real
+database.json (SQLite) one folder up on first load if it does not exist.
+Copy the fields you need from here into that file.
+
+Files
+-----
+  config.cfg            Plugin settings (matchzy_* convars).
+  warmup.cfg            Ready phase / warmup.
+  knife.cfg             Knife round.
+  live.cfg              Live match (5v5).
+  live_wingman.cfg      Live match (wingman).
+  scrim.cfg, hill.cfg   Scrim and king-of-the-hill modes.
+  prac.cfg, dryrun.cfg  Practice mode and dry run.
+  sleep.cfg             Idle server.
+  matchzymaps.cfg       Map rotation.
+""";
+
+        // Writes reference copies of the current defaults to <cfg dir>/defaults/: every embedded cfg,
+        // database.json.example and a README. Never exec'd. Lives under the case-resolved cfg dir
+        // (not in the release zip) so it lands in the folder the server actually uses and never
+        // creates a second matchzy/MatchZy folder. A file is only rewritten when its content
+        // differs, and reference cfgs that a newer version no longer ships are removed.
+        private void WriteReferenceDefaults()
+        {
+            try
+            {
+                string dir = Path.Combine(ServerPath, DefaultsFolderName);
+                Directory.CreateDirectory(dir);
+
+                var expectedCfgs = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                var assembly = typeof(ConfigManager).Assembly;
+                foreach (string resource in assembly.GetManifestResourceNames())
+                {
+                    if (!resource.StartsWith(CfgResourcePrefix, StringComparison.Ordinal))
+                        continue;
+                    string fileName = resource.Substring(CfgResourcePrefix.Length);
+                    string? content = ReadResource(resource);
+                    if (content == null)
+                        continue;
+                    expectedCfgs.Add(fileName);
+                    WriteIfChanged(Path.Combine(dir, fileName), content.TrimStart());
+                }
+
+                string? dbExample = ReadResource(DatabaseExampleResource);
+                if (dbExample != null)
+                    WriteIfChanged(Path.Combine(dir, "database.json.example"), dbExample);
+
+                WriteIfChanged(Path.Combine(dir, "README.txt"), DefaultsReadme.TrimStart() + "\n");
+
+                // Drop reference cfgs of files this version no longer ships. Only *.cfg: anything
+                // else an admin put here is left alone.
+                foreach (string existing in Directory.GetFiles(dir, "*.cfg"))
+                {
+                    if (!expectedCfgs.Contains(Path.GetFileName(existing)))
+                        File.Delete(existing);
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[MatchZy] Could not write reference defaults: {ex.Message}");
+            }
+        }
+
+        private static string? ReadResource(string name)
+        {
+            using var stream = typeof(ConfigManager).Assembly.GetManifestResourceStream(name);
+            if (stream == null)
+                return null;
+            using var reader = new StreamReader(stream);
+            return reader.ReadToEnd();
+        }
+
+        private static void WriteIfChanged(string path, string content)
+        {
+            if (File.Exists(path) && File.ReadAllText(path) == content)
+                return;
+            File.WriteAllText(path, content);
         }
 
         private void MergeMissingConfigCvars(string templateContent)

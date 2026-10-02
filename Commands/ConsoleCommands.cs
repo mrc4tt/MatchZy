@@ -66,7 +66,7 @@ namespace MatchZy
         {
             if (readyAvailable && !matchStarted)
             {
-                int totalPlayers = minimumReadyRequired;
+                int totalPlayers = readyPerTeam.Value > 0 ? readyPerTeam.Value * 2 : minimumReadyRequired;
 
                 int readyPlayers = playerReadyStatus.Values.Count(status => status);
                 int notReadyPlayers = totalPlayers - readyPlayers;

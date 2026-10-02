@@ -35,6 +35,15 @@ public partial class MatchZy
         if (IsBotSide(team))
             return true;
 
+        // matchzy_ready_per_team: N ready players make the whole side ready (e.g. one per team),
+        // instead of every player on the roster.
+        int perTeam = readyPerTeam.Value;
+        if (perTeam > 0 && (team == (int)CsTeam.CounterTerrorist || team == (int)CsTeam.Terrorist))
+        {
+            (int sidePlayers, int sideReady) = GetTeamPlayerCount(team, false);
+            return sidePlayers > 0 && sideReady >= perTeam;
+        }
+
         int minPlayers = GetPlayersPerTeam(team);
         int minReady = GetTeamMinReady(team);
         (int playerCount, int readyCount) = GetTeamPlayerCount(team, false);

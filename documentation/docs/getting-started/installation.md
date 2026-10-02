@@ -12,7 +12,7 @@
 ## Install from the release zip
 
 [:material-download: Download MatchZy @@MATCHZY_VERSION@@ (.zip)](https://git.miksen.me/mikkel/matchzy/releases/download/@@MATCHZY_VERSION@@/MatchZy-@@MATCHZY_VERSION@@.zip){ .md-button .md-button--primary }
-[Release notes](https://git.miksen.me/mikkel/matchzy/releases/latest){ .md-button }
+[Download](https://git.miksen.me/mikkel/matchzy/releases/latest){ .md-button } [Changelog](https://git.miksen.me/mikkel/matchzy/src/branch/main/CHANGELOG.md){ .md-button }
 
 1. Install **CounterStrikeSharp** into `game/csgo/addons/counterstrikesharp/`.
 2. Download the latest `MatchZy-<version>.zip` (button above, or the [releases page](https://git.miksen.me/mikkel/matchzy/releases)).
@@ -20,11 +20,10 @@
 
     ```text
     addons/counterstrikesharp/plugins/MatchZy/            # plugin and its dependencies
-    addons/counterstrikesharp/plugins/MatchZy/defaults/   # reference copies of the default cfgs and database.json
     addons/counterstrikesharp/gamedata/matchzy.json       # signatures used by practice mode
     ```
 
-    The zip contains nothing under `cfg/`. MatchZy writes its cfg files itself on first load.
+    The zip contains nothing under `cfg/`. MatchZy writes its cfg files itself on first load, plus reference copies of the defaults in `cfg/MatchZy/defaults/`.
 
 4. *(Optional)* Install **CS2MenuManager** as its own plugin under `addons/counterstrikesharp/plugins/CS2MenuManager/` if you want the in-game menus.
 5. Restart the server, or run `css_plugins load MatchZy`.

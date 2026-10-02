@@ -55,6 +55,8 @@
     <None Include="lang\**\*.*" CopyToOutputDirectory="PreserveNewest" />
     <!-- Default cfgs: written by ConfigManager.InitializeConfigs when a server has none. -->
     <EmbeddedResource Include="cfg\*.cfg" LogicalName="MatchZy.cfg.%(Filename)%(Extension)" />
+    <!-- Reference copy written to cfg/<matchzy>/defaults/ by ConfigManager.WriteReferenceDefaults. -->
+    <EmbeddedResource Include="database.json.example" LogicalName="MatchZy.defaults.database.json.example" />
     <None Update="spawns\**\*.*" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 

@@ -16,7 +16,7 @@ namespace MatchZy
     public partial class MatchZy : BasePlugin
     {
         public override string ModuleName => "MatchZy";
-        public override string ModuleVersion => "0.8.93";
+        public override string ModuleVersion => "0.8.94";
         public override string ModuleAuthor => "Miksen/mrc4tt (based on MatchZy by WD-)";
         public override string ModuleDescription => "A plugin for running and managing CS2 practice/pugs/scrims/matches!";
         public string chatPrefix = $"{ChatColors.Green}[MatchZy]{ChatColors.Default}";
@@ -157,7 +157,7 @@ namespace MatchZy
 
         // Game Config
         public bool isKnifeRequired = true;
-        public int minimumReadyRequired = 2;
+        public int minimumReadyRequired = 10;
         public bool isWhitelistRequired = false;
         public bool isSaveNadesAsGlobalEnabled = false;
         public bool isPlayOutEnabled = false;

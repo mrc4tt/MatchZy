@@ -6,7 +6,7 @@
 |---|---|---|
 | `config.cfg` | `<cfg>` | All settings. Generated on first load, new settings appended on updates. |
 | `warmup.cfg`, `knife.cfg`, `live.cfg`, `live_wingman.cfg`, `scrim.cfg`, `hill.cfg`, `prac.cfg`, `dryrun.cfg`, `sleep.cfg` | `<cfg>` | Executed when the matching phase or mode starts. Written from the built-in defaults when missing, never overwritten. |
-| `defaults/cfg/*.cfg`, `defaults/database.json.example` | plugin folder | Reference copies of the current defaults, replaced on every update and never executed. Compare your own files with them after an update. |
+| `defaults/*.cfg`, `defaults/database.json.example`, `defaults/README.txt` | `<cfg>` | Reference copies of the current defaults, rewritten by MatchZy on every load and never executed. Compare your own files with them after an update; do not edit them. |
 | `matchzymaps.cfg` | `<cfg>` | Map list for automatic map changes and the `.matchsetup` wizard. One map per line, `#` for comments, `workshop/<id>` for workshop maps. |
 | `database.json` | `<cfg>` | Database backend. See below. |
 | `admins.json` | `<cfg>` | Extra admins by SteamID64. See below. |

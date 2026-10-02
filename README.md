@@ -34,7 +34,7 @@ Full guide: [Installation](https://matchzy.miksen.me/getting-started/installatio
 
 ## Update
 
-Extract the new zip over the old one and restart. The zip contains nothing under `cfg/`, so your config files, admins, database settings and saved lineups are never overwritten. New settings are added to the bottom of your `config.cfg` automatically, and reference copies of the current default cfgs are in `addons/counterstrikesharp/plugins/MatchZy/defaults/`.
+Extract the new zip over the old one and restart. The zip contains nothing under `cfg/`, so your config files, admins, database settings and saved lineups are never overwritten. New settings are added to the bottom of your `config.cfg` automatically, and reference copies of the current default cfgs are written to `cfg/MatchZy/defaults/` on every load.
 
 Details: [Updating](https://matchzy.miksen.me/getting-started/updating/)
 

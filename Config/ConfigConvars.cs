@@ -75,7 +75,9 @@ namespace MatchZy
         //   1 = HTML READY-UP panel, warmup suppressed: own WARMUP badge, no native 'Warmup' pill,
         //       but a frozen 1:00 round timer top-center (hiding warmup forces the client to draw the
         //       round timer; no netvar can blank it)
-        public FakeConVar<int> readyHintStyle = new("matchzy_ready_hint_style", "Ready-status display mode. 0 = classic center text. 1 = HTML READY-UP panel (progress bar, per-player status) with the native warmup suppressed: own WARMUP badge, no native 'Warmup' pill, frozen 1:00 top timer. 2 = no center text, upstream MatchZy's chat reminder listing the players who are not ready (every matchzy_chat_messages_timer_delay seconds). Default: 0", 0, ConVarFlags.FCVAR_NONE, new CounterStrikeSharp.API.Modules.Cvars.Validators.RangeValidator<int>(0, 2));
+        public FakeConVar<int> readyHintStyle = new("matchzy_ready_hint_style", "Ready-status display mode. 0 = classic center text. 1 = HTML READY-UP panel (progress bar, per-player status) with the native warmup suppressed: own WARMUP badge, no native 'Warmup' pill, frozen 1:00 top timer. 2 = no center text, upstream MatchZy's chat reminder listing the players who are not ready (every matchzy_chat_messages_timer_delay seconds), native warmup suppressed the same way as 1 (no 'Warmup' pill). Default: 0", 0, ConVarFlags.FCVAR_NONE, new CounterStrikeSharp.API.Modules.Cvars.Validators.RangeValidator<int>(0, 2));
+
+        public FakeConVar<int> readyPerTeam = new("matchzy_ready_per_team", "Per-team ready-up. 0 = off (pug: matchzy_minimum_ready_required players in total, loaded match: every player on both teams). N = a team is ready once N of its players have typed .ready, and the match starts when CT and T are both ready. Works with and without a loaded match. Default: 0", 0, ConVarFlags.FCVAR_NONE, new CounterStrikeSharp.API.Modules.Cvars.Validators.RangeValidator<int>(0, 10));
 
         public FakeConVar<bool> readyHintBlinkEnabled = new("matchzy_ready_hint_blink", "Blink the 'YOU ARE NOT READY' line on the HTML READY-UP panel to grab attention. ONLY applies when matchzy_ready_hint_style is 1 (the HTML panel); no effect in classic style (0). Default: false", false);
 
@@ -204,7 +206,7 @@ namespace MatchZy
             resetCvarsOnSeriesEnd = ParseCvarBool(args, resetCvarsOnSeriesEnd);
         }
 
-        [ConsoleCommand("matchzy_minimum_ready_required", "Minimum ready players required to start the match. Default: 2")]
+        [ConsoleCommand("matchzy_minimum_ready_required", "Minimum ready players required to start the match. Default: 10")]
         public void MatchZyMinimumReadyRequired(CCSPlayerController? player, CommandInfo command)
         {
             if (player != null)

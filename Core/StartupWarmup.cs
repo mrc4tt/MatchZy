@@ -52,6 +52,38 @@ namespace MatchZy
         /// calls with throwaway data here means the real round finds them warm. Touches nothing
         /// in the engine, so it is safe off the game thread.
         /// </summary>
+        private int PrepareConfigCommandHandlers()
+        {
+            int prepared = 0;
+            const BindingFlags flags = BindingFlags.Instance | BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.DeclaredOnly;
+            foreach (MethodInfo method in typeof(MatchZy).GetMethods(flags))
+            {
+                if (method.ContainsGenericParameters)
+                    continue;
+                bool isConfigCommand = false;
+                foreach (var attr in method.GetCustomAttributes<CounterStrikeSharp.API.Core.Attributes.Registration.ConsoleCommandAttribute>())
+                {
+                    if (attr.Command.StartsWith("matchzy_", StringComparison.Ordinal) || attr.Command.StartsWith("get5_", StringComparison.Ordinal))
+                    {
+                        isConfigCommand = true;
+                        break;
+                    }
+                }
+                if (!isConfigCommand)
+                    continue;
+                try
+                {
+                    RuntimeHelpers.PrepareMethod(method.MethodHandle);
+                    prepared++;
+                }
+                catch (Exception e)
+                {
+                    Log($"[Warmup] Could not prepare {method.Name}: {e.GetType().Name}: {e.Message}");
+                }
+            }
+            return prepared;
+        }
+
         private void WarmRoundStartPaths()
         {
             _ = Task.Run(() =>
@@ -60,6 +92,15 @@ namespace MatchZy
                 int prepared = 0;
                 try
                 {
+                    // First, because Load() queues config.cfg right after this starts and the exec runs
+                    // on the next frame: JIT the matchzy_* / get5_* console-command handlers it calls.
+                    // The first exec ran ~60 cold handlers back to back on the game thread, which showed
+                    // up as one ~100 ms "Input Handling" frame at server start. JIT is thread-safe; a
+                    // handler the game thread reaches while it is still being compiled here just waits
+                    // for that compile instead of doing it twice. Only these prefixes: menu commands
+                    // must stay cold (CS2MenuManager is an optional, lazily resolved dependency).
+                    prepared += PrepareConfigCommandHandlers();
+
                     // Newtonsoft: contract cache for the two types the round backup serializes.
                     Newtonsoft.Json.JsonConvert.SerializeObject(new MatchConfig());
                     Newtonsoft.Json.JsonConvert.SerializeObject(new Team { teamName = "warmup" });

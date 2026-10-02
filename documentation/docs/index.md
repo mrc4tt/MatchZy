@@ -15,7 +15,7 @@ hide:
 [What the fork adds](comparison.md){ .md-button }
 [Commands](reference/commands.md){ .md-button }
 
-<small>[Release notes](https://git.miksen.me/mikkel/matchzy/releases/latest) · [All releases](https://git.miksen.me/mikkel/matchzy/releases)</small>
+<small>[Download](https://git.miksen.me/mikkel/matchzy/releases/latest) · [Changelog](https://git.miksen.me/mikkel/matchzy/src/branch/main/CHANGELOG.md) · [All releases](https://git.miksen.me/mikkel/matchzy/releases)</small>
 
 </div>
 

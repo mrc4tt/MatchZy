@@ -4,6 +4,7 @@ In match, scrim and hill mode the server waits in warmup until enough players ar
 
 - Players type `.ready` / `.unready`, or ping (middle mouse) to toggle :fontawesome-solid-code-fork: (`matchzy_ready_up_by_ping`).
 - `matchzy_minimum_ready_required` (or `.readyrequired <n>`) sets how many must be ready. `0` = everyone connected.
+- `matchzy_ready_per_team <n>` makes it per team instead: the match starts once `n` players on CT and `n` on T are ready (`1` = one player per team). In a loaded match it replaces the rule that every player must ready up.
 - `.readycheck` :fontawesome-solid-code-fork: shows who is missing.
 - With a match config, `.forceready` readies a whole team once it has enough players.
 - Coaches do not count and do not need to ready. :fontawesome-solid-code-fork:

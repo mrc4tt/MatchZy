@@ -349,6 +349,12 @@ namespace MatchZy
             // covers the first-connect case whenever it happens.
             AddTimer(3.0f, () => SettlePracticeWarmupState("+3s"));
 
+            // Resolve the grenade factory signatures now, while practice is switching modes anyway,
+            // instead of on the first .rt / .throw of each grenade type (a long stall mid-practice).
+            long prewarmStart = System.Diagnostics.Stopwatch.GetTimestamp();
+            int factories = GrenadeFunctions.Prewarm();
+            Log($"[Practice] Grenade factories resolved: {factories}/4 in {System.Diagnostics.Stopwatch.GetElapsedTime(prewarmStart).TotalMilliseconds:0.0} ms.");
+
             GetSpawns();
             string[] practiceHelpKeys =
             {

@@ -50,4 +50,19 @@ public static class GrenadeFunctions
         Guard(() => new MemoryFunctionWithReturn<IntPtr, IntPtr, IntPtr, IntPtr, IntPtr, int, CDecoyProjectile>(GameData.GetSignature("CDecoyProjectile_Create"))));
 
     public static MemoryFunctionWithReturn<IntPtr, IntPtr, IntPtr, IntPtr, IntPtr, int, CDecoyProjectile>? CDecoyProjectile_CreateFunc => CDecoyProjectile_CreateFuncLazy.Value;
+
+    // Resolve every factory up front. Each Lazy runs a signature scan over the server binary on
+    // first access, and that first access used to be the first .rt / .throw of each grenade type:
+    // a long game-thread stall in the middle of practice. The scan must stay on the game thread
+    // (StartupWarmup cannot do it), so the caller runs this when practice starts. Returns how many
+    // factories resolved; the rest use the managed fallback in GrenadeThrownData.Throw.
+    public static int Prewarm()
+    {
+        int resolved = 0;
+        if (CSmokeGrenadeProjectile_CreateFunc != null) resolved++;
+        if (CHEGrenadeProjectile_CreateFunc != null) resolved++;
+        if (CMolotovProjectile_CreateFunc != null) resolved++;
+        if (CDecoyProjectile_CreateFunc != null) resolved++;
+        return resolved;
+    }
 }

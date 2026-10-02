@@ -102,7 +102,30 @@ public class GrenadeThrownData
         return ent;
     }
 
+    // A rethrow normally costs well under a millisecond. Anything slower is reported (rate limited)
+    // so a remaining server-frame stall on .rt / .throw can be pinned to this path or ruled out.
+    private const double SlowThrowWarnMs = 4.0;
+    private static DateTime lastSlowThrowWarn = DateTime.MinValue;
+
     public void Throw(CCSPlayerController player, (int R, int G, int B)? smokeColor = null)
+    {
+        long startedAt = System.Diagnostics.Stopwatch.GetTimestamp();
+        try
+        {
+            ThrowInternal(player, smokeColor);
+        }
+        finally
+        {
+            double ms = System.Diagnostics.Stopwatch.GetElapsedTime(startedAt).TotalMilliseconds;
+            if (ms >= SlowThrowWarnMs && (DateTime.UtcNow - lastSlowThrowWarn).TotalSeconds >= 10)
+            {
+                lastSlowThrowWarn = DateTime.UtcNow;
+                Console.WriteLine($"[MatchZy] Slow grenade rethrow: {Type} took {ms:0.0} ms on the game thread.");
+            }
+        }
+    }
+
+    private void ThrowInternal(CCSPlayerController player, (int R, int G, int B)? smokeColor)
     {
         // Validate player before accessing any properties
         if (player == null || !player.IsValid || player.Connected != PlayerConnectedState.Connected || !player.PlayerPawn.IsValid || player.PlayerPawn.Value == null)
@@ -127,7 +150,7 @@ public class GrenadeThrownData
             case "smoke":
             {
                 var factory = GrenadeFunctions.CSmokeGrenadeProjectile_CreateFunc;
-                grenadeEntity = factory?.Invoke(Position.Handle, Angle.Handle, Velocity.Handle, Velocity.Handle, IntPtr.Zero, ItemIndex, (int)player.Team);
+                grenadeEntity = factory?.Invoke(Position.Handle, Angle.Handle, Velocity.Handle, AngularVelocity.Handle, IntPtr.Zero, ItemIndex, (int)player.Team);
                 grenadeEntity ??= CreateGrenadeFallback<CSmokeGrenadeProjectile>("smokegrenade_projectile", "CSmokeGrenadeProjectile_Create");
                 break;
             }
@@ -135,21 +158,21 @@ public class GrenadeThrownData
             case "incendiary":
             {
                 var factory = GrenadeFunctions.CMolotovProjectile_CreateFunc;
-                grenadeEntity = factory?.Invoke(Position.Handle, Angle.Handle, Velocity.Handle, Velocity.Handle, IntPtr.Zero, ItemIndex);
+                grenadeEntity = factory?.Invoke(Position.Handle, Angle.Handle, Velocity.Handle, AngularVelocity.Handle, IntPtr.Zero, ItemIndex);
                 grenadeEntity ??= CreateGrenadeFallback<CMolotovProjectile>(Type == "incendiary" ? "incendiary_projectile" : "molotov_projectile", "CMolotovProjectile_Create");
                 break;
             }
             case "hegrenade":
             {
                 var factory = GrenadeFunctions.CHEGrenadeProjectile_CreateFunc;
-                grenadeEntity = factory?.Invoke(Position.Handle, Angle.Handle, Velocity.Handle, Velocity.Handle, IntPtr.Zero, ItemIndex);
+                grenadeEntity = factory?.Invoke(Position.Handle, Angle.Handle, Velocity.Handle, AngularVelocity.Handle, IntPtr.Zero, ItemIndex);
                 grenadeEntity ??= CreateGrenadeFallback<CHEGrenadeProjectile>("hegrenade_projectile", "CHEGrenadeProjectile_Create");
                 break;
             }
             case "decoy":
             {
                 var factory = GrenadeFunctions.CDecoyProjectile_CreateFunc;
-                grenadeEntity = factory?.Invoke(Position.Handle, Angle.Handle, Velocity.Handle, Velocity.Handle, IntPtr.Zero, ItemIndex);
+                grenadeEntity = factory?.Invoke(Position.Handle, Angle.Handle, Velocity.Handle, AngularVelocity.Handle, IntPtr.Zero, ItemIndex);
                 grenadeEntity ??= CreateGrenadeFallback<CDecoyProjectile>("decoy_projectile", "CDecoyProjectile_Create");
                 break;
             }

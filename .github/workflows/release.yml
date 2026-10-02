@@ -57,15 +57,9 @@ jobs:
           # overwrite an admin's files (config.cfg, mode cfgs, admins.json, database.json, ...), and a
           # cfg/MatchZy/ folder in the zip also created a second folder on servers that use
           # cfg/matchzy/. The plugin writes every missing cfg on load from the copies embedded in the
-          # DLL (the repo's cfg/ folder). For comparison after an update, the current defaults are
-          # shipped as reference copies in the plugin folder, which is replaced on every update and
-          # never exec'd.
-          DEFAULTS=package/addons/counterstrikesharp/plugins/MatchZy/defaults
-          mkdir -p "$DEFAULTS/cfg"
-          cp cfg/*.cfg "$DEFAULTS/cfg/"
-          # Reference copy of the database config (MySQL settings). The plugin creates the real
-          # database.json (SQLite default) on first load if none exists.
-          cp database.json.example "$DEFAULTS/database.json.example"
+          # DLL (the repo's cfg/ folder), and writes reference copies of the current defaults (plus
+          # database.json.example and a README) to csgo/cfg/<matchzy>/defaults/ on every load, in
+          # whichever folder casing the server uses. Nothing for that goes in the zip.
           # Ship MatchZy's gamedata so CounterStrikeSharp auto-loads it (it merges every *.json in
           # the gamedata dir). Provides the signatures MatchZy resolves by key - practice grenade
           # rethrow (.rt/.last/.back) and .breakrestore - so it works on stock CSS without editing
@@ -74,11 +68,23 @@ jobs:
           cp gamedata/matchzy.json package/addons/counterstrikesharp/gamedata/matchzy.json
           cd package && 7z a -tzip ../MatchZy-${{ env.MATCHZY_VERSION }}.zip . && cd ..
 
-      - name: Extract release notes
+      - name: Write release notes
         run: |
-          # Top version block of CHANGELOG.md becomes the release body.
-          awk '/^# [0-9]/{n++} n==1' CHANGELOG.md > notes.md || true
-          [ -s notes.md ] || echo "Automated build." > notes.md
+          # Short body on purpose: the full changelog block made every release long in the release
+          # list, pushing the zip far down. CHANGELOG.md stays the only place the changes are
+          # written; the body links to it at this tag (GitHub and Forgejo use different paths).
+          VER="${{ env.MATCHZY_VERSION }}"
+          REPO_URL="${{ github.server_url }}/${{ github.repository }}"
+          if [ "${{ github.server_url }}" = "https://github.com" ]; then
+            CHANGELOG_URL="$REPO_URL/blob/$VER/CHANGELOG.md"
+          else
+            CHANGELOG_URL="$REPO_URL/src/tag/$VER/CHANGELOG.md"
+          fi
+          {
+            echo "Download \`MatchZy-$VER.zip\` below and extract it into \`game/csgo/\`. Updating never touches your \`cfg/\` files."
+            echo
+            echo "What's new: https://matchzy.miksen.me/whats-new/ · Full changelog: [CHANGELOG.md]($CHANGELOG_URL)"
+          } > notes.md
 
       # --- GitHub release (runs on the github.com mirror) ---
       # Uses the gh CLI (a run: step) rather than a marketplace action: the Forgejo runner tries
