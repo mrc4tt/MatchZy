@@ -7,6 +7,8 @@
 
 MikZy is a CounterStrikeSharp plugin for running CS2 matches, scrims, pugs and practice on your own server. It is a customized fork of [MatchZy](https://github.com/shobhit-pathak/MatchZy) built for game-server hosting. The plugin still loads as `MatchZy`, so file names, folders, commands and settings (`MatchZy.dll`, `cfg/MatchZy/`, `matchzy_*`) are unchanged.
 
+> **Looking for the official MatchZy?** Use [MatchZy by WD-](https://github.com/shobhit-pathak/MatchZy). This fork is an optional alternative for those who want its extra features, for example for tournaments, leagues or community servers. Feature requests and issues are welcome, but there is no guarantee they will be picked up or implemented.
+
 **Documentation:** <https://matchzy.miksen.me/>
 
 ## What the fork adds
