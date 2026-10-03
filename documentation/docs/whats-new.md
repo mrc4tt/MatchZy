@@ -2,6 +2,14 @@
 
 A short summary of each release. The [full changelog](changelog.md) has the details and background for every change.
 
+## 0.8.96 <small>October 3, 2026</small>
+
+- **New:** `.addreadytime <seconds>`, `get5_time_to_start` / `get5_time_to_start_veto` aliases and a separate veto ready-up limit (`matchzy_forfeit_veto_ready_timeout`).
+- **New:** Join ready mode (`matchzy_ready_mode 1`): teams are ready once enough players have joined; the match starts after `matchzy_join_start_delay` seconds.
+- **New:** Get5 technical pause rules (`matchzy_tech_pause_mode 1`, or `get5_max_tech_pauses` / `get5_tech_pause_time`): cancel before freeze time, either team can unpause once the time is up.
+- **Changed:** Neither team ready in time ends the series in a tie instead of cancelling it.
+- **Changed:** Technical pauses used are saved in round backups.
+
 ## 0.8.95 <small>October 3, 2026</small>
 
 - **Changed:** Live events use Get5's event format by default (`matchzy_events_format get5`): nested player and weapon objects, `round_time`, `game_paused` / `game_unpaused`. Set `matchzy_events_format legacy` if your receiver reads the old flat fields. See [Events](reference/events.md#live-scorebot).

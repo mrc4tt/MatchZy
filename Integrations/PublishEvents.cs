@@ -64,7 +64,9 @@ namespace MatchZy
         {
             string name = e.GetType().Name;
             bool live = name.EndsWith("LiveEvent", StringComparison.Ordinal) || name.StartsWith("Get5", StringComparison.Ordinal);
-            return live && e is not MatchPausedLiveEvent && e is not MatchUnpausedLiveEvent && e is not Get5MatchPauseEvent;
+            // Pauses, disconnects and round starts (G5API cleans up a restore on round_start) must arrive.
+            return live && e is not MatchPausedLiveEvent && e is not MatchUnpausedLiveEvent && e is not Get5MatchPauseEvent
+                && e is not Get5PlayerDisconnectEvent && e is not RoundStartLiveEvent;
         }
 
         private async Task RunEventSenderAsync()

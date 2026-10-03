@@ -290,6 +290,21 @@ namespace MatchZy
             SetNadeTransmitListener(false);
         }
 
+        // The previous map's entities are gone (their wrappers point at freed memory), so on a new
+        // map only forget them: no Remove(), no IsValid (which would read the freed memory). Without
+        // this the transmit listener and .hidenades worked on dangling pointers, and +use near an old
+        // spot teleported to the previous map's spawn positions.
+        private void ForgetPracticeEntitiesOnMapStart()
+        {
+            nadeMarkerEntities.Clear();
+            activeNadeGroups.Clear();
+            grenadeLibraryActive = false;
+            SetNadeTransmitListener(false);
+            spawnMarkerBeams.Clear();
+            spawnMarkersActive = false;
+            activeSpawnMarkers.Clear();
+        }
+
         // CheckTransmit fires every tick and crosses into managed code for every recipient, so the
         // listener is only registered while markers are shown (.shownades), not for the whole session.
         private Listeners.CheckTransmit? _nadeTransmitHandler;
@@ -567,15 +582,37 @@ namespace MatchZy
             NadeLineup target = group.Lineups[group.Current];
             Server.NextFrame(() =>
             {
-                if (!IsPlayerValid(player)) return;
-                // Teleport AND deploy the grenade in hand (same as .loadnade), not just a bare
-                // teleport - otherwise you arrive at the lineup with the wrong weapon out.
-                bool isCT = player.TeamNum == (byte)CsTeam.CounterTerrorist;
-                TeleportAndClearPose(player, target.Pos.PlayerPosition, target.Pos.PlayerAngle, wantDucked: false, deployWeapon: NadeTypeToWeapon(target.Type, isCT), giveDeploy: true);
-                string tag = target.Global ? " (G)" : "";
-                string note = string.IsNullOrEmpty(target.Desc) ? "" : $" - {target.Desc}";
-                ReplyToUserCommand(player, Localizer.ForPlayer(player, "matchzy.gl.loaded", $"[{target.Type}] {target.Name}{tag}{note}"));
+                if (IsPlayerValid(player))
+                    LoadNadeLineup(player, target);
             });
+        }
+
+        // Teleport AND deploy the grenade in hand (same as .loadnade), not just a bare teleport -
+        // otherwise you arrive at the lineup with the wrong weapon out. Used by the marker +use and
+        // the .nades menu (shared-pack entries).
+        private void LoadNadeLineup(CCSPlayerController player, NadeLineup target)
+        {
+            if (!isPractice || player.TeamNum != (byte)CsTeam.CounterTerrorist && player.TeamNum != (byte)CsTeam.Terrorist)
+                return;
+            bool isCT = player.TeamNum == (byte)CsTeam.CounterTerrorist;
+            TeleportAndClearPose(player, target.Pos.PlayerPosition, target.Pos.PlayerAngle, wantDucked: false, deployWeapon: NadeTypeToWeapon(target.Type, isCT), giveDeploy: true);
+            string tag = target.Global ? " (G)" : "";
+            string note = string.IsNullOrEmpty(target.Desc) ? "" : $" - {target.Desc}";
+            ReplyToUserCommand(player, Localizer.ForPlayer(player, "matchzy.gl.loaded", $"[{target.Type}] {target.Name}{tag}{note}"));
+        }
+
+        // Shared-pack (grenadelibrary.json) lineups for the current map, for the .nades menu.
+        private List<NadeLineup> LoadPackLineupsForCurrentMap()
+        {
+            var result = new List<NadeLineup>();
+            try
+            {
+                string map = Server.MapName;
+                if (LoadGlobalPack().TryGetValue(map, out var slots))
+                    AddLineupsFromSlots(slots, map, global: true, result);
+            }
+            catch (Exception e) { Log($"[GrenadeLibrary] pack load: {e.Message}"); }
+            return result;
         }
 
         // ── F-toggle: cycle which lineup is shown in the aimed group ─────────────────────

@@ -11,11 +11,11 @@
 
 ## Install from the release zip
 
-[:material-download: Download MatchZy @@MATCHZY_VERSION@@ (.zip)](https://git.miksen.me/mikkel/matchzy/releases/download/@@MATCHZY_VERSION@@/MatchZy-@@MATCHZY_VERSION@@.zip){ .md-button .md-button--primary }
-[Download](https://git.miksen.me/mikkel/matchzy/releases/latest){ .md-button } [Changelog](https://git.miksen.me/mikkel/matchzy/src/branch/main/CHANGELOG.md){ .md-button }
+[:material-download: Download MatchZy @@MATCHZY_VERSION@@ (.zip)](https://github.com/mrc4tt/MatchZy/releases/download/@@MATCHZY_VERSION@@/MatchZy-@@MATCHZY_VERSION@@.zip){ .md-button .md-button--primary }
+[Download](https://github.com/mrc4tt/MatchZy/releases/latest){ .md-button } [Changelog](https://github.com/mrc4tt/MatchZy/blob/main/CHANGELOG.md){ .md-button }
 
 1. Install **CounterStrikeSharp** into `game/csgo/addons/counterstrikesharp/`.
-2. Download the latest `MatchZy-<version>.zip` (button above, or the [releases page](https://git.miksen.me/mikkel/matchzy/releases)).
+2. Download the latest `MatchZy-<version>.zip` (button above, or the [releases page](https://github.com/mrc4tt/MatchZy/releases)).
 3. Extract the zip into `game/csgo/`. It contains:
 
     ```text
@@ -38,8 +38,8 @@ To update later, see [Updating](updating.md).
 ## Build from source
 
 ```bash
-git clone https://git.miksen.me/mikkel/matchzy.git
-cd matchzy
+git clone https://github.com/mrc4tt/MatchZy.git
+cd MatchZy
 dotnet build -c Release
 # output: bin/Release/net10.0/MatchZy.dll (+ dependencies)
 ```

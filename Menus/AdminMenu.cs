@@ -83,7 +83,8 @@ namespace MatchZy
                 return;
             }
             // Defer so menu render isn't clobbered when entered via .chat dispatch.
-            Server.NextFrame(() => OpenMenuGuarded(player, OpenMatchAdminMenu));
+            // Re-validated: the player can leave before the next frame.
+            Server.NextFrame(() => { if (IsPlayerValid(player)) OpenMenuGuarded(player, OpenMatchAdminMenu); });
         }
 
         private void OpenMatchAdminMenu(CCSPlayerController player)

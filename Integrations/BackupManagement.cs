@@ -459,6 +459,22 @@ namespace MatchZy
                 // This is to prevent any buggish behaviour with timeouts (like incorrect timeout used showing, or force-unpausing the match once timeout ends)
                 gameRules.CTTimeOutActive = gameRules.TerroristTimeOutActive = false;
 
+                // Get5: technical pauses used are per map and survive a restore of the same map; only a
+                // backup of another match or map brings its own counts.
+                // Decided here, before this pass can switch the match id / map, queue the restore or
+                // change map: the pass that finally loads the round runs with both already switched.
+                // Applied when the round is actually loaded (going live resets the counters before).
+                bool sameMatchAndMap = backupData.TryGetValue("matchid", out var backupIdText) && backupIdText == liveMatchId.ToString()
+                    && backupData.TryGetValue("mapnumber", out var backupMapText) && backupMapText == matchConfig.CurrentMapNumber.ToString();
+                if (!sameMatchAndMap)
+                {
+                    pendingRestoreTechPauses =
+                        backupData.TryGetValue("team1_tech_pauses_used", out var team1Tech) && int.TryParse(team1Tech, out int team1TechUsed)
+                        && backupData.TryGetValue("team2_tech_pauses_used", out var team2Tech) && int.TryParse(team2Tech, out int team2TechUsed)
+                            ? (Math.Max(0, team1TechUsed), Math.Max(0, team2TechUsed))
+                            : null;
+                }
+
                 // MatchID is set first to avoid generating a new one.
                 if (backupData.TryGetValue("matchid", out var matchId) && long.TryParse(matchId, out var parsedBackupId) && parsedBackupId > 0)
                 {
@@ -652,6 +668,7 @@ namespace MatchZy
                             // successful restore and pause the match. Report it instead.
                             Log($"[RestoreRoundBackup] {fileName} has no usable valve_backup data and no complete .txt in csgo/, nothing to restore.");
                             ReplyToUserCommand(player, Localizer.ForPlayer(player, "matchzy.backupmsg.nousabledata", fileName));
+                            pendingRestoreTechPauses = null;
                             return false;
                         }
 
@@ -706,6 +723,12 @@ namespace MatchZy
                             );
                             Server.ExecuteCommand($"mp_backup_restore_load_file {loadFileName}");
                             SendBackupLoadedEvents(fileName, restoredRoundsPlayed);
+                            if (pendingRestoreTechPauses is var (team1Tech, team2Tech))
+                            {
+                                technicalPauseUsed[matchzyTeam1] = team1Tech;
+                                technicalPauseUsed[matchzyTeam2] = team2Tech;
+                                pendingRestoreTechPauses = null;
+                            }
                             // Put the advanced stats back to the start of the restored round (also undoes
                             // the reset that setting the match live again does).
                             RestoreAdvancedStatsSnapshot(advancedStatsJson);
@@ -867,6 +890,9 @@ namespace MatchZy
             // successful load triggers, so leaving it set here would stop every later round backup.
             isRoundRestoring = false;
             isSpawnKeeping = false;
+            // backup_loaded / round_start were already sent for this load; let the next real round
+            // start through.
+            roundStartSentByRestore = false;
             Log($"[RestoreRoundBackup FATAL] Engine did not load {fileName}. Rounds played is still {roundsPlayed}, expected {expectedRoundsPlayed}.");
             PrintLocalizedToAll("matchzy.backupmsg.restorefailed", fileName);
             if (IsPlayerValid(player))
@@ -963,6 +989,16 @@ namespace MatchZy
                     pausedStateTimer?.Kill();
                     pausedStateTimer = null;
                     PrintLocalizedToAll("matchzy.backupmsg.matchlive");
+                    // Pairs with the game_paused (pause_type backup) sent when the pause began.
+                    if (UseGet5Events)
+                    {
+                        PublishEvent(new MatchUnpausedLiveEvent
+                        {
+                            MatchId = liveMatchId,
+                            MapNumber = matchConfig.CurrentMapNumber,
+                            RoundNumber = GetRoundNumer(),
+                        });
+                    }
                 },
                 TimerFlags.REPEAT | TimerFlags.STOP_ON_MAPCHANGE
             );
@@ -1186,6 +1222,8 @@ namespace MatchZy
                     { "team2_series_score", matchzyTeam2.seriesScore.ToString() },
                     { "TerroristTimeOuts", gameRules.TerroristTimeOuts.ToString() },
                     { "CTTimeOuts", gameRules.CTTimeOuts.ToString() },
+                    { "team1_tech_pauses_used", technicalPauseUsed.GetValueOrDefault(matchzyTeam1).ToString() },
+                    { "team2_tech_pauses_used", technicalPauseUsed.GetValueOrDefault(matchzyTeam2).ToString() },
                     { "match_loaded", isMatchSetup.ToString() },
                     { "match_config", "" },
                     // Filled in off-thread once the engine's own round file has been read.

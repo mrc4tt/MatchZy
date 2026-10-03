@@ -4,6 +4,40 @@ Customized fork of [MatchZy](https://github.com/shobhit-pathak/MatchZy) by Shobh
 
 Fork version numbering and this changelog are independent of upstream.
 
+# 0.8.96
+
+#### October 3, 2026
+
+- Ready-up time limit, Get5 style: `get5_time_to_start` / `matchzy_time_to_start` set `matchzy_forfeit_ready_timeout`, and the new `matchzy_forfeit_veto_ready_timeout` (`get5_time_to_start_veto`) sets a separate limit for the ready-up before the map veto (default `-1`, same as the map).
+- New `.addreadytime <seconds>` (also `matchzy_add_ready_time` / `get5_add_ready_time`) gives the teams more time to ready up, at most the full time.
+- When neither team is ready in time the series now ends in a tie (`series_end` with no winner), as in Get5, instead of being cancelled.
+- The ready-up time limit reminders follow Get5: every minute, every 30 seconds in the last five minutes, and at 10 seconds. The clock does not run while a round restore is waiting for the teams.
+- New join ready mode `matchzy_ready_mode 1`: in a loaded match a team is ready once `min_players_to_ready` of its players are on its side, and the match starts `matchzy_join_start_delay` (default 10) seconds after everyone has joined.
+- New `matchzy_tech_pause_mode 1` for Get5 technical pause rules: a pause counts once it takes effect in freeze time, the pausing team can cancel it before then, it never ends on its own, and once it has lasted `matchzy_tech_pause_duration` seconds either team can `.unpause`. A countdown is shown in the center of the screen. `get5_max_tech_pauses` and `get5_tech_pause_time` set the limits and switch to this mode. The default (`0`) keeps the current behavior.
+- Technical pauses used are saved in round backups. Restoring a backup of another map or match (for example after a server crash) brings back its counts; restoring a round of the current map keeps the pauses already used.
+- The default config.cfg is reorganized into sections with shorter, corrected descriptions, and now also lists `matchzy_prac_disable_magazine_drop`, `matchzy_grenadelibrary_labels`, `matchzy_grenadelibrary_label_scale` and `matchzy_botjiggle_range`. Setting names and defaults are unchanged, and existing config.cfg files are not rewritten (compare with `defaults/config.cfg`).
+- `matchzy_chat_prefix` with an empty value now falls back to the green `[MatchZy]` prefix, the same as the config.cfg default.
+- Fixed a possible server crash after a map change when `.shownades` markers, `.showspawns` markers or `.landmarker` beams were active (the plugin kept using the previous map's entities).
+- Delayed rethrows (`.delay` with `.rt` / `.throw`) no longer fire after practice has ended or the map has changed.
+- Leaving practice now turns off all-talk, `buddha` and impact markers, which carried over into a dry run or warmup. dryrun.cfg also sets `sv_full_alltalk 0`.
+- A practice bot kicked by the console or another plugin no longer keeps a bot slot reserved (the server kept adding and kicking a replacement bot).
+- After a map veto that changes map, the match can no longer start on the old map before the map change (possible with join ready mode or a quick `.ready`).
+- A surrender vote (`css_gg`) from one team no longer stops the other team's vote from expiring.
+- Auto-pause: a long `matchzy_autopause_resume_delay` no longer schedules several resumes, and the match is not resumed when a player dropped again during the delay.
+- `css_unpause` from the server console now unpauses the match.
+- `.matchsetup` no longer replaces a match another admin or a panel loaded while the wizard was open.
+- A match start that was stopped while the database was still being set up no longer goes ahead later, and its database row is closed.
+- Removing a retired setting from config.cfg no longer removes a commented-out setting right above it.
+- Player names ending in a backslash no longer break the forced player names file.
+- MySQL passwords containing `;` work.
+- In the Get5 event format, `game_unpaused` is sent when the pause after a round restore ends on its own, `player_disconnect` and `round_start` are never dropped while the receiver is unreachable, and `freezetime_end` counts and lists bots.
+- The built-in warmup settings (used when warmup.cfg is missing) now match warmup.cfg (free armor, CSTV voice relay).
+- Albanian practice messages and a Danish coach message that were still in English are translated.
+- `.loadbotpos` without a name spawns every saved bot again, one after the other (only one bot appeared).
+- The `.nades` menu also lists the shared lineups added with `.libadd`, marked (G).
+- `.autopause` takes effect immediately: turning it on during a live map starts the check, turning it off ends an auto-pause in progress.
+- scrim.cfg, hill.cfg and knife.cfg now set `sv_deadtalk 1` like live.cfg, so dead players can talk to their living teammates in scrims too. Existing cfg files are not rewritten.
+
 # 0.8.95
 
 #### October 3, 2026

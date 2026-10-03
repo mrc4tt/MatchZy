@@ -44,7 +44,8 @@ Workshop maps work everywhere a map name does: `workshop/<id>`, `ws/<id>` or `ws
 
 | Setting | What it does |
 |---|---|
-| `matchzy_forfeit_ready_timeout 600` | A team not ready 10 minutes after the ready phase began loses by forfeit (neither ready: cancelled). |
+| `matchzy_forfeit_ready_timeout 600` | A team not ready 10 minutes after the ready phase began loses by forfeit (neither ready: the series ends in a tie). Get5 name: `get5_time_to_start`. Admins can add time with `.addreadytime <seconds>`. |
+| `matchzy_forfeit_veto_ready_timeout 300` | The same for the ready-up before the map veto (`-1` = same as above, `0` = no limit). Get5 name: `get5_time_to_start_veto`. |
 | `matchzy_forfeit_leave_timeout 300` | A team with nobody on the server for 5 minutes during a live map loses by forfeit. |
 | `matchzy_veto_step_timeout 60` | A captain who does not ban, pick or choose a side within 60 seconds gets a random choice. |
 

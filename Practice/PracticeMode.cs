@@ -3515,11 +3515,14 @@ namespace MatchZy
             beam.EndPos.Z = z + 70.0f;
             beam.Teleport(basePos, new QAngle(0, 0, 0), new Vector(0, 0, 0));
             beam.DispatchSpawn();
+            // Resolved through the handle (a map change frees the entity) and dropped on map change.
+            uint beamRaw = beam.EntityHandle.Raw;
             AddTimer(6.0f, () =>
             {
-                if (beam != null && beam.IsValid)
-                    SafeRemoveEntity(beam, "landmarker");
-            });
+                var live = new CHandle<CBeam>(beamRaw).Value;
+                if (live != null && live.IsValid)
+                    SafeRemoveEntity(live, "landmarker");
+            }, TimerFlags.STOP_ON_MAPCHANGE);
         }
 
         private void SafeRemoveEntity(CBaseEntity? entity, string label)
@@ -3585,6 +3588,9 @@ namespace MatchZy
                 fastForwardTimer?.Kill();
                 ResetFastForward();
             }
+            // prac.cfg settings no mode cfg resets: undo them here, before sv_cheats goes off (buddha is
+            // a cheat command). Otherwise all-talk and buddha stayed on into a dry run or warmup.
+            Server.ExecuteCommand("buddha 0; buddha_ignore_bots 0; sv_full_alltalk 0; sv_showimpacts 0;");
             Server.ExecuteCommand("sv_cheats false;sv_grenade_trajectory_prac_pipreview false;sv_grenade_trajectory_prac_trailtime 0; mp_ct_default_grenades \"\"; mp_ct_default_primary \"\"; mp_t_default_grenades\"\"; mp_t_default_primary\"\"; mp_teammates_are_enemies false;");
             Server.ExecuteCommand("mp_death_drop_defuser true; mp_death_drop_taser true; mp_drop_knife_enable false; mp_death_drop_grenade 2; ammo_grenade_limit_total 4; mp_defuser_allocation 0; sv_infinite_ammo 0; mp_force_pick_time 15");
             // CS2 March 2026+: Re-enable magazine-based reload when exiting practice mode
@@ -3621,7 +3627,7 @@ namespace MatchZy
             }
             GrenadeThrownData grenadeThrown = nadeSpecificLastGrenadeData[userId][nadeType];
             if (grenadeThrown != null)
-                AddTimer(grenadeThrown.Delay, () => grenadeThrown.Throw(player, SmokeColorForThrow(player)));
+                AddTimer(grenadeThrown.Delay, () => { if (isPractice && IsPlayerValid(player)) grenadeThrown.Throw(player, SmokeColorForThrow(player)); }, TimerFlags.STOP_ON_MAPCHANGE);
         }
 
         // Practice teleports (.back, .last, .loadpos, .loadnade) only move a living player on T/CT:
@@ -3732,7 +3738,7 @@ namespace MatchZy
                     {
                         positionNumber -= 1;
                         GrenadeThrownData grenadeThrown = lastGrenadesData[userId][positionNumber];
-                        AddTimer(grenadeThrown.Delay, () => grenadeThrown.Throw(player, SmokeColorForThrow(player)));
+                        AddTimer(grenadeThrown.Delay, () => { if (isPractice && IsPlayerValid(player)) grenadeThrown.Throw(player, SmokeColorForThrow(player)); }, TimerFlags.STOP_ON_MAPCHANGE);
                         // PrintToPlayerChat(player, $"Throwing grenade of history position: {positionNumber+1}/{lastGrenadesData[userId].Count}");
                         PrintToPlayerChat(player, Localizer.ForPlayer(player, "matchzy.pm.throwgrenadehistory", $"{positionNumber + 1}/{lastGrenadesData[userId].Count}"));
                     }
@@ -3822,7 +3828,7 @@ namespace MatchZy
             }
             GrenadeThrownData lastGrenade = lastGrenadesData[userId].Last();
             if (lastGrenade != null)
-                AddTimer(lastGrenade.Delay, () => lastGrenade.Throw(player, SmokeColorForThrow(player)));
+                AddTimer(lastGrenade.Delay, () => { if (isPractice && IsPlayerValid(player)) lastGrenade.Throw(player, SmokeColorForThrow(player)); }, TimerFlags.STOP_ON_MAPCHANGE);
         }
 
         [ConsoleCommand("css_grt", "Rethrows every player's last thrown grenade at once")]
@@ -3855,7 +3861,7 @@ namespace MatchZy
                 // Capture the target so the delayed callback throws for the right player;
                 // Throw() re-validates before touching the pawn (safe if they leave meanwhile).
                 CCSPlayerController thrower = target;
-                AddTimer(lastGrenade.Delay, () => lastGrenade.Throw(thrower, SmokeColorForThrow(thrower)));
+                AddTimer(lastGrenade.Delay, () => { if (isPractice && IsPlayerValid(thrower)) lastGrenade.Throw(thrower, SmokeColorForThrow(thrower)); }, TimerFlags.STOP_ON_MAPCHANGE);
                 thrown++;
             }
 

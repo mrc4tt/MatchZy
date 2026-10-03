@@ -16,7 +16,7 @@ namespace MatchZy
     public partial class MatchZy : BasePlugin
     {
         public override string ModuleName => "MatchZy";
-        public override string ModuleVersion => "0.8.95";
+        public override string ModuleVersion => "0.8.96";
         public override string ModuleAuthor => "Miksen/mrc4tt (based on MatchZy by WD-)";
         public override string ModuleDescription => "A plugin for running and managing CS2 practice/pugs/scrims/matches!";
         public string chatPrefix = $"{ChatColors.Green}[MatchZy]{ChatColors.Default}";
@@ -991,6 +991,9 @@ namespace MatchZy
                 // The cached cs_gamerules proxy belongs to the previous map's entity system.
                 InvalidateGameRulesCache();
                 ClearCoachSpawnCache();
+                ForgetPracticeEntitiesOnMapStart();
+                // Set by FinishVeto when it queued a changelevel; the new map is here.
+                mapChangePending = false;
 
                 // Re-arm AutoStart latch: allow exactly one AutoStart for this new map.
                 autoStartLatched = false;
@@ -1353,10 +1356,11 @@ namespace MatchZy
                     var players = new List<LivePlayerInfo>();
                     var get5Players = new List<Get5FreezetimePlayer>();
 
-                    foreach (var kvp in playerData)
+                    // All controllers, bots included: playerData holds humans only, so bots were missing
+                    // from the alive counts (and from the Get5 players list, while player_hurt reports them).
+                    foreach (var p in Utilities.GetPlayers())
                     {
-                        var p = kvp.Value;
-                        if (p == null || !p.IsValid || p.IsBot || p.IsHLTV || IsMatchCoach(p))
+                        if (p == null || !p.IsValid || p.IsHLTV || IsMatchCoach(p))
                             continue;
                         if (p.PlayerPawn?.Value == null)
                             continue;
@@ -1387,11 +1391,11 @@ namespace MatchZy
                             int userId = p.UserId ?? 0;
                             get5Players.Add(new Get5FreezetimePlayer
                             {
-                                SteamId = p.SteamID.ToString(),
+                                SteamId = p.IsBot ? $"BOT-{userId}" : p.SteamID.ToString(),
                                 Name = p.PlayerName,
                                 UserId = userId,
                                 Side = Get5Side(p.TeamNum),
-                                IsBot = false,
+                                IsBot = p.IsBot,
                                 Health = alive ? pawn.Health : 0,
                                 Armor = pawn.ArmorValue,
                                 HasHelmet = csItemServices?.HasHelmet == true,
@@ -1401,6 +1405,9 @@ namespace MatchZy
                             continue;
                         }
 
+                        // The legacy list stays humans only, as before.
+                        if (p.IsBot)
+                            continue;
                         players.Add(
                             new LivePlayerInfo
                             {
@@ -1635,6 +1642,11 @@ namespace MatchZy
                     // ".banana" ran .ban. A trailing space in the old prefix meant "argument
                     // required"; that is kept as an explicit non-empty argument check.
                     string cmdWord = messageCommand.ToLowerInvariant();
+
+                    if (cmdWord == ".addreadytime")
+                    {
+                        HandleAddReadyTimeCommand(player, messageCommandArg);
+                    }
 
                     if (cmdWord == ".readyrequired")
                     {

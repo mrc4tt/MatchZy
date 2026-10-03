@@ -35,6 +35,11 @@ public partial class MatchZy
         if (IsBotSide(team))
             return true;
 
+        // matchzy_ready_mode 1: joining the side is enough, nobody types .ready.
+        bool? joined = IsTeamJoinedReady(team);
+        if (joined.HasValue)
+            return joined.Value;
+
         // matchzy_ready_per_team: N ready players make the whole side ready (e.g. one per team),
         // instead of every player on the roster.
         int perTeam = readyPerTeam.Value;

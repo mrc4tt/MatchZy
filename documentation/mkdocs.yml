@@ -2,8 +2,8 @@ site_name: MikZy (MatchZy)
 site_url: https://matchzy.miksen.me/
 site_description: MatchZy fork for CS2 servers - match management, practice mode, coaching, live events and stats on CounterStrikeSharp.
 site_author: Miksen
-repo_url: https://git.miksen.me/mikkel/matchzy
-repo_name: mikkel/matchzy
+repo_url: https://github.com/mrc4tt/MatchZy
+repo_name: mrc4tt/MatchZy
 edit_uri: ""
 copyright: MikZy is based on MatchZy by Shobhit Pathak (upstream). Maintained by Miksen.
 

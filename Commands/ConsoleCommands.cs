@@ -127,7 +127,7 @@ namespace MatchZy
                         }
                     }
 
-                    AddTimer(afterReadyDelay, CheckLiveRequired);
+                    AddTimer(afterReadyDelay, () => CheckLiveRequired());
                     _readyStatusDirty = true;
                     // Defer tag update: setting m_szClan on the same tick as the chat
                     // command dispatch loses a network race, so the scoreboard tag lags.
@@ -484,6 +484,11 @@ namespace MatchZy
                     return;
                 }
 
+                // Get5 tech pause rules: the pausing team can cancel before it takes effect, and
+                // either team can end it once its time is up.
+                if (player != null && HandleGet5TechPauseUnpause(player))
+                    return;
+
                 string unpauseTeamName = "Admin";
                 string remainingUnpauseTeam = "Admin";
                 if (player?.TeamNum == 2)
@@ -504,8 +509,10 @@ namespace MatchZy
                         unpauseData["ct"] = true;
                     }
                 }
-                else
+                else if (player != null)
                 {
+                    // A spectator or unassigned player cannot unpause. The server console (null)
+                    // falls through as "Admin" and unpauses, as the comment above says.
                     return;
                 }
 

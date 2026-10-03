@@ -10,12 +10,12 @@ hide:
 
 <p class="mz-lead">Match management, practice mode, coaching, live events and stats for CS2 servers running CounterStrikeSharp. Built on MatchZy, extended for hosted competitive servers.</p>
 
-[:material-download: Download @@MATCHZY_VERSION@@](https://git.miksen.me/mikkel/matchzy/releases/download/@@MATCHZY_VERSION@@/MatchZy-@@MATCHZY_VERSION@@.zip){ .md-button .md-button--primary }
+[:material-download: Download @@MATCHZY_VERSION@@](https://github.com/mrc4tt/MatchZy/releases/download/@@MATCHZY_VERSION@@/MatchZy-@@MATCHZY_VERSION@@.zip){ .md-button .md-button--primary }
 [Get started](getting-started/installation.md){ .md-button }
 [What the fork adds](comparison.md){ .md-button }
 [Commands](reference/commands.md){ .md-button }
 
-<small>[Download](https://git.miksen.me/mikkel/matchzy/releases/latest) · [Changelog](https://git.miksen.me/mikkel/matchzy/src/branch/main/CHANGELOG.md) · [All releases](https://git.miksen.me/mikkel/matchzy/releases)</small>
+<small>[Download](https://github.com/mrc4tt/MatchZy/releases/latest) · [Changelog](https://github.com/mrc4tt/MatchZy/blob/main/CHANGELOG.md) · [All releases](https://github.com/mrc4tt/MatchZy/releases)</small>
 
 </div>
 

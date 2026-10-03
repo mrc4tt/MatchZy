@@ -44,7 +44,15 @@ namespace MatchZy
 
         public FakeConVar<int> overtimePausesPerTeam = new("matchzy_overtime_pauses_per_team", "How many times each team may use .pause in each overtime period. 0 = no limit. Admin pauses are not counted. Default: 1", 1);
 
-        public FakeConVar<int> forfeitReadyTimeout = new("matchzy_forfeit_ready_timeout", "Seconds after the ready phase of a loaded match begins before a team that is not ready forfeits the series (neither ready: the match is cancelled). 0 = off. Default: 0", 0);
+        public FakeConVar<int> forfeitReadyTimeout = new("matchzy_forfeit_ready_timeout", "Seconds after the ready phase of a loaded match begins before a team that is not ready forfeits the series (neither ready: the series ends in a tie). 0 = off. Get5 name: get5_time_to_start. Default: 0", 0);
+
+        public FakeConVar<int> forfeitVetoReadyTimeout = new("matchzy_forfeit_veto_ready_timeout", "Like matchzy_forfeit_ready_timeout, for the ready-up before the map veto. -1 = same as matchzy_forfeit_ready_timeout, 0 = no limit. Get5 name: get5_time_to_start_veto. Default: -1", -1);
+
+        public FakeConVar<int> readyMode = new("matchzy_ready_mode", "How teams get ready in a loaded match. 0 = players type .ready. 1 = join mode: a team is ready once min_players_to_ready of its players are on its side, and the match starts matchzy_join_start_delay seconds later. Default: 0", 0);
+
+        public FakeConVar<int> joinStartDelay = new("matchzy_join_start_delay", "matchzy_ready_mode 1: seconds between everyone having joined and the match starting. Default: 10", 10);
+
+        public FakeConVar<int> techPauseMode = new("matchzy_tech_pause_mode", "0 = a technical pause ends on its own after matchzy_tech_pause_duration seconds. 1 = Get5 rules: after matchzy_tech_pause_duration seconds in freeze time either team can unpause (0 = both teams always have to), the pausing team can cancel the pause before it takes effect, and matchzy_max_tech_pauses_allowed 0 means unlimited. get5_max_tech_pauses / get5_tech_pause_time switch to 1. Default: 0", 0);
 
         public FakeConVar<int> forfeitLeaveTimeout = new("matchzy_forfeit_leave_timeout", "Seconds a team may have no players left during a live map of a loaded match before it forfeits the series. 0 = off. Default: 0", 0);
 
@@ -349,7 +357,7 @@ namespace MatchZy
         }
 
         [ConsoleCommand("prefix")]
-        [ConsoleCommand("matchzy_chat_prefix", "Default value of chat prefix for MatchZy messages. Default value: [{Green}MatchZy{Default}]")]
+        [ConsoleCommand("matchzy_chat_prefix", "Chat prefix of MatchZy messages. Default: {Green}[MatchZy]{Default}")]
         public void MatchZyChatPrefix(CCSPlayerController? player, CommandInfo command)
         {
             if (player != null)
@@ -359,7 +367,8 @@ namespace MatchZy
 
             if (string.IsNullOrEmpty(args))
             {
-                chatPrefix = $"{ChatColors.Red}[MatchZy]{ChatColors.Default}";
+                // Same as the config.cfg default (it used to fall back to a red prefix).
+                chatPrefix = $"{ChatColors.Green}[MatchZy]{ChatColors.Default}";
                 return;
             }
 

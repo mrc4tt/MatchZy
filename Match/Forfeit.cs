@@ -9,8 +9,9 @@ namespace MatchZy
     {
         // No-show / walkover handling for loaded matches (both off by default):
         //   matchzy_forfeit_ready_timeout - a team that is not ready this many seconds after the
-        //       ready phase of a map began loses the series; if neither team is ready the match is
-        //       cancelled.
+        //       ready phase of a map began loses the series; if neither team is ready the series
+        //       ends in a tie, as in Get5 (get5_time_to_start). The veto's ready-up can have its own
+        //       limit (matchzy_forfeit_veto_ready_timeout, ReadyTime.cs).
         //   matchzy_forfeit_leave_timeout - a team with nobody left on its side for this many
         //       seconds during a live map loses the series.
         // A forfeit ends the series like "get5_endmatch team1|team2", so panels get series_end
@@ -68,9 +69,15 @@ namespace MatchZy
             if (matchStarted)
                 readyPhaseStartedAt = null;
 
-            int timeout = forfeitReadyTimeout.Value;
+            int timeout = CurrentReadyTimeout();
             if (timeout <= 0 || !readyAvailable || matchStarted || isVeto || readyPhaseStartedAt == null)
                 return;
+            // As in Get5: the clock does not run while a round restore is waiting for the teams.
+            if (isRoundRestorePending)
+            {
+                readyPhaseStartedAt = DateTime.UtcNow;
+                return;
+            }
 
             double elapsed = (DateTime.UtcNow - readyPhaseStartedAt.Value).TotalSeconds;
             int secondsLeft = (int)Math.Ceiling(timeout - elapsed);
@@ -82,15 +89,12 @@ namespace MatchZy
 
             if (secondsLeft > 0)
             {
-                // A reminder at 5, 2 and 1 minute(s) and at 30 seconds.
-                foreach (int mark in new[] { 300, 120, 60, 30 })
+                // Get5's schedule: every minute, every 30 s in the last five minutes, and at 10 s.
+                int? mark = DueReadyReminder(secondsLeft, ForfeitCheckInterval);
+                if (mark != null && forfeitWarnedSecondsLeft != mark.Value)
                 {
-                    if (secondsLeft <= mark && secondsLeft > mark - ForfeitCheckInterval && forfeitWarnedSecondsLeft != mark)
-                    {
-                        forfeitWarnedSecondsLeft = mark;
-                        PrintLocalizedToAll("matchzy.matchmsg.forfeitreadywarning", secondsLeft);
-                        break;
-                    }
+                    forfeitWarnedSecondsLeft = mark.Value;
+                    PrintLocalizedToAll("matchzy.matchmsg.forfeitreadywarning", FormatReadyTime(secondsLeft));
                 }
                 return;
             }
@@ -98,9 +102,11 @@ namespace MatchZy
             readyPhaseStartedAt = null;
             if (!team1Ready && !team2Ready)
             {
-                Log("[Forfeit] Neither team was ready in time - cancelling the match.");
+                // Get5: no winner, the series ends in a tie (series_end winner none) instead of a cancel,
+                // so panels record it as a no-show draw.
+                Log("[Forfeit] Neither team was ready in time - the series ends in a tie.");
                 PrintLocalizedToAll("matchzy.matchmsg.forfeitnoneready");
-                ResetMatch(true, "no_show");
+                EndSeriesWithoutWinner();
                 return;
             }
 
@@ -161,6 +167,19 @@ namespace MatchZy
             Log($"[Forfeit] {reason}. {winner.teamName} wins by forfeit.");
             PrintLocalizedToAll(reasonKey, loserName, winner.teamName);
             EndSeriesWithWinner(winner);
+        }
+
+        // Ends the series with no winner (a tie), from the ready phase: no map is in progress, so
+        // there is no map_result, only series_end.
+        private void EndSeriesWithoutWinner()
+        {
+            (int t1score, int t2score) = GetTeamsScore();
+            if (isDemoRecording || previousDemoSegments.Count > 0)
+                StopDemoRecording(activeDemoFile, liveMatchId, matchConfig.CurrentMapNumber);
+            readyAvailable = false;
+            isPreVeto = false;
+            readyPhaseStartedAt = null;
+            EndSeries(null, 5, t1score, t2score, noWinner: true);
         }
 
         /// <summary>

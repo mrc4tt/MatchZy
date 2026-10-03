@@ -46,6 +46,8 @@ namespace MatchZy
         private void OpenNadesListMenu(CCSPlayerController player, string typeFilter, WasdMenu prev)
         {
             List<(string Steam, string Name, string Type, string Throw)> entries = new();
+            // The shared pack (.libadd, grenadelibrary.json) is listed after the saved lineups.
+            List<NadeLineup> packEntries = new();
             try
             {
                 string path = Path.Join(Server.GameDirectory + "/csgo/cfg", MatchZyCfgRel("savednades.json"));
@@ -65,9 +67,15 @@ namespace MatchZy
             {
                 Log($"[NadesMenu] {e.Message}");
             }
+            foreach (var lineup in LoadPackLineupsForCurrentMap())
+            {
+                if (typeFilter == "All" || string.Equals(lineup.Type, typeFilter, StringComparison.OrdinalIgnoreCase))
+                    packEntries.Add(lineup);
+            }
 
-            var sub = new WasdMenu($"Nades: {typeFilter} ({entries.Count})", this) { PrevMenu = prev };
-            if (entries.Count == 0)
+            int total = entries.Count + packEntries.Count;
+            var sub = new WasdMenu($"Nades: {typeFilter} ({total})", this) { PrevMenu = prev };
+            if (total == 0)
             {
                 sub.AddItem("(no lineups on this map)", (_, _) => { });
             }
@@ -85,6 +93,15 @@ namespace MatchZy
                         // Same load path as .loadnade: teleport to the lineup + equip the grenade.
                         HandleLoadNadeCommand(p, loadName, loadGroup);
                     });
+                }
+                foreach (var lineup in packEntries)
+                {
+                    string label = string.IsNullOrEmpty(lineup.Type) ? lineup.Name : $"[{lineup.Type}] {lineup.Name}";
+                    label += " (G)";
+                    if (!string.IsNullOrEmpty(lineup.Throw))
+                        label += $" - {lineup.Throw}";
+                    var target = lineup;
+                    sub.AddItem(label, (p, _) => LoadNadeLineup(p, target));
                 }
             }
             sub.Display(player, 0);

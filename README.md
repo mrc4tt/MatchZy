@@ -1,6 +1,6 @@
 # MikZy (MatchZy)
 
-[![Latest release](https://img.shields.io/badge/release-latest-2ea44f)](https://git.miksen.me/mikkel/matchzy/releases/latest)
+[![Latest release](https://img.shields.io/github/v/release/mrc4tt/MatchZy?label=release)](https://github.com/mrc4tt/MatchZy/releases/latest)
 [![CS2](https://img.shields.io/badge/game-CS2-orange)](https://www.counter-strike.net/)
 [![CounterStrikeSharp](https://img.shields.io/badge/CounterStrikeSharp-.NET%2010-512bd4)](https://github.com/roflmuffin/CounterStrikeSharp)
 [![Docs](https://img.shields.io/badge/docs-matchzy.miksen.me-blue)](https://matchzy.miksen.me/)
@@ -13,8 +13,9 @@ MikZy is a CounterStrikeSharp plugin for running CS2 matches, scrims, pugs and p
 
 ## What the fork adds
 
-- **Live events API:** every round, kill, pause and map result posted as JSON to `matchzy_remote_log_url`, for panels, bots and scoreboards.
-- **Get5 / G5API compatibility:** load matches from a URL, `get5_status`, `get5_endmatch` and the Get5 match config format.
+- **Live events API:** every round, kill, pause and map result posted as JSON to `matchzy_remote_log_url`, for panels, bots and scoreboards. Live events follow Get5's event format by default, so Get5 tooling can read them as is.
+- **Get5 / G5API compatibility:** load matches from a URL, `get5_status`, `get5_endmatch`, the Get5 match config format, `get5_time_to_start` / `.addreadytime` and Get5's technical pause rules.
+- **Ready-up options:** per-team ready (`matchzy_ready_per_team`), join ready mode where nobody types `.ready` (`matchzy_ready_mode 1`), and a no-show forfeit when a team is not ready in time.
 - **Advanced stats:** HLTV 2.0 rating, KAST, clutches and opening duels, saved to SQLite or MySQL and exported as CSV and JSON.
 - **Coaches:** per-team coach lists in the match config, invisible coach slots and hand-tuned viewing spots per map.
 - **Pauses:** tactical and technical pauses with per-team budgets, overtime timeouts and automatic pausing when a player disconnects.
@@ -25,10 +26,10 @@ MikZy is a CounterStrikeSharp plugin for running CS2 matches, scrims, pugs and p
 ## Install
 
 1. Install [CounterStrikeSharp](https://github.com/roflmuffin/CounterStrikeSharp) on the server.
-2. Download the latest `MatchZy-<version>.zip` from the [releases page](https://git.miksen.me/mikkel/matchzy/releases/latest).
+2. Download the latest `MatchZy-<version>.zip` from the [releases page](https://github.com/mrc4tt/MatchZy/releases/latest).
 3. Extract it into `game/csgo/` and restart the server.
 
-MatchZy writes its config files to `csgo/cfg/MatchZy/` on first load. Edit `config.cfg` there to tune the server.
+MatchZy writes its config files to `csgo/cfg/MatchZy/` on first load (or to `csgo/cfg/matchzy/` if that folder already exists). Edit `config.cfg` there to tune the server.
 
 *Optional:* install [CS2MenuManager](https://git.miksen.me/mikkel/CS2MenuManager/releases) (1.0.42 or newer) for the in-game menus. Everything else works without it.
 
@@ -37,6 +38,8 @@ Full guide: [Installation](https://matchzy.miksen.me/getting-started/installatio
 ## Update
 
 Extract the new zip over the old one and restart. The zip contains nothing under `cfg/`, so your config files, admins, database settings and saved lineups are never overwritten. New settings are added to the bottom of your `config.cfg` automatically, and reference copies of the current default cfgs are written to `cfg/MatchZy/defaults/` on every load.
+
+To change a few settings of a mode (for example warmup), put only those lines in `warmup_override.cfg` next to `warmup.cfg`. MatchZy runs it right after the mode cfg and never writes it, so your changes survive every update.
 
 Details: [Updating](https://matchzy.miksen.me/getting-started/updating/)
 
@@ -62,8 +65,8 @@ Details: [Updating](https://matchzy.miksen.me/getting-started/updating/)
 ## Build from source
 
 ```bash
-git clone https://git.miksen.me/mikkel/matchzy.git
-cd matchzy
+git clone https://github.com/mrc4tt/MatchZy.git
+cd MatchZy
 dotnet build -c Release
 ```
 

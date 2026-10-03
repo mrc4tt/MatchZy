@@ -53,8 +53,9 @@ Legend: **cfg** = present in the generated `config.cfg`. :fontawesome-solid-code
 | `matchzy_allow_unpause` :fontawesome-solid-code-fork: | `true` | Y | Enable `.unpause`. Admin force unpause is not affected. |
 | `matchzy_use_pause_command_for_tactical_pause` | `false` | Y | `.pause` starts a tactical timeout instead of a normal pause. |
 | `matchzy_enable_tech_pause` | `true` | Y | Enable `.tech`. |
-| `matchzy_tech_pause_duration` | `300` | Y | Tech pause length in seconds; the match unpauses on its own when it runs out. `-1` = unlimited. |
-| `matchzy_max_tech_pauses_allowed` | `2` | Y | Tech pauses per team per map. |
+| `matchzy_tech_pause_duration` | `300` | Y | Tech pause length in seconds; the match unpauses on its own when it runs out. `-1` = unlimited. With `matchzy_tech_pause_mode 1`: seconds in freeze time before either team can unpause (`0` = both teams always have to). Get5 name: `get5_tech_pause_time`. |
+| `matchzy_max_tech_pauses_allowed` | `2` | Y | Tech pauses per team per map. With `matchzy_tech_pause_mode 1`, `0` = unlimited. Get5 name: `get5_max_tech_pauses`. |
+| `matchzy_tech_pause_mode` :fontawesome-solid-code-fork: | `0` | Y | `0` = a tech pause ends on its own when its time runs out. `1` = Get5 rules: the pause counts once it takes effect in freeze time, the pausing team can cancel it before then, and once its time is up either team can `.unpause`. Setting `get5_max_tech_pauses` or `get5_tech_pause_time` switches to `1`. |
 | `matchzy_overtime_pauses_per_team` :fontawesome-solid-code-fork: | `1` | Y | `.pause` uses per team in each overtime period. `0` = no limit. Tactical timeouts in overtime are set in live.cfg (`mp_team_timeout_ot_add_once`, `mp_team_timeout_ot_add_each`, `mp_team_timeout_ot_max`). |
 | `matchzy_autopause_enabled` :fontawesome-solid-code-fork: | `true` | Y | Pause automatically when a team drops below the minimum player count. |
 | `matchzy_autopause_minplayers` :fontawesome-solid-code-fork: | `5` | Y | Players per team below which autopause triggers. Autopause is active once the map has had at least twice this many players. |
@@ -73,7 +74,10 @@ Legend: **cfg** = present in the generated `config.cfg`. :fontawesome-solid-code
 
 | Setting | Default | cfg | Description |
 |---|---|---|---|
-| `matchzy_forfeit_ready_timeout` | `0` | Y | Loaded matches: seconds after a map's ready phase begins before a team that is not ready forfeits the series. Neither team ready: the match is cancelled. `0` = off. |
+| `matchzy_forfeit_ready_timeout` | `0` | Y | Loaded matches: seconds after a map's ready phase begins before a team that is not ready forfeits the series. Neither team ready: the series ends in a tie. `0` = off. Also settable as `matchzy_time_to_start` / `get5_time_to_start`. |
+| `matchzy_forfeit_veto_ready_timeout` :fontawesome-solid-code-fork: | `-1` | Y | The same for the ready-up before the map veto. `-1` = same as `matchzy_forfeit_ready_timeout`, `0` = no limit. Also settable as `matchzy_time_to_start_veto` / `get5_time_to_start_veto`. |
+| `matchzy_ready_mode` | `0` | Y | Loaded matches: `0` = players type `.ready`. `1` = join mode: a team is ready once `min_players_to_ready` of its players are on its side, and the match starts `matchzy_join_start_delay` seconds later. |
+| `matchzy_join_start_delay` | `10` | Y | Join mode: seconds between everyone having joined and the match starting. |
 | `matchzy_forfeit_leave_timeout` | `0` | Y | Loaded matches: seconds a team may have nobody on its side during a live map before it forfeits the series. `0` = off. |
 | `matchzy_veto_step_timeout` | `0` | Y | Seconds a veto captain has per ban, pick or side choice; then it is made at random (side: CT). `0` = off. |
 

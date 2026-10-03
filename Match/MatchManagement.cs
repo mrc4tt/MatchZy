@@ -895,6 +895,11 @@ namespace MatchZy
                         // remember the server's own value; otherwise the match's value stayed on the
                         // server after the series (e.g. matchzy_kick_when_no_match_loaded).
                         matchConfig.OriginalCvars[cvarName] = accessor.Get();
+                        // get5_max_tech_pauses / get5_tech_pause_time also switch on Get5 pause rules;
+                        // remember the server's mode so the series end puts it back.
+                        if (cvarName.Equals("get5_max_tech_pauses", StringComparison.OrdinalIgnoreCase)
+                            || cvarName.Equals("get5_tech_pause_time", StringComparison.OrdinalIgnoreCase))
+                            matchConfig.OriginalCvars.TryAdd("matchzy_tech_pause_mode", techPauseMode.Value.ToString());
                     }
                     else if (GetFakeConVarValue(cvarName) is string fakeValue)
                     {
@@ -1200,7 +1205,7 @@ namespace MatchZy
         // is no map in progress, so ending the series then must not write end data for a map row.
         private bool currentMapFinished = false;
 
-        public void EndSeries(string? winnerName, int restartDelay, int t1score, int t2score, bool writeEndData = true)
+        public void EndSeries(string? winnerName, int restartDelay, int t1score, int t2score, bool writeEndData = true, bool noWinner = false)
         {
             if (seriesEnded)
             {
@@ -1226,7 +1231,9 @@ namespace MatchZy
                 MatchId = matchId,
                 // A forfeit or surrender names its winner even when the series score does not show
                 // one (1-1 in a BO3); otherwise use the series score.
-                Winner = winnerName == matchzyTeam1.teamName ? BuildWinnerFor(matchzyTeam1)
+                // noWinner: a tie by decision (nobody ready in time), whatever the series score says.
+                Winner = noWinner ? BuildWinnerFor(null)
+                    : winnerName == matchzyTeam1.teamName ? BuildWinnerFor(matchzyTeam1)
                     : winnerName == matchzyTeam2.teamName ? BuildWinnerFor(matchzyTeam2)
                     : BuildWinner(team1Score, team2Score),
                 Team1SeriesScore = team1Score,

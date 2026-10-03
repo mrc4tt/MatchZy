@@ -222,6 +222,10 @@ public partial class MatchZy
             lastSpawnMarkerUseTime.Remove(userId);
             nadeSpecificLastGrenadeData.Remove(userId);
             lastNadeMarkerUseTime.Remove(userId);
+            // A practice bot kicked from outside (console, admin plugin) must not keep pinning
+            // bot_quota; the engine would refill the slot with an untracked bot over and over.
+            pracUsedBots.Remove(userId);
+            _botsBeingProcessed.Remove(userId);
             lastNadeToggleTime.Remove(userId);
             _lastPanelHtml.Remove(userId);
             stopCommandCooldowns.Remove(player.SteamID);
@@ -780,7 +784,7 @@ public partial class MatchZy
                 }
 
                 // Check if all players are ready to start the match
-                AddTimer(afterReadyDelay, CheckLiveRequired);
+                AddTimer(afterReadyDelay, () => CheckLiveRequired());
             }
 
             return HookResult.Continue;

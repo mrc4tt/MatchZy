@@ -81,6 +81,7 @@ Before a match goes live, players ready up. The match starts when enough players
 | `.ready` `.r` `.rdy` | Player | Marks you ready. Pinging (middle mouse) also toggles ready :fontawesome-solid-code-fork:. |
 | `.unready` `.ur` `.notready` | Player | Takes back your ready. |
 | `.readycheck` `.rc` :fontawesome-solid-code-fork: | Player | Shows how many players are ready, how many are needed, and how many are missing. |
+| `.addreadytime <seconds>` | Admin | Gives the teams more time before the ready-up time limit (`matchzy_forfeit_ready_timeout`) runs out, at most the full time. Also `matchzy_add_ready_time` / `get5_add_ready_time` from the console. |
 | `.forceready` | Player | Readies your whole team at once. Only in a loaded match config, only when your team has enough players, and only if `matchzy_allow_force_ready` is on. |
 | `.start` `.forcestart` | Config | Starts the match now, skipping the ready check. |
 | `.readyrequired <n>` `.teamsize <n>` | Config | Sets how many ready players are needed. `0` = everyone connected. |

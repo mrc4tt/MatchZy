@@ -485,6 +485,7 @@ namespace MatchZy
                     HandleClanTags();
                 }
                 SyncUnreadyChatReminder();
+                HandleJoinStartCountdown();
 
                 if (readyHintStyle.Value == 0)
                 {
@@ -499,9 +500,11 @@ namespace MatchZy
                     }
                 }
             }
-            catch (Exception)
+            catch (Exception e)
             {
-                // Server not ready yet; retried on the next tick.
+                // Usually the server not being ready yet (retried on the next tick); logged because
+                // the join-mode match start runs in here too.
+                Log($"[SendReadyStatusHintMessage] {e.Message}");
             }
         }
 
@@ -891,7 +894,7 @@ namespace MatchZy
             else
             {
                 KickAllBotsProtectCSTV();
-                Server.ExecuteCommand("mp_autokick 0;mp_autoteambalance 0;mp_buy_anywhere 0;mp_buytime 15;mp_death_drop_gun 0;mp_free_armor 0;mp_ignore_round_win_conditions 0;mp_limitteams 0;mp_radar_showall 0;mp_respawn_on_death_ct 0;mp_respawn_on_death_t 0;mp_solid_teammates 0;mp_spectators_max 20;mp_maxmoney 16000;mp_startmoney 16000;mp_timelimit 0;sv_alltalk 0;sv_auto_full_alltalk_during_warmup_half_end 0;sv_deadtalk 1;sv_full_alltalk 0;sv_grenade_trajectory 0;sv_hibernate_when_empty 0;sv_hide_roundtime_until_seconds 1;mp_weapons_allow_typecount -1;ammo_grenade_limit_flashbang 2;mp_respawn_immunitytime 0;sv_infinite_ammo 0;sv_showimpacts 0;sv_voiceenable 1;sm_cvar sv_mute_players_with_social_penalties 0;sv_mute_players_with_social_penalties 0;tv_relayvoice 1;sv_cheats 0;mp_ct_default_melee weapon_knife;mp_ct_default_secondary weapon_hkp2000;mp_ct_default_primary \"\";mp_t_default_melee weapon_knife;mp_t_default_secondary weapon_glock;mp_t_default_primary \"\";mp_maxrounds 24;mp_warmuptime 9999;cash_team_bonus_shorthanded 0;mp_restartgame 1;mp_warmup_online_enabled 1;mp_warmup_start;mp_warmup_pausetimer 1");
+                Server.ExecuteCommand("mp_autokick 0;mp_autoteambalance 0;mp_buy_anywhere 0;mp_buytime 15;mp_death_drop_gun 0;mp_free_armor 1;mp_ignore_round_win_conditions 0;mp_limitteams 0;mp_radar_showall 0;mp_respawn_on_death_ct 0;mp_respawn_on_death_t 0;mp_solid_teammates 0;mp_spectators_max 20;mp_maxmoney 16000;mp_startmoney 16000;mp_timelimit 0;sv_alltalk 0;sv_auto_full_alltalk_during_warmup_half_end 0;sv_deadtalk 1;sv_full_alltalk 0;sv_grenade_trajectory 0;sv_hibernate_when_empty 0;sv_hide_roundtime_until_seconds 1;mp_weapons_allow_typecount -1;ammo_grenade_limit_flashbang 2;mp_respawn_immunitytime 0;sv_infinite_ammo 0;sv_showimpacts 0;sv_voiceenable 1;sm_cvar sv_mute_players_with_social_penalties 0;sv_mute_players_with_social_penalties 0;tv_relayvoice 0;sv_cheats 0;mp_ct_default_melee weapon_knife;mp_ct_default_secondary weapon_hkp2000;mp_ct_default_primary \"\";mp_t_default_melee weapon_knife;mp_t_default_secondary weapon_glock;mp_t_default_primary \"\";mp_maxrounds 24;mp_warmuptime 9999;cash_team_bonus_shorthanded 0;mp_restartgame 1;mp_warmup_online_enabled 1;mp_warmup_start;mp_warmup_pausetimer 1");
             }
             // The warmup cfg sets bot_quota 0; put a bot team back.
             ApplyBotTeam();
@@ -1556,6 +1559,7 @@ namespace MatchZy
                 {
                     playerReadyStatus[key] = false;
                 }
+                pendingRestoreTechPauses = null;
                 _readyStatusDirty = true;
 
                 teamReadyOverride = new()
@@ -1960,9 +1964,17 @@ namespace MatchZy
             }
         }
 
-        private void CheckLiveRequired()
+        private void CheckLiveRequired(bool fromJoinCountdown = false)
         {
             if (!readyAvailable || matchStarted)
+                return;
+            // Join ready mode starts the match from its own countdown (HandleJoinStartCountdown), not
+            // the moment the last player joins or someone types .ready.
+            if (IsJoinReadyMode() && !fromJoinCountdown)
+                return;
+            // The veto picked another map and the changelevel is queued: the match starts there,
+            // never on the map that is about to unload.
+            if (mapChangePending)
                 return;
 
             // Todo: Implement a same ready system for both pug and match
@@ -2142,6 +2154,9 @@ namespace MatchZy
             bool matchSetup = isMatchSetup;
             long currentMatchId = liveMatchId;
             int currentMapNum = matchConfig.CurrentMapNumber;
+            // ResetMatch bumps this: a callback from a start that was reset meanwhile must not run,
+            // even when a new start has set matchStartInProgress again.
+            int startGeneration = matchLoadGeneration;
 
             Task.Run(async () =>
             {
@@ -2168,9 +2183,15 @@ namespace MatchZy
                         // The DB retries above can take a few seconds. If the match was reset or
                         // stopped meanwhile (ResetMatch clears matchStartInProgress), do not start a
                         // knife round or go live on a server that has moved on.
-                        if (!matchStartInProgress || matchStarted)
+                        if (!matchStartInProgress || matchStarted || startGeneration != matchLoadGeneration)
                         {
                             Log("[HandleMatchStart] Match start abandoned: the match was reset while the database was being initialized.");
+                            // A row created for this start would otherwise stay open (end_time NULL) forever.
+                            if (newMatchId > 0 && newMatchId != currentMatchId)
+                            {
+                                long orphanId = newMatchId;
+                                Task.Run(async () => await database.SetMatchCancelledAsync(orphanId, currentMapNum, 0, 0, 0, 0));
+                            }
                             return;
                         }
 
@@ -3170,7 +3191,7 @@ namespace MatchZy
 
             // Send webhook event for live scorebot
             string teamName = (string)(unpauseData["pauseTeam"] ?? "");
-            int? maxDur = pauseType == "tech" ? techPauseDuration.Value : (int?)null;
+            int? maxDur = pauseType == "tech" && !Get5TechPauseMode ? techPauseDuration.Value : (int?)null;
 
             var pauseEvent = new MatchPausedLiveEvent
             {
@@ -3202,7 +3223,7 @@ namespace MatchZy
                 MapNumber = matchConfig.CurrentMapNumber,
                 PauseType = "tech",
                 TeamName = string.IsNullOrEmpty(teamName) ? null : teamName,
-                MaxDuration = techPauseDuration.Value,
+                MaxDuration = Get5TechPauseMode ? null : techPauseDuration.Value,
                 RoundNumber = GetRoundNumer(),
             };
 
@@ -3587,9 +3608,11 @@ namespace MatchZy
             foreach (JProperty player in playersObject.Properties())
             {
                 string steamId = player.Name;
-                string escapedName = player.Value.ToString().Replace("\"", "\\\"").Trim();
+                // KeyValues: escape backslashes before quotes, or a name ending in \ eats the closing
+                // quote and the whole forced-names file is rejected. Keys must be SteamID64s.
+                string escapedName = player.Value.ToString().Trim().Replace("\\", "\\\\").Replace("\"", "\\\"");
 
-                if (string.IsNullOrEmpty(escapedName))
+                if (string.IsNullOrEmpty(escapedName) || !ulong.TryParse(steamId, out _))
                     continue;
 
                 sb.AppendLine($"\t\"{steamId}\"\t\t\"{escapedName}\"");
@@ -3988,9 +4011,16 @@ namespace MatchZy
                     ["matchzy_remote_backup_url"] = Str(() => backupUploadURL, v => backupUploadURL = v),
                     ["matchzy_remote_backup_header_key"] = Str(() => backupUploadHeaderKey, v => backupUploadHeaderKey = v),
                     ["matchzy_remote_backup_header_value"] = Str(() => backupUploadHeaderValue, v => backupUploadHeaderValue = v),
+                    // Console-command aliases of FakeConVar settings (ReadyTime.cs, TechPauseGet5.cs).
+                    ["matchzy_time_to_start"] = Int(() => forfeitReadyTimeout.Value, v => forfeitReadyTimeout.Value = Math.Max(0, v)),
+                    ["matchzy_time_to_start_veto"] = Int(() => forfeitVetoReadyTimeout.Value, v => forfeitVetoReadyTimeout.Value = Math.Max(-1, v)),
+                    // Restoring only puts the value back; matchzy_tech_pause_mode is restored on its own
+                    // (GetCvarValues records it when a match config sets one of these).
+                    ["get5_max_tech_pauses"] = Int(() => maxTechPausesAllowed.Value, v => maxTechPausesAllowed.Value = Math.Max(0, v)),
+                    ["get5_tech_pause_time"] = Int(() => techPauseDuration.Value, v => techPauseDuration.Value = v),
                 };
                 // Get5 aliases share the setting.
-                foreach (var alias in new[] { "demo_upload_url", "demo_upload_s3", "demo_upload_header_key", "demo_upload_header_value", "allow_force_ready", "remote_backup_url", "remote_backup_header_key", "remote_backup_header_value" })
+                foreach (var alias in new[] { "demo_upload_url", "demo_upload_s3", "demo_upload_header_key", "demo_upload_header_value", "allow_force_ready", "remote_backup_url", "remote_backup_header_key", "remote_backup_header_value", "time_to_start", "time_to_start_veto" })
                     map["get5_" + alias] = map["matchzy_" + alias];
                 _pluginSettingAccessors = map;
                 return map;

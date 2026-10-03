@@ -9,6 +9,7 @@ using CounterStrikeSharp.API.Core.Attributes.Registration;
 using CounterStrikeSharp.API.Core.Translations;
 using CounterStrikeSharp.API.Modules.Commands;
 using CounterStrikeSharp.API.Modules.Memory;
+using CounterStrikeSharp.API.Modules.Timers;
 using CounterStrikeSharp.API.Modules.Utils;
 
 namespace MatchZy
@@ -185,17 +186,35 @@ namespace MatchZy
                 targets.Add(bp);
             }
 
-            foreach (var bp in targets)
-            {
-                // Yaw ONLY - never pass the saver's view pitch to the placement. SpawnBot teleports
-                // the bot with this angle; a steep saved pitch (looking up/down at save time) tilted
-                // the bot's whole model back and lifted it off the ground / under the map. A placed bot
-                // has no use for view pitch (the aim-mirror idea was dropped); it just faces the yaw.
-                var pos = new Position(new Vector(bp.X, bp.Y, bp.Z), new QAngle(0.0f, bp.Yaw, 0.0f));
-                CsTeam team = bp.Team == (byte)CsTeam.CounterTerrorist ? CsTeam.CounterTerrorist : CsTeam.Terrorist;
-                AddBot(player, bp.Crouch, forceTeam: team, boost: false, posOverride: pos);
-            }
+            // One bot at a time: AddBot pins bot_quota to the tracked count + 1, and SpawnBot kicks every
+            // bot it cannot claim, so several AddBot calls in one tick ended with a single bot.
+            SpawnBotPositionsSequentially(player, targets, 0, 0);
             ReplyToUserCommand(player, Localizer.ForPlayer(player, "matchzy.bp.loaded", string.IsNullOrEmpty(name) ? $"{targets.Count}" : name));
+        }
+
+        private void SpawnBotPositionsSequentially(CCSPlayerController player, List<BotPos> targets, int index, int waitedTicks)
+        {
+            if (index >= targets.Count || !isPractice || !IsPlayerValid(player))
+                return;
+            // Wait for the previous bot's SpawnBot to finish (it clears isSpawningBot), at most ~5 s.
+            if (isSpawningBot && waitedTicks < 25)
+            {
+                AddTimer(0.2f, () => SpawnBotPositionsSequentially(player, targets, index, waitedTicks + 1), TimerFlags.STOP_ON_MAPCHANGE);
+                return;
+            }
+            if (!CanSpawnAnotherBot(player))
+                return;
+
+            var bp = targets[index];
+            // Yaw ONLY - never pass the saver's view pitch to the placement. SpawnBot teleports
+            // the bot with this angle; a steep saved pitch (looking up/down at save time) tilted
+            // the bot's whole model back and lifted it off the ground / under the map. A placed bot
+            // has no use for view pitch (the aim-mirror idea was dropped); it just faces the yaw.
+            var pos = new Position(new Vector(bp.X, bp.Y, bp.Z), new QAngle(0.0f, bp.Yaw, 0.0f));
+            CsTeam team = bp.Team == (byte)CsTeam.CounterTerrorist ? CsTeam.CounterTerrorist : CsTeam.Terrorist;
+            AddBot(player, bp.Crouch, forceTeam: team, boost: false, posOverride: pos);
+            if (index + 1 < targets.Count)
+                AddTimer(0.2f, () => SpawnBotPositionsSequentially(player, targets, index + 1, 0), TimerFlags.STOP_ON_MAPCHANGE);
         }
 
         [ConsoleCommand("css_listbotpos", "List saved bot positions on this map")]

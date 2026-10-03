@@ -27,6 +27,28 @@ public partial class MatchZy
         // Toggle the setting
         autoPauseEnabled.Value = !autoPauseEnabled.Value;
 
+        // Apply it now, not from the next map: start the check on a live map, or stop it and lift an
+        // auto-pause in progress (with the check off it would never resume on its own).
+        if (autoPauseEnabled.Value)
+        {
+            if (isMatchLive)
+                StartAutoPauseMonitor();
+        }
+        else
+        {
+            autoPauseCheckTimer?.Kill();
+            autoPauseCheckTimer = null;
+            autoResumeTimer?.Kill();
+            autoResumeTimer = null;
+            if (IsCurrentPauseAuto())
+            {
+                isAutoPaused = false;
+                autoPauseReason = null;
+                UnpauseMatch();
+                unpauseData["pauseTeam"] = "";
+            }
+        }
+
         string status = Localizer.ForPlayer(player, autoPauseEnabled.Value ? "matchzy.pausemsg.enabled" : "matchzy.pausemsg.disabled");
         string minPlayers = autoPauseMinPlayers.Value.ToString();
 

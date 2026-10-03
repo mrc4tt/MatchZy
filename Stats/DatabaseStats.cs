@@ -201,7 +201,15 @@ namespace MatchZy
 
                 if (config != null && databaseType == DatabaseType.MySQL)
                 {
-                    _connectionString = $"Server={config.MySqlHost};Port={config.MySqlPort};Database={config.MySqlDatabase};User Id={config.MySqlUsername};Password={config.MySqlPassword};";
+                    // Built, not interpolated: a password containing ";" broke the string or injected options.
+                    _connectionString = new MySqlConnectionStringBuilder
+                    {
+                        Server = config.MySqlHost ?? "",
+                        Port = (uint)(config.MySqlPort ?? 3306),
+                        Database = config.MySqlDatabase ?? "",
+                        UserID = config.MySqlUsername ?? "",
+                        Password = config.MySqlPassword ?? "",
+                    }.ConnectionString;
                     Log("[ConnectDatabase] MySQL connection string configured");
                 }
                 else

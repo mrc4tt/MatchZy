@@ -71,7 +71,8 @@ namespace MatchZy
             activeSetup = new MatchSetupState { AdminSteamId = player.SteamID };
             // Defer to next frame so menu render isn't clobbered when entered via .chat dispatch
             // (the originating chat line is still being broadcast on this tick).
-            Server.NextFrame(() => OpenMenuGuarded(player, OpenSeriesMenu));
+            // Re-validated: the player can leave before the next frame.
+            Server.NextFrame(() => { if (IsPlayerValid(player)) OpenMenuGuarded(player, OpenSeriesMenu); });
         }
 
         // ─── Wizard menus ──────────────────────────────────────────────────────────
@@ -289,6 +290,18 @@ namespace MatchZy
                 return;
             var s = activeSetup!;
             activeSetup = null;
+
+            // Another admin's .match or a panel load may have set up a match while the wizard was open.
+            if (matchStarted || isMatchLive)
+            {
+                ReplyToUserCommand(player, Localizer.ForPlayer(player, "matchzy.menu.setupmatchrunning"));
+                return;
+            }
+            if (isMatchSetup)
+            {
+                ReplyToUserCommand(player, Localizer.ForPlayer(player, "matchzy.menu.setupalreadyconfigured", liveMatchId));
+                return;
+            }
 
             string team1 = ResolveTeam1Name();
             string team2 = ResolveTeam2Name();

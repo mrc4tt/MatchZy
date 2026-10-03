@@ -10,7 +10,9 @@ namespace MatchZy
     {
         private Dictionary<CsTeam, HashSet<int>> ggVotes = new() { { CsTeam.CounterTerrorist, new HashSet<int>() }, { CsTeam.Terrorist, new HashSet<int>() } };
 
-        private CounterStrikeSharp.API.Modules.Timers.Timer? ggResetTimer = null;
+        // One expiry timer per side: a shared one was killed by the other side's vote, so the first
+        // side's partial votes never expired.
+        private readonly Dictionary<CsTeam, CounterStrikeSharp.API.Modules.Timers.Timer?> ggResetTimers = new();
 
         [ConsoleCommand("css_gg", "Vote to surrender the match")]
         public void OnGGCommand(CCSPlayerController? player, CommandInfo? command)
@@ -57,7 +59,7 @@ namespace MatchZy
             int opponentTeamScore = 0;
             string playerTeamName = GetTeamName(playerTeam);
 
-            // Define MatchTeam for the player's team (as in FFWSystem)
+            // Define MatchTeam for the player's team
             Team? playerMatchTeam = null;
             if (playerTeam == CsTeam.CounterTerrorist)
             {
@@ -177,8 +179,9 @@ namespace MatchZy
             else
             {
                 // Устанавливаем таймер для сброса голосов через 60 секунд
-                ggResetTimer?.Kill();
-                ggResetTimer = AddTimer(
+                if (ggResetTimers.TryGetValue(playerTeam, out var oldTimer))
+                    oldTimer?.Kill();
+                ggResetTimers[playerTeam] = AddTimer(
                     60.0f,
                     () =>
                     {
@@ -192,10 +195,39 @@ namespace MatchZy
             }
         }
 
+        // Match team name of a side (moved here from the removed FFWSystem.cs).
+        private string GetTeamName(CsTeam team)
+        {
+            if (team == CsTeam.CounterTerrorist)
+            {
+                if (reverseTeamSides["CT"] == matchzyTeam1)
+                {
+                    return matchzyTeam1.teamName;
+                }
+                else
+                {
+                    return matchzyTeam2.teamName;
+                }
+            }
+            else if (team == CsTeam.Terrorist)
+            {
+                if (reverseTeamSides["TERRORIST"] == matchzyTeam1)
+                {
+                    return matchzyTeam1.teamName;
+                }
+                else
+                {
+                    return matchzyTeam2.teamName;
+                }
+            }
+            return "Unknown Team";
+        }
+
         private void ResetGGVotes()
         {
-            ggResetTimer?.Kill();
-            ggResetTimer = null;
+            foreach (var timer in ggResetTimers.Values)
+                timer?.Kill();
+            ggResetTimers.Clear();
             ggVotes[CsTeam.CounterTerrorist].Clear();
             ggVotes[CsTeam.Terrorist].Clear();
         }

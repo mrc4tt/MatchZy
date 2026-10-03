@@ -27,6 +27,7 @@ public partial class MatchZy
         techPauseTimer?.Kill();
         techPauseTimer = null;
         techPauseToken++;
+        StopGet5TechPause();
     }
 
     // Auto-pause tracking
@@ -66,6 +67,7 @@ public partial class MatchZy
     // Arguments for the localized auto-pause reason (team side, player count, minimum players).
     private object[] autoPauseReasonArgs = Array.Empty<object>();
     private CounterStrikeSharp.API.Modules.Timers.Timer? autoPauseCheckTimer = null;
+    private CounterStrikeSharp.API.Modules.Timers.Timer? autoResumeTimer = null;
 
     public void TechPause(CCSPlayerController? player, CommandInfo? command)
     {
@@ -113,7 +115,8 @@ public partial class MatchZy
             return;
         }
 
-        if (maxTechPausesAllowed.Value <= 0)
+        // Get5 rules (matchzy_tech_pause_mode 1): 0 = unlimited. Otherwise 0 disables tech pauses.
+        if (maxTechPausesAllowed.Value <= 0 && !Get5TechPauseMode)
             return;
 
         // Initialize team if it doesn't exist yet in the dictionary
@@ -133,12 +136,15 @@ public partial class MatchZy
 
         // matchzy_max_tech_pauses_allowed was never enforced: the counter existed but was
         // never compared or incremented.
-        if (technicalPauseUsed[playerTeam] >= maxTechPausesAllowed.Value)
+        if (maxTechPausesAllowed.Value > 0 && technicalPauseUsed[playerTeam] >= maxTechPausesAllowed.Value)
         {
             ReplyToUserCommand(player, Localizer.ForPlayer(player, "matchzy.pausemsg.techpauseslimitreached", maxTechPausesAllowed.Value));
             return;
         }
-        technicalPauseUsed[playerTeam]++;
+        // Get5 rules count the pause once it takes effect in freeze time (Get5TechPauseTick), so a
+        // pause the team cancels before then is not used up.
+        if (!Get5TechPauseMode)
+            technicalPauseUsed[playerTeam]++;
 
         // The team on the player's side. mp_teamname_1/2 swap meaning after halftime, so reading
         // them by side named the opponent in the second half.
@@ -164,14 +170,24 @@ public partial class MatchZy
         autoPauseReason = null;
 
         // Announce the technical pause
-        int techPausesLeft = maxTechPausesAllowed.Value - technicalPauseUsed[playerTeam];
-        PrintLocalizedToAll("matchzy.pause.techpause.started", teamName, techPausesLeft, maxTechPausesAllowed.Value);
+        if (maxTechPausesAllowed.Value > 0)
+        {
+            int techPausesLeft = maxTechPausesAllowed.Value - technicalPauseUsed[playerTeam] - (Get5TechPauseMode ? 1 : 0);
+            PrintLocalizedToAll("matchzy.pause.techpause.started", teamName, Math.Max(0, techPausesLeft), maxTechPausesAllowed.Value);
+        }
+        else
+        {
+            PrintLocalizedToAll("matchzy.pause.techpause.startedunlimited", teamName);
+        }
 
-        // matchzy_tech_pause_duration (-1 = no limit) ends the pause on its own.
+        // matchzy_tech_pause_duration (-1 = no limit) ends the pause on its own; under Get5 rules it
+        // only lets either team unpause (TechPauseGet5.cs).
         techPauseTimer?.Kill();
         techPauseTimer = null;
         int duration = techPauseDuration.Value;
-        if (duration > 0)
+        if (Get5TechPauseMode)
+            StartGet5TechPause(playerTeam);
+        else if (duration > 0)
         {
             int token = ++techPauseToken;
             string pauseTeamName = playerTeam.teamName;
@@ -197,7 +213,8 @@ public partial class MatchZy
                 MapNumber = matchConfig.CurrentMapNumber,
                 PauseType = "tech",
                 TeamName = playerTeam.teamName,
-                MaxDuration = techPauseDuration.Value,
+                // Under Get5 rules the pause does not end on its own.
+                MaxDuration = Get5TechPauseMode ? null : techPauseDuration.Value,
                 RoundNumber = GetRoundNumer(),
             };
 
@@ -314,15 +331,24 @@ public partial class MatchZy
         {
             Log($"[AutoPause] Auto-resuming - both teams now have {minPlayers} players (CT: {ctPlayerCount}, T: {tPlayerCount})");
 
+            // The 10 s check runs again before a long resume delay is over: keep one resume.
+            if (autoResumeTimer != null)
+                return;
             int resumeDelay = autoResumeDelay.Value;
             PrintLocalizedToAll("matchzy.pausemsg.autoresuming", minPlayers, resumeDelay);
 
-            AddTimer(
+            autoResumeTimer = AddTimer(
                 (float)resumeDelay,
                 () =>
                 {
+                    autoResumeTimer = null;
                     if (!IsCurrentPauseAuto())
                         return; // Already unpaused, or replaced by a manual/admin pause
+                    // A player may have dropped again during the delay.
+                    int ctNow = IsBotSide(3) ? minPlayers : GetTeamPlayerCount(CsTeam.CounterTerrorist);
+                    int tNow = IsBotSide(2) ? minPlayers : GetTeamPlayerCount(CsTeam.Terrorist);
+                    if (ctNow < minPlayers || tNow < minPlayers)
+                        return;
 
                     Server.ExecuteCommand("mp_unpause_match");
                     CancelTechPauseTimer();
@@ -471,7 +497,12 @@ public partial class MatchZy
         // Called when a map goes live (match, scrim, hill): every team starts with its full
         // tech pause budget. ResetTechPauses was never called before.
         ResetTechPauses();
+        StartAutoPauseMonitor();
+    }
 
+    // The 10 s auto-pause check. Also started by .autopause when it is turned on during a live map.
+    private void StartAutoPauseMonitor()
+    {
         if (!autoPauseEnabled.Value)
         {
             Log("[AutoPause] Auto-pause is disabled - not starting monitoring timer");
