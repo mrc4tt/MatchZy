@@ -1,12 +1,10 @@
 name: Build and Release
+# Releases only from a version tag (0.8.96), never from a plain push to main: a push used to
+# publish ModuleVersion as a release straight away, before it was tested on a server.
 on:
   push:
-    paths-ignore:
-      - documentation/**
-      - '**/*.md'
-      - .github/workflows/docs.yml
-    branches:
-      - main
+    tags:
+      - '[0-9]*.[0-9]*.[0-9]*'
   workflow_dispatch:
 
 # Needed by softprops/action-gh-release to create the GitHub release.
@@ -38,6 +36,11 @@ jobs:
           VERSION=$(grep -oP 'ModuleVersion\s*=>\s*"\K[^"]*' Core/MatchZy.cs)
           if [ -z "$VERSION" ]; then
             echo "Error: Could not extract version from Core/MatchZy.cs"
+            exit 1
+          fi
+          # A tag must match the version in the code, or the release and its zip would be mislabelled.
+          if [ "${{ github.ref_type }}" = "tag" ] && [ "${{ github.ref_name }}" != "$VERSION" ]; then
+            echo "Error: tag ${{ github.ref_name }} does not match ModuleVersion $VERSION in Core/MatchZy.cs"
             exit 1
           fi
           echo "MATCHZY_VERSION=$VERSION" >> $GITHUB_ENV
