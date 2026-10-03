@@ -2,6 +2,12 @@
 
 Based on [MatchZy](https://github.com/shobhit-pathak/MatchZy) by Shobhit Pathak, adapted for CS2 game-server hosting: remote log HTTP API, G5API compatibility, auto changelevel, advanced stats (HLTV 2.0 rating / KAST / clutch / opening duels), a coach system, a pause overhaul, and in-game admin and match-setup menus.
 
+# 0.8.98
+
+#### October 3, 2026
+
+- New `matchzy_empty_shutdown_seconds` (default `0`, off): closes the server with `quit` once it has had no players for that many seconds. Bots and CSTV do not count, players reconnecting during a map change do, and the count also runs from server start, so a server nobody joins is closed too. Before quitting, MatchZy sends the `server_shutdown` event with `reason` `empty` and `empty_seconds`, and it waits while a demo or round backup upload is still running. Can be set per match in the match config's `cvars`.
+
 # 0.8.97
 
 #### October 3, 2026

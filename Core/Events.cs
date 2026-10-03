@@ -773,9 +773,14 @@ public class MapChangeEvent : ServerLifecycleEvent
 
 public class ServerShutdownEvent : ServerLifecycleEvent
 {
-    // "quit", "restart", "fatal" or "plugin_unload".
+    // "quit", "restart", "fatal", "plugin_unload" or "empty" (matchzy_empty_shutdown_seconds).
     [JsonPropertyName("reason")]
     public required string Reason { get; init; }
+
+    // reason "empty": seconds the server had no players. Null otherwise.
+    [JsonPropertyName("empty_seconds")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public int? EmptySeconds { get; init; }
 
     public ServerShutdownEvent()
         : base("server_shutdown") { }

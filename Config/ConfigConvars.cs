@@ -14,6 +14,8 @@ namespace MatchZy
 
         public FakeConVar<string> eventsFormat = new("matchzy_events_format", "Format of the live events sent to matchzy_remote_log_url (player_death, bomb_planted, player_hurt, ...). \"get5\" follows Get5's event schema (nested player/weapon objects, round_time), \"legacy\" is the flat format of 0.8.94 and older. Default: get5", "get5");
 
+        public FakeConVar<int> emptyShutdownSeconds = new("matchzy_empty_shutdown_seconds", "Close the server (quit) after it has had no players for this many seconds, counted from server start too. Sends server_shutdown with reason empty first and waits for demo and backup uploads. 0 = off. Default: 0", 0);
+
         public FakeConVar<bool> smokeColorEnabled = new("matchzy_smoke_color_enabled", "Whether player-specific smoke color is enabled or not. Default: false", false);
 
         public FakeConVar<float> botJiggleRange = new("matchzy_botjiggle_range", "Practice .botjiggle: how far (units) bots strafe side-to-side. Default: 30", 30.0f);

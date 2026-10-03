@@ -115,7 +115,7 @@ namespace MatchZy
 
         // Queues server_shutdown and blocks briefly so it is on the wire before the process exits.
         // Once per process: quit runs the command listener and then unloads the plugin.
-        private void AnnounceShutdown(string reason)
+        private void AnnounceShutdown(string reason, int? emptySeconds = null)
         {
             if (_shutdownAnnounced)
                 return;
@@ -128,6 +128,7 @@ namespace MatchZy
                     MapName = SafeMapName(),
                     PluginVersion = ModuleVersion,
                     Reason = reason,
+                    EmptySeconds = emptySeconds,
                 });
                 if (sent.Length > 0)
                     Task.WaitAll(sent, ShutdownEventWait);

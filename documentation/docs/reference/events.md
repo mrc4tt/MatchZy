@@ -41,7 +41,7 @@ Sent with or without a loaded match, to `matchzy_remote_log_url` from `config.cf
 |---|---|---|
 | `server_ready` | All plugins are loaded and `config.cfg` is applied (about 2 seconds after load; on a boot, once the first map runs) | `hot_reload` (`true` when only MatchZy was reloaded) |
 | `map_change` | Before the map changes. Sent when a map command runs (`changelevel`, `map`, `ds_workshop_changelevel`, `host_workshop_map`), otherwise when the map ends | `next_map` (map name or workshop id, `null` when not known), `trigger` (the command, or `map_end`) |
-| `server_shutdown` | The server is about to stop: `quit` / `exit`, `_restart`, a fatal error, or MatchZy being unloaded | `reason` (`quit`, `restart`, `fatal`, `plugin_unload`) |
+| `server_shutdown` | The server is about to stop: `quit` / `exit`, `_restart`, a fatal error, MatchZy being unloaded, or the server being empty for `matchzy_empty_shutdown_seconds` | `reason` (`quit`, `restart`, `fatal`, `plugin_unload`, `empty`), `empty_seconds` (with `empty`: how long the server had no players) |
 
 `server_shutdown` is sent while the server waits up to 3 seconds for it. A server that is killed (crash, `SIGKILL`, a panel's force stop) sends nothing; use `server_ready` on the next start to notice it.
 

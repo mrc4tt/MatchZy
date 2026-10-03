@@ -2,6 +2,10 @@
 
 A short summary of each release. The [full changelog](changelog.md) has the details and background for every change.
 
+## 0.8.98 <small>October 3, 2026</small>
+
+- **New:** `matchzy_empty_shutdown_seconds` closes a server that has had no players for the set time, after sending `server_shutdown` with `reason` `empty`. It waits for demo and backup uploads. Off by default.
+
 ## 0.8.97 <small>October 3, 2026</small>
 
 - **New:** `matchzy_max_tech_pauses`, `matchzy_tech_pause_time` and `get5_allow_technical_pause` as alternative names for the technical pause settings.

@@ -69,6 +69,7 @@ Legend: **cfg** = present in the generated `config.cfg`.
 | `matchzy_reset_cvars_on_series_end` | `true` | Y | Restore cvars changed by a match config's `cvars` block when the series ends. |
 | `matchzy_match_start_message` | `""` | Y | Chat message at match start. `$$$` = new line. Supports `{TIME}`, `{MATCH_ID}`, `{MAP}`, `{MAPNUMBER}`, `{TEAM1}`, `{TEAM2}` and color tags. |
 | `matchzy_match_end_auto_changelevel` | `true` | Y | Change map automatically after a match ends. Disable for panel-driven servers (G5API). |
+| `matchzy_empty_shutdown_seconds` | `0` | Y | Close the server (`quit`) after it has had no players for this many seconds (bots and CSTV do not count; also counted from server start). Sends `server_shutdown` with `reason` `empty` first and waits for demo and backup uploads. Can be set per match in the match config's `cvars`. `0` = off. |
 
 ## Tournament timeouts
 

@@ -1277,6 +1277,20 @@ namespace MatchZy
         /// </summary>
         private async Task UploadRoundBackupAsync(string filePath, string url, string headerKey, string headerValue, long matchId, int mapNumber, int roundNumber)
         {
+            // Counted so the empty-server shutdown waits for it.
+            Interlocked.Increment(ref _pendingUploads);
+            try
+            {
+                await UploadRoundBackupCoreAsync(filePath, url, headerKey, headerValue, matchId, mapNumber, roundNumber).ConfigureAwait(false);
+            }
+            finally
+            {
+                Interlocked.Decrement(ref _pendingUploads);
+            }
+        }
+
+        private async Task UploadRoundBackupCoreAsync(string filePath, string url, string headerKey, string headerValue, long matchId, int mapNumber, int roundNumber)
+        {
             try
             {
                 if (!IsValidUrl(url) || !File.Exists(filePath))

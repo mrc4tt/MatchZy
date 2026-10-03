@@ -418,10 +418,16 @@ namespace MatchZy
             // then failed still hold the match up to the stall and must be uploaded.
             if (segmentPaths.Count > 0)
             {
+                // Counted from now (the upload starts 15 s later) so the empty-server shutdown waits for it.
+                bool countsAsUpload = uploadURL != "";
+                if (countsAsUpload)
+                    Interlocked.Increment(ref _pendingUploads);
                 AddTimer(15, () =>
                 {
                     Task.Run(async () =>
                     {
+                      try
+                      {
                         foreach (string segmentPath in segmentPaths)
                         {
                             bool uploadSuccess = await UploadFileAsync(segmentPath, uploadURL, headerKey, headerValue, uploadMatchId, currentMapNumber, roundNumber, useS3);
@@ -438,6 +444,12 @@ namespace MatchZy
                                 Success = uploadSuccess,
                             }, eventTarget);
                         }
+                      }
+                      finally
+                      {
+                        if (countsAsUpload)
+                            Interlocked.Decrement(ref _pendingUploads);
+                      }
                     });
                 });
             }
