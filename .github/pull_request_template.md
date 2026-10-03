@@ -4,7 +4,7 @@
 
 ## How it was tested
 
-<!-- MikZy only runs on a live CS2 server. Say what you tested there, or that it is untested. -->
+<!-- MatchZy only runs on a live CS2 server. Say what you tested there, or that it is untested. -->
 
 - [ ] Tested on a live CS2 server
 - [ ] Not tested on a server (build only)

@@ -1,26 +1,28 @@
-name: Feature request
-description: Suggest a new feature or a change to an existing one.
+name: Feature request or suggestion
+description: A new feature, a change to an existing one, or an idea.
+title: "[Request] "
 labels: ["enhancement"]
 body:
-  - type: markdown
+  - type: dropdown
+    id: kind
     attributes:
-      value: |
-        Suggestions are welcome, but there is no guarantee they will be picked up or implemented. A clear use case helps the most.
-  - type: textarea
-    id: problem
-    attributes:
-      label: What do you want to do, and what stops you today?
-      description: Describe the situation on your server (tournament, pugs, practice, panel integration, ...).
+      label: What kind of request is it?
+      options:
+        - New feature (a new command, setting or function)
+        - Improvement to something MatchZy already does
+        - Suggestion or idea
     validations:
       required: true
   - type: textarea
-    id: proposal
+    id: idea
     attributes:
-      label: How should it work?
-      description: Commands, settings or events you have in mind. Mention it if Get5 or upstream MatchZy already does this.
+      label: Describe it
+      description: What should MatchZy do? A few sentences are enough.
+      placeholder: "Example: a command that shows each player's ping during warmup."
     validations:
       required: true
   - type: textarea
-    id: alternatives
+    id: why
     attributes:
-      label: Workarounds you tried
+      label: How would you use it? (optional)
+      description: Your server or situation (tournament, pugs, practice, panel, ...).
