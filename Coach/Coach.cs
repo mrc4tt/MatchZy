@@ -242,7 +242,7 @@ public partial class MatchZy
         }
 
         matchZyCoachTeam.coach.Add(player!);
-        player!.Clan = $"[{matchZyCoachTeam.teamName} COACH]";
+        ApplyClanTag(player!, $"[{matchZyCoachTeam.teamName} COACH]");
         if (player.InGameMoneyServices != null)
             player.InGameMoneyServices.Account = 0;
         Server.NextFrame(EnforceCompetitiveTeammateColors);
@@ -1666,7 +1666,7 @@ public partial class MatchZy
             return;
 
         coachTeam.coach.Add(player);
-        player.Clan = $"[{coachTeam.teamName} COACH]";
+        ApplyClanTag(player, $"[{coachTeam.teamName} COACH]");
         if (player.InGameMoneyServices != null)
             player.InGameMoneyServices.Account = 0;
         Server.NextFrame(EnforceCompetitiveTeammateColors);

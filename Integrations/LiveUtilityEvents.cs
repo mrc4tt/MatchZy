@@ -88,6 +88,43 @@ namespace MatchZy
                 bool assisterValid = assister != null && assister.IsValid;
                 var (ctAlive, tAlive) = CountAlivePlayers();
 
+                if (UseGet5Events)
+                {
+                    PublishEvent(new Get5PlayerKillEvent
+                    {
+                        MatchId = liveMatchId,
+                        MapNumber = matchConfig.CurrentMapNumber,
+                        RoundNumber = round,
+                        RoundTime = LiveRoundTimeMs(),
+                        Player = Get5Player(victim),
+                        Attacker = Get5Player(killer),
+                        Assist = assisterValid ? new Get5AssistInfo
+                        {
+                            Player = Get5Player(assister!),
+                            FriendlyFire = assister!.TeamNum == victim.TeamNum,
+                            FlashAssist = @event.Assistedflash,
+                        } : null,
+                        Weapon = Get5Weapon(@event.Weapon),
+                        Bomb = false,
+                        Headshot = @event.Headshot,
+                        ThruSmoke = @event.Thrusmoke,
+                        Penetrated = @event.Penetrated,
+                        AttackerBlind = @event.Attackerblind,
+                        NoScope = @event.Noscope,
+                        Suicide = false,
+                        FriendlyFire = teamKill,
+                        AttackerHp = killerPawn?.Health ?? 0,
+                        Distance = distance,
+                        FirstKill = firstKill,
+                        TradeKill = !teamKill && lastDeathWasTradeKill,
+                        AttackerRoundKills = roundKills,
+                        AttackerMapKills = mapKills,
+                        CtAlive = ctAlive,
+                        TAlive = tAlive,
+                    });
+                    return HookResult.Continue;
+                }
+
                 var killEvent = new PlayerKillLiveEvent
                 {
                     MatchId = liveMatchId,
@@ -143,6 +180,20 @@ namespace MatchZy
                     if (player == null || !player.IsValid)
                         return HookResult.Continue;
 
+                    if (UseGet5Events)
+                    {
+                        PublishEvent(new Get5GrenadeThrownEvent
+                        {
+                            MatchId = liveMatchId,
+                            MapNumber = matchConfig.CurrentMapNumber,
+                            RoundNumber = GetRoundNumer(),
+                            RoundTime = LiveRoundTimeMs(),
+                            Player = Get5Player(player),
+                            Weapon = Get5Weapon(@event.Weapon),
+                        });
+                        return HookResult.Continue;
+                    }
+
                     var liveEvent = new GrenadeThrownLiveEvent
                     {
                         MatchId = liveMatchId,
@@ -163,14 +214,14 @@ namespace MatchZy
             });
 
             RegisterEventHandler<EventSmokegrenadeDetonate>((@event, info) =>
-                SendGrenadeDetonated("smoke", @event.Userid, @event.X, @event.Y, @event.Z));
+                SendGrenadeDetonated("smoke", "smokegrenade", @event.Userid, @event.X, @event.Y, @event.Z));
             RegisterEventHandler<EventFlashbangDetonate>((@event, info) =>
-                SendGrenadeDetonated("flash", @event.Userid, @event.X, @event.Y, @event.Z));
+                SendGrenadeDetonated("flash", "flashbang", @event.Userid, @event.X, @event.Y, @event.Z));
             RegisterEventHandler<EventHegrenadeDetonate>((@event, info) =>
-                SendGrenadeDetonated("he", @event.Userid, @event.X, @event.Y, @event.Z));
+                SendGrenadeDetonated("he", "hegrenade", @event.Userid, @event.X, @event.Y, @event.Z));
             // Fires for both molotov and incendiary.
             RegisterEventHandler<EventMolotovDetonate>((@event, info) =>
-                SendGrenadeDetonated("molotov", @event.Userid, @event.X, @event.Y, @event.Z));
+                SendGrenadeDetonated("molotov", "molotov", @event.Userid, @event.X, @event.Y, @event.Z));
 
             RegisterEventHandler<EventPlayerBlind>((@event, info) =>
             {
@@ -186,6 +237,22 @@ namespace MatchZy
 
                     var attacker = @event.Attacker;
                     bool attackerValid = attacker != null && attacker.IsValid;
+
+                    if (UseGet5Events)
+                    {
+                        PublishEvent(new Get5PlayerBlindedEvent
+                        {
+                            MatchId = liveMatchId,
+                            MapNumber = matchConfig.CurrentMapNumber,
+                            RoundNumber = GetRoundNumer(),
+                            RoundTime = LiveRoundTimeMs(),
+                            Player = Get5Player(victim),
+                            Attacker = Get5PlayerOrNull(attacker),
+                            BlindDuration = MathF.Round(@event.BlindDuration, 2),
+                            FriendlyFire = attackerValid && attacker != victim && attacker!.TeamNum == victim.TeamNum,
+                        });
+                        return HookResult.Continue;
+                    }
 
                     var liveEvent = new PlayerBlindedLiveEvent
                     {
@@ -223,6 +290,20 @@ namespace MatchZy
                         return HookResult.Continue;
 
                     var (ctAlive, tAlive) = CountAlivePlayers();
+                    if (UseGet5Events)
+                    {
+                        PublishEvent(new Get5BombExplodedEvent
+                        {
+                            MatchId = liveMatchId,
+                            MapNumber = matchConfig.CurrentMapNumber,
+                            RoundNumber = GetRoundNumer(),
+                            RoundTime = LiveRoundTimeMs(),
+                            Site = Get5BombSite(),
+                            CtAlive = ctAlive,
+                            TAlive = tAlive,
+                        });
+                        return HookResult.Continue;
+                    }
                     var liveEvent = new BombExplodedLiveEvent
                     {
                         MatchId = liveMatchId,
@@ -247,13 +328,31 @@ namespace MatchZy
             return isMatchLive && !string.IsNullOrEmpty(matchConfig.RemoteLogURL);
         }
 
-        private HookResult SendGrenadeDetonated(string grenade, CCSPlayerController? player, float x, float y, float z)
+        private HookResult SendGrenadeDetonated(string grenade, string weaponName, CCSPlayerController? player, float x, float y, float z)
         {
             try
             {
                 if (!ShouldSendLiveEvent())
                     return HookResult.Continue;
                 bool playerValid = player != null && player.IsValid;
+
+                if (UseGet5Events)
+                {
+                    PublishEvent(new Get5GrenadeDetonatedEvent
+                    {
+                        MatchId = liveMatchId,
+                        MapNumber = matchConfig.CurrentMapNumber,
+                        RoundNumber = GetRoundNumer(),
+                        RoundTime = LiveRoundTimeMs(),
+                        Player = Get5PlayerOrNull(player),
+                        // molotov_detonate fires for both; only CTs can buy the incendiary.
+                        Weapon = Get5Weapon(weaponName == "molotov" && playerValid && player!.TeamNum == (int)CsTeam.CounterTerrorist ? "incgrenade" : weaponName),
+                        X = x,
+                        Y = y,
+                        Z = z,
+                    });
+                    return HookResult.Continue;
+                }
 
                 var liveEvent = new GrenadeDetonatedLiveEvent
                 {
@@ -285,6 +384,19 @@ namespace MatchZy
                     return HookResult.Continue;
                 if (player == null || !player.IsValid)
                     return HookResult.Continue;
+
+                if (UseGet5Events)
+                {
+                    PublishEvent(new Get5BombCarrierEvent(eventName)
+                    {
+                        MatchId = liveMatchId,
+                        MapNumber = matchConfig.CurrentMapNumber,
+                        RoundNumber = GetRoundNumer(),
+                        RoundTime = LiveRoundTimeMs(),
+                        Player = Get5Player(player),
+                    });
+                    return HookResult.Continue;
+                }
 
                 var liveEvent = new BombCarrierLiveEvent(eventName)
                 {
@@ -323,13 +435,16 @@ namespace MatchZy
         // The site of the bomb planted this round, read once at bomb_planted. Finding planted_c4
         // walks the entity list; defuse and explode (explode runs in an already heavy frame) reuse it.
         private string? plantedBombSite;
+        private float? plantedBombBlowTime;
 
         private string GetPlantedBombSite(bool refresh = false)
         {
             if (!refresh && plantedBombSite != null)
                 return plantedBombSite;
             var c4 = Utilities.FindAllEntitiesByDesignerName<CPlantedC4>("planted_c4").FirstOrDefault();
-            plantedBombSite = c4 == null || !c4.IsValid ? null : c4.BombSite == 0 ? "A" : "B";
+            bool found = c4 != null && c4.IsValid;
+            plantedBombSite = !found ? null : c4!.BombSite == 0 ? "A" : "B";
+            plantedBombBlowTime = found ? c4!.C4Blow : null;
             return plantedBombSite ?? "unknown";
         }
     }

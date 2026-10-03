@@ -117,6 +117,7 @@ Legend: **cfg** = present in the generated `config.cfg`. :fontawesome-solid-code
 | Setting | Default | cfg | Description |
 |---|---|---|---|
 | `matchzy_stats_include_bots` :fontawesome-solid-code-fork: | `false` | Y | Record bots in the database, CSV and stats events (stable id per bot name). |
+| `matchzy_events_format` :fontawesome-solid-code-fork: | `get5` | Y | Format of the live events: `get5` (Get5 event schema, nested player/weapon objects) or `legacy` (flat format of 0.8.94 and older). See [Events](events.md#live-scorebot). |
 | `matchzy_enable_damage_report` | `true` | Y | Per-round damage report in chat. |
 
 Database connection settings are in [`database.json`](files.md#databasejson), not convars.

@@ -20,7 +20,9 @@ namespace MatchZy
         [ConsoleCommand("css_nades", "Opens the grenade library menu")]
         public void OnNadesMenuCommand(CCSPlayerController? player, CommandInfo? command)
         {
-            if (!isPractice || !IsPlayerValid(player))
+            if (!RequirePractice(player))
+                return;
+            if (!IsPlayerValid(player))
                 return;
             // Defer: opening a menu on the chat-dispatch tick gets clobbered by the chat broadcast.
             Server.NextFrame(() =>

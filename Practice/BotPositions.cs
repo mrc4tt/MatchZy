@@ -202,7 +202,9 @@ namespace MatchZy
         [ConsoleCommand("css_listbp", "List saved bot positions on this map")]
         public void OnListBotPosCommand(CCSPlayerController? player, CommandInfo? command)
         {
-            if (!isPractice || !IsPlayerValid(player))
+            if (!RequirePractice(player))
+                return;
+            if (!IsPlayerValid(player))
                 return;
             var slots = LoadBotPositions().TryGetValue(Server.MapName, out var s) ? s : null;
             if (slots == null || slots.Count == 0)
@@ -269,7 +271,9 @@ namespace MatchZy
         [ConsoleCommand("css_showbp", "Show saved bot positions in-world")]
         public void OnShowBotPosCommand(CCSPlayerController? player, CommandInfo? command)
         {
-            if (!isPractice || !IsPlayerValid(player))
+            if (!RequirePractice(player))
+                return;
+            if (!IsPlayerValid(player))
                 return;
             if (_botPosVizOn)
             {
@@ -361,7 +365,9 @@ namespace MatchZy
         [ConsoleCommand("css_botjiggle", "Toggle bots strafing side-to-side (silent)")]
         public void OnBotJiggleCommand(CCSPlayerController? player, CommandInfo? command)
         {
-            if (!isPractice || !IsPlayerValid(player))
+            if (!RequirePractice(player))
+                return;
+            if (!IsPlayerValid(player))
                 return;
             _botJiggleOn = !_botJiggleOn;
             if (!_botJiggleOn)

@@ -729,9 +729,8 @@ namespace MatchZy
             // No-op unless .shownades is active (grenadeLibraryActive gate).
             RegisterListener<Listeners.OnPlayerButtonsChanged>(OnNadeMarkerButtonHandler);
 
-            // Grenade library: per-player, hide the marker a player stands on so it doesn't block the
-            // throw view (reappears when they walk off). Guarded; no-op unless .shownades is active.
-            RegisterListener<Listeners.CheckTransmit>(OnNadeCheckTransmit);
+            // Grenade library: the CheckTransmit listener that hides the marker a player stands on is
+            // registered by .shownades and removed when the markers are hidden (SetNadeTransmitListener).
 
             // Demo-arc sampler: samples traced grenades each tick. No-op unless .arc is on
             // and a grenade is mid-flight.
@@ -744,6 +743,8 @@ namespace MatchZy
             RegisterEventHandler<EventPlayerTeam>(
                 (@event, info) =>
                 {
+                    // Side counts in the ready data (panel, readycheck, clan tags) depend on teams.
+                    _readyStatusDirty = true;
                     CCSPlayerController? player = @event.Userid;
                     if (!IsPlayerValid(player))
                         return HookResult.Continue;
@@ -1172,6 +1173,41 @@ namespace MatchZy
                     // Count alive players per team AFTER this death
                     var (ctAlive, tAlive) = CountAlivePlayers();
 
+                    if (UseGet5Events)
+                    {
+                        bool assisterValid = assister != null && assister.IsValid;
+                        bool bomb = @event.Weapon == "planted_c4";
+                        bool killedByOther = attacker != null && attacker.IsValid && attacker != victim;
+                        PublishEvent(new Get5PlayerDeathEvent
+                        {
+                            MatchId = liveMatchId,
+                            MapNumber = matchConfig.CurrentMapNumber,
+                            RoundNumber = GetRoundNumer(),
+                            RoundTime = LiveRoundTimeMs(),
+                            Player = Get5Player(victim),
+                            Weapon = Get5Weapon(@event.Weapon),
+                            Bomb = bomb,
+                            Headshot = @event.Headshot,
+                            ThruSmoke = @event.Thrusmoke,
+                            Penetrated = @event.Penetrated,
+                            AttackerBlind = @event.Attackerblind,
+                            NoScope = @event.Noscope,
+                            // Get5: falling or your own grenade is a suicide, the bomb is not.
+                            Suicide = !bomb && !killedByOther,
+                            FriendlyFire = killedByOther && attacker!.TeamNum == victim.TeamNum,
+                            Attacker = killedByOther ? Get5Player(attacker!) : null,
+                            Assist = assisterValid ? new Get5AssistInfo
+                            {
+                                Player = Get5Player(assister!),
+                                FriendlyFire = assister!.TeamNum == victim.TeamNum,
+                                FlashAssist = @event.Assistedflash,
+                            } : null,
+                            CtAlive = ctAlive,
+                            TAlive = tAlive,
+                        });
+                        return HookResult.Continue;
+                    }
+
                     var deathEvent = new PlayerDeathLiveEvent
                     {
                         MatchId = liveMatchId,
@@ -1218,6 +1254,22 @@ namespace MatchZy
                     // Count alive players
                     var (ctAlive, tAlive) = CountAlivePlayers();
 
+                    if (UseGet5Events)
+                    {
+                        PublishEvent(new Get5BombPlayerEvent("bomb_planted")
+                        {
+                            MatchId = liveMatchId,
+                            MapNumber = matchConfig.CurrentMapNumber,
+                            RoundNumber = GetRoundNumer(),
+                            RoundTime = LiveRoundTimeMs(),
+                            Player = Get5Player(player),
+                            Site = Get5BombSite(refresh: true),
+                            CtAlive = ctAlive,
+                            TAlive = tAlive,
+                        });
+                        return HookResult.Continue;
+                    }
+
                     var plantEvent = new BombPlantedLiveEvent
                     {
                         MatchId = liveMatchId,
@@ -1251,6 +1303,23 @@ namespace MatchZy
                     // Count alive players
                     var (ctAlive, tAlive) = CountAlivePlayers();
 
+                    if (UseGet5Events)
+                    {
+                        PublishEvent(new Get5BombDefusedEvent
+                        {
+                            MatchId = liveMatchId,
+                            MapNumber = matchConfig.CurrentMapNumber,
+                            RoundNumber = GetRoundNumer(),
+                            RoundTime = LiveRoundTimeMs(),
+                            Player = Get5Player(player),
+                            Site = Get5BombSite(),
+                            BombTimeRemaining = BombTimeRemainingMs(),
+                            CtAlive = ctAlive,
+                            TAlive = tAlive,
+                        });
+                        return HookResult.Continue;
+                    }
+
                     var defuseEvent = new BombDefusedLiveEvent
                     {
                         MatchId = liveMatchId,
@@ -1274,12 +1343,14 @@ namespace MatchZy
                 {
                     if (!isMatchLive)
                         return HookResult.Continue;
+                    MarkLiveRoundPlayStart();
                     if (string.IsNullOrEmpty(matchConfig.RemoteLogURL))
                         return HookResult.Continue;
 
                     int ctAlive = 0,
                         tAlive = 0;
                     var players = new List<LivePlayerInfo>();
+                    var get5Players = new List<Get5FreezetimePlayer>();
 
                     foreach (var kvp in playerData)
                     {
@@ -1310,6 +1381,25 @@ namespace MatchZy
                                 tAlive++;
                         }
 
+                        if (UseGet5Events)
+                        {
+                            int userId = p.UserId ?? 0;
+                            get5Players.Add(new Get5FreezetimePlayer
+                            {
+                                SteamId = p.SteamID.ToString(),
+                                Name = p.PlayerName,
+                                UserId = userId,
+                                Side = Get5Side(p.TeamNum),
+                                IsBot = false,
+                                Health = alive ? pawn.Health : 0,
+                                Armor = pawn.ArmorValue,
+                                HasHelmet = csItemServices?.HasHelmet == true,
+                                HasDefuser = csItemServices?.HasDefuser == true,
+                                Money = p.InGameMoneyServices?.Account ?? 0,
+                            });
+                            continue;
+                        }
+
                         players.Add(
                             new LivePlayerInfo
                             {
@@ -1323,6 +1413,20 @@ namespace MatchZy
                                 Money = p.InGameMoneyServices?.Account ?? 0,
                             }
                         );
+                    }
+
+                    if (UseGet5Events)
+                    {
+                        PublishEvent(new Get5FreezetimeEndEvent
+                        {
+                            MatchId = liveMatchId,
+                            MapNumber = matchConfig.CurrentMapNumber,
+                            RoundNumber = GetRoundNumer(),
+                            CtAlive = ctAlive,
+                            TAlive = tAlive,
+                            Players = get5Players,
+                        });
+                        return HookResult.Continue;
                     }
 
                     var freezeEndEvent = new FreezetimeEndLiveEvent
@@ -1388,13 +1492,35 @@ namespace MatchZy
                         return HookResult.Continue;
 
                     var victim = @event.Userid;
-                    if (victim == null || !victim.IsValid || victim.IsBot)
+                    // Get5 reports bots (player.is_bot); the legacy format leaves bot victims out.
+                    if (victim == null || !victim.IsValid || (victim.IsBot && !UseGet5Events))
                         return HookResult.Continue;
 
                     var attacker = @event.Attacker;
                     bool hasDamage = @event.DmgHealth > 0 || @event.DmgArmor > 0;
                     if (!hasDamage)
                         return HookResult.Continue;
+
+                    if (UseGet5Events)
+                    {
+                        PublishEvent(new Get5PlayerHurtEvent
+                        {
+                            MatchId = liveMatchId,
+                            MapNumber = matchConfig.CurrentMapNumber,
+                            RoundNumber = GetRoundNumer(),
+                            RoundTime = LiveRoundTimeMs(),
+                            Player = Get5Player(victim),
+                            Attacker = Get5PlayerOrNull(attacker),
+                            Weapon = Get5Weapon(@event.Weapon),
+                            Damage = @event.DmgHealth,
+                            DamageArmor = @event.DmgArmor,
+                            Health = @event.Health,
+                            Armor = @event.Armor,
+                            Hitgroup = @event.Hitgroup,
+                            FriendlyFire = attacker != null && attacker.IsValid && attacker != victim && attacker.TeamNum == victim.TeamNum,
+                        });
+                        return HookResult.Continue;
+                    }
 
                     var hurtEvent = new PlayerHurtLiveEvent
                     {

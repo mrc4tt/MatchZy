@@ -10,7 +10,7 @@ Every event is sent as an HTTP `POST` with a JSON body to `matchzy_remote_log_ur
 - `matchid`: on match events.
 - `map_number`: 0-based map index in the series.
 - `round_number`: on round and live events.
-- Veto events use `team` = `"team1"` / `"team2"`. Live events use sides `"CT"` / `"T"`.
+- Veto events use `team` = `"team1"` / `"team2"`. Live events in the legacy format use sides `"CT"` / `"T"`; the Get5 format uses `"ct"` / `"t"` inside player objects.
 
 Player stats objects (`team1.players[].stats` on `round_end` and `map_result`) use the Get5 field names: `kills`, `deaths`, `assists`, `damage`, `utility_damage`, `enemies_flashed`, `friendlies_flashed`, `flash_assists`, `headshot_kills`, `knife_kills`, `team_kills`, `suicides`, `bomb_plants`, `bomb_defuses`, `rounds_played`, `1k`-`5k`, `1v1`-`1v5` (clutches won), `first_kills_t`, `first_kills_ct`, `first_deaths_t`, `first_deaths_ct`, `trade_kills`, `kast` (rounds with a kill, assist, survival or trade), `score` and `mvp`. Fields beyond the engine's own scoreboard stats are filled for human players; bots report 0 for them. Rating and ADR are in the [stats JSON file](../guides/stats.md#advanced-stats).
 
@@ -49,6 +49,92 @@ Sent with or without a loaded match, to `matchzy_remote_log_url` from `config.cf
 
 ## Live scorebot :fontawesome-solid-code-fork:
 
+`matchzy_events_format` picks the format of these events: `get5` (default) or `legacy` (the flat format of 0.8.94 and older, see [below](#legacy-format)).
+
+### Get5 format
+
+Events that Get5 also has (`player_death`, `bomb_planted`, `bomb_defused`, `bomb_exploded`, `grenade_thrown`, `round_start`, `game_paused`, `game_unpaused`) use [Get5's event schema](https://splewis.github.io/get5/latest/events.html), so Get5 tooling can read them as is. MatchZy's own events use the same building blocks. Fields Get5 does not have (marked *extra*) are added on top; a Get5 consumer ignores them.
+
+Building blocks:
+
+- **Player object**: `{"steamid", "name", "user_id", "side", "is_bot"}`. `side` is `ct`, `t`, `spec` or `null`; a bot's `steamid` is `BOT-<user_id>`.
+- **Weapon object**: `{"name", "id"}`. `name` without the `weapon_` prefix (`ak47`, `hegrenade`, `planted_c4`). `id` is the CS2 item definition index (`ak47` = 7), `0` for the bomb, fire and the world. Get5 on CS:GO sent SourceMod's weapon ID here, which does not exist in CS2.
+- **`round_time`**: milliseconds since freeze time ended, `0` during freeze time.
+- **`round_number`**: 0-based, the number of rounds already played.
+
+| Event | When | Fields |
+|---|---|---|
+| `player_death` | A player dies (including suicides, world and bomb deaths) | `player` (victim), `attacker` (or `null`), `assist` (`{player, friendly_fire, flash_assist}` or `null`), `weapon`, `bomb`, `headshot`, `thru_smoke`, `penetrated` (objects passed through), `attacker_blind`, `no_scope`, `suicide`, `friendly_fire`, `round_time`; *extra* `ct_alive`, `t_alive` |
+| `player_kill` :fontawesome-solid-code-fork: | A player kills another player (not suicides or world deaths) | everything in `player_death`, plus `attacker_hp`, `distance`, `first_kill`, `trade_kill`, `attacker_round_kills`, `attacker_map_kills` |
+| `player_hurt` :fontawesome-solid-code-fork: | A player takes damage | `player` (victim), `attacker` (or `null`), `weapon`, `damage`, `damage_armor`, `health`, `armor` (left after the hit), `hitgroup`, `friendly_fire`, `round_time` |
+| `bomb_planted` | Bomb planted | `player`, `site` (`a`/`b`), `round_time`; *extra* `ct_alive`, `t_alive` |
+| `bomb_defused` | Bomb defused | same as `bomb_planted`, plus `bomb_time_remaining` (ms) |
+| `bomb_exploded` | Bomb exploded | `site`, `round_time`; *extra* `ct_alive`, `t_alive` |
+| `bomb_pickup`, `bomb_dropped` :fontawesome-solid-code-fork: | Bomb picked up / dropped | `player`, `round_time` |
+| `grenade_thrown` | Grenade thrown | `player`, `weapon`, `round_time` |
+| `grenade_detonated` :fontawesome-solid-code-fork: | Smoke, flash, HE or molotov detonated | `player` (thrower, or `null`), `weapon`, `x`, `y`, `z`, `round_time` |
+| `player_blinded` :fontawesome-solid-code-fork: | A player is flashed | `player` (victim), `attacker` (or `null`), `blind_duration` (seconds), `friendly_fire`, `round_time` |
+| `freezetime_end` :fontawesome-solid-code-fork: | Freeze time ended | `players` (player objects with `health`, `armor`, `has_helmet`, `has_defuser`, `money`), `ct_alive`, `t_alive` |
+| `round_start` | A live round starts | `round_number` |
+| `game_paused`, `game_unpaused` | Match paused / unpaused | `team` (`team1`, `team2`, or `null` for admin and automatic pauses), `pause_type` (`tactical`, `technical`, `admin`); *extra* `round_number`, `max_duration` (seconds of a timed technical pause) |
+
+All live events carry `matchid`, `map_number` and `round_number`. `matchid` is a number, as in every other MatchZy event (Get5 sends a string).
+
+Get5's per-grenade detonation events with victim lists (`hegrenade_detonated`, `flashbang_detonated`, ...) are not sent; use `grenade_detonated`, `player_hurt` and `player_blinded`.
+
+`player_kill` and `player_death` both fire for a kill. Use `player_kill` for a kill feed or multi-kill tracking (`attacker_round_kills` 2 = double kill, 5 = ace) and `player_death` when you also need suicides and deaths by the world.
+
+`player_death`:
+
+```json
+{
+  "event": "player_death",
+  "matchid": 1042,
+  "map_number": 0,
+  "round_number": 7,
+  "round_time": 51434,
+  "player": { "steamid": "76561198000000013", "name": "bravo3", "user_id": 9, "side": "t", "is_bot": false },
+  "weapon": { "name": "ak47", "id": 7 },
+  "bomb": false,
+  "headshot": true,
+  "thru_smoke": false,
+  "penetrated": 0,
+  "attacker_blind": false,
+  "no_scope": false,
+  "suicide": false,
+  "friendly_fire": false,
+  "attacker": { "steamid": "76561198000000001", "name": "alpha1", "user_id": 3, "side": "ct", "is_bot": false },
+  "assist": {
+    "player": { "steamid": "76561198000000002", "name": "alpha2", "user_id": 4, "side": "ct", "is_bot": false },
+    "friendly_fire": false,
+    "flash_assist": true
+  },
+  "ct_alive": 5,
+  "t_alive": 3
+}
+```
+
+`bomb_planted`:
+
+```json
+{
+  "event": "bomb_planted",
+  "matchid": 1042,
+  "map_number": 0,
+  "round_number": 7,
+  "round_time": 38120,
+  "player": { "steamid": "76561198000000013", "name": "bravo3", "user_id": 9, "side": "t", "is_bot": false },
+  "site": "a",
+  "ct_alive": 3,
+  "t_alive": 4
+}
+```
+
+### Legacy format
+
+`matchzy_events_format legacy` sends the flat format below, unchanged from 0.8.94 and older. Pauses are sent as `match_paused` (`pause_type` `tech`, `pause`, `admin` or `auto`, `team_name`, `max_duration`) and `match_unpaused`.
+
+
 | Event | When | Fields |
 |---|---|---|
 | `player_kill` | A player kills another player (not suicides or world deaths) | `killer_name`, `killer_steamid`, `killer_team`, `killer_hp`, `victim_name`, `victim_steamid`, `victim_team`, `assister_name`, `assister_steamid`, `flash_assist`, `weapon`, `headshot`, `penetrated`, `noscope`, `thrusmoke`, `attackerblind`, `distance`, `team_kill`, `first_kill`, `trade_kill`, `killer_round_kills`, `killer_map_kills`, `ct_alive`, `t_alive` |
@@ -62,11 +148,11 @@ Sent with or without a loaded match, to `matchzy_remote_log_url` from `config.cf
 | `grenade_detonated` | Grenade detonated | `player_name`, `player_steamid`, `player_team`, `grenade`, `x`, `y`, `z` |
 | `player_blinded` | A player is flashed | `attacker_*`, `victim_*`, `duration` (seconds), `team_flash` |
 
-All live events also carry `matchid`, `map_number` and `round_number`.
+All legacy live events also carry `matchid`, `map_number` and `round_number`.
 
 `player_kill` and `player_death` both fire for a kill. Use `player_kill` for a kill feed or multi-kill tracking (`killer_round_kills` 2 = double kill, 5 = ace) and `player_death` when you also need suicides and deaths by the world.
 
-## Examples
+#### Legacy examples
 
 `player_kill`:
 

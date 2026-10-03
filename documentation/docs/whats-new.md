@@ -4,9 +4,13 @@ A short summary of each release. The [full changelog](changelog.md) has the deta
 
 ## 0.8.95 <small>October 3, 2026</small>
 
+- **Changed:** Live events use Get5's event format by default (`matchzy_events_format get5`): nested player and weapon objects, `round_time`, `game_paused` / `game_unpaused`. Set `matchzy_events_format legacy` if your receiver reads the old flat fields. See [Events](reference/events.md#live-scorebot).
 - **New:** Optional `<mode>_override.cfg` files (e.g. `warmup_override.cfg`) run right after their mode cfg. MatchZy never writes them, so your own settings survive every update. See [Server-specific settings](reference/files.md#server-specific-settings).
 - **New:** `mikzy_version` / `css_mikzy_version` aliases for `matchzy_version`.
 - **Changed:** Default warmup.cfg is back to normal warmup values (no spawn protection, no purchase limit, flashbangs allowed). Existing files are not rewritten; put the 0.8.94 values in `warmup_override.cfg` to keep them.
+- **Fixed:** Coach scoreboard tags were replaced by `[UNREADY]` or cleared.
+- **Changed:** Practice commands outside practice now say "Practice mode is not active!" instead of nothing.
+- **Changed:** Less per-tick work during the ready phase and while practicing.
 - **Fixed:** `.forceready` with `matchzy_ready_per_team` readies a team with fewer players than required.
 - **Fixed:** `.readycheck` and the `matchzy_ready_hint_style 2` chat reminder respect `matchzy_ready_per_team`.
 - **Fixed:** Dry run and practice started from warmup no longer keep the warmup purchase limit and spawn protection (update your own dryrun.cfg / prac.cfg, see the changelog).

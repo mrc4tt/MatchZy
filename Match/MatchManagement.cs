@@ -1009,7 +1009,7 @@ namespace MatchZy
                 ctTeam.teamName = teamName;
                 foreach (var coach in ctTeam.coach)
                 {
-                    coach.Clan = $"[{ctTeam.teamName} COACH]";
+                    ApplyClanTag(coach, $"[{ctTeam.teamName} COACH]");
                 }
             }
             else if (teamNum == 2)
@@ -1020,7 +1020,7 @@ namespace MatchZy
                 tTeam.teamName = teamName;
                 foreach (var coach in tTeam.coach)
                 {
-                    coach.Clan = $"[{tTeam.teamName} COACH]";
+                    ApplyClanTag(coach, $"[{tTeam.teamName} COACH]");
                 }
             }
 

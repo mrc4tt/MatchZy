@@ -205,6 +205,7 @@ namespace MatchZy
                 }
                 activeNadeGroups.AddRange(groups);
                 grenadeLibraryActive = true;
+                SetNadeTransmitListener(true);
                 ReplyToUserCommand(player, Localizer.ForPlayer(player, "matchzy.gl.showing", lineups.Count));
             }
             catch (Exception e)
@@ -236,6 +237,7 @@ namespace MatchZy
                     DrawNadeMarkerGroup(g);
                 activeNadeGroups.AddRange(groups);
                 grenadeLibraryActive = lineups.Count > 0;
+                SetNadeTransmitListener(grenadeLibraryActive);
             }
             catch (Exception e)
             {
@@ -245,7 +247,7 @@ namespace MatchZy
 
         // Per-player marker visibility: hide the beam + label of any marker the player is standing on
         // (within NadeHideRadius) so it doesn't block the throw view; it transmits again once they move
-        // off. Registered as a CheckTransmit listener in Load. Fully guarded - a throw here would crash
+        // off. Registered as a CheckTransmit listener only while markers are shown. Fully guarded - a throw here would crash
         // the transmit path, so it never throws.
         public void OnNadeCheckTransmit(CCheckTransmitInfoList infoList)
         {
@@ -285,6 +287,25 @@ namespace MatchZy
             nadeMarkerEntities.Clear();
             activeNadeGroups.Clear();
             grenadeLibraryActive = false;
+            SetNadeTransmitListener(false);
+        }
+
+        // CheckTransmit fires every tick and crosses into managed code for every recipient, so the
+        // listener is only registered while markers are shown (.shownades), not for the whole session.
+        private Listeners.CheckTransmit? _nadeTransmitHandler;
+
+        private void SetNadeTransmitListener(bool on)
+        {
+            if (on && _nadeTransmitHandler == null)
+            {
+                _nadeTransmitHandler = OnNadeCheckTransmit;
+                RegisterListener(_nadeTransmitHandler);
+            }
+            else if (!on && _nadeTransmitHandler != null)
+            {
+                RemoveListener(_nadeTransmitHandler);
+                _nadeTransmitHandler = null;
+            }
         }
 
         // ── marker rendering ─────────────────────────────────────────────────────────────

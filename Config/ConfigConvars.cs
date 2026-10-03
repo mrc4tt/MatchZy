@@ -12,6 +12,8 @@ namespace MatchZy
     {
         public FakeConVar<bool> statsIncludeBots = new("matchzy_stats_include_bots", "Whether bots on CT/T get player stats (database, CSV and stats events). Bots have no SteamID, so each is recorded under a stable id of 90000000000000000 plus a hash of its name. Default: false", false);
 
+        public FakeConVar<string> eventsFormat = new("matchzy_events_format", "Format of the live events sent to matchzy_remote_log_url (player_death, bomb_planted, player_hurt, ...). \"get5\" follows Get5's event schema (nested player/weapon objects, round_time), \"legacy\" is the flat format of 0.8.94 and older. Default: get5", "get5");
+
         public FakeConVar<bool> smokeColorEnabled = new("matchzy_smoke_color_enabled", "Whether player-specific smoke color is enabled or not. Default: false", false);
 
         public FakeConVar<float> botJiggleRange = new("matchzy_botjiggle_range", "Practice .botjiggle: how far (units) bots strafe side-to-side. Default: 30", 30.0f);

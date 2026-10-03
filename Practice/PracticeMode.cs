@@ -210,12 +210,21 @@ namespace MatchZy
         public Dictionary<byte, List<Position>> coachSpawns = GetEmptySpawnsData();
 
         // (Backup)
-        private readonly Dictionary<int, DateTime> lastRethrowTimes = new();
         private readonly object _botsDictLock = new();
         public Dictionary<int, Dictionary<string, object>> pracUsedBots = new Dictionary<int, Dictionary<string, object>>();
         private readonly HashSet<int> _botsBeingProcessed = new();
 
         public string practiceCfgPath => MatchZyCfgRel("prac.cfg");
+
+        // Guard for practice-only commands: outside practice, tell the player instead of doing
+        // nothing (a silent return looked like a broken command).
+        private bool RequirePractice(CCSPlayerController? player)
+        {
+            if (isPractice)
+                return true;
+            ReplyToUserCommand(player, Localizer.ForPlayer(player, "matchzy.cmd.pracnotactive"));
+            return false;
+        }
         public string dryrunCfgPath => MatchZyCfgRel("dryrun.cfg");
 
         // Resolved by key from the plugin's own gamedata/matchzy.json (single source of truth) -
@@ -630,7 +639,9 @@ namespace MatchZy
         [ConsoleCommand("css_mynades", "Shows how many grenade lineups you have saved")]
         public void OnMyNadesCommand(CCSPlayerController? player, CommandInfo? command)
         {
-            if (!isPractice || player == null)
+            if (!RequirePractice(player))
+                return;
+            if (player == null)
                 return;
             string steamId = isSaveNadesAsGlobalEnabled ? "default" : player.SteamID.ToString();
             string path = Path.Join(Server.GameDirectory + "/csgo/cfg", MatchZyCfgRel("savednades.json"));
@@ -1114,7 +1125,9 @@ namespace MatchZy
         [ConsoleCommand("css_blind", "Throw a flashbang at yourself (pop-flash reaction practice)")]
         public void OnSelfFlashCommand(CCSPlayerController? player, CommandInfo? command)
         {
-            if (!isPractice || player == null || !player.UserId.HasValue || player.PlayerPawn.Value == null)
+            if (!RequirePractice(player))
+                return;
+            if (player == null || !player.UserId.HasValue || player.PlayerPawn.Value == null)
                 return;
             if (player.TeamNum != (byte)CsTeam.CounterTerrorist && player.TeamNum != (byte)CsTeam.Terrorist)
                 return;
@@ -1160,7 +1173,9 @@ namespace MatchZy
         [ConsoleCommand("css_clearnades", "Clears your grenade throw history")]
         public void OnWipeNadesCommand(CCSPlayerController? player, CommandInfo? command)
         {
-            if (!isPractice || player == null || !player.UserId.HasValue)
+            if (!RequirePractice(player))
+                return;
+            if (player == null || !player.UserId.HasValue)
                 return;
             int userId = player.UserId.Value;
             lastGrenadesData.Remove(userId);
@@ -1172,7 +1187,9 @@ namespace MatchZy
         [ConsoleCommand("css_god", "Sets Infinite health for player")]
         public void OnGodCommand(CCSPlayerController? player, CommandInfo? command)
         {
-            if (!isPractice || player == null || !IsPlayerValid(player))
+            if (!RequirePractice(player))
+                return;
+            if (player == null || !IsPlayerValid(player))
                 return;
 
             if (player?.PlayerPawn?.IsValid != true || player.PlayerPawn.Value == null)
@@ -1320,7 +1337,7 @@ namespace MatchZy
         [ConsoleCommand("css_sp", "Teleport to provided spawn")]
         public void OnSpawnCommand(CCSPlayerController? player, CommandInfo command)
         {
-            if (!isPractice)
+            if (!RequirePractice(player))
                 return;
             if (spawnsData.Values.Any(list => list.Count == 0))
                 GetSpawns();
@@ -1344,7 +1361,7 @@ namespace MatchZy
         [ConsoleCommand("css_ctspawn", "Teleport to provided CT spawn")]
         public void OnCtSpawnCommand(CCSPlayerController? player, CommandInfo command)
         {
-            if (!isPractice)
+            if (!RequirePractice(player))
                 return;
             if (spawnsData.Values.Any(list => list.Count == 0))
                 GetSpawns();
@@ -1368,7 +1385,7 @@ namespace MatchZy
         [ConsoleCommand("css_tspawn", "Teleport to provided T spawn")]
         public void OnTSpawnCommand(CCSPlayerController? player, CommandInfo command)
         {
-            if (!isPractice)
+            if (!RequirePractice(player))
                 return;
             if (spawnsData.Values.Any(list => list.Count == 0))
                 GetSpawns();
@@ -1462,7 +1479,9 @@ namespace MatchZy
         [ConsoleCommand("css_bot", "Spawns a bot at the player's position")]
         public void OnBotCommand(CCSPlayerController? player, CommandInfo? command)
         {
-            if (!isPractice || !IsPlayerValid(player))
+            if (!RequirePractice(player))
+                return;
+            if (!IsPlayerValid(player))
                 return;
 
             if (IsNoBotsFlagSet())
@@ -1484,7 +1503,9 @@ namespace MatchZy
         [ConsoleCommand("css_tbot", "Spawns a T bot at the player's position")]
         public void OnTBotCommand(CCSPlayerController? player, CommandInfo? command)
         {
-            if (!isPractice || !IsPlayerValid(player))
+            if (!RequirePractice(player))
+                return;
+            if (!IsPlayerValid(player))
                 return;
 
             if (IsNoBotsFlagSet())
@@ -1507,7 +1528,9 @@ namespace MatchZy
         [ConsoleCommand("css_ctbot", "Spawns a CT bot at the player's position")]
         public void OnCtBotCommand(CCSPlayerController? player, CommandInfo? command)
         {
-            if (!isPractice || !IsPlayerValid(player))
+            if (!RequirePractice(player))
+                return;
+            if (!IsPlayerValid(player))
                 return;
 
             if (IsNoBotsFlagSet())
@@ -1532,7 +1555,9 @@ namespace MatchZy
         [ConsoleCommand("css_duckbot")]
         public void OnCrouchBotCommand(CCSPlayerController? player, CommandInfo? command)
         {
-            if (!isPractice || !IsPlayerValid(player))
+            if (!RequirePractice(player))
+                return;
+            if (!IsPlayerValid(player))
                 return;
 
             if (IsNoBotsFlagSet())
@@ -1556,7 +1581,9 @@ namespace MatchZy
         [ConsoleCommand("css_tcrouchbot", "Spawns a crouched T bot at the player's position")]
         public void OnTCrouchBotCommand(CCSPlayerController? player, CommandInfo? command)
         {
-            if (!isPractice || !IsPlayerValid(player))
+            if (!RequirePractice(player))
+                return;
+            if (!IsPlayerValid(player))
                 return;
 
             if (IsNoBotsFlagSet())
@@ -1579,7 +1606,9 @@ namespace MatchZy
         [ConsoleCommand("css_ctcrouchbot", "Spawns a crouched CT bot at the player's position")]
         public void OnCtCrouchBotCommand(CCSPlayerController? player, CommandInfo? command)
         {
-            if (!isPractice || !IsPlayerValid(player))
+            if (!RequirePractice(player))
+                return;
+            if (!IsPlayerValid(player))
                 return;
 
             if (IsNoBotsFlagSet())
@@ -1602,7 +1631,9 @@ namespace MatchZy
         [ConsoleCommand("css_boost", "Spawns a bot at the player's position and boost the player on it")]
         public void OnBoostBotCommand(CCSPlayerController? player, CommandInfo? command)
         {
-            if (!isPractice || !IsPlayerValid(player))
+            if (!RequirePractice(player))
+                return;
+            if (!IsPlayerValid(player))
                 return;
 
             if (IsNoBotsFlagSet())
@@ -1626,7 +1657,9 @@ namespace MatchZy
         [ConsoleCommand("css_duckboost")]
         public void OnCrouchBoostBotCommand(CCSPlayerController? player, CommandInfo? command)
         {
-            if (!isPractice || !IsPlayerValid(player))
+            if (!RequirePractice(player))
+                return;
+            if (!IsPlayerValid(player))
                 return;
 
             if (IsNoBotsFlagSet())
@@ -2534,7 +2567,9 @@ namespace MatchZy
         [ConsoleCommand("css_rs", "Removes bots from the practice session")]
         public void OnRestartRoundCommand(CCSPlayerController? player, CommandInfo? command)
         {
-            if (!isPractice || player == null)
+            if (!RequirePractice(player))
+                return;
+            if (player == null)
                 return;
             // Restarts the game for everyone on the server: admins only.
             if (!IsPlayerAdmin(player, "css_rs", "@css/map", "@custom/prac"))
@@ -2549,7 +2584,9 @@ namespace MatchZy
         [ConsoleCommand("css_nobot", "Removes the closest bot from the practice session")]
         public void OnNoBotCommand(CCSPlayerController? player, CommandInfo? command)
         {
-            if (!isPractice || player == null || !IsPlayerValid(player))
+            if (!RequirePractice(player))
+                return;
+            if (player == null || !IsPlayerValid(player))
                 return;
 
             if (IsNoBotsFlagSet())
@@ -2649,7 +2686,9 @@ namespace MatchZy
         [ConsoleCommand("css_nobots", "Removes bots from the practice session")]
         public void OnNoBotsCommand(CCSPlayerController? player, CommandInfo? command)
         {
-            if (!isPractice || player == null)
+            if (!RequirePractice(player))
+                return;
+            if (player == null)
                 return;
             // Drop the quota to 0 BEFORE kicking, else bot_quota_mode normal refills the kicked bots.
             KickAllBotsProtectCSTV();
@@ -2667,7 +2706,9 @@ namespace MatchZy
         [ConsoleCommand("css_fastforward", "Fast forwards the timescale to 20 seconds")]
         public void OnFFCommand(CCSPlayerController? player, CommandInfo? command)
         {
-            if (!isPractice || player == null)
+            if (!RequirePractice(player))
+                return;
+            if (player == null)
                 return;
 
             if (preFastForwardMoveTypes != null)
@@ -2737,7 +2778,9 @@ namespace MatchZy
         [ConsoleCommand("css_cleanup", "Clears all utility currently on the map")]
         public void OnCleanupCommand(CCSPlayerController? player, CommandInfo? command)
         {
-            if (!isPractice || player == null)
+            if (!RequirePractice(player))
+                return;
+            if (player == null)
                 return;
             RemoveGrenadeEntities();
             PrintToPlayerChat(player, Localizer.ForPlayer(player, "matchzy.pm.utilitycleared"));
@@ -2746,7 +2789,9 @@ namespace MatchZy
         [ConsoleCommand("css_autoclear", "Toggle auto-clearing older utility when a new grenade detonates")]
         public void OnAutoClearCommand(CCSPlayerController? player, CommandInfo? command)
         {
-            if (!isPractice || player == null)
+            if (!RequirePractice(player))
+                return;
+            if (player == null)
                 return;
             autoClearUtility = !autoClearUtility;
             PrintToPlayerChat(player, Localizer.ForPlayer(player, autoClearUtility ? "matchzy.pm.autoclearon" : "matchzy.pm.autoclearoff"));
@@ -2756,7 +2801,9 @@ namespace MatchZy
         [ConsoleCommand("css_lm", "Toggle a beam marker at each grenade's detonation point")]
         public void OnLandMarkerCommand(CCSPlayerController? player, CommandInfo? command)
         {
-            if (!isPractice || player == null)
+            if (!RequirePractice(player))
+                return;
+            if (player == null)
                 return;
             showLandingMarkers = !showLandingMarkers;
             PrintToPlayerChat(player, Localizer.ForPlayer(player, showLandingMarkers ? "matchzy.pm.landmarkeron" : "matchzy.pm.landmarkeroff"));
@@ -2766,7 +2813,9 @@ namespace MatchZy
         [ConsoleCommand("css_traceline", "Toggle drawing the trajectory arc of thrown grenades")]
         public void OnArcCommand(CCSPlayerController? player, CommandInfo? command)
         {
-            if (!isPractice || player == null)
+            if (!RequirePractice(player))
+                return;
+            if (player == null)
                 return;
             traceNadeArcs = !traceNadeArcs;
             PrintToPlayerChat(player, Localizer.ForPlayer(player, traceNadeArcs ? "matchzy.pm.arcon" : "matchzy.pm.arcoff"));
@@ -2881,7 +2930,9 @@ namespace MatchZy
         [ConsoleCommand("css_spec", "Switches team to Spectator")]
         public void OnSpecCommand(CCSPlayerController? player, CommandInfo? command)
         {
-            if (!isPractice || player == null)
+            if (!RequirePractice(player))
+                return;
+            if (player == null)
                 return;
 
             // Force respawn before switching to spec to clear any noclip/movement state
@@ -2901,7 +2952,9 @@ namespace MatchZy
         [ConsoleCommand("css_watchme", "Switches all other players to spectator")]
         public void OnFASCommand(CCSPlayerController? player, CommandInfo? command)
         {
-            if (!isPractice || player == null)
+            if (!RequirePractice(player))
+                return;
+            if (player == null)
                 return;
             // Moves every other player to spectator: admins only.
             if (!IsPlayerAdmin(player, "css_fas", "@css/map", "@custom/prac"))
@@ -2917,7 +2970,9 @@ namespace MatchZy
         [ConsoleCommand("css_noflash", "Disables flash effect for the player")]
         public void OnNoFlashCommand(CCSPlayerController? player, CommandInfo? command)
         {
-            if (!isPractice || player == null || player.UserId == null)
+            if (!RequirePractice(player))
+                return;
+            if (player == null || player.UserId == null)
                 return;
 
             int userId = player.UserId.Value;
@@ -2944,7 +2999,7 @@ namespace MatchZy
         [ConsoleCommand("css_nobreak", "")]
         public void OnBreakRestoreCommand(CCSPlayerController? player, CommandInfo? command)
         {
-            if (!isPractice)
+            if (!RequirePractice(player))
                 return;
 
             var gameRules = Utilities.FindAllEntitiesByDesignerName<CCSGameRulesProxy>("cs_gamerules").FirstOrDefault()?.GameRules;
@@ -2969,7 +3024,7 @@ namespace MatchZy
         [ConsoleCommand("css_break", "Breaks the breakable entities")]
         public void OnBreakCommand(CCSPlayerController? player, CommandInfo? command)
         {
-            if (!isPractice)
+            if (!RequirePractice(player))
                 return;
 
             // Get all breakable entities including doors
@@ -3755,7 +3810,9 @@ namespace MatchZy
         [ConsoleCommand("css_rt", "Throws the last thrown grenade")]
         public void OnRethrowCommand(CCSPlayerController? player, CommandInfo? command)
         {
-            if (!isPractice || player == null || !player.UserId.HasValue)
+            if (!RequirePractice(player))
+                return;
+            if (player == null || !player.UserId.HasValue)
                 return;
             int userId = player.UserId.Value;
             if (!lastGrenadesData.ContainsKey(userId) || lastGrenadesData[userId].Count <= 0)
@@ -3772,7 +3829,7 @@ namespace MatchZy
         [ConsoleCommand("css_globalrethrow", "Rethrows every player's last thrown grenade at once")]
         public void OnGlobalRethrowCommand(CCSPlayerController? player, CommandInfo? command)
         {
-            if (!isPractice)
+            if (!RequirePractice(player))
                 return;
             // Throws for every player on the server: admins only.
             if (!IsPlayerAdmin(player, "css_grt", "@css/map", "@custom/prac"))
@@ -3949,7 +4006,9 @@ namespace MatchZy
         [ConsoleCommand("css_flashtest", "Toggle a readout of your own blind duration when flashed")]
         public void OnFlashTestCommand(CCSPlayerController? player, CommandInfo? command)
         {
-            if (!isPractice || player == null || !player.UserId.HasValue)
+            if (!RequirePractice(player))
+                return;
+            if (player == null || !player.UserId.HasValue)
                 return;
             int userId = player.UserId.Value;
             if (flashTestList.Remove(userId))
@@ -4011,7 +4070,9 @@ namespace MatchZy
         [ConsoleCommand("css_last", "Teleports to the last thrown grenade position")]
         public void OnLastCommand(CCSPlayerController? player, CommandInfo? command)
         {
-            if (!isPractice || player == null || !player.UserId.HasValue)
+            if (!RequirePractice(player))
+                return;
+            if (player == null || !player.UserId.HasValue)
                 return;
 
             // No teleporting spectators or dead pawns
@@ -4032,7 +4093,9 @@ namespace MatchZy
         [ConsoleCommand("css_back", "Teleports to the provided position in grenade thrown history")]
         public void OnBackCommand(CCSPlayerController? player, CommandInfo command)
         {
-            if (!isPractice || player == null || !player.UserId.HasValue)
+            if (!RequirePractice(player))
+                return;
+            if (player == null || !player.UserId.HasValue)
                 return;
 
             // Prevent spectators from teleporting
@@ -4078,7 +4141,9 @@ namespace MatchZy
         [ConsoleCommand("css_lastindex", "Returns index of the last thrown grenade")]
         public void OnLastIndexCommand(CCSPlayerController? player, CommandInfo? command)
         {
-            if (!isPractice || !IsPlayerValid(player))
+            if (!RequirePractice(player))
+                return;
+            if (!IsPlayerValid(player))
                 return;
             if (IsValidPositionForLastGrenade(player!, 1))
             {
@@ -4089,7 +4154,9 @@ namespace MatchZy
         [ConsoleCommand("css_delay", "Adds a delay to the last thrown grenade. Usage: !delay <delay_in_seconds>")]
         public void OnDelayCommand(CCSPlayerController? player, CommandInfo command)
         {
-            if (!isPractice || !IsPlayerValid(player))
+            if (!RequirePractice(player))
+                return;
+            if (!IsPlayerValid(player))
                 return;
             if (command.ArgCount >= 2)
             {
@@ -4104,7 +4171,9 @@ namespace MatchZy
         [ConsoleCommand("css_timer", "Starts a timer, use .timer again to stop it.")]
         public void OnTimerCommand(CCSPlayerController? player, CommandInfo? command)
         {
-            if (!isPractice || !IsPlayerValid(player))
+            if (!RequirePractice(player))
+                return;
+            if (!IsPlayerValid(player))
                 return;
             int userId = player!.UserId!.Value;
             if (playerTimers.ContainsKey(userId))
@@ -4127,7 +4196,9 @@ namespace MatchZy
         [ConsoleCommand("css_savenade", "Saves current nade position")]
         public void OnSaveNadeCommand(CCSPlayerController? player, CommandInfo command)
         {
-            if (!isPractice || !IsPlayerValid(player))
+            if (!RequirePractice(player))
+                return;
+            if (!IsPlayerValid(player))
                 return;
 
             HandleSaveNadeCommand(player, command.ArgString);
@@ -4137,7 +4208,9 @@ namespace MatchZy
         [ConsoleCommand("css_loadnade", "Loades the nade with provided filter")]
         public void OnLoadNadeCommand(CCSPlayerController? player, CommandInfo command)
         {
-            if (!isPractice || !IsPlayerValid(player))
+            if (!RequirePractice(player))
+                return;
+            if (!IsPlayerValid(player))
                 return;
 
             if (player!.TeamNum == (byte)CsTeam.Spectator)
@@ -4150,7 +4223,9 @@ namespace MatchZy
         [ConsoleCommand("css_listnades", "Lists the nade with provided filter")]
         public void OnListNadesCommand(CCSPlayerController? player, CommandInfo command)
         {
-            if (!isPractice || !IsPlayerValid(player))
+            if (!RequirePractice(player))
+                return;
+            if (!IsPlayerValid(player))
                 return;
 
             HandleListNadesCommand(player, command.ArgString);
@@ -4160,7 +4235,9 @@ namespace MatchZy
         [ConsoleCommand("css_in", "Imports the nade with the given code")]
         public void OnImportNadeCommand(CCSPlayerController? player, CommandInfo command)
         {
-            if (!isPractice || !IsPlayerValid(player))
+            if (!RequirePractice(player))
+                return;
+            if (!IsPlayerValid(player))
                 return;
 
             HandleImportNadeCommand(player, command.ArgString);
@@ -4171,7 +4248,9 @@ namespace MatchZy
         [ConsoleCommand("css_dn", "Deletes the nade by name")]
         public void OnDeleteNadeCommand(CCSPlayerController? player, CommandInfo command)
         {
-            if (!isPractice || !IsPlayerValid(player))
+            if (!RequirePractice(player))
+                return;
+            if (!IsPlayerValid(player))
                 return;
 
             HandleDeleteNadeCommand(player, command.ArgString);
@@ -4180,7 +4259,9 @@ namespace MatchZy
         [ConsoleCommand("css_solid", "Toggles mp_solid_teammates in practice mode")]
         public void OnSolidCommand(CCSPlayerController? player, CommandInfo? command)
         {
-            if (!isPractice || !IsPlayerValid(player))
+            if (!RequirePractice(player))
+                return;
+            if (!IsPlayerValid(player))
                 return;
 
             int solidValue = ConVar.Find("mp_solid_teammates")!.GetPrimitiveValue<int>();
@@ -4251,7 +4332,9 @@ namespace MatchZy
         [ConsoleCommand("css_impacts", "Toggles sv_showimpacts in practice mode")]
         public void OnImpactsCommand(CCSPlayerController? player, CommandInfo? command)
         {
-            if (!isPractice || !IsPlayerValid(player))
+            if (!RequirePractice(player))
+                return;
+            if (!IsPlayerValid(player))
                 return;
 
             // Not in the dictionary = never toggled = at the per-player default, which is ON
@@ -4281,7 +4364,9 @@ namespace MatchZy
         [ConsoleCommand("css_pip", "Toggles sv_grenade_trajectory_prac_pipreview in practice mode")]
         public void OnTrajCommand(CCSPlayerController? player, CommandInfo? command)
         {
-            if (!isPractice || !IsPlayerValid(player))
+            if (!RequirePractice(player))
+                return;
+            if (!IsPlayerValid(player))
                 return;
 
             // Toggle the player's personal preference
@@ -4298,7 +4383,9 @@ namespace MatchZy
         [ConsoleCommand("css_bestspawn", "Teleports you to your team's closest spawn from your current position")]
         public void OnBestSpawnCommand(CCSPlayerController? player, CommandInfo? command)
         {
-            if (!isPractice || !IsPlayerValid(player))
+            if (!RequirePractice(player))
+                return;
+            if (!IsPlayerValid(player))
                 return;
 
             if (player!.TeamNum == (byte)CsTeam.Spectator)
@@ -4310,7 +4397,9 @@ namespace MatchZy
         [ConsoleCommand("css_worstspawn", "Teleports you to your team's furthest spawn from your current position")]
         public void OnWorstSpawnCommand(CCSPlayerController? player, CommandInfo? command)
         {
-            if (!isPractice || !IsPlayerValid(player))
+            if (!RequirePractice(player))
+                return;
+            if (!IsPlayerValid(player))
                 return;
 
             if (player!.TeamNum == (byte)CsTeam.Spectator)
@@ -4322,7 +4411,9 @@ namespace MatchZy
         [ConsoleCommand("css_bestctspawn", "Teleports you to CT team's closest spawn from your current position")]
         public void OnBestCTSpawnCommand(CCSPlayerController? player, CommandInfo? command)
         {
-            if (!isPractice || !IsPlayerValid(player))
+            if (!RequirePractice(player))
+                return;
+            if (!IsPlayerValid(player))
                 return;
 
             if (player!.TeamNum == (byte)CsTeam.Spectator)
@@ -4334,7 +4425,9 @@ namespace MatchZy
         [ConsoleCommand("css_worstctspawn", "Teleports you to CT team's furthest spawn from your current position")]
         public void OnWorstCTSpawnCommand(CCSPlayerController? player, CommandInfo? command)
         {
-            if (!isPractice || !IsPlayerValid(player))
+            if (!RequirePractice(player))
+                return;
+            if (!IsPlayerValid(player))
                 return;
 
             if (player!.TeamNum == (byte)CsTeam.Spectator)
@@ -4346,7 +4439,9 @@ namespace MatchZy
         [ConsoleCommand("css_besttspawn", "Teleports you to T team's closest spawn from your current position")]
         public void OnBestTSpawnCommand(CCSPlayerController? player, CommandInfo? command)
         {
-            if (!isPractice || !IsPlayerValid(player))
+            if (!RequirePractice(player))
+                return;
+            if (!IsPlayerValid(player))
                 return;
 
             if (player!.TeamNum == (byte)CsTeam.Spectator)
@@ -4358,7 +4453,9 @@ namespace MatchZy
         [ConsoleCommand("css_worsttspawn", "Teleports you to T team's furthest spawn from your current position")]
         public void OnWorstTSpawnCommand(CCSPlayerController? player, CommandInfo? command)
         {
-            if (!isPractice || !IsPlayerValid(player))
+            if (!RequirePractice(player))
+                return;
+            if (!IsPlayerValid(player))
                 return;
 
             if (player!.TeamNum == (byte)CsTeam.Spectator)
@@ -4370,7 +4467,9 @@ namespace MatchZy
         [ConsoleCommand("css_showspawns", "Highlights all the competitive spawns")]
         public void OnShowSpawnsCommand(CCSPlayerController? player, CommandInfo? command)
         {
-            if (!isPractice || !IsPlayerValid(player))
+            if (!RequirePractice(player))
+                return;
+            if (!IsPlayerValid(player))
                 return;
             RemoveSpawnBeams();   // clears the flag + list too
             if (spawnsData.Values.Any(list => list.Count == 0))
@@ -4465,7 +4564,9 @@ namespace MatchZy
         [ConsoleCommand("css_hidespawns", "Hides the highlighted spawns")]
         public void OnHideSpawnsCommand(CCSPlayerController? player, CommandInfo? command)
         {
-            if (!isPractice || !IsPlayerValid(player))
+            if (!RequirePractice(player))
+                return;
+            if (!IsPlayerValid(player))
                 return;
             RemoveSpawnBeams();   // also disarms the +use interaction
             PrintToPlayerChat(player!, Localizer.ForPlayer(player, "matchzy.pm.spawnmarkersoff"));

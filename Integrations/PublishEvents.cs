@@ -57,10 +57,15 @@ namespace MatchZy
         // server_shutdown is sent while the process is about to exit; keep the lifecycle events short.
         private static readonly TimeSpan LifecycleEventTimeout = TimeSpan.FromSeconds(3);
 
-        // The scorebot's per-action events (class names ending in LiveEvent) are many per round and
-        // only useful in real time; everything else is a match event that must arrive.
-        private static bool IsHighVolumeLiveEvent(MatchZyEvent e) => e.GetType().Name.EndsWith("LiveEvent", StringComparison.Ordinal)
-            && e is not MatchPausedLiveEvent && e is not MatchUnpausedLiveEvent;
+        // The scorebot's per-action events (legacy classes ending in LiveEvent, and their Get5-format
+        // counterparts starting with Get5) are many per round and only useful in real time;
+        // everything else, pauses included, is a match event that must arrive.
+        private static bool IsHighVolumeLiveEvent(MatchZyEvent e)
+        {
+            string name = e.GetType().Name;
+            bool live = name.EndsWith("LiveEvent", StringComparison.Ordinal) || name.StartsWith("Get5", StringComparison.Ordinal);
+            return live && e is not MatchPausedLiveEvent && e is not MatchUnpausedLiveEvent && e is not Get5MatchPauseEvent;
+        }
 
         private async Task RunEventSenderAsync()
         {
@@ -128,6 +133,8 @@ namespace MatchZy
         /// </summary>
         public void PublishEvent(MatchZyEvent @event)
         {
+            if (UseGet5Events)
+                @event = ToGet5Event(@event);
             EnqueueEvent(@event, CurrentRemoteLogTarget(), liveMatchId);
         }
 

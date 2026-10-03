@@ -332,6 +332,11 @@ namespace MatchZy
         // changed nothing can skip the whole build instead of rebuilding and then discovering
         // the result was identical.
         private int _rpVersion;
+        // Inputs of the last full ready-panel pass (RenderReadyPanel skips unchanged ticks).
+        private int _rpLastRenderVersion = -1;
+        private int _clanTagVersion = -1;
+        private string? _rpLastRenderMode;
+        private bool _rpLastRenderNotReadyVisible;
         private string _rpBar = "";
         private int _rpBarVersion = -1;
         // Last panel state per player (by userid). The panel is only re-sent when its content
@@ -472,7 +477,13 @@ namespace MatchZy
             try
             {
                 ComputeReadyData();
-                HandleClanTags();
+                // Tags only change with the ready data (ready toggles, connects, team changes all bump
+                // its version); event paths that need an immediate update call HandleClanTags directly.
+                if (_clanTagVersion != _rpVersion)
+                {
+                    _clanTagVersion = _rpVersion;
+                    HandleClanTags();
+                }
                 SyncUnreadyChatReminder();
 
                 if (readyHintStyle.Value == 0)
@@ -695,6 +706,20 @@ namespace MatchZy
                     _rpBarVersion = _rpVersion;
                 }
                 string bar = _rpBar;
+
+                // Nothing the panels depend on changed since the last pass (ready data, mode, blink
+                // phase) and no keepalive is due: skip the 64-slot walk. Every 8th tick still runs so a
+                // team change, which only bumps the ready data on the next 1 s compute, shows within
+                // ~125 ms instead of up to a second.
+                if (!keepalive
+                    && _rpLastRenderVersion == _rpVersion
+                    && ReferenceEquals(_rpLastRenderMode, mode)
+                    && _rpLastRenderNotReadyVisible == notReadyVisible
+                    && _readyTickCounter % 8 != 0)
+                    return;
+                _rpLastRenderVersion = _rpVersion;
+                _rpLastRenderMode = mode;
+                _rpLastRenderNotReadyVisible = notReadyVisible;
 
                 // Slot loop instead of Utilities.GetPlayers(): that helper allocates a fresh List
                 // on every call, and this runs every tick for the whole ready phase.
@@ -1586,7 +1611,7 @@ namespace MatchZy
                 {
                     if (!IsPlayerValid(coach))
                         continue;
-                    coach.Clan = "";
+                    ApplyClanTag(coach, "");
                     SetPlayerVisible(coach);
                 }
 
@@ -2064,7 +2089,7 @@ namespace MatchZy
                 // Update coach clan tags
                 foreach (var coach in matchzyTeam1.coach)
                 {
-                    coach.Clan = $"[{matchzyTeam1.teamName} COACH]";
+                    ApplyClanTag(coach, $"[{matchzyTeam1.teamName} COACH]");
                 }
             }
 
@@ -2095,7 +2120,7 @@ namespace MatchZy
                 // Update coach clan tags
                 foreach (var coach in matchzyTeam2.coach)
                 {
-                    coach.Clan = $"[{matchzyTeam2.teamName} COACH]";
+                    ApplyClanTag(coach, $"[{matchzyTeam2.teamName} COACH]");
                 }
             }
 
@@ -2238,6 +2263,9 @@ namespace MatchZy
             {
                 if (player == null || !player.IsValid || player.IsBot || !player.UserId.HasValue)
                     continue;
+                // Coaches keep their [TEAM COACH] tag; they do not ready up.
+                if (IsMatchCoach(player))
+                    continue;
 
                 // Only T/CT get ready tags. Spectators/unassigned → strip any stale tag.
                 if (player.TeamNum != 2 && player.TeamNum != 3)
@@ -2272,7 +2300,7 @@ namespace MatchZy
                 bool anyChanged = false;
                 foreach (var player in Utilities.GetPlayers())
                 {
-                    if (player == null || !player.IsValid || player.IsBot)
+                    if (player == null || !player.IsValid || player.IsBot || IsMatchCoach(player))
                         continue;
 
                     if (!string.IsNullOrEmpty(player.Clan))
@@ -2738,6 +2766,7 @@ namespace MatchZy
             // Initialize advanced stats tracking for this round
             OnAdvancedStatsRoundStart();
             ResetLiveRoundKillCounters();
+            ClearLiveRoundPlayStart();
             Stage("advstats");
 
             // ── Live scorebot: round_start event ──
@@ -2803,7 +2832,7 @@ namespace MatchZy
                         MapNumber = matchConfig.CurrentMapNumber,
                         RoundNumber = GetRoundNumer(),
                         Reason = @event.Reason,
-                        RoundTime = 0,
+                        RoundTime = LiveRoundTimeMs(),
                         Winner = winner,
                         StatsTeam1 = new MatchZyStatsTeam(matchzyTeam1.id, matchzyTeam1.teamName, matchzyTeam1.seriesScore, t1score, 0, 0, playerStatsListTeam1),
                         StatsTeam2 = new MatchZyStatsTeam(matchzyTeam2.id, matchzyTeam2.teamName, matchzyTeam2.seriesScore, t2score, 0, 0, playerStatsListTeam2),
@@ -4003,6 +4032,9 @@ namespace MatchZy
             if (hostname == "" || hostname == "\"\"")
                 return;
             string formattedHostname = FormatCvarValue(hostname);
+            // Runs every round start; skip the console command when the hostname is already set.
+            if (ConVar.Find("hostname")?.StringValue == formattedHostname)
+                return;
             Server.ExecuteCommand($"hostname {formattedHostname}");
         }
 
@@ -4892,6 +4924,24 @@ namespace MatchZy
             }
         }
 
+        // whitelist.cfg parsed once and reused until the file changes (one stat per connect instead
+        // of reading and scanning the whole file on the game thread).
+        private HashSet<string>? _whitelistCache;
+        private string? _whitelistCachePath;
+        private DateTime _whitelistCacheWriteTime;
+
+        private HashSet<string> GetWhitelist(string path)
+        {
+            DateTime writeTime = File.GetLastWriteTimeUtc(path);
+            if (_whitelistCache == null || _whitelistCachePath != path || _whitelistCacheWriteTime != writeTime)
+            {
+                _whitelistCache = new HashSet<string>(File.ReadAllLines(path).Select(line => line.Trim()), StringComparer.Ordinal);
+                _whitelistCachePath = path;
+                _whitelistCacheWriteTime = writeTime;
+            }
+            return _whitelistCache;
+        }
+
         public bool HandlePlayerWhitelist(CCSPlayerController player, string steamId)
         {
             // Whitelist off: no file access at all. It used to create and read whitelist.cfg on the
@@ -4907,8 +4957,7 @@ namespace MatchZy
             if (!File.Exists(whitelistPath))
                 File.WriteAllLines(whitelistPath, new[] { "Steamid1", "Steamid2" });
 
-            var whiteList = File.ReadAllLines(whitelistPath).Select(line => line.Trim());
-            if (!whiteList.Contains(steamId))
+            if (!GetWhitelist(whitelistPath).Contains(steamId))
             {
                 Log($"[EventPlayerConnectFull] KICKING PLAYER STEAMID: {steamId}, Name: {player.PlayerName} (Not whitelisted!)");
                 PrintLocalizedToAll("matchzy.util.kicknotwhitelisted", player.PlayerName);

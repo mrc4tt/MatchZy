@@ -14,6 +14,10 @@ matchzy_remote_log_header_value "Bearer <token>"
 
 A second header pair (`matchzy_remote_log_auth_key` / `matchzy_remote_log_auth_value`) is available for services that need two. :fontawesome-solid-code-fork:
 
+## Format
+
+Live events follow [Get5's event schema](https://splewis.github.io/get5/latest/events.html) by default: players and weapons are nested objects (`player`, `attacker`, `weapon`), so a receiver built for Get5 can read them directly. `matchzy_events_format legacy` switches back to the flat format of 0.8.94 and older (`killer_name`, `victim_steamid`, ...). See the [Events reference](../reference/events.md#live-scorebot).
+
 ## Delivery
 
 - `POST`, `Content-Type: application/json`, one event per request.
@@ -36,7 +40,7 @@ app.post("/matchzy/events", (req, res) => {
   const e = req.body;
   switch (e.event) {
     case "player_kill":
-      console.log(`${e.killer_name} killed ${e.victim_name} with ${e.weapon}` + (e.headshot ? " (HS)" : ""));
+      console.log(`${e.attacker.name} killed ${e.player.name} with ${e.weapon.name}` + (e.headshot ? " (HS)" : ""));
       break;
     case "round_end":
       console.log(`Round ${e.round_number}: ${e.team1.score} - ${e.team2.score}`);

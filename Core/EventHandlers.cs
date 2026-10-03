@@ -212,6 +212,10 @@ public partial class MatchZy
             lastGrenadeBackCursor.Remove(userId);
             lastSpawnMarkerUseTime.Remove(userId);
             nadeSpecificLastGrenadeData.Remove(userId);
+            lastNadeMarkerUseTime.Remove(userId);
+            lastNadeToggleTime.Remove(userId);
+            _lastPanelHtml.Remove(userId);
+            stopCommandCooldowns.Remove(player.SteamID);
 
             // Leak fix: a .timer repeating timer (0.2s REPEAT) keeps firing
             // DisplayPracticeTimerCenter(userId) forever if the player disconnects
