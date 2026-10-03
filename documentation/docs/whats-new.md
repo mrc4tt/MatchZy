@@ -2,6 +2,10 @@
 
 A short summary of each release. The [full changelog](changelog.md) has the details and background for every change.
 
+## 0.8.99 <small>October 3, 2026</small>
+
+- **New:** `.friendlyfire` / `.ff` (outside practice) turns friendly fire on or off before a match, scrim or hill starts, like `.knife`. In practice `.ff` is still fast-forward.
+
 ## 0.8.98 <small>October 3, 2026</small>
 
 - **New:** `matchzy_empty_shutdown_seconds` closes a server that has had no players for the set time, after sending `server_shutdown` with `reason` `empty`. It waits for demo and backup uploads. Off by default.

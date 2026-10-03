@@ -2706,8 +2706,12 @@ namespace MatchZy
         [ConsoleCommand("css_fastforward", "Fast forwards the timescale to 20 seconds")]
         public void OnFFCommand(CCSPlayerController? player, CommandInfo? command)
         {
-            if (!RequirePractice(player))
+            // Outside practice, .ff is the friendly fire toggle for the coming match (.friendlyfire).
+            if (!isPractice)
+            {
+                OnFriendlyFireCommand(player, command);
                 return;
+            }
             if (player == null)
                 return;
 

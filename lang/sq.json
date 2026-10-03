@@ -541,5 +541,8 @@
     "matchzy.pause.techhintanyone": "{0}: pauzë teknike. Secili ekip mund të shkruajë .unpause.",
     "matchzy.pause.techhintpending": "{0}: pauza teknike fillon në freeze time. Shkruaj .unpause për ta anuluar.",
     "matchzy.pause.pauserequestcanceled": "{green}{0}{default} anuloi pauzën e tyre teknike.",
-    "matchzy.pause.unpausedby": "{green}{0}{default} përfundoi pauzën teknike."
+    "matchzy.pause.unpausedby": "{green}{0}{default} përfundoi pauzën teknike.",
+    "matchzy.cc.friendlyfire": "Friendly fire për ndeshjen tani është {green}{0}{default}.",
+    "matchzy.cc.friendlyfirestarted": "Friendly fire mund të ndryshohet vetëm para se të fillojë ndeshja.",
+    "matchzy.cc.friendlyfirepractice": "Friendly fire caktohet nga modaliteti i ndeshjes, jo në praktikë."
 }

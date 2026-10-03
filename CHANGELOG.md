@@ -2,6 +2,12 @@
 
 Based on [MatchZy](https://github.com/shobhit-pathak/MatchZy) by Shobhit Pathak, adapted for CS2 game-server hosting: remote log HTTP API, G5API compatibility, auto changelevel, advanced stats (HLTV 2.0 rating / KAST / clutch / opening duels), a coach system, a pause overhaul, and in-game admin and match-setup menus.
 
+# 0.8.99
+
+#### October 3, 2026
+
+- New `.friendlyfire` (also `.ffire`, and `.ff` outside practice mode): admins turn friendly fire on or off for the coming match, scrim or hill before it starts, like `.knife` for the knife round. It is applied on top of live.cfg / scrim.cfg / hill.cfg and the match config on every map of the series, and cleared when the match is reset. In practice mode `.ff` is still fast-forward.
+
 # 0.8.98
 
 #### October 3, 2026

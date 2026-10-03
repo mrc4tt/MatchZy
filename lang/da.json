@@ -541,5 +541,8 @@
     "matchzy.pause.techhintanyone": "{0}: teknisk pause. Hvert hold kan skrive .unpause.",
     "matchzy.pause.techhintpending": "{0}: teknisk pause starter i freeze time. Skriv .unpause for at annullere.",
     "matchzy.pause.pauserequestcanceled": "{green}{0}{default} annullerede deres tekniske pause.",
-    "matchzy.pause.unpausedby": "{green}{0}{default} afsluttede den tekniske pause."
+    "matchzy.pause.unpausedby": "{green}{0}{default} afsluttede den tekniske pause.",
+    "matchzy.cc.friendlyfire": "Friendly fire for kampen er nu {green}{0}{default}.",
+    "matchzy.cc.friendlyfirestarted": "Friendly fire kan kun ændres, før kampen starter.",
+    "matchzy.cc.friendlyfirepractice": "Friendly fire styres af kamptilstanden, ikke i practice."
 }

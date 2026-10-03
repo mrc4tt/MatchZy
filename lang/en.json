@@ -541,5 +541,8 @@
     "matchzy.pause.techhintanyone": "{0}: technical pause. Either team can type .unpause.",
     "matchzy.pause.techhintpending": "{0}: technical pause starts at freeze time. Type .unpause to cancel it.",
     "matchzy.pause.pauserequestcanceled": "{green}{0}{default} cancelled their technical pause.",
-    "matchzy.pause.unpausedby": "{green}{0}{default} ended the technical pause."
+    "matchzy.pause.unpausedby": "{green}{0}{default} ended the technical pause.",
+    "matchzy.cc.friendlyfire": "Friendly fire for the match is now {green}{0}{default}.",
+    "matchzy.cc.friendlyfirestarted": "Friendly fire can only be changed before the match starts.",
+    "matchzy.cc.friendlyfirepractice": "Friendly fire is set by the match mode, not in practice."
 }

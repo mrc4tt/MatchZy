@@ -105,6 +105,7 @@ Before a match goes live, players ready up. The match starts when enough players
 | `.start` `.force` `.forcestart` | Config | Starts the match now, skipping the ready check. Not in practice or dryrun. |
 | `.readyrequired [n]` `.teamsize [n]` | Config | Sets how many ready players are needed (0 to 32). `0` = everyone connected. Without a number it shows the current value. |
 | `.knife` `.rk` `.kr` `.kniferound` | Config | Turns the knife round on or off for this match. Also `!roundknife`. |
+| `.friendlyfire` `.ffire` `.ff` | Config | Turns friendly fire on or off for the coming match, scrim or hill, before it starts. Kept for every map of the series. In practice mode `.ff` is fast-forward instead. |
 | `.team1 <name>` `.ctname <name>` | Config | Sets the name of the team currently on CT. |
 | `.team2 <name>` `.tname <name>` | Config | Sets the name of the team currently on T. |
 | `.whitelist` | Config | Turns the whitelist on or off (`whitelist.cfg`). Also `!wl`. |
@@ -314,7 +315,7 @@ The per-type rethrow commands also work as `.rethrowsmoke`, `.rethrowflash`, `.r
 | `.blind` | Throws a flashbang at your face, for pop-flash reaction practice. |
 | `.god` | You take no damage. Type again to turn it off. |
 | `.solid` | Toggles whether teammates block each other. |
-| `.ff` `.fastforward` | Speeds up time for 10 seconds (wait out smokes and fires). Players are frozen meanwhile. |
+| `.ff` `.fastforward` | Speeds up time for 10 seconds (wait out smokes and fires). Players are frozen meanwhile. Outside practice `.ff` toggles friendly fire instead (see `.friendlyfire`). |
 | `.break` | Breaks all breakable glass, doors and props. |
 | `.breakrestore` `.nobreak` | Restores everything `.break` destroyed. |
 | `.rs` `.rr` | Restarts the practice round for everyone. Map/prac admins only. |
