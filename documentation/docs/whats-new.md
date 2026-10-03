@@ -2,6 +2,18 @@
 
 A short summary of each release. The [full changelog](changelog.md) has the details and background for every change.
 
+## 0.8.95 <small>October 3, 2026</small>
+
+- **New:** Optional `<mode>_override.cfg` files (e.g. `warmup_override.cfg`) run right after their mode cfg. MatchZy never writes them, so your own settings survive every update. See [Server-specific settings](reference/files.md#server-specific-settings).
+- **New:** `mikzy_version` / `css_mikzy_version` aliases for `matchzy_version`.
+- **Changed:** Default warmup.cfg is back to normal warmup values (no spawn protection, no purchase limit, flashbangs allowed). Existing files are not rewritten; put the 0.8.94 values in `warmup_override.cfg` to keep them.
+- **Fixed:** `.forceready` with `matchzy_ready_per_team` readies a team with fewer players than required.
+- **Fixed:** `.readycheck` and the `matchzy_ready_hint_style 2` chat reminder respect `matchzy_ready_per_team`.
+- **Fixed:** Dry run and practice started from warmup no longer keep the warmup purchase limit and spawn protection (update your own dryrun.cfg / prac.cfg, see the changelog).
+- **Fixed:** Round timer hidden in live play when a live, scrim or hill cfg file was missing.
+- **Fixed:** A `map_change` event with an empty map name was sent at every server start.
+- **Fixed:** Stall on the first `.rt` / `.throw` after a server start.
+
 ## 0.8.94 <small>October 2, 2026</small>
 
 - **New:** `matchzy_ready_per_team`: a team is ready once that many of its players are ready (`1` = one player per team). Works for pugs and loaded matches. See [Ready system](guides/ready-system.md).
