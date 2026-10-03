@@ -34,12 +34,19 @@
   vertical-align: middle;
 }
 
-/* Comparison table marks */
-.mz-yes { color: #2e7d32; font-weight: 700; }
-.mz-no { color: var(--md-default-fg-color--lighter); }
-.mz-plus { color: var(--md-primary-fg-color); font-weight: 700; }
-[data-md-color-scheme="slate"] .mz-yes { color: #66bb6a; }
+/* Wider pages: the reference tables need the room (Material's default is 61rem). */
+.md-grid { max-width: 76rem; }
 
-/* Tables: keep command columns tidy */
+/* Tables use the full content width. Name and value columns stay compact, the last column
+   (the description) gets the rest with a readable minimum width, and code names are never
+   split in the middle. */
+.md-typeset__table { width: 100%; }
+.md-typeset table:not([class]) { display: table; width: 100%; }
+.md-typeset table:not([class]) td { vertical-align: top; }
 .md-typeset table:not([class]) td:first-child code { white-space: nowrap; }
+.md-typeset table:not([class]) td:not(:first-child):not(:last-child):has(> code:only-child) { white-space: nowrap; width: 1%; }
+.md-typeset table:not([class]) td:last-child { min-width: 18rem; }
+.md-typeset table:not([class]) code { word-break: normal; overflow-wrap: normal; }
+.md-typeset table:not([class]) td:last-child code { white-space: nowrap; }
+
 .md-typeset .grid.cards > ul > li { border-radius: .5rem; }

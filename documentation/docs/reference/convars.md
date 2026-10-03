@@ -19,9 +19,12 @@ Legend: **cfg** = present in the generated `config.cfg`.
 | `matchzy_whitelist_enabled_default` | `false` | Y | Enforce `whitelist.cfg` on connect. Admins can toggle with `.whitelist`. |
 | `matchzy_kick_when_no_match_loaded` | `false` | Y | Kick players who are not on the loaded match's roster (everyone if no match is loaded). Admins are exempt. |
 | `matchzy_hostname_format` | `""` | Y | Hostname template, e.g. `MatchZy \| {TEAM1} vs {TEAM2}`. Empty keeps your hostname. |
-| `matchzy_map_console_command_enabled` | `true` | Y | Register `css_map` / `!map`. Set `false` when another plugin owns it. MatchZy also yields automatically when CS2-SimpleAdmin or CS2MapChange is installed. `.map` always works. |
+| `matchzy_map_console_command_enabled` | `true` | Y | Register `css_map` / `!map`. Set `false` when another plugin owns it. `.map` always works. |
 | `matchzy_asay_console_enabled` | `true` | Y | Register `css_asay` / `!asay`. Set `false` when another plugin owns it. |
 | `matchzy_dot_trigger_dedupe` | `true` | Y | When `.` is a CounterStrikeSharp chat trigger in `core.json`, let CounterStrikeSharp handle dot commands so they do not run twice. |
+
+!!! note "`matchzy_map_console_command_enabled`"
+    MatchZy also leaves `css_map` / `!map` to the other plugin automatically when CS2-SimpleAdmin or CS2MapChange is installed.
 
 ## Ready and warmup
 
@@ -29,13 +32,16 @@ Legend: **cfg** = present in the generated `config.cfg`.
 |---|---|---|---|
 | `matchzy_warmup_enabled` | `true` | Y | Use warmup (execute `warmup.cfg`) before a match. |
 | `matchzy_minimum_ready_required` | `10` | Y | Ready players needed to start. `0` = every connected player. Also `.readyrequired <n>`. |
-| `matchzy_ready_per_team` | `0` | Y | Per-team ready-up. `N` = a team is ready once `N` of its players are ready; the match starts when CT and T are both ready (`1` = one player per team). Works with and without a loaded match. `0` = off. |
+| `matchzy_ready_per_team` | `0` | Y | Per-team ready-up: a team is ready once `N` of its players are ready. `0` = off. |
 | `matchzy_allow_force_ready` | `true` | Y | Allow `.forceready` (match setup only). Alias `get5_allow_force_ready`. |
-| `matchzy_ready_hint_style` | `0` | Y | `0` classic center text, `1` HTML ready-up panel (progress bar, team split, own status; hides the native warmup banner), `2` no center text: a chat reminder lists the players who are not ready every `matchzy_chat_messages_timer_delay` seconds; also hides the native warmup banner. |
+| `matchzy_ready_hint_style` | `0` | Y | `0` classic center text, `1` HTML ready-up panel, `2` chat reminder only. |
 | `matchzy_ready_hint_blink` | `false` | Y | Blink the "NOT READY" line on the HTML panel. |
 | `matchzy_loaded_match_hide_mode_hints` | `true` | Y | In a match loaded from a match config, joining players only see the ready-up hint (no `.scrim` / `.prac` / `.knife` hints or admin help line). |
 | `matchzy_ready_clantag_enabled` | `true` | Y | Show `[READY]` / `[UNREADY]` scoreboard clan tags. |
 | `matchzy_ready_up_by_ping` | `true` | Y | Pinging (middle mouse) toggles ready. |
+
+- **`matchzy_ready_per_team`**: the match starts when CT and T are both ready (`1` = one player per team). Works with and without a loaded match.
+- **`matchzy_ready_hint_style`**: `1` shows a progress bar, the team split and your own status, and hides the native warmup banner. `2` shows no center text; a chat reminder lists the players who are not ready every `matchzy_chat_messages_timer_delay` seconds, and the native warmup banner is hidden as well.
 
 ## Knife, sides and team names
 
@@ -52,14 +58,22 @@ Legend: **cfg** = present in the generated `config.cfg`.
 | `matchzy_allow_pause` | `true` | Y | Enable `.pause`. |
 | `matchzy_allow_unpause` | `true` | Y | Enable `.unpause`. Admin force unpause is not affected. |
 | `matchzy_use_pause_command_for_tactical_pause` | `false` | Y | `.pause` starts a tactical timeout instead of a normal pause. |
-| `matchzy_enable_tech_pause` | `true` | Y | Enable `.tech`. Also settable as `get5_allow_technical_pause`. |
-| `matchzy_tech_pause_duration` | `300` | Y | Tech pause length in seconds; the match unpauses on its own when it runs out. `-1` = unlimited. With `matchzy_tech_pause_mode 1`: seconds in freeze time before either team can unpause (`0` = both teams always have to). Also settable as `get5_tech_pause_time` / `matchzy_tech_pause_time`, which switch to `matchzy_tech_pause_mode 1`. |
-| `matchzy_max_tech_pauses_allowed` | `2` | Y | Tech pauses per team per map. With `matchzy_tech_pause_mode 1`, `0` = unlimited. Also settable as `get5_max_tech_pauses` / `matchzy_max_tech_pauses`, which switch to `matchzy_tech_pause_mode 1`. |
-| `matchzy_tech_pause_mode` | `0` | Y | `0` = a tech pause ends on its own when its time runs out. `1` = Get5 rules: the pause counts once it takes effect in freeze time, the pausing team can cancel it before then, and once its time is up either team can `.unpause`. Setting `get5_max_tech_pauses` or `get5_tech_pause_time` switches to `1`. |
-| `matchzy_overtime_pauses_per_team` | `1` | Y | `.pause` uses per team in each overtime period. `0` = no limit. Tactical timeouts in overtime are set in live.cfg (`mp_team_timeout_ot_add_once`, `mp_team_timeout_ot_add_each`, `mp_team_timeout_ot_max`). |
+| `matchzy_enable_tech_pause` | `true` | Y | Enable `.tech`. |
+| `matchzy_tech_pause_duration` | `300` | Y | Tech pause length in seconds; the match unpauses on its own when it runs out. `-1` = unlimited. |
+| `matchzy_max_tech_pauses_allowed` | `2` | Y | Tech pauses per team per map. |
+| `matchzy_tech_pause_mode` | `0` | Y | `0` = a tech pause ends on its own when its time runs out. `1` = Get5 rules (see below). |
+| `matchzy_overtime_pauses_per_team` | `1` | Y | `.pause` uses per team in each overtime period. `0` = no limit. |
 | `matchzy_autopause_enabled` | `true` | Y | Pause automatically when a team drops below the minimum player count. |
 | `matchzy_autopause_minplayers` | `5` | Y | Players per team below which autopause triggers. Autopause is active once the map has had at least twice this many players. |
 | `matchzy_autopause_resume_delay` | `3` | Y | Seconds before resuming once teams are full again. |
+
+!!! note "Tech pause mode `1` (Get5 rules)"
+    - A tech pause counts once it takes effect in freeze time, the pausing team can cancel it before then, and once its time is up either team can `.unpause`.
+    - `matchzy_tech_pause_duration` becomes the seconds in freeze time before either team can unpause (`0` = both teams always have to).
+    - `matchzy_max_tech_pauses_allowed` `0` means unlimited.
+    - Setting `get5_max_tech_pauses` or `get5_tech_pause_time` switches to mode `1` (see [Get5 aliases](#get5-aliases)).
+
+Tactical timeouts in overtime are set in `live.cfg` (`mp_team_timeout_ot_add_once`, `mp_team_timeout_ot_add_each`, `mp_team_timeout_ot_max`), not by `matchzy_overtime_pauses_per_team`.
 
 ## Match and series
 
@@ -69,18 +83,24 @@ Legend: **cfg** = present in the generated `config.cfg`.
 | `matchzy_reset_cvars_on_series_end` | `true` | Y | Restore cvars changed by a match config's `cvars` block when the series ends. |
 | `matchzy_match_start_message` | `""` | Y | Chat message at match start. `$$$` = new line. Supports `{TIME}`, `{MATCH_ID}`, `{MAP}`, `{MAPNUMBER}`, `{TEAM1}`, `{TEAM2}` and color tags. |
 | `matchzy_match_end_auto_changelevel` | `true` | Y | Change map automatically after a match ends. Disable for panel-driven servers (G5API). |
-| `matchzy_empty_shutdown_seconds` | `0` | Y | Close the server (`quit`) after it has had no players for this many seconds (bots and CSTV do not count; also counted from server start). Sends `server_shutdown` with `reason` `empty` first and waits for demo and backup uploads. Can be set per match in the match config's `cvars`. `0` = off. |
+| `matchzy_empty_shutdown_seconds` | `0` | Y | Close the server (`quit`) after it has had no players for this many seconds. `0` = off. |
+
+!!! note "`matchzy_empty_shutdown_seconds`"
+    Bots and CSTV do not count as players, and the empty time is also counted from server start. Before closing, MatchZy sends `server_shutdown` with `reason` `empty` and waits for demo and backup uploads. It can be set per match in the match config's `cvars`.
 
 ## Tournament timeouts
 
 | Setting | Default | cfg | Description |
 |---|---|---|---|
-| `matchzy_forfeit_ready_timeout` | `0` | Y | Loaded matches: seconds after a map's ready phase begins before a team that is not ready forfeits the series. Neither team ready: the series ends in a tie. `0` = off. Also settable as `matchzy_time_to_start` / `get5_time_to_start`. |
-| `matchzy_forfeit_veto_ready_timeout` | `-1` | Y | The same for the ready-up before the map veto. `-1` = same as `matchzy_forfeit_ready_timeout`, `0` = no limit. Also settable as `matchzy_time_to_start_veto` / `get5_time_to_start_veto`. |
-| `matchzy_ready_mode` | `0` | Y | Loaded matches: `0` = players type `.ready`. `1` = join mode: a team is ready once `min_players_to_ready` of its players are on its side, and the match starts `matchzy_join_start_delay` seconds later. |
+| `matchzy_forfeit_ready_timeout` | `0` | Y | Loaded matches: seconds after a map's ready phase begins before a team that is not ready forfeits the series. `0` = off. |
+| `matchzy_forfeit_veto_ready_timeout` | `-1` | Y | The same for the ready-up before the map veto. `-1` = same as `matchzy_forfeit_ready_timeout`, `0` = no limit. |
+| `matchzy_ready_mode` | `0` | Y | Loaded matches: `0` = players type `.ready`. `1` = join mode (see below). |
 | `matchzy_join_start_delay` | `10` | Y | Join mode: seconds between everyone having joined and the match starting. |
 | `matchzy_forfeit_leave_timeout` | `0` | Y | Loaded matches: seconds a team may have nobody on its side during a live map before it forfeits the series. `0` = off. |
 | `matchzy_veto_step_timeout` | `0` | Y | Seconds a veto captain has per ban, pick or side choice; then it is made at random (side: CT). `0` = off. |
+
+- **`matchzy_forfeit_ready_timeout`**: if neither team is ready when the time runs out, the series ends in a tie.
+- **`matchzy_ready_mode 1`** (join mode): a team is ready once `min_players_to_ready` of its players are on its side, and the match starts `matchzy_join_start_delay` seconds later.
 
 ## Demos (GOTV)
 
@@ -158,3 +178,13 @@ Database connection settings are in [`database.json`](files.md#databasejson), no
 ## Get5 aliases
 
 For panel compatibility these `get5_` names map to the `matchzy_` settings above: `get5_allow_force_ready`, `get5_demo_upload_url`, `get5_demo_upload_s3`, `get5_demo_upload_header_key`, `get5_demo_upload_header_value`, `get5_remote_log_url`, `get5_remote_log_header_key`, `get5_remote_log_header_value`, `get5_remote_backup_url`, `get5_remote_backup_header_key`, `get5_remote_backup_header_value`.
+
+These alternative names are also accepted:
+
+| Alternative name | Sets | Notes |
+|---|---|---|
+| `get5_allow_technical_pause` | `matchzy_enable_tech_pause` | |
+| `get5_tech_pause_time`, `matchzy_tech_pause_time` | `matchzy_tech_pause_duration` | Switches to `matchzy_tech_pause_mode 1`. |
+| `get5_max_tech_pauses`, `matchzy_max_tech_pauses` | `matchzy_max_tech_pauses_allowed` | Switches to `matchzy_tech_pause_mode 1`. |
+| `get5_time_to_start`, `matchzy_time_to_start` | `matchzy_forfeit_ready_timeout` | |
+| `get5_time_to_start_veto`, `matchzy_time_to_start_veto` | `matchzy_forfeit_veto_ready_timeout` | |

@@ -43,9 +43,14 @@ Arguments in `<angle brackets>` are required, arguments in `[square brackets]` a
 | `.mhelp` | Any admin | Chat: the admin commands you can run, grouped by category. Console: the full list with a check mark per command and the permission you are missing. |
 | `.version` | Player | Shows the CS2 build and MatchZy version. Also `!matchzy_version` and `!mikzy_version`. |
 | `!color <0-4>` | Player | Picks your teammate color on the radar and scoreboard (0 blue, 1 green, 2 yellow, 3 orange, 4 purple). |
-| `.asay <message>` | Chat | Sends an announcement to all chat with the admin prefix. The `!asay` form can be turned off with `matchzy_asay_console_enabled` when another admin plugin owns it; `.asay` always works. |
-| `.map <map>` | Map | Changes map before a match has started. Accepts `mirage`, `de_mirage`, a workshop id, `ws/<id>`, or `ws:<name>` for a map in the server's workshop collection. The name is checked first, so a typo does not stop the demo or kick bots. Stands aside automatically if CS2-SimpleAdmin or CS2MapChange is installed, or when `matchzy_map_console_command_enabled` is off. |
+| `.asay <message>` | Chat | Sends an announcement to all chat with the admin prefix. `.asay` always works. |
+| `.map <map>` | Map | Changes map before a match has started. Accepts `mirage`, `de_mirage`, a workshop id, `ws/<id>` or `ws:<name>`. |
 | `.rmap` | Root | Reloads the current map. |
+
+The `!asay` form can be turned off with `matchzy_asay_console_enabled` when another admin plugin owns it.
+
+!!! note "`.map`"
+    `ws:<name>` loads a map from the server's workshop collection. The name is checked first, so a typo does not stop the demo or kick bots. The command stands aside automatically if CS2-SimpleAdmin or CS2MapChange is installed, or when `matchzy_map_console_command_enabled` is off.
 
 ### Switching modes (admin)
 
@@ -95,8 +100,8 @@ Before a match goes live, players ready up. The match starts when enough players
 | `.ready` `.r` `.rdy` `.gaben` | Player | Marks you ready. Pinging (middle mouse) also toggles ready. While a live match is paused, `.r` votes to unpause instead. |
 | `.unready` `.ur` `.notready` `.nr` `.urdy` | Player | Takes back your ready. |
 | `.readycheck` `.rc` `.rcheck` | Player | Shows how many players are ready and how many are still missing. |
-| `.forceready` | Player | Readies your whole team at once. Only in a loaded match config, only when your team has at least `min_players_to_ready` players, and only if `matchzy_allow_force_ready` is on. |
-| `.addreadytime <seconds>` | Config | Gives the teams more time before the ready-up time limit (`matchzy_forfeit_ready_timeout`) runs out. Only in a loaded match with a time limit; the time left can never go above the full limit. |
+| `.forceready` | Player | Readies your whole team at once. Loaded match configs only. |
+| `.addreadytime <seconds>` | Config | Gives the teams more time before the ready-up time limit (`matchzy_forfeit_ready_timeout`) runs out. Never above the full limit. |
 | `.start` `.force` `.forcestart` | Config | Starts the match now, skipping the ready check. Not in practice or dryrun. |
 | `.readyrequired [n]` `.teamsize [n]` | Config | Sets how many ready players are needed (0 to 32). `0` = everyone connected. Without a number it shows the current value. |
 | `.knife` `.rk` `.kr` `.kniferound` | Config | Turns the knife round on or off for this match. Also `!roundknife`. |
@@ -107,6 +112,10 @@ Before a match goes live, players ready up. The match starts when enough players
 | `.settings` `.configs` `.config` | Config | Shows the current knife, match mode and scrim settings. Also `!options`. |
 | `.warmupbots [count]` | Map/prac | Adds bots to shoot at while you wait (default 4, 1 to 10). They leave by themselves when the knife round or the match starts. Run again to remove them. |
 | `.coach [t\|ct]` | Player | Become coach. See [Coaching](#coaching). |
+
+`.forceready` also needs at least `min_players_to_ready` players on your team and `matchzy_allow_force_ready` on.
+
+`.addreadytime` only works in a loaded match that has a ready-up time limit, and the time left can never go above the full limit.
 
 ### Examples
 
@@ -155,19 +164,25 @@ Runs after a match config with `"skip_veto": false` is loaded. MatchZy picks one
 
 | Command | Who | What it does |
 |---|---|---|
-| `.pause` `.p` | Player | Pauses the match in the next freeze time (also in the knife round). Unpausing needs both teams. Refused while `matchzy_allow_pause` is off. If `matchzy_use_pause_command_for_tactical_pause` is on, this calls a tactical timeout instead. |
+| `.pause` `.p` | Player | Pauses the match in the next freeze time (also in the knife round). Unpausing needs both teams. |
 | `.unpause` `.up` | Player | Your team's vote to unpause. The game resumes when both teams have voted. A pause called by an admin can only be lifted by an admin. `.r` also works during a pause. |
-| `.tech` | Player | Technical pause for connection or hardware trouble. Each team gets `matchzy_max_tech_pauses_allowed` per map (`0` = none, or unlimited with `matchzy_tech_pause_mode 1`). By default each one ends on its own after `matchzy_tech_pause_duration` seconds; with `matchzy_tech_pause_mode 1` it never ends by itself, but after that time either team can unpause alone. |
+| `.tech` | Player | Technical pause for connection or hardware trouble. Each team gets `matchzy_max_tech_pauses_allowed` per map. |
 | `.tac` | Player | Tactical timeout from your team's timeout budget. |
-| `.stop` | Player | Vote to replay the current round from its start. A player from each team must type it within 30 seconds. Needs `matchzy_stop_command_available`. With `matchzy_stop_command_no_damage`, it is refused once someone has damaged an opponent. |
+| `.stop` | Player | Vote to replay the current round from its start. A player from each team must type it within 30 seconds. |
 | `!gg` | Player | Surrender vote. Your team must be 6 or more rounds behind and all but one of its players must vote (all of them in a team of 2 or fewer). Single-map matches only. |
+
+- **`.pause`**: refused while `matchzy_allow_pause` is off. If `matchzy_use_pause_command_for_tactical_pause` is on, it calls a tactical timeout instead.
+- **`.tech`**: `matchzy_max_tech_pauses_allowed 0` means no tech pauses, or unlimited with `matchzy_tech_pause_mode 1`. By default each tech pause ends on its own after `matchzy_tech_pause_duration` seconds. With `matchzy_tech_pause_mode 1` it never ends by itself, but after that time either team can unpause alone.
+- **`.stop`**: needs `matchzy_stop_command_available`. With `matchzy_stop_command_no_damage`, it is refused once someone has damaged an opponent.
 
 ### Coaching
 
 | Command | Who | What it does |
 |---|---|---|
-| `.coach [t\|ct]` | Player | Become your own team's coach. Without a side it uses the team you are on; with a side it must be your own. Works in warmup and freeze time, not in the middle of a live round. The coach watches from a spot behind the team during freeze time and is killed right before the round starts, so they spectate the round. With a `coaches` list in the match config, only listed SteamIDs can coach that team. Not in practice mode. |
+| `.coach [t\|ct]` | Player | Become your own team's coach. Works in warmup and freeze time, not in a live round or in practice mode. |
 | `.uncoach` `.play` | Coach | Go back to playing. A player listed only as a coach in the match config cannot. |
+
+- **`.coach`**: without a side it uses the team you are on; with a side it must be your own. The coach watches from a spot behind the team during freeze time and is killed right before the round starts, so they spectate the round. With a `coaches` list in the match config, only listed SteamIDs can coach that team.
 
 More in [Coaching](../guides/coaching.md).
 
@@ -177,10 +192,10 @@ More in [Coaching](../guides/coaching.md).
 |---|---|---|
 | `.forcepause` `.fp` | Config | Admin pause. Only an admin can lift it. |
 | `.forceunpause` `.fup` | Config | Lifts any pause at once. |
-| `.restore <round>` | Config | Restores the match to the start of that round (score, money, equipment). The number is the count of rounds already played when the backup was taken, the same `R` number `.backups` shows. |
+| `.restore <round>` | Config | Restores the match to the start of that round (score, money, equipment). Use the `R` number `.backups` shows. |
 | `.restorelast` `.rl` | Config | Restores the previous round. |
 | `.restorecurrent` `.rrestore` `.rr` | Config | Restarts the current round from its start. Also `!restartround`. (In practice, `.rr` restarts the practice round instead.) |
-| `.backups` `.backup` `.backupmenu` | Config | Lists up to 10 backups of this match, latest round first, with score and the `!restore` command for each. Outside a live match it lists the 5 newest backup files on disk with a `!loadbackup` hint, handy after a server crash. |
+| `.backups` `.backup` `.backupmenu` | Config | Lists up to 10 backups of this match, latest round first, with score and the `!restore` command for each. |
 | `!loadbackup <file>` | Config | Restores a backup file by name (from `csgo/MatchZyDataBackup`). Rebuilds the match from the file, including a map change if needed. |
 | `.listbackups [matchid]` | Config | Lists every backup of a match. Without a match id it uses the current match. |
 | `.restart` `.abort` | Config | Resets the match back to warmup. Not in practice or dryrun. |
@@ -190,6 +205,10 @@ More in [Coaching](../guides/coaching.md).
 | `.autopause` | Root | Turns autopause (pause when a team is short) on or off. |
 | `!autopause_minplayers <1-5>` | Root | Players a team needs before autopause kicks in. |
 | `!autopause_delay <0-30>` | Root | Seconds to wait before resuming once both teams are full again. |
+
+The `.restore` number is the count of rounds already played when the backup was taken.
+
+`.backups` outside a live match lists the 5 newest backup files on disk with a `!loadbackup` hint, handy after a server crash.
 | `!autopause_status` / `!autopause_check` | Root | Shows the autopause settings / runs the check once now. |
 
 ### Examples
@@ -253,27 +272,32 @@ Every grenade you throw is recorded (position, view, how it was thrown). History
 | `.back [n]` | Steps back through your history: the first `.back` goes to your newest grenade, each further `.back` one older. `.back 3` jumps to entry 3. |
 | `.rethrow` `.rt` `.throw` | Throws your last grenade again from the same spot, without you moving. |
 | `.grt` `.globalrethrow` | Rethrows the last grenade of **every** player at once, to see a full team execute. Map/prac admins only. |
-| `.throwsmoke` / `.throwflash` / `.thrownade` / `.throwmolotov` / `.throwdecoy` | Rethrows your last grenade of that type. Also as `.rethrowsmoke`, `.rethrowflash`, `.rethrownade` (`.throwgrenade`, `.rethrowgrenade`), `.rethrowmolotov`, `.rethrowdecoy`. |
+| `.throwsmoke` / `.throwflash` / `.thrownade` / `.throwmolotov` / `.throwdecoy` | Rethrows your last grenade of that type. |
 | `.throwindex <n...>` `.throwidx` | Throws one or more history entries by number. |
 | `.lastindex` | Shows the number of your last grenade in the history. |
 | `.delay <seconds>` | Adds a delay to your last grenade when rethrown (for timing executes with `.grt`). `.delay 0` clears it. |
 | `.wipe` `.clearnades` | Clears your throw history. |
 | `.timer` | Stopwatch: type once to start, again to stop. |
 
+The per-type rethrow commands also work as `.rethrowsmoke`, `.rethrowflash`, `.rethrownade` (`.throwgrenade`, `.rethrowgrenade`), `.rethrowmolotov` and `.rethrowdecoy`.
+
 ### Saved lineups and the grenade library
 
 | Command | What it does |
 |---|---|
-| `.savenade <name> [throw] [comment]` `.sn` | Saves your current lineup. The optional throw style (`normal`, `jump`/`jt`, `run`, `walk`, `crouch`/`duck`) is shown on the marker; anything after it is a comment. Up to 500 per player. |
+| `.savenade <name> [throw] [comment]` `.sn` | Saves your current lineup, with an optional throw style and comment. Up to 500 per player. |
 | `.loadnade <name>` `.ln` | Teleports you to a saved lineup with the grenade in hand. The closest matching name is used. `.ln #3` loads by the number from `.listnades`. |
 | `.listnades [filter]` `.lin` | Numbered list of your lineups and the shared ones on this map. With a filter, only names that contain it. |
 | `.delnade <name> [name2...]` `.dn` `.deletenade` | Deletes lineups on this map. Several at once, or `all` for every lineup you have on this map. |
 | `.importnade <name> <x> <y> <z> <pitch> <yaw> <roll>` | Imports a lineup from a position and view (for example copied from `getpos`). Also `!in`. |
 | `.mynades` | How many lineups you have saved. |
 | `.nades` | Menu to browse lineups by grenade type and load one (needs CS2MenuManager). |
-| `.shownades` / `.hidenades` | Colored markers with labels at every lineup on the map. Aim at one and press ++e++ to load it; press ++f++ (or `.nadetoggle`) to cycle lineups that share a spot. Bind it with `bind g "css_shownades"`. |
+| `.shownades` / `.hidenades` | Colored markers with labels at every lineup on the map. Aim at one and press ++e++ to load it. |
 | `.liblist` | Lists the shared lineup library for this map. |
 | `.libadd <name>` / `.libremove <name>` | Config admins: add one of your lineups on this map to the shared library, or remove one. |
+
+- **`.savenade`**: the throw style (`normal`, `jump`/`jt`, `run`, `walk`, `crouch`/`duck`) is shown on the marker; anything after it is a comment.
+- **`.shownades`**: press ++f++ (or `.nadetoggle`) to cycle lineups that share a spot. Bind it with `bind g "css_shownades"`.
 
 ### Utility and visuals
 

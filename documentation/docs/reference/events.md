@@ -27,11 +27,13 @@ Player stats objects (`team1.players[].stats` on `round_end` and `map_result`) u
 | `round_end` | A live round ends | `round_number`, `reason`, `winner{side,team}` (the team that won this round), `team1`, `team2` (scores and player stats) |
 | `map_result` | The map ends | `map_number`, `winner`, `team1`, `team2`, `demo_filename` |
 | `series_end` | The series ends | `winner`, `team1_series_score`, `team2_series_score`, `time_until_restore` |
-| `match_cancelled` | A loaded or running match is stopped, surrendered, restarted, cancelled for a no-show, or ended by a map change from outside MatchZy | `reason` (`ended_early`, `surrendered`, `restarted`, `no_show`, `map_changed`), `demo_filename`, `team1`, `team2`, `team1_score`, `team2_score` |
+| `match_cancelled` | A loaded or running match ends without a result (see `reason` below) | `reason`, `demo_filename`, `team1`, `team2`, `team1_score`, `team2_score` |
 | `match_paused` | Any pause starts | `round_number`, `pause_type` (`pause`, `tech`, `admin`, `auto`), `team_name`, `max_duration` |
 | `match_unpaused` | Any pause ends | `round_number` |
 | `demo_upload_ended` | A demo upload finished | `map_number`, `filename`, `success` |
 | `player_disconnect` | A player leaves while a match is loaded | `player` (user id), `player_steamid`, `player_name`, `player_team`, `reason` |
+
+`match_cancelled` `reason` values: `ended_early` (stopped), `surrendered`, `restarted`, `no_show` (cancelled for a no-show) and `map_changed` (ended by a map change from outside MatchZy).
 
 ## Server lifecycle
 
@@ -39,9 +41,13 @@ Sent with or without a loaded match, to `matchzy_remote_log_url` from `config.cf
 
 | Event | When | Fields |
 |---|---|---|
-| `server_ready` | All plugins are loaded and `config.cfg` is applied (about 2 seconds after load; on a boot, once the first map runs) | `hot_reload` (`true` when only MatchZy was reloaded) |
-| `map_change` | Before the map changes. Sent when a map command runs (`changelevel`, `map`, `ds_workshop_changelevel`, `host_workshop_map`), otherwise when the map ends | `next_map` (map name or workshop id, `null` when not known), `trigger` (the command, or `map_end`) |
-| `server_shutdown` | The server is about to stop: `quit` / `exit`, `_restart`, a fatal error, MatchZy being unloaded, or the server being empty for `matchzy_empty_shutdown_seconds` | `reason` (`quit`, `restart`, `fatal`, `plugin_unload`, `empty`), `empty_seconds` (with `empty`: how long the server had no players) |
+| `server_ready` | All plugins are loaded and `config.cfg` is applied | `hot_reload` (`true` when only MatchZy was reloaded) |
+| `map_change` | Before the map changes | `next_map` (map name or workshop id, `null` when not known), `trigger` (the command, or `map_end`) |
+| `server_shutdown` | The server is about to stop | `reason`, `empty_seconds` (with `empty`: how long the server had no players) |
+
+- **`server_ready`**: about 2 seconds after load; on a boot, once the first map runs.
+- **`map_change`**: sent when a map command runs (`changelevel`, `map`, `ds_workshop_changelevel`, `host_workshop_map`), otherwise when the map ends.
+- **`server_shutdown`** `reason`: `quit` (`quit` / `exit`), `restart` (`_restart`), `fatal` (a fatal error), `plugin_unload` (MatchZy being unloaded) or `empty` (the server was empty for `matchzy_empty_shutdown_seconds`).
 
 `server_shutdown` is sent while the server waits up to 3 seconds for it. A server that is killed (crash, `SIGKILL`, a panel's force stop) sends nothing; use `server_ready` on the next start to notice it.
 
@@ -74,9 +80,12 @@ Building blocks:
 | `player_blinded` | A player is flashed | `player` (victim), `attacker` (or `null`), `blind_duration` (seconds), `friendly_fire`, `round_time` |
 | `freezetime_end` | Freeze time ended | `players` (player objects with `health`, `armor`, `has_helmet`, `has_defuser`, `money`), `ct_alive`, `t_alive` |
 | `round_start` | A live round starts | `round_number` |
-| `game_paused`, `game_unpaused` | Match paused / unpaused | `team` (`team1`, `team2`, or `null` for admin, automatic and restore pauses), `pause_type` (`tactical`, `technical`, `admin`, `backup` after a round restore); *extra* `round_number`, `max_duration` (seconds of a timed technical pause) |
+| `game_paused`, `game_unpaused` | Match paused / unpaused | `team`, `pause_type`; *extra* `round_number`, `max_duration` |
 | `player_disconnect` | A player leaves while a match is loaded | `player`; *extra* `reason` (engine disconnect code) |
-| `backup_loaded` | A round backup was restored | `round_number` (the round restored to), `filename`. Followed by that round's `round_start`; the engine's own round start after the load is not sent again. |
+| `backup_loaded` | A round backup was restored | `round_number` (the round restored to), `filename` |
+
+- **`game_paused`, `game_unpaused`**: `team` is `team1`, `team2`, or `null` for admin, automatic and restore pauses. `pause_type` is `tactical`, `technical`, `admin`, or `backup` after a round restore. `max_duration` is the seconds of a timed technical pause.
+- **`backup_loaded`**: followed by that round's `round_start`; the engine's own round start after the load is not sent again.
 
 All live events carry `matchid`, `map_number` and `round_number`. In this format `round_end`'s `round_number` is also Get5's: the rounds played when the round started (the legacy format sends the rounds played after it). `matchid` is a number, as in every other MatchZy event (Get5 sends a string).
 

@@ -77,7 +77,10 @@ Prefer an in-game flow? Admins can build the same config with the [`.matchsetup`
 | `spectators` | object | `{}` | `{ "players": { "<steamid64>": "<name>" } }`. |
 | `clinch_series` | bool | `true` | End the series once a team has won the majority of maps. |
 | `wingman` | bool | `false` | Wingman game mode, uses `live_wingman.cfg`. |
-| `cvars` | object | - | Cvars applied when the match loads and before each map goes live, e.g. `{ "mp_overtime_enable": "1" }`. Only existing convars and MatchZy/Get5 settings are accepted, with plain values (no quotes or `;`). Action commands (`matchzy_loadmatch_url`, `matchzy_loadbackup`, `get5_endmatch`, ...), `rcon_password` and `matchzy_everyone_is_admin` are ignored and logged. Restored at series end when `matchzy_reset_cvars_on_series_end` is on. |
+| `cvars` | object | - | Cvars applied when the match loads and before each map goes live, e.g. `{ "mp_overtime_enable": "1" }`. See below. |
+
+!!! note "`cvars`"
+    Only existing convars and MatchZy/Get5 settings are accepted, with plain values (no quotes or `;`). Action commands (`matchzy_loadmatch_url`, `matchzy_loadbackup`, `get5_endmatch`, ...), `rcon_password` and `matchzy_everyone_is_admin` are ignored and logged. The values are restored at series end when `matchzy_reset_cvars_on_series_end` is on.
 
 ## Team fields
 
@@ -85,10 +88,13 @@ Prefer an in-game flow? Admins can build the same config with the [`.matchsetup`
 |---|---|---|---|
 | `name` | string | **required** | Team name, shown on the scoreboard. |
 | `id` | string | `""` | Your own id for the team, echoed in events. |
-| `players` | object, array or `"any"` | **required** | Roster as `{ "<steamid64>": "<name>" }` or `["<steamid64>", ...]`. `"any"` opens the team to every human who is not on the other roster. Only one team can be `"any"`. |
-| `coaches` | object or string[] | - | SteamID64s that coach this team. They may join, are not kicked by `matchzy_kick_when_no_match_loaded`, and become coach automatically. With a list, only those SteamIDs can `.coach` this team. See [Coaching](../guides/coaching.md). |
+| `players` | object, array or `"any"` | **required** | Roster as `{ "<steamid64>": "<name>" }` or `["<steamid64>", ...]`, or `"any"` (see below). |
+| `coaches` | object or string[] | - | SteamID64s that coach this team. They become coach automatically. See [Coaching](../guides/coaching.md). |
 | `bots` | bool | `false` | The team is played by bots, filled to `players_per_team`. |
 | `bot_difficulty` | integer 0-3 | `2` | Bot difficulty for a bot team. |
+
+- **`players`**: `"any"` opens the team to every human who is not on the other roster. Only one team can be `"any"`.
+- **`coaches`**: listed coaches may join and are not kicked by `matchzy_kick_when_no_match_loaded`. With a list, only those SteamIDs can `.coach` this team.
 
 ## Players vs bots
 

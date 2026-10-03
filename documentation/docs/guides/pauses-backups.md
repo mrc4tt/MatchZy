@@ -6,9 +6,12 @@
 |---|---|---|
 | Normal | `.pause` | Both teams type `.unpause`. |
 | Tactical | `.tac` (or `.pause` with `matchzy_use_pause_command_for_tactical_pause`) | The timeout runs out. |
-| Technical | `.tech` | Both teams unpause, or `matchzy_tech_pause_duration` runs out (then it unpauses on its own). Each team gets `matchzy_max_tech_pauses_allowed` per map. With `matchzy_tech_pause_mode 1` (Get5 rules) it never ends on its own: once it has lasted `matchzy_tech_pause_duration` seconds in freeze time either team can `.unpause`, and the pausing team can cancel it with `.unpause` before freeze time without using it up. |
+| Technical | `.tech` | Both teams unpause, or `matchzy_tech_pause_duration` runs out (then it unpauses on its own). |
 | Admin | `.forcepause` | An admin types `.forceunpause`. |
 | Auto | A team drops below `matchzy_autopause_minplayers` | The team is full again; the game resumes after `matchzy_autopause_resume_delay` seconds. |
+
+!!! note "Technical pauses"
+    Each team gets `matchzy_max_tech_pauses_allowed` per map. With `matchzy_tech_pause_mode 1` (Get5 rules) a tech pause never ends on its own: once it has lasted `matchzy_tech_pause_duration` seconds in freeze time either team can `.unpause`, and the pausing team can cancel it with `.unpause` before freeze time without using it up.
 
 **Overtime**: tactical timeouts (`.tac`) follow the engine settings in live.cfg: 4 per team in regulation (`mp_team_timeout_max`) and one more when overtime starts (`mp_team_timeout_ot_add_once 1`, up to `mp_team_timeout_ot_max 5`). In every overtime period each team may also use `.pause` `matchzy_overtime_pauses_per_team` times (1 by default). Admin pauses are not limited.
 

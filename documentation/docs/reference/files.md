@@ -5,9 +5,9 @@
 | File | Location | Purpose |
 |---|---|---|
 | `config.cfg` | `<cfg>` | All settings. Generated on first load, new settings appended on updates. |
-| `warmup.cfg`, `knife.cfg`, `live.cfg`, `live_wingman.cfg`, `scrim.cfg`, `hill.cfg`, `prac.cfg`, `dryrun.cfg`, `sleep.cfg` | `<cfg>` | Executed when the matching phase or mode starts. Written from the built-in defaults when missing, never overwritten. |
-| `<mode>_override.cfg` (e.g. `warmup_override.cfg`, `live_override.cfg`) | `<cfg>` | Optional, created by you. Executed right after the matching mode cfg, so its values win; settings from a loaded match config still win over both. MatchZy never ships, creates or changes these files. See [Server-specific settings](#server-specific-settings). |
-| `defaults/*.cfg`, `defaults/database.json.example`, `defaults/README.txt` | `<cfg>` | Reference copies of the current defaults, rewritten by MatchZy on every load and never executed. Compare your own files with them after an update; do not edit them. |
+| `warmup.cfg`, `knife.cfg`, `live.cfg`, `live_wingman.cfg`, `scrim.cfg`, `hill.cfg`, `prac.cfg`, `dryrun.cfg`, `sleep.cfg` | `<cfg>` | Executed when the matching phase or mode starts. Written when missing, never overwritten. |
+| `<mode>_override.cfg` (e.g. `warmup_override.cfg`, `live_override.cfg`) | `<cfg>` | Optional, created by you. Executed right after the matching mode cfg, so its values win. See [Server-specific settings](#server-specific-settings). |
+| `defaults/*.cfg`, `defaults/database.json.example`, `defaults/README.txt` | `<cfg>` | Reference copies of the current defaults, rewritten on every load and never executed. Do not edit them. |
 | `matchzymaps.cfg` | `<cfg>` | Map list for automatic map changes and the `.matchsetup` wizard. One map per line, `#` for comments, `workshop/<id>` for workshop maps. |
 | `database.json` | `<cfg>` | Database backend. See below. |
 | `admins.json` | `<cfg>` | Extra admins by SteamID64. See below. |
@@ -22,6 +22,10 @@
 | `MatchZy_Stats/<matchid>/` | `csgo/` | CSV and advanced stats JSON per map. See [Stats](../guides/stats.md). |
 | `MatchZyDataBackup/` | `csgo/` | Round backups. |
 | Demos | `csgo/demos/` | Controlled by `matchzy_demo_path`. |
+
+- **Mode cfgs** (`warmup.cfg`, `live.cfg`, ...): written from the built-in defaults when missing.
+- **`<mode>_override.cfg`**: settings from a loaded match config still win over both the mode cfg and the override. MatchZy never ships, creates or changes these files.
+- **`defaults/`**: MatchZy rewrites these files on every load. Compare your own files with them after an update.
 
 ## Server-specific settings
 

@@ -6,7 +6,7 @@
 |---|---|---|
 | CS2 dedicated server | Yes | Linux or Windows. |
 | [CounterStrikeSharp](https://github.com/roflmuffin/CounterStrikeSharp) | Yes | Stock CounterStrikeSharp works. The fork is developed against a .NET 10 CounterStrikeSharp build. |
-| [CS2MenuManager](https://git.miksen.me/mikkel/CS2MenuManager/releases) 1.0.42+ | Optional | Only needed for the in-game menus (`.ma`, `.matchsetup`, `.nades`). Without it MatchZy runs normally and those commands reply with a notice. |
+| [CS2MenuManager](https://git.miksen.me/mikkel/CS2MenuManager/releases) 1.0.42+ | Optional | Only needed for the in-game menus (`.ma`, `.matchsetup`, `.nades`); without it those commands reply with a notice. |
 | MySQL / MariaDB | Optional | SQLite is used by default and needs no setup. |
 
 ## Install from the release zip

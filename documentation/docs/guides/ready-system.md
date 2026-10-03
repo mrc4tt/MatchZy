@@ -16,7 +16,9 @@ In match, scrim and hill mode the server waits in warmup until enough players ar
 | `matchzy_ready_hint_style` | Look |
 |---|---|
 | `0` (default) | Classic center text with the ready count. |
-| `1` | HTML **READY-UP** panel per player: progress bar, ready count, CT/T split, current mode, and your own READY / NOT READY status, in your language. The native WARMUP banner is hidden; the round timer shows a frozen `1:00`. |
+| `1` | HTML **READY-UP** panel per player with a progress bar, ready count and your own status. |
+
+Style `1` also shows the CT/T split and the current mode, in your language. The native WARMUP banner is hidden and the round timer shows a frozen `1:00`.
 
 Related: `matchzy_ready_hint_blink` blinks the NOT READY line (style 1), `matchzy_ready_clantag_enabled` shows `[READY]` / `[UNREADY]` on the scoreboard.
 

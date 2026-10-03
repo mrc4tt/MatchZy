@@ -6,12 +6,15 @@ The release zip contains nothing under `cfg/`, so an update never overwrites any
 
 | File | What happens on update |
 |---|---|
-| `config.cfg` | Not in the zip. New settings from the update are **appended** to your existing file under a `// --- Added by MatchZy update ---` header. Your edits are never changed, and a setting you commented out is not added back. Retired settings are removed automatically so the server does not log "Unknown command". |
+| `config.cfg` | Not in the zip. New settings are **appended** to your existing file; your edits are never changed. See below. |
 | `database.json` | Not in the zip, so your MySQL login is kept. A reference copy is in `cfg/MatchZy/defaults/database.json.example`. |
-| `live.cfg`, `scrim.cfg`, `prac.cfg`, ... | Not in the zip, never touched. They are only written when missing. When a release changes a default in one of them, the changelog says so: compare your file with the copy in `cfg/MatchZy/defaults/` and copy the lines you want, or delete your file to get the new default on the next restart. |
+| `live.cfg`, `scrim.cfg`, `prac.cfg`, ... | Not in the zip, never touched. They are only written when missing. See below. |
 | `<mode>_override.cfg` | Not in the zip and never written by MatchZy. The safest place for your own changes to a mode. See [Server-specific settings](../reference/files.md#server-specific-settings). |
 | `savednades.json`, `botpositions.json`, `whitelist.cfg`, `admins.json` | Not in the zip, never touched. |
 | `gamedata/matchzy.json` | Replaced. Always deploy it together with the plugin. |
+
+- **`config.cfg`**: new settings go under a `// --- Added by MatchZy update ---` header. A setting you commented out is not added back. Retired settings are removed automatically so the server does not log "Unknown command".
+- **`live.cfg`, `scrim.cfg`, `prac.cfg`, ...**: when a release changes a default in one of them, the changelog says so. Compare your file with the copy in `cfg/MatchZy/defaults/` and copy the lines you want, or delete your file to get the new default on the next restart.
 
 !!! warning "After a CS2 update"
     Valve updates can shift the native signatures in `gamedata/matchzy.json`. If practice rethrows, `.breakrestore` or `.t`/`.ct` from spectator stop working after a game update, update to the latest MatchZy release. Missing or stale signatures only disable the affected feature; they never crash the server. See [Gamedata](gamedata.md).
