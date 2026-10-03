@@ -2,6 +2,10 @@
 
 A short summary of each release. The [full changelog](changelog.md) has the details and background for every change.
 
+## 0.8.97 <small>October 3, 2026</small>
+
+- **New:** Upstream MatchZy 0.9.1's `matchzy_max_tech_pauses`, `matchzy_tech_pause_time` and `get5_allow_technical_pause` are accepted, so configs written for upstream keep their technical pause settings.
+
 ## 0.8.96 <small>October 3, 2026</small>
 
 - **New:** `.addreadytime <seconds>`, `get5_time_to_start` / `get5_time_to_start_veto` aliases and a separate veto ready-up limit (`matchzy_forfeit_veto_ready_timeout`).

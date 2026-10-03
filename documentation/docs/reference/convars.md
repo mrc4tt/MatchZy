@@ -52,9 +52,9 @@ Legend: **cfg** = present in the generated `config.cfg`. :fontawesome-solid-code
 | `matchzy_allow_pause` :fontawesome-solid-code-fork: | `true` | Y | Enable `.pause`. |
 | `matchzy_allow_unpause` :fontawesome-solid-code-fork: | `true` | Y | Enable `.unpause`. Admin force unpause is not affected. |
 | `matchzy_use_pause_command_for_tactical_pause` | `false` | Y | `.pause` starts a tactical timeout instead of a normal pause. |
-| `matchzy_enable_tech_pause` | `true` | Y | Enable `.tech`. |
-| `matchzy_tech_pause_duration` | `300` | Y | Tech pause length in seconds; the match unpauses on its own when it runs out. `-1` = unlimited. With `matchzy_tech_pause_mode 1`: seconds in freeze time before either team can unpause (`0` = both teams always have to). Get5 name: `get5_tech_pause_time`. |
-| `matchzy_max_tech_pauses_allowed` | `2` | Y | Tech pauses per team per map. With `matchzy_tech_pause_mode 1`, `0` = unlimited. Get5 name: `get5_max_tech_pauses`. |
+| `matchzy_enable_tech_pause` | `true` | Y | Enable `.tech`. Also settable as `get5_allow_technical_pause`. |
+| `matchzy_tech_pause_duration` | `300` | Y | Tech pause length in seconds; the match unpauses on its own when it runs out. `-1` = unlimited. With `matchzy_tech_pause_mode 1`: seconds in freeze time before either team can unpause (`0` = both teams always have to). Also settable as `get5_tech_pause_time` / `matchzy_tech_pause_time` (upstream's name), which switch to `matchzy_tech_pause_mode 1`. |
+| `matchzy_max_tech_pauses_allowed` | `2` | Y | Tech pauses per team per map. With `matchzy_tech_pause_mode 1`, `0` = unlimited. Also settable as `get5_max_tech_pauses` / `matchzy_max_tech_pauses` (upstream's name), which switch to `matchzy_tech_pause_mode 1`. |
 | `matchzy_tech_pause_mode` :fontawesome-solid-code-fork: | `0` | Y | `0` = a tech pause ends on its own when its time runs out. `1` = Get5 rules: the pause counts once it takes effect in freeze time, the pausing team can cancel it before then, and once its time is up either team can `.unpause`. Setting `get5_max_tech_pauses` or `get5_tech_pause_time` switches to `1`. |
 | `matchzy_overtime_pauses_per_team` :fontawesome-solid-code-fork: | `1` | Y | `.pause` uses per team in each overtime period. `0` = no limit. Tactical timeouts in overtime are set in live.cfg (`mp_team_timeout_ot_add_once`, `mp_team_timeout_ot_add_each`, `mp_team_timeout_ot_max`). |
 | `matchzy_autopause_enabled` :fontawesome-solid-code-fork: | `true` | Y | Pause automatically when a team drops below the minimum player count. |

@@ -898,7 +898,9 @@ namespace MatchZy
                         // get5_max_tech_pauses / get5_tech_pause_time also switch on Get5 pause rules;
                         // remember the server's mode so the series end puts it back.
                         if (cvarName.Equals("get5_max_tech_pauses", StringComparison.OrdinalIgnoreCase)
-                            || cvarName.Equals("get5_tech_pause_time", StringComparison.OrdinalIgnoreCase))
+                            || cvarName.Equals("get5_tech_pause_time", StringComparison.OrdinalIgnoreCase)
+                            || cvarName.Equals("matchzy_max_tech_pauses", StringComparison.OrdinalIgnoreCase)
+                            || cvarName.Equals("matchzy_tech_pause_time", StringComparison.OrdinalIgnoreCase))
                             matchConfig.OriginalCvars.TryAdd("matchzy_tech_pause_mode", techPauseMode.Value.ToString());
                     }
                     else if (GetFakeConVarValue(cvarName) is string fakeValue)

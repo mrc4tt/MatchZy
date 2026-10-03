@@ -4018,7 +4018,11 @@ namespace MatchZy
                     // (GetCvarValues records it when a match config sets one of these).
                     ["get5_max_tech_pauses"] = Int(() => maxTechPausesAllowed.Value, v => maxTechPausesAllowed.Value = Math.Max(0, v)),
                     ["get5_tech_pause_time"] = Int(() => techPauseDuration.Value, v => techPauseDuration.Value = v),
+                    ["get5_allow_technical_pause"] = Bool(() => techPauseEnabled.Value, v => techPauseEnabled.Value = v),
                 };
+                // Upstream MatchZy 0.9.1 names for the same tech pause settings.
+                map["matchzy_max_tech_pauses"] = map["get5_max_tech_pauses"];
+                map["matchzy_tech_pause_time"] = map["get5_tech_pause_time"];
                 // Get5 aliases share the setting.
                 foreach (var alias in new[] { "demo_upload_url", "demo_upload_s3", "demo_upload_header_key", "demo_upload_header_value", "allow_force_ready", "remote_backup_url", "remote_backup_header_key", "remote_backup_header_value", "time_to_start", "time_to_start_veto" })
                     map["get5_" + alias] = map["matchzy_" + alias];

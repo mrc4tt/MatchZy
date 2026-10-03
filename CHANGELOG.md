@@ -4,6 +4,12 @@ Customized fork of [MatchZy](https://github.com/shobhit-pathak/MatchZy) by Shobh
 
 Fork version numbering and this changelog are independent of upstream.
 
+# 0.8.97
+
+#### October 3, 2026
+
+- Upstream MatchZy 0.9.1's technical pause setting names work here too: `matchzy_max_tech_pauses` and `matchzy_tech_pause_time` set `matchzy_max_tech_pauses_allowed` / `matchzy_tech_pause_duration` and switch to Get5 pause rules (like `get5_max_tech_pauses` / `get5_tech_pause_time`), and `get5_allow_technical_pause` sets `matchzy_enable_tech_pause`. Configs and panels written for upstream 0.9.1 no longer lose these settings.
+
 # 0.8.96
 
 #### October 3, 2026
