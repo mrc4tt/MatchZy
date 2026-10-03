@@ -153,7 +153,16 @@ public partial class MatchZy
 
             int userId = player.UserId.Value;
 
-            if ((isMatchSetup || matchStarted) && !player.IsBot && !player.IsHLTV)
+            if ((isMatchSetup || matchStarted) && !player.IsBot && !player.IsHLTV && UseGet5Events)
+            {
+                PublishEvent(new Get5PlayerDisconnectEvent
+                {
+                    MatchId = liveMatchId,
+                    Player = Get5Player(player),
+                    Reason = @event.Reason,
+                });
+            }
+            else if ((isMatchSetup || matchStarted) && !player.IsBot && !player.IsHLTV)
             {
                 var disconnectEvent = new MatchZyPlayerDisconnectedEvent
                 {

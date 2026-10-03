@@ -705,6 +705,7 @@ namespace MatchZy
                                 $"[RestoreRoundBackup] Loading {loadFileName}. Rounds played: {preRoundsPlayed}, score: {preTeam1Score}-{preTeam2Score}, target round: {restoredRoundsPlayed}."
                             );
                             Server.ExecuteCommand($"mp_backup_restore_load_file {loadFileName}");
+                            SendBackupLoadedEvents(fileName, restoredRoundsPlayed);
                             // Put the advanced stats back to the start of the restored round (also undoes
                             // the reset that setting the match live again does).
                             RestoreAdvancedStatsSnapshot(advancedStatsJson);
@@ -904,6 +905,20 @@ namespace MatchZy
             unpauseData["ct"] = false;
             unpauseData["t"] = false;
             unpauseData["pauseTeam"] = "RoundRestore";
+            // Get5 announces the pause a restore leaves the match in as pause_type "backup" (the
+            // legacy format never sent one).
+            if (UseGet5Events)
+            {
+                PublishEvent(new MatchPausedLiveEvent
+                {
+                    MatchId = liveMatchId,
+                    MapNumber = matchConfig.CurrentMapNumber,
+                    PauseType = "backup",
+                    TeamName = null,
+                    MaxDuration = null,
+                    RoundNumber = GetRoundNumer(),
+                });
+            }
 
             if (!restoreAutoUnpause.Value)
             {

@@ -2770,7 +2770,10 @@ namespace MatchZy
             Stage("advstats");
 
             // ── Live scorebot: round_start event ──
-            if (!string.IsNullOrEmpty(matchConfig.RemoteLogURL))
+            liveRoundNumber = GetRoundNumer();
+            if (roundStartSentByRestore)
+                roundStartSentByRestore = false; // already sent for the restored round
+            else if (!string.IsNullOrEmpty(matchConfig.RemoteLogURL))
             {
                 var roundStartEvent = new RoundStartLiveEvent
                 {
@@ -2830,7 +2833,8 @@ namespace MatchZy
                     {
                         MatchId = liveMatchId,
                         MapNumber = matchConfig.CurrentMapNumber,
-                        RoundNumber = GetRoundNumer(),
+                        // Get5: the rounds played when this round started (the score already counts it).
+                        RoundNumber = UseGet5Events ? liveRoundNumber : GetRoundNumer(),
                         Reason = @event.Reason,
                         RoundTime = LiveRoundTimeMs(),
                         Winner = winner,

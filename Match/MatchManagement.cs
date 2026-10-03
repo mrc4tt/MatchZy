@@ -355,6 +355,17 @@ namespace MatchZy
             }
 
             // A new match: the previous series' end state must not block this one.
+            // As in Get5: nobody is ready in a newly loaded match (a .ready typed before the load, or a
+            // .forceready, carried over when the map did not change), and the game is not left paused.
+            foreach (var key in playerReadyStatus.Keys.ToList())
+                playerReadyStatus[key] = false;
+            foreach (var team in teamReadyOverride.Keys.ToList())
+                teamReadyOverride[team] = false;
+            _readyStatusDirty = true;
+            if (isPaused)
+                UnpauseMatch();
+            else if (GetGameRules()?.GamePaused == true)
+                Server.ExecuteCommand("mp_unpause_match;"); // paused outside MatchZy (console)
             matchLoadGeneration++;
             seriesEnded = false;
             currentMapFinished = false;

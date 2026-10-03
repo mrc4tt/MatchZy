@@ -1344,6 +1344,7 @@ namespace MatchZy
                     if (!isMatchLive)
                         return HookResult.Continue;
                     MarkLiveRoundPlayStart();
+                    roundStartSentByRestore = false;
                     if (string.IsNullOrEmpty(matchConfig.RemoteLogURL))
                         return HookResult.Continue;
 

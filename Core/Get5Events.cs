@@ -33,7 +33,8 @@ public class Get5WeaponInfo
     [JsonPropertyName("name")]
     public required string Name { get; init; }
 
-    // CS2 item definition index (ak47 = 7), 0 when the weapon has none (world, bomb, fire).
+    // SourceMod's CSWeaponID (ak47 = 27), as Get5 sends it; 0 when the weapon has none (world,
+    // bomb, fire, MP5-SD).
     [JsonPropertyName("id")]
     public int Id { get; init; }
 }
@@ -304,7 +305,7 @@ public class Get5MatchPauseEvent : MatchZyMapEvent
     [JsonPropertyName("team")]
     public string? Team { get; init; }
 
-    // "tactical" | "technical" | "admin"
+    // "tactical" | "technical" | "admin" | "backup"
     [JsonPropertyName("pause_type")]
     public required string PauseType { get; init; }
 
@@ -318,4 +319,28 @@ public class Get5MatchPauseEvent : MatchZyMapEvent
     // game_paused | game_unpaused
     public Get5MatchPauseEvent(string eventName)
         : base(eventName) { }
+}
+
+public class Get5PlayerDisconnectEvent : MatchZyMatchEvent
+{
+    [JsonPropertyName("player")]
+    public required Get5PlayerInfo Player { get; init; }
+
+    // Engine disconnect reason code (ENetworkDisconnectionReason). Not in Get5.
+    [JsonPropertyName("reason")]
+    public int Reason { get; init; }
+
+    public Get5PlayerDisconnectEvent()
+        : base("player_disconnect") { }
+}
+
+// A round backup was restored. round_number is the round restored to (rounds played at its start).
+// Sent in both event formats; in the Get5 format it is followed by that round's round_start.
+public class MatchZyBackupLoadedEvent : MatchZyRoundEvent
+{
+    [JsonPropertyName("filename")]
+    public required string FileName { get; init; }
+
+    public MatchZyBackupLoadedEvent()
+        : base("backup_loaded") { }
 }

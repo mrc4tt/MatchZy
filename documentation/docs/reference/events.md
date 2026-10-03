@@ -53,12 +53,12 @@ Sent with or without a loaded match, to `matchzy_remote_log_url` from `config.cf
 
 ### Get5 format
 
-Events that Get5 also has (`player_death`, `bomb_planted`, `bomb_defused`, `bomb_exploded`, `grenade_thrown`, `round_start`, `game_paused`, `game_unpaused`) use [Get5's event schema](https://splewis.github.io/get5/latest/events.html), so Get5 tooling can read them as is. MatchZy's own events use the same building blocks. Fields Get5 does not have (marked *extra*) are added on top; a Get5 consumer ignores them.
+Events that Get5 also has (`player_death`, `bomb_planted`, `bomb_defused`, `bomb_exploded`, `grenade_thrown`, `round_start`, `game_paused`, `game_unpaused`, `player_disconnect`, `backup_loaded`) use [Get5's event schema](https://splewis.github.io/get5/latest/events.html), so Get5 tooling can read them as is. MatchZy's own events use the same building blocks. Fields Get5 does not have (marked *extra*) are added on top; a Get5 consumer ignores them.
 
 Building blocks:
 
 - **Player object**: `{"steamid", "name", "user_id", "side", "is_bot"}`. `side` is `ct`, `t`, `spec` or `null`; a bot's `steamid` is `BOT-<user_id>`.
-- **Weapon object**: `{"name", "id"}`. `name` without the `weapon_` prefix (`ak47`, `hegrenade`, `planted_c4`). `id` is the CS2 item definition index (`ak47` = 7), `0` for the bomb, fire and the world. Get5 on CS:GO sent SourceMod's weapon ID here, which does not exist in CS2.
+- **Weapon object**: `{"name", "id"}`. `name` without the `weapon_` prefix (`ak47`, `hegrenade`, `planted_c4`). `id` is SourceMod's weapon ID as Get5 sends it (`ak47` = 27), `0` for weapons without one (MP5-SD), the bomb, fire and the world.
 - **`round_time`**: milliseconds since freeze time ended, `0` during freeze time.
 - **`round_number`**: 0-based, the number of rounds already played.
 
@@ -76,9 +76,11 @@ Building blocks:
 | `player_blinded` :fontawesome-solid-code-fork: | A player is flashed | `player` (victim), `attacker` (or `null`), `blind_duration` (seconds), `friendly_fire`, `round_time` |
 | `freezetime_end` :fontawesome-solid-code-fork: | Freeze time ended | `players` (player objects with `health`, `armor`, `has_helmet`, `has_defuser`, `money`), `ct_alive`, `t_alive` |
 | `round_start` | A live round starts | `round_number` |
-| `game_paused`, `game_unpaused` | Match paused / unpaused | `team` (`team1`, `team2`, or `null` for admin and automatic pauses), `pause_type` (`tactical`, `technical`, `admin`); *extra* `round_number`, `max_duration` (seconds of a timed technical pause) |
+| `game_paused`, `game_unpaused` | Match paused / unpaused | `team` (`team1`, `team2`, or `null` for admin, automatic and restore pauses), `pause_type` (`tactical`, `technical`, `admin`, `backup` after a round restore); *extra* `round_number`, `max_duration` (seconds of a timed technical pause) |
+| `player_disconnect` | A player leaves while a match is loaded | `player`; *extra* `reason` (engine disconnect code) |
+| `backup_loaded` | A round backup was restored | `round_number` (the round restored to), `filename`. Followed by that round's `round_start`; the engine's own round start after the load is not sent again. |
 
-All live events carry `matchid`, `map_number` and `round_number`. `matchid` is a number, as in every other MatchZy event (Get5 sends a string).
+All live events carry `matchid`, `map_number` and `round_number`. In this format `round_end`'s `round_number` is also Get5's: the rounds played when the round started (the legacy format sends the rounds played after it). `matchid` is a number, as in every other MatchZy event (Get5 sends a string).
 
 Get5's per-grenade detonation events with victim lists (`hegrenade_detonated`, `flashbang_detonated`, ...) are not sent; use `grenade_detonated`, `player_hurt` and `player_blinded`.
 

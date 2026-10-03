@@ -55,18 +55,27 @@ namespace MatchZy
             return player != null && player.IsValid ? Get5Player(player) : null;
         }
 
-        // CS2 item definition indexes (items_game.txt) by weapon name. Get5 on CS:GO sent SourceMod's
-        // CSWeaponID here, which does not exist in CS2; the definition index is CS2's own weapon id.
-        private static readonly Dictionary<string, int> WeaponDefIndex = new(StringComparer.OrdinalIgnoreCase)
+        // SourceMod's CSWeaponID (cstrike.inc), which Get5 sends as weapon.id and G5API stores. Weapons
+        // without one (the MP5-SD), fire ("inferno"), the bomb ("planted_c4") and the world are 0, as in Get5.
+        private static readonly Dictionary<string, int> Get5WeaponIds = new(StringComparer.OrdinalIgnoreCase)
         {
-            { "deagle", 1 }, { "elite", 2 }, { "fiveseven", 3 }, { "glock", 4 }, { "ak47", 7 }, { "aug", 8 },
-            { "awp", 9 }, { "famas", 10 }, { "g3sg1", 11 }, { "galilar", 13 }, { "m249", 14 }, { "m4a1", 16 },
-            { "mac10", 17 }, { "p90", 19 }, { "mp5sd", 23 }, { "ump45", 24 }, { "xm1014", 25 }, { "bizon", 26 },
-            { "mag7", 27 }, { "negev", 28 }, { "sawedoff", 29 }, { "tec9", 30 }, { "taser", 31 }, { "hkp2000", 32 },
-            { "mp7", 33 }, { "mp9", 34 }, { "nova", 35 }, { "p250", 36 }, { "scar20", 38 }, { "sg556", 39 },
-            { "ssg08", 40 }, { "knife", 42 }, { "flashbang", 43 }, { "hegrenade", 44 }, { "smokegrenade", 45 },
-            { "molotov", 46 }, { "decoy", 47 }, { "incgrenade", 48 }, { "c4", 49 }, { "knife_t", 59 },
-            { "m4a1_silencer", 60 }, { "usp_silencer", 61 }, { "cz75a", 63 }, { "revolver", 64 },
+            ["p228"] = 1, ["glock"] = 2, ["scout"] = 3, ["hegrenade"] = 4, ["xm1014"] = 5, ["c4"] = 6, ["mac10"] = 7,
+            ["aug"] = 8, ["smokegrenade"] = 9, ["elite"] = 10, ["fiveseven"] = 11, ["ump45"] = 12, ["sg550"] = 13,
+            ["galil"] = 14, ["famas"] = 15, ["usp"] = 16, ["awp"] = 17, ["mp5navy"] = 18, ["m249"] = 19, ["m3"] = 20,
+            ["m4a1"] = 21, ["tmp"] = 22, ["g3sg1"] = 23, ["flashbang"] = 24, ["deagle"] = 25, ["sg552"] = 26, ["ak47"] = 27,
+            ["knife"] = 28, ["p90"] = 29, ["shield"] = 30, ["kevlar"] = 31, ["assaultsuit"] = 32, ["nightvision"] = 33,
+            ["galilar"] = 34, ["bizon"] = 35, ["mag7"] = 36, ["negev"] = 37, ["sawedoff"] = 38, ["tec9"] = 39, ["taser"] = 40,
+            ["hkp2000"] = 41, ["mp7"] = 42, ["mp9"] = 43, ["nova"] = 44, ["p250"] = 45, ["scar17"] = 46, ["scar20"] = 47,
+            ["sg556"] = 48, ["ssg08"] = 49, ["knifegg"] = 50, ["molotov"] = 51, ["decoy"] = 52, ["incgrenade"] = 53,
+            ["defuser"] = 54, ["heavyassaultsuit"] = 55, ["cutters"] = 56, ["healthshot"] = 57, ["knife_t"] = 59,
+            ["m4a1_silencer"] = 60, ["usp_silencer"] = 61, ["cz75a"] = 63, ["revolver"] = 64, ["tagrenade"] = 68,
+            ["fists"] = 69, ["breachcharge"] = 70, ["tablet"] = 72, ["melee"] = 74, ["axe"] = 75, ["hammer"] = 76,
+            ["spanner"] = 78, ["knife_ghost"] = 80, ["firebomb"] = 81, ["diversion"] = 82, ["frag_grenade"] = 83,
+            ["snowball"] = 84, ["bumpmine"] = 85, ["bayonet"] = 500, ["knife_css"] = 503, ["knife_flip"] = 505,
+            ["knife_gut"] = 506, ["knife_karambit"] = 507, ["knife_m9_bayonet"] = 508, ["knife_tactical"] = 509,
+            ["knife_falchion"] = 512, ["knife_survival_bowie"] = 514, ["knife_butterfly"] = 515, ["knife_push"] = 516,
+            ["knife_cord"] = 517, ["knife_canis"] = 518, ["knife_ursus"] = 519, ["knife_gypsy_jackknife"] = 520,
+            ["knife_outdoor"] = 521, ["knife_stiletto"] = 522, ["knife_widowmaker"] = 523, ["knife_skeleton"] = 525,
         };
 
         private static Get5WeaponInfo Get5Weapon(string? weapon)
@@ -76,11 +85,37 @@ namespace MatchZy
                 name = name.Substring("weapon_".Length);
             if (name.Length == 0)
                 name = "unknown";
-            // Knife skins (knife_karambit, bayonet, ...) all report as some knife name.
-            int id = WeaponDefIndex.TryGetValue(name, out int def) ? def
-                : name.StartsWith("knife", StringComparison.OrdinalIgnoreCase) || name == "bayonet" ? 42
-                : 0;
-            return new Get5WeaponInfo { Name = name, Id = id };
+            return new Get5WeaponInfo { Name = name, Id = Get5WeaponIds.TryGetValue(name, out int id) ? id : 0 };
+        }
+
+        // Rounds played when the current round started: Get5's round_number for round_end, which fires
+        // after the score already counts the round. Set at round start and by a round restore.
+        private int liveRoundNumber;
+
+        // A round restore sends backup_loaded and the restored round's round_start itself, so the
+        // round_start of the engine's restart that follows the load is not sent again.
+        private bool roundStartSentByRestore;
+
+        private void SendBackupLoadedEvents(string fileName, int roundNumber)
+        {
+            liveRoundNumber = roundNumber;
+            PublishEvent(new MatchZyBackupLoadedEvent
+            {
+                MatchId = liveMatchId,
+                MapNumber = matchConfig.CurrentMapNumber,
+                RoundNumber = roundNumber,
+                FileName = fileName,
+            });
+            if (!UseGet5Events)
+                return;
+            // G5API drops the kills and plants of the undone rounds on this round_start.
+            roundStartSentByRestore = true;
+            PublishEvent(new RoundStartLiveEvent
+            {
+                MatchId = liveMatchId,
+                MapNumber = matchConfig.CurrentMapNumber,
+                RoundNumber = roundNumber,
+            });
         }
 
         // "A"/"B" from GetPlantedBombSite to Get5's "a"/"b".
@@ -110,10 +145,13 @@ namespace MatchZy
             switch (@event)
             {
                 case MatchPausedLiveEvent paused:
+                    // .pause (both teams must unpause) and automatic pauses are technical, as in
+                    // upstream MatchZy; a round restore's pause is Get5's "backup".
                     lastGet5PauseType = paused.PauseType switch
                     {
-                        "tech" or "auto" => "technical",
+                        "tech" or "auto" or "pause" => "technical",
                         "admin" => "admin",
+                        "backup" => "backup",
                         _ => "tactical",
                     };
                     lastGet5PauseTeam = paused.TeamName == null ? null

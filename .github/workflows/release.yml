@@ -4,6 +4,7 @@ on:
     paths-ignore:
       - documentation/**
       - '**/*.md'
+      - .github/workflows/docs.yml
     branches:
       - main
   workflow_dispatch:
