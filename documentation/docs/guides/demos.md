@@ -7,7 +7,7 @@ When GOTV is enabled (`tv_enable 1`, from the launch options or any cfg), MatchZ
 | `matchzy_demo_path` | `demos/` | Folder relative to `csgo/`. |
 | `matchzy_demo_name_format` | `{TIME}_{MATCH_ID}_{MAP}_{TEAM1}_vs_{TEAM2}` | File name. Also `{MAPNUMBER}`. |
 
-## Reliable recording :fontawesome-solid-code-fork:
+## Reliable recording
 
 Demo recording in CS2 fails silently in several ways (a `mp_restartgame` killing the recording, another plugin changing map, dynamic CSTV removing the bot). This fork guards against them:
 
@@ -35,6 +35,6 @@ The upload starts shortly after the map ends. Two modes:
 | Mode | Request |
 |---|---|
 | Default | `POST` with the demo as body, plus `MatchZy-FileName`, `MatchZy-MatchId`, `MatchZy-MapNumber`, `MatchZy-RoundNumber` headers (also sent as `Get5-*`). |
-| S3 :fontawesome-solid-code-fork: (`matchzy_demo_upload_s3 true`) | `PUT` with the raw `.dem` as body and only your custom header, for S3-compatible presigned URLs. Sign the URL with `Content-Type: application/octet-stream`. |
+| S3 (`matchzy_demo_upload_s3 true`) | `PUT` with the raw `.dem` as body and only your custom header, for S3-compatible presigned URLs. Sign the URL with `Content-Type: application/octet-stream`. |
 
 After each upload a `demo_upload_ended` event reports the file name and whether it succeeded.

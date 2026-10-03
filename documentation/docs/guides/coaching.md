@@ -10,7 +10,7 @@ The rules depend on whether the match config gives the team a `coaches` list.
 |---|---|
 | No match loaded (pug, scrim) | Anyone on that team's side. |
 | Match config, team **without** `coaches` | Players on that team's `players` roster, while on the team's side. With `matchzy_coach_listed_only true`: nobody. |
-| Match config, team **with** `coaches` :fontawesome-solid-code-fork: | Only the SteamIDs in that team's `coaches` list. |
+| Match config, team **with** `coaches` | Only the SteamIDs in that team's `coaches` list. |
 | Any case | Never the opposing team. Being an admin gives no exception. |
 | `matchzy_coach_enabled false` | Nobody (also not listed coaches). |
 
@@ -18,12 +18,12 @@ The rules depend on whether the match config gives the team a `coaches` list.
     - **No coaching at all:** `matchzy_coach_enabled false` in `config.cfg`, or per match in the match config's `cvars` block (`"matchzy_coach_enabled": "false"`, restored after the series).
     - **Only whitelisted coaches:** `matchzy_coach_listed_only true`, then list each team's coaches in `"coaches"`. A team without a list has no coach.
 
-- `.coach` only works for the team you are on. :fontawesome-solid-code-fork:
+- `.coach` only works for the team you are on.
 - `.coach` works in warmup and during freeze time, not in the middle of a live round.
 - `.uncoach` goes back to playing (not for a coach who is only in the `coaches` list).
 - Someone who is in no roster of a loaded match is moved to Spectator and cannot coach, admins included. To let an admin coach, put their SteamID in the team's `players` or `coaches`.
 
-## Coaches in the match config :fontawesome-solid-code-fork:
+## Coaches in the match config
 
 List coaches per team, the same way as players (an object keyed by SteamID64, or an array of SteamID64s):
 
@@ -73,13 +73,11 @@ What this does:
 - Listed coaches may join even with `matchzy_kick_when_no_match_loaded`, do not count toward `players_per_team` or the ready check, and do not need to `.ready`.
 - Remove a team's `coaches` list to let its rostered players coach instead.
 
-Upstream MatchZy cannot set coaches in the match config.
-
 ## What players notice
 
-Nothing. The coach does not take a competitive spawn, so the five players always spawn on the normal spots. The coach has no teammate color, does not show up in the kill feed when removed at the end of freeze time, and never passes through the Spectator team. :fontawesome-solid-code-fork:
+Nothing. The coach does not take a competitive spawn, so the five players always spawn on the normal spots. The coach has no teammate color, does not show up in the kill feed when removed at the end of freeze time, and never passes through the Spectator team.
 
-## Viewing spots :fontawesome-solid-code-fork:
+## Viewing spots
 
 | `matchzy_coaching_mode` | Spot |
 |---|---|

@@ -4,7 +4,7 @@ A short summary of each release. The [full changelog](changelog.md) has the deta
 
 ## 0.8.97 <small>October 3, 2026</small>
 
-- **New:** Upstream MatchZy 0.9.1's `matchzy_max_tech_pauses`, `matchzy_tech_pause_time` and `get5_allow_technical_pause` are accepted, so configs written for upstream keep their technical pause settings.
+- **New:** `matchzy_max_tech_pauses`, `matchzy_tech_pause_time` and `get5_allow_technical_pause` as alternative names for the technical pause settings.
 
 ## 0.8.96 <small>October 3, 2026</small>
 
@@ -71,7 +71,7 @@ A short summary of each release. The [full changelog](changelog.md) has the deta
 - **Fixed:** Forfeit, `.ffw` and `.gg` now stop the demo, send `map_result` and write the real score.
 - **Fixed:** `.ln` and the nades menu loaded the wrong lineup; `.delbotpos` deleted the wrong position after a typo.
 - **Performance:** Less work per round in coach matches, per grenade with `.autoclear`, and on bomb events.
-- **Added:** `matchzy_ready_hint_style 2`: no center hint, upstream-style chat reminder of who is not ready.
+- **Added:** `matchzy_ready_hint_style 2`: no center hint, a chat reminder of who is not ready.
 - **Changed:** `.coach` only in warmup and freeze time.
 - **Changed:** `.rs`, `.grt` and `.fas` need admin.
 - **Fixed:** Live events could arrive out of order.

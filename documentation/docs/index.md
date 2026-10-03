@@ -12,7 +12,6 @@ hide:
 
 [:material-download: Download @@MATCHZY_VERSION@@](https://github.com/mrc4tt/MatchZy/releases/download/@@MATCHZY_VERSION@@/MatchZy-@@MATCHZY_VERSION@@.zip){ .md-button .md-button--primary }
 [Get started](getting-started/installation.md){ .md-button }
-[What the fork adds](comparison.md){ .md-button }
 [Commands](reference/commands.md){ .md-button }
 
 <small>[Download](https://github.com/mrc4tt/MatchZy/releases/latest) · [Changelog](https://github.com/mrc4tt/MatchZy/blob/@@MATCHZY_VERSION@@/CHANGELOG.md) · [All releases](https://github.com/mrc4tt/MatchZy/releases) · [Report an issue](https://github.com/mrc4tt/MatchZy/issues/new/choose)</small>
@@ -67,7 +66,7 @@ hide:
 
     Reliable demo recording and S3 upload, round restores after a crash, auto-pause, safe config updates, and coexistence with CS2-SimpleAdmin.
 
-    [:octicons-arrow-right-24: Fork vs upstream](comparison.md)
+    [:octicons-arrow-right-24: Updating](getting-started/updating.md)
 
 </div>
 
@@ -84,4 +83,4 @@ Full steps in [Installation](getting-started/installation.md).
 
 ## Credits
 
-This fork is based on MatchZy, created by [Shobhit Pathak](https://github.com/shobhit-pathak/MatchZy). It is maintained by Miksen and keeps the upstream command names and match config format, so upstream guides and Get5 panels keep working.
+Based on [MatchZy](https://github.com/shobhit-pathak/MatchZy) by Shobhit Pathak. Maintained by Miksen. Command names and the match config format are unchanged, so existing guides and Get5 panels keep working.

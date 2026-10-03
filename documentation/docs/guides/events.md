@@ -1,6 +1,6 @@
 # Live events API
 
-MatchZy POSTs a JSON event to your server whenever something happens in a match. Upstream sends the handful of events a Get5 panel needs; this fork adds a **live scorebot** feed (kills, damage, bomb, grenades, flashes, pauses) so you can build live scoreboards, Discord bots or overlays. :fontawesome-solid-code-fork:
+MatchZy POSTs a JSON event to your server whenever something happens in a match: the match flow events a Get5 panel needs, plus a **live scorebot** feed (kills, damage, bomb, grenades, flashes, pauses) so you can build live scoreboards, Discord bots or overlays.
 
 ## Setup
 
@@ -12,7 +12,7 @@ matchzy_remote_log_header_key "Authorization"
 matchzy_remote_log_header_value "Bearer <token>"
 ```
 
-A second header pair (`matchzy_remote_log_auth_key` / `matchzy_remote_log_auth_value`) is available for services that need two. :fontawesome-solid-code-fork:
+A second header pair (`matchzy_remote_log_auth_key` / `matchzy_remote_log_auth_value`) is available for services that need two.
 
 ## Format
 

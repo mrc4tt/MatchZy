@@ -38,9 +38,9 @@ There are three ways to run a match, from quick pug to fully scripted tournament
 - `map_sides` sets the starting side per map (`team1_ct`, `team2_t`, `knife`, ...).
 - `clinch_series` ends a BO3 at 2-0.
 
-Workshop maps work everywhere a map name does: `workshop/<id>`, `ws/<id>` or `ws:<name>` (hosted collection). :fontawesome-solid-code-fork:
+Workshop maps work everywhere a map name does: `workshop/<id>`, `ws/<id>` or `ws:<name>` (hosted collection).
 
-## Tournament timeouts :fontawesome-solid-code-fork:
+## Tournament timeouts
 
 | Setting | What it does |
 |---|---|
@@ -58,7 +58,7 @@ All three are off (`0`) by default. A forfeit ends the series with the other tea
 | `matchzy_kick_when_no_match_loaded true` | Players not on the loaded roster are kicked on join. Everyone is kicked when no match is loaded. Admins are exempt. |
 | `matchzy_whitelist_enabled_default true` | Only SteamIDs in `whitelist.cfg` may join. |
 
-## Players vs bots :fontawesome-solid-code-fork:
+## Players vs bots
 
 One team can be `"players": "any"` (any human) and the other `"bots": true`. Bots are filled to `players_per_team`, stay on their side through halftime and overtime, always count as ready, and are recorded in stats. The map list must be fixed. Example in the [match config reference](../reference/match-config.md#players-vs-bots).
 
@@ -66,9 +66,9 @@ One team can be `"players": "any"` (any human) and the other `"bots": true`. Bot
 
 - Stats are written to the database and a CSV. See [Stats](stats.md).
 - The demo stops and is uploaded if configured. See [Demos](demos.md).
-- With `matchzy_match_end_auto_changelevel` :fontawesome-solid-code-fork: the server changes to the next map by itself. Panel-loaded matches (`matchzy_loadmatch_url`) leave the map change to the panel.
+- With `matchzy_match_end_auto_changelevel` the server changes to the next map by itself. Panel-loaded matches (`matchzy_loadmatch_url`) leave the map change to the panel.
 - Cvars from the match config's `cvars` block are restored (`matchzy_reset_cvars_on_series_end`).
 
 ## Stopping a match
 
-`.stopmatch` (or the Stop Match button in `.ma`) stops the match in any state, from setup to live, and resets to warmup. The database gets an end time and no winner, so stopped matches are easy to tell apart. :fontawesome-solid-code-fork:
+`.stopmatch` (or the Stop Match button in `.ma`) stops the match in any state, from setup to live, and resets to warmup. The database gets an end time and no winner, so stopped matches are easy to tell apart.

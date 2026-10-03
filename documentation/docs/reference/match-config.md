@@ -86,11 +86,11 @@ Prefer an in-game flow? Admins can build the same config with the [`.matchsetup`
 | `name` | string | **required** | Team name, shown on the scoreboard. |
 | `id` | string | `""` | Your own id for the team, echoed in events. |
 | `players` | object, array or `"any"` | **required** | Roster as `{ "<steamid64>": "<name>" }` or `["<steamid64>", ...]`. `"any"` opens the team to every human who is not on the other roster. Only one team can be `"any"`. |
-| `coaches` :fontawesome-solid-code-fork: | object or string[] | - | SteamID64s that coach this team. They may join, are not kicked by `matchzy_kick_when_no_match_loaded`, and become coach automatically. With a list, only those SteamIDs can `.coach` this team. See [Coaching](../guides/coaching.md). |
-| `bots` :fontawesome-solid-code-fork: | bool | `false` | The team is played by bots, filled to `players_per_team`. |
-| `bot_difficulty` :fontawesome-solid-code-fork: | integer 0-3 | `2` | Bot difficulty for a bot team. |
+| `coaches` | object or string[] | - | SteamID64s that coach this team. They may join, are not kicked by `matchzy_kick_when_no_match_loaded`, and become coach automatically. With a list, only those SteamIDs can `.coach` this team. See [Coaching](../guides/coaching.md). |
+| `bots` | bool | `false` | The team is played by bots, filled to `players_per_team`. |
+| `bot_difficulty` | integer 0-3 | `2` | Bot difficulty for a bot team. |
 
-## Players vs bots :fontawesome-solid-code-fork:
+## Players vs bots
 
 ```json
 {
@@ -115,9 +115,9 @@ Prefer an in-game flow? Admins can build the same config with the [`.matchsetup`
 |---|---|
 | `de_mirage` | `changelevel de_mirage` |
 | `3070284539` | Workshop map by id (`host_workshop_map`) |
-| `workshop/3070284539` or `workshop/3070284539/cs_alpine` | Workshop map by id :fontawesome-solid-code-fork: |
-| `ws/3070284539` | Workshop map by id :fontawesome-solid-code-fork: |
-| `ws:cs_alpine` | Workshop map by name from the server's hosted collection (`ds_workshop_changelevel`) :fontawesome-solid-code-fork: |
+| `workshop/3070284539` or `workshop/3070284539/cs_alpine` | Workshop map by id |
+| `ws/3070284539` | Workshop map by id |
+| `ws:cs_alpine` | Workshop map by name from the server's hosted collection (`ds_workshop_changelevel`) |
 
 ## Roster commands
 

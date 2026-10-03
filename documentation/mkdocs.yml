@@ -5,7 +5,7 @@ site_author: Miksen
 repo_url: https://github.com/mrc4tt/MatchZy
 repo_name: mrc4tt/MatchZy
 edit_uri: ""
-copyright: This MatchZy fork is based on MatchZy by Shobhit Pathak (upstream). Maintained by Miksen.
+copyright: Based on MatchZy by Shobhit Pathak. Maintained by Miksen.
 
 theme:
   name: material
@@ -100,11 +100,10 @@ extra:
       name: Source, releases and issues on GitHub
     - icon: fontawesome/brands/github
       link: https://github.com/shobhit-pathak/MatchZy
-      name: Upstream MatchZy
+      name: MatchZy by Shobhit Pathak
 
 nav:
   - Home: index.md
-  - Fork vs upstream: comparison.md
   - Getting started:
       - getting-started/index.md
       - Installation: getting-started/installation.md

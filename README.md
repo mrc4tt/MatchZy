@@ -74,4 +74,4 @@ The output is `bin/Release/net10.0/MatchZy.dll` with its dependencies. The proje
 
 ## Credits
 
-Based on [MatchZy](https://github.com/shobhit-pathak/MatchZy) by Shobhit Pathak (WD-). This fork is developed independently and no longer tracks the upstream changelog.
+Based on [MatchZy](https://github.com/shobhit-pathak/MatchZy) by Shobhit Pathak (WD-).

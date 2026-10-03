@@ -23,15 +23,15 @@ Tables are created automatically:
 | `matchzy_stats_maps` | One row per map: map name, start and end time, winner, score. |
 | `matchzy_stats_players` | One row per player per map: kills, deaths, assists, damage, multi kills, utility and flash stats, 1v1 / 1v2, entries, headshots, money. Updated every round. |
 
-A stopped match has an end time and an empty winner. :fontawesome-solid-code-fork:
+A stopped match has an end time and an empty winner.
 
-Set `matchzy_stats_include_bots true` to record bots as well (each bot gets a stable id from its name). :fontawesome-solid-code-fork:
+Set `matchzy_stats_include_bots true` to record bots as well (each bot gets a stable id from its name).
 
 ## CSV export
 
 After every map: `csgo/MatchZy_Stats/<matchid>/match_data_map<N>_<matchid>.csv`, the player table for that map.
 
-## Advanced stats :fontawesome-solid-code-fork:
+## Advanced stats
 
 When the map ends, MatchZy also writes an HLTV-style scoreboard to `csgo/MatchZy_Stats/<matchid>/<demo name>_stats.json` (written when a demo was recorded). Per player:
 

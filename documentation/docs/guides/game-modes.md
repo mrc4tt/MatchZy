@@ -5,8 +5,8 @@ MatchZy runs the server in one mode at a time. Admins switch with a chat command
 | Mode | Command | Knife | Rounds | Money | Use it for |
 |---|---|---|---|---|---|
 | **Match** | `.match` | Yes | MR12 with overtime, can clinch | 800 | Competitive matches and pugs. |
-| **Scrim** :fontawesome-solid-code-fork: | `.scrim` | No | All 24 rounds played, no overtime | 800 | Scrims where both halves should be played out. |
-| **Hill** :fontawesome-solid-code-fork: | `.hill` | No | All 24 rounds played | 16000 | Full-buy rounds, e.g. retakes-style or aim sessions with teams. |
+| **Scrim** | `.scrim` | No | All 24 rounds played, no overtime | 800 | Scrims where both halves should be played out. |
+| **Hill** | `.hill` | No | All 24 rounds played | 16000 | Full-buy rounds, e.g. retakes-style or aim sessions with teams. |
 | **Practice** | `.prac` | - | Endless | Unlimited, buy anywhere | Learning lineups, spawns, executes. |
 | **Dryrun** | `.dry` | No | Live-like rounds until stopped | 16000 | Running executes against bots or your team. |
 | **Sleep** | `.sleep` | - | - | - | Idle server with nothing loaded. |
@@ -23,7 +23,7 @@ Every mode executes its own cfg from `cfg/MatchZy/` (`live.cfg`, `scrim.cfg`, `h
 | `1` | Match warmup (default). |
 | `2` | Practice. |
 
-The mode commands (`.prac`, `.match`, `.scrim`, `.sleep`, `.exitprac`) also set this value, so a practice server stays in practice after `.map`. :fontawesome-solid-code-fork:
+The mode commands (`.prac`, `.match`, `.scrim`, `.sleep`, `.exitprac`) also set this value, so a practice server stays in practice after `.map`.
 
 ## Match flow
 

@@ -4020,7 +4020,7 @@ namespace MatchZy
                     ["get5_tech_pause_time"] = Int(() => techPauseDuration.Value, v => techPauseDuration.Value = v),
                     ["get5_allow_technical_pause"] = Bool(() => techPauseEnabled.Value, v => techPauseEnabled.Value = v),
                 };
-                // Upstream MatchZy 0.9.1 names for the same tech pause settings.
+                // Alternative names for the same tech pause settings.
                 map["matchzy_max_tech_pauses"] = map["get5_max_tech_pauses"];
                 map["matchzy_tech_pause_time"] = map["get5_tech_pause_time"];
                 // Get5 aliases share the setting.

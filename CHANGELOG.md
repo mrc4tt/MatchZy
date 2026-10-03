@@ -1,14 +1,12 @@
 # Changelog
 
-Customized fork of [MatchZy](https://github.com/shobhit-pathak/MatchZy) by Shobhit Pathak, adapted for CS2 game-server hosting. On top of upstream it adds a remote log HTTP API, G5API compatibility, auto changelevel, advanced stats (HLTV 2.0 rating / KAST / clutch / opening duels), a coach system, a pause overhaul, and in-game admin and match-setup menus.
-
-Fork version numbering and this changelog are independent of upstream.
+Based on [MatchZy](https://github.com/shobhit-pathak/MatchZy) by Shobhit Pathak, adapted for CS2 game-server hosting: remote log HTTP API, G5API compatibility, auto changelevel, advanced stats (HLTV 2.0 rating / KAST / clutch / opening duels), a coach system, a pause overhaul, and in-game admin and match-setup menus.
 
 # 0.8.97
 
 #### October 3, 2026
 
-- Upstream MatchZy 0.9.1's technical pause setting names work here too: `matchzy_max_tech_pauses` and `matchzy_tech_pause_time` set `matchzy_max_tech_pauses_allowed` / `matchzy_tech_pause_duration` and switch to Get5 pause rules (like `get5_max_tech_pauses` / `get5_tech_pause_time`), and `get5_allow_technical_pause` sets `matchzy_enable_tech_pause`. Configs and panels written for upstream 0.9.1 no longer lose these settings.
+- New setting names `matchzy_max_tech_pauses` and `matchzy_tech_pause_time`: they set `matchzy_max_tech_pauses_allowed` / `matchzy_tech_pause_duration` and switch to Get5 pause rules, like `get5_max_tech_pauses` / `get5_tech_pause_time`. `get5_allow_technical_pause` sets `matchzy_enable_tech_pause`. All three also work in a match config's `cvars` block.
 
 # 0.8.96
 

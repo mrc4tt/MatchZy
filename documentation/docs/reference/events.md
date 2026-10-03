@@ -2,8 +2,6 @@
 
 Every event is sent as an HTTP `POST` with a JSON body to `matchzy_remote_log_url`. The `event` field names the event. See the [Live events guide](../guides/events.md) for setup.
 
-:fontawesome-solid-code-fork: = not sent by upstream MatchZy.
-
 ## Common fields
 
 - `event`: event name.
@@ -22,20 +20,20 @@ Player stats objects (`team1.players[].stats` on `round_end` and `map_result`) u
 | `map_vetoed` | A team bans a map | `matchid`, `team`, `map_name` |
 | `map_picked` | A team picks a map | `matchid`, `team`, `map_name`, `map_number` |
 | `side_picked` | A side is chosen for a picked map | `matchid`, `team`, `map_name`, `map_number`, `side` |
-| `knife_won` :fontawesome-solid-code-fork: | The knife winner has chosen a side | `matchid`, `map_number`, `team`, `side` (`ct`/`t`), `swapped` |
+| `knife_won` | The knife winner has chosen a side | `matchid`, `map_number`, `team`, `side` (`ct`/`t`), `swapped` |
 | `going_live` | The map goes live | `matchid`, `map_number` |
-| `round_start` :fontawesome-solid-code-fork: | Every round start once the match has started | `matchid`, `map_number`, `round_number` |
-| `freezetime_end` :fontawesome-solid-code-fork: | Freeze time ends | `round_number`, `ct_alive`, `t_alive`, `players[]` (`name`, `steamid`, `team`, `hp`, `armor`, `has_helmet`, `has_defuser`, `money`) |
+| `round_start` | Every round start once the match has started | `matchid`, `map_number`, `round_number` |
+| `freezetime_end` | Freeze time ends | `round_number`, `ct_alive`, `t_alive`, `players[]` (`name`, `steamid`, `team`, `hp`, `armor`, `has_helmet`, `has_defuser`, `money`) |
 | `round_end` | A live round ends | `round_number`, `reason`, `winner{side,team}` (the team that won this round), `team1`, `team2` (scores and player stats) |
 | `map_result` | The map ends | `map_number`, `winner`, `team1`, `team2`, `demo_filename` |
 | `series_end` | The series ends | `winner`, `team1_series_score`, `team2_series_score`, `time_until_restore` |
-| `match_cancelled` :fontawesome-solid-code-fork: | A loaded or running match is stopped, surrendered, restarted, cancelled for a no-show, or ended by a map change from outside MatchZy | `reason` (`ended_early`, `surrendered`, `restarted`, `no_show`, `map_changed`), `demo_filename`, `team1`, `team2`, `team1_score`, `team2_score` |
-| `match_paused` :fontawesome-solid-code-fork: | Any pause starts | `round_number`, `pause_type` (`pause`, `tech`, `admin`, `auto`), `team_name`, `max_duration` |
-| `match_unpaused` :fontawesome-solid-code-fork: | Any pause ends | `round_number` |
+| `match_cancelled` | A loaded or running match is stopped, surrendered, restarted, cancelled for a no-show, or ended by a map change from outside MatchZy | `reason` (`ended_early`, `surrendered`, `restarted`, `no_show`, `map_changed`), `demo_filename`, `team1`, `team2`, `team1_score`, `team2_score` |
+| `match_paused` | Any pause starts | `round_number`, `pause_type` (`pause`, `tech`, `admin`, `auto`), `team_name`, `max_duration` |
+| `match_unpaused` | Any pause ends | `round_number` |
 | `demo_upload_ended` | A demo upload finished | `map_number`, `filename`, `success` |
 | `player_disconnect` | A player leaves while a match is loaded | `player` (user id), `player_steamid`, `player_name`, `player_team`, `reason` |
 
-## Server lifecycle :fontawesome-solid-code-fork:
+## Server lifecycle
 
 Sent with or without a loaded match, to `matchzy_remote_log_url` from `config.cfg`. While a loaded match uses its own remote log URL, they go there as well. All three carry `matchid` (`null` without a match), `map_name` (the current map) and `plugin_version`.
 
@@ -47,7 +45,7 @@ Sent with or without a loaded match, to `matchzy_remote_log_url` from `config.cf
 
 `server_shutdown` is sent while the server waits up to 3 seconds for it. A server that is killed (crash, `SIGKILL`, a panel's force stop) sends nothing; use `server_ready` on the next start to notice it.
 
-## Live scorebot :fontawesome-solid-code-fork:
+## Live scorebot
 
 `matchzy_events_format` picks the format of these events: `get5` (default) or `legacy` (the flat format of 0.8.94 and older, see [below](#legacy-format)).
 
@@ -65,16 +63,16 @@ Building blocks:
 | Event | When | Fields |
 |---|---|---|
 | `player_death` | A player dies (including suicides, world and bomb deaths) | `player` (victim), `attacker` (or `null`), `assist` (`{player, friendly_fire, flash_assist}` or `null`), `weapon`, `bomb`, `headshot`, `thru_smoke`, `penetrated` (objects passed through), `attacker_blind`, `no_scope`, `suicide`, `friendly_fire`, `round_time`; *extra* `ct_alive`, `t_alive` |
-| `player_kill` :fontawesome-solid-code-fork: | A player kills another player (not suicides or world deaths) | everything in `player_death`, plus `attacker_hp`, `distance`, `first_kill`, `trade_kill`, `attacker_round_kills`, `attacker_map_kills` |
-| `player_hurt` :fontawesome-solid-code-fork: | A player takes damage | `player` (victim), `attacker` (or `null`), `weapon`, `damage`, `damage_armor`, `health`, `armor` (left after the hit), `hitgroup`, `friendly_fire`, `round_time` |
+| `player_kill` | A player kills another player (not suicides or world deaths) | everything in `player_death`, plus `attacker_hp`, `distance`, `first_kill`, `trade_kill`, `attacker_round_kills`, `attacker_map_kills` |
+| `player_hurt` | A player takes damage | `player` (victim), `attacker` (or `null`), `weapon`, `damage`, `damage_armor`, `health`, `armor` (left after the hit), `hitgroup`, `friendly_fire`, `round_time` |
 | `bomb_planted` | Bomb planted | `player`, `site` (`a`/`b`), `round_time`; *extra* `ct_alive`, `t_alive` |
 | `bomb_defused` | Bomb defused | same as `bomb_planted`, plus `bomb_time_remaining` (ms) |
 | `bomb_exploded` | Bomb exploded | `site`, `round_time`; *extra* `ct_alive`, `t_alive` |
-| `bomb_pickup`, `bomb_dropped` :fontawesome-solid-code-fork: | Bomb picked up / dropped | `player`, `round_time` |
+| `bomb_pickup`, `bomb_dropped` | Bomb picked up / dropped | `player`, `round_time` |
 | `grenade_thrown` | Grenade thrown | `player`, `weapon`, `round_time` |
-| `grenade_detonated` :fontawesome-solid-code-fork: | Smoke, flash, HE or molotov detonated | `player` (thrower, or `null`), `weapon`, `x`, `y`, `z`, `round_time` |
-| `player_blinded` :fontawesome-solid-code-fork: | A player is flashed | `player` (victim), `attacker` (or `null`), `blind_duration` (seconds), `friendly_fire`, `round_time` |
-| `freezetime_end` :fontawesome-solid-code-fork: | Freeze time ended | `players` (player objects with `health`, `armor`, `has_helmet`, `has_defuser`, `money`), `ct_alive`, `t_alive` |
+| `grenade_detonated` | Smoke, flash, HE or molotov detonated | `player` (thrower, or `null`), `weapon`, `x`, `y`, `z`, `round_time` |
+| `player_blinded` | A player is flashed | `player` (victim), `attacker` (or `null`), `blind_duration` (seconds), `friendly_fire`, `round_time` |
+| `freezetime_end` | Freeze time ended | `players` (player objects with `health`, `armor`, `has_helmet`, `has_defuser`, `money`), `ct_alive`, `t_alive` |
 | `round_start` | A live round starts | `round_number` |
 | `game_paused`, `game_unpaused` | Match paused / unpaused | `team` (`team1`, `team2`, or `null` for admin, automatic and restore pauses), `pause_type` (`tactical`, `technical`, `admin`, `backup` after a round restore); *extra* `round_number`, `max_duration` (seconds of a timed technical pause) |
 | `player_disconnect` | A player leaves while a match is loaded | `player`; *extra* `reason` (engine disconnect code) |

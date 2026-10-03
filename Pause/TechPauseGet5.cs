@@ -27,8 +27,7 @@ public partial class MatchZy
     private int get5TechPauseElapsed = -1;
     private CounterStrikeSharp.API.Modules.Timers.Timer? get5TechPauseTimer;
 
-    // matchzy_max_tech_pauses / matchzy_tech_pause_time are upstream MatchZy 0.9.1's names for the
-    // same settings, so configs written for upstream keep working here.
+    // matchzy_max_tech_pauses / matchzy_tech_pause_time are alternative names for the same settings.
     [ConsoleCommand("get5_max_tech_pauses", "Technical pauses a team can call per map, Get5 rules (matchzy_tech_pause_mode 1). 0 = unlimited.")]
     [ConsoleCommand("matchzy_max_tech_pauses", "Technical pauses a team can call per map, Get5 rules (matchzy_tech_pause_mode 1). 0 = unlimited.")]
     public void OnGet5MaxTechPausesCommand(CCSPlayerController? player, CommandInfo command)

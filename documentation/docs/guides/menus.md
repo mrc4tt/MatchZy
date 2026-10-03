@@ -1,4 +1,4 @@
-# Admin menus :fontawesome-solid-code-fork:
+# Admin menus
 
 The menus need the optional [CS2MenuManager](https://git.miksen.me/mikkel/CS2MenuManager/releases) plugin (1.0.42+). Without it, MatchZy runs normally and the menu commands reply with a notice.
 
