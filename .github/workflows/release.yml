@@ -16,13 +16,13 @@ jobs:
     name: Build and Release
     runs-on: ubuntu-latest
     env:
-      # Auth for the "forgejo" NuGet source (CS2MenuManager) in nuget.config. On the GitHub
-      # mirror, add repo secrets FORGEJO_USER + RELEASE_TOKEN so `dotnet restore` can reach the
-      # feed at git.miksen.me (GITHUB_TOKEN there cannot authenticate to the Forgejo instance).
+      # Auth for the "forgejo" NuGet source in nuget.config (CS2MenuManager and the fork's
+      # CounterStrikeSharp.API are published there). Repo secrets FORGEJO_USER + RELEASE_TOKEN;
+      # GITHUB_TOKEN cannot authenticate to git.miksen.me.
       NuGetPackageSourceCredentials_forgejo: "Username=${{ secrets.FORGEJO_USER || 'mikkel' }};Password=${{ secrets.RELEASE_TOKEN || secrets.GITHUB_TOKEN }}"
     steps:
       - name: Checkout Repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Install dependencies
         run: |
@@ -47,7 +47,7 @@ jobs:
           echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
 
       - name: Set up .NET
-        uses: actions/setup-dotnet@v4
+        uses: actions/setup-dotnet@v6
         with:
           dotnet-version: "10.0"
 
@@ -76,28 +76,17 @@ jobs:
         run: |
           # Short body on purpose: the full changelog block made every release long in the release
           # list, pushing the zip far down. CHANGELOG.md stays the only place the changes are
-          # written; the body links to it at this tag (GitHub and Forgejo use different paths).
+          # written; the body links to it at this tag.
           VER="${{ env.MATCHZY_VERSION }}"
-          REPO_URL="${{ github.server_url }}/${{ github.repository }}"
-          if [ "${{ github.server_url }}" = "https://github.com" ]; then
-            CHANGELOG_URL="$REPO_URL/blob/$VER/CHANGELOG.md"
-          else
-            CHANGELOG_URL="$REPO_URL/src/tag/$VER/CHANGELOG.md"
-          fi
+          CHANGELOG_URL="${{ github.server_url }}/${{ github.repository }}/blob/$VER/CHANGELOG.md"
           {
             echo "Download \`MatchZy-$VER.zip\` below and extract it into \`game/csgo/\`. Updating never touches your \`cfg/\` files."
             echo
             echo "What's new: https://matchzy.miksen.me/whats-new/ · Full changelog: [CHANGELOG.md]($CHANGELOG_URL)"
           } > notes.md
 
-      # --- GitHub release (runs on the github.com mirror) ---
-      # Uses the gh CLI (a run: step) rather than a marketplace action: the Forgejo runner tries
-      # to clone every `uses:` action at prep time - before the `if` is evaluated - and
-      # softprops/action-gh-release is not mirrored to data.forgejo.org, which failed the whole
-      # job. A run: step is simply skipped by the `if` with nothing to fetch. gh is preinstalled
-      # on GitHub-hosted runners.
+      # Creates the release, or refreshes the zip when the release already exists.
       - name: Create GitHub Release
-        if: github.server_url == 'https://github.com'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
@@ -109,59 +98,3 @@ jobs:
           else
             gh release create "$VER" "$ASSET" --title "MatchZy $VER" --notes-file notes.md
           fi
-
-      # --- Forgejo release (runs on the Forgejo instance) ---
-      # Create the release if missing, otherwise UPDATE it in place: delete the old same-name
-      # asset and re-upload. This lets a same-version fix (no ModuleVersion bump) refresh the zip
-      # on an existing release instead of being skipped (mirrors the GitHub --clobber behavior).
-      - name: Create or update Forgejo Release
-        if: github.server_url != 'https://github.com'
-        env:
-          GITEA_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          set -e
-          API="${{ github.server_url }}/api/v1/repos/${{ github.repository }}"
-          VER="${{ env.MATCHZY_VERSION }}"
-          BODY=$(jq -Rs . < notes.md)
-
-          REL=$(curl -s -H "Authorization: token $GITEA_TOKEN" "$API/releases/tags/$VER")
-          RELEASE_ID=$(echo "$REL" | jq -r '.id // empty')
-
-          if [ -z "$RELEASE_ID" ]; then
-            echo "Creating release $VER..."
-            REL=$(curl -s -X POST "$API/releases" \
-              -H "Authorization: token $GITEA_TOKEN" \
-              -H "Content-Type: application/json" \
-              -d "{\"tag_name\":\"$VER\",\"name\":\"MatchZy $VER\",\"body\":$BODY,\"draft\":false,\"prerelease\":false}")
-            RELEASE_ID=$(echo "$REL" | jq -r '.id // empty')
-            if [ -z "$RELEASE_ID" ]; then
-              echo "Error: Failed to create release!"
-              echo "$REL"
-              exit 1
-            fi
-            echo "Created release with ID: $RELEASE_ID"
-          else
-            echo "Release $VER already exists (ID: $RELEASE_ID); updating its assets."
-          fi
-
-          for file in MatchZy-${VER}*.zip; do
-            # Replace an existing same-name asset so the zip is refreshed, not duplicated.
-            EXIST_ID=$(echo "$REL" | jq -r --arg n "$file" '.assets[]? | select(.name==$n) | .id')
-            if [ -n "$EXIST_ID" ]; then
-              echo "Deleting old asset $file (ID: $EXIST_ID)"
-              curl -s -X DELETE "$API/releases/$RELEASE_ID/assets/$EXIST_ID" -H "Authorization: token $GITEA_TOKEN" >/dev/null
-            fi
-            echo "Uploading $file..."
-            UPLOAD_RESPONSE=$(curl -s -X POST \
-              "$API/releases/$RELEASE_ID/assets?name=$file" \
-              -H "Authorization: token $GITEA_TOKEN" \
-              -H "Content-Type: application/octet-stream" \
-              --data-binary "@$file")
-            ASSET_ID=$(echo "$UPLOAD_RESPONSE" | jq -r '.id // empty')
-            if [ -z "$ASSET_ID" ]; then
-              echo "Warning: Upload may have failed for $file"
-              echo "$UPLOAD_RESPONSE"
-            else
-              echo "Uploaded $file (asset ID: $ASSET_ID)"
-            fi
-          done

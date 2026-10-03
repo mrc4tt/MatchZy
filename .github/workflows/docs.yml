@@ -27,10 +27,19 @@ jobs:
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - name: Checkout Repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
+
+      # Own Python instead of the runner's system one: newer runner images mark the system Python
+      # as externally managed, and a plain pip install fails there.
+      - name: Set up Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: "3.13"
+          cache: pip
+          cache-dependency-path: documentation/requirements.txt
 
       - name: Install MkDocs
-        run: python3 -m pip install -r documentation/requirements.txt
+        run: python -m pip install -r documentation/requirements.txt
 
       # Deploys as a Pages artifact (Settings > Pages > Source: GitHub Actions), no gh-pages branch.
       # docs/CNAME is copied into the site for the custom domain.
@@ -47,10 +56,10 @@ jobs:
         run: mkdocs build --strict
 
       - name: Upload Pages artifact
-        uses: actions/upload-pages-artifact@v3
+        uses: actions/upload-pages-artifact@v5
         with:
           path: documentation/site
 
       - name: Deploy to GitHub Pages
         id: deployment
-        uses: actions/deploy-pages@v4
+        uses: actions/deploy-pages@v5
