@@ -1,13 +1,12 @@
 name: Docs
+# Published together with a release (version tag), so the site never describes or links an
+# unreleased version: the download buttons point at the tag's MatchZy-<version>.zip. For a docs-only
+# fix between releases, run it by hand (Actions > Docs > Run workflow) on the latest release tag
+# or on main.
 on:
   push:
-    branches:
-      - main
-    paths:
-      - documentation/**
-      - CHANGELOG.md
-      - Core/MatchZy.cs
-      - .github/workflows/docs.yml
+    tags:
+      - '[0-9]*.[0-9]*.[0-9]*'
   workflow_dispatch:
 
 permissions:
@@ -22,9 +21,6 @@ concurrency:
 jobs:
   deploy:
     name: Build and deploy docs
-    # GitHub Pages only exists on the github.com mirror. The job-level `if` skips the whole job on
-    # the Forgejo runner, so none of its actions are fetched there.
-    if: github.server_url == 'https://github.com'
     runs-on: ubuntu-latest
     environment:
       name: github-pages
@@ -36,9 +32,8 @@ jobs:
       - name: Install MkDocs
         run: python3 -m pip install -r documentation/requirements.txt
 
-      # Deploys as a Pages artifact (Settings > Pages > Source: GitHub Actions) instead of a
-      # gh-pages branch: the Forgejo push mirror syncs with --mirror and deletes any branch that
-      # only exists on GitHub. docs/CNAME is copied into the site for the custom domain.
+      # Deploys as a Pages artifact (Settings > Pages > Source: GitHub Actions), no gh-pages branch.
+      # docs/CNAME is copied into the site for the custom domain.
       # The download buttons use @@MATCHZY_VERSION@@; fill in the plugin's ModuleVersion so they
       # always point at the current release zip.
       - name: Insert release version

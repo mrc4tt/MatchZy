@@ -1,0 +1,98 @@
+name: PR checks
+on:
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  # Checks that need no secrets, so they also run for pull requests from forks.
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Language files are valid and have the same keys
+        run: |
+          python3 - <<'PY'
+          import json, sys
+          files = {"en": "lang/en.json", "da": "lang/da.json", "sq": "lang/sq.json"}
+          data = {}
+          for name, path in files.items():
+              try:
+                  with open(path, encoding="utf-8") as f:
+                      data[name] = json.load(f)
+              except Exception as e:
+                  print(f"::error file={path}::invalid JSON: {e}")
+                  sys.exit(1)
+          ok = True
+          base = set(data["en"])
+          for name, keys in data.items():
+              missing = base - set(keys)
+              extra = set(keys) - base
+              for k in sorted(missing):
+                  print(f"::error file={files[name]}::missing key {k} (present in en.json)")
+                  ok = False
+              for k in sorted(extra):
+                  print(f"::error file={files[name]}::key {k} is not in en.json")
+                  ok = False
+          sys.exit(0 if ok else 1)
+          PY
+
+      - name: No em-dashes in changed files
+        run: |
+          base="${{ github.event.pull_request.base.sha }}"
+          found=0
+          while IFS= read -r file; do
+            [ -f "$file" ] || continue
+            lines=$(git diff -U0 "$base"...HEAD -- "$file" | grep '^+' | grep -v '^+++' | grep -c $'\xe2\x80\x94' || true)
+            if [ "$lines" != "0" ]; then
+              echo "::error file=$file::added lines contain an em-dash; use a hyphen, colon or parentheses"
+              found=1
+            fi
+          done < <(git diff --name-only "$base"...HEAD)
+          exit $found
+
+      - name: New settings are in config.cfg
+        run: |
+          # Warning only: debug flags and secrets are deliberately kept out of config.cfg.
+          grep -rhoE 'new\("matchzy_[a-z0-9_]+' --include=*.cs . | sed 's/new("//' | sort -u > /tmp/code.txt
+          grep -oE '^(// )?matchzy_[a-z0-9_]+' cfg/config.cfg | sed 's#// ##' | sort -u > /tmp/cfg.txt
+          comm -23 /tmp/code.txt /tmp/cfg.txt | while read -r name; do
+            echo "::warning file=cfg/config.cfg::$name is defined in code but not listed in config.cfg (fine for debug flags and secrets)"
+          done
+
+      - name: Changelog reminder
+        run: |
+          base="${{ github.event.pull_request.base.sha }}"
+          changed=$(git diff --name-only "$base"...HEAD)
+          if echo "$changed" | grep -qE '\.(cs|cfg)$|^lang/' && ! echo "$changed" | grep -qx 'CHANGELOG.md'; then
+            echo "::warning file=CHANGELOG.md::code or cfg changed without a CHANGELOG.md line; add one if server owners would notice the change"
+          fi
+
+  # The build restores CS2MenuManager and the CounterStrikeSharp API from a private NuGet feed,
+  # which needs repository secrets. GitHub does not give secrets to pull requests from forks, so
+  # this only runs for branches in this repository; a maintainer builds fork PRs before merging.
+  build:
+    name: Build
+    if: github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    env:
+      NuGetPackageSourceCredentials_forgejo: "Username=${{ secrets.FORGEJO_USER || 'mikkel' }};Password=${{ secrets.RELEASE_TOKEN }}"
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "10.0"
+
+      - name: Build
+        run: dotnet build -c Release

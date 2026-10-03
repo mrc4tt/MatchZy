@@ -1,0 +1,85 @@
+name: Bug report
+description: Something in MikZy does not work as documented.
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for the report. This tracker is for MikZy, the MatchZy fork. For the official MatchZy, use https://github.com/shobhit-pathak/MatchZy/issues.
+        Feature requests and reports are welcome, but there is no guarantee they will be picked up or implemented.
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Before you report
+      options:
+        - label: I am on the latest MikZy release.
+          required: true
+        - label: I searched the existing issues and the documentation (https://matchzy.miksen.me/).
+          required: true
+  - type: input
+    id: version
+    attributes:
+      label: MikZy version
+      description: Output of `css_mikzy_version` (or `matchzy_version`) in the server console.
+      placeholder: "0.8.96"
+    validations:
+      required: true
+  - type: input
+    id: css
+    attributes:
+      label: CounterStrikeSharp version
+      description: Output of `css_plugins list` or `meta list`.
+      placeholder: "1.0.398"
+    validations:
+      required: true
+  - type: dropdown
+    id: os
+    attributes:
+      label: Server OS
+      options:
+        - Linux
+        - Windows
+    validations:
+      required: true
+  - type: dropdown
+    id: mode
+    attributes:
+      label: Where does it happen?
+      multiple: true
+      options:
+        - Loaded match (JSON / URL / G5API / .matchsetup)
+        - Pug / scrim
+        - Practice mode
+        - Ready-up / warmup
+        - Pauses / backups
+        - Live events (remote log)
+        - Coaches
+        - Other
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened, and what did you expect?
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Load a match with ...
+        2. Type .ready ...
+        3. ...
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Server log
+      description: The relevant console lines (lines starting with [MatchZy] are the most useful). Remove tokens, passwords and IPs you do not want public.
+      render: text
+  - type: textarea
+    id: config
+    attributes:
+      label: Relevant settings or match config
+      description: Only the settings that matter for the problem. Do not paste secrets (remote log tokens, MySQL passwords, upload URLs).
+      render: text

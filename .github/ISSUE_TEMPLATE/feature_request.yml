@@ -1,0 +1,26 @@
+name: Feature request
+description: Suggest a new feature or a change to an existing one.
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Suggestions are welcome, but there is no guarantee they will be picked up or implemented. A clear use case helps the most.
+  - type: textarea
+    id: problem
+    attributes:
+      label: What do you want to do, and what stops you today?
+      description: Describe the situation on your server (tournament, pugs, practice, panel integration, ...).
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: How should it work?
+      description: Commands, settings or events you have in mind. Mention it if Get5 or upstream MatchZy already does this.
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Workarounds you tried

@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Documentation
+    url: https://matchzy.miksen.me/
+    about: Installation, commands, settings, match configs and live events.
+  - name: Official MatchZy (upstream)
+    url: https://github.com/shobhit-pathak/MatchZy/issues
+    about: For problems with the official MatchZy by WD-, not this fork.
