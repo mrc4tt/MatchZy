@@ -7,8 +7,8 @@ body:
     id: version
     attributes:
       label: MatchZy version
-      description: Output of `css_matchzy_version` in the server console.
-      placeholder: "0.8.96"
+      description: Output of `css_matchzy_version` in the server console, or `.version` in chat.
+      placeholder: "0.8.x"
     validations:
       required: true
   - type: input
@@ -16,7 +16,7 @@ body:
     attributes:
       label: CounterStrikeSharp version
       description: Output of `css` or `meta list`.
-      placeholder: "1.0.398"
+      placeholder: "1.0.x"
     validations:
       required: true
   - type: textarea
