@@ -1,10 +1,13 @@
 name: Docs
-# Published together with a release (version tag), so the site never describes or links an
-# unreleased version: the download buttons point at the tag's MatchZy-<version>.zip. For a docs-only
-# fix between releases, run it by hand (Actions > Docs > Run workflow) on the latest release tag
-# or on main.
+# Published with a release (version tag), and on a push to main that changes the docs while the
+# version in the code is already released. A docs-only fix then goes live right away, but the site
+# never describes or links an unreleased version: the download buttons point at that version's zip.
 on:
   push:
+    branches:
+      - main
+    paths:
+      - documentation/**
     tags:
       - '[0-9]*.[0-9]*.[0-9]*'
   workflow_dispatch:
@@ -19,8 +22,33 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # On main: only when ModuleVersion already has its release tag. A version that is still being
+  # prepared waits for its tag, which publishes the docs together with the release.
+  check:
+    name: Version released?
+    runs-on: ubuntu-latest
+    outputs:
+      deploy: ${{ steps.check.outputs.deploy }}
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - name: Check release tag
+        id: check
+        run: |
+          VERSION=$(grep -oP 'ModuleVersion\s*=>\s*"\K[^"]*' Core/MatchZy.cs)
+          if [ "${{ github.ref_type }}" = "tag" ] || git rev-parse -q --verify "refs/tags/$VERSION" >/dev/null; then
+            echo "deploy=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "deploy=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::$VERSION is not released yet; the docs go live with its release tag."
+          fi
+
   deploy:
     name: Build and deploy docs
+    needs: check
+    if: needs.check.outputs.deploy == 'true'
     runs-on: ubuntu-latest
     environment:
       name: github-pages
