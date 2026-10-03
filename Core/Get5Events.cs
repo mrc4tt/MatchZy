@@ -334,6 +334,33 @@ public class Get5PlayerDisconnectEvent : MatchZyMatchEvent
         : base("player_disconnect") { }
 }
 
+public class Get5PlayerConnectEvent : MatchZyMatchEvent
+{
+    [JsonPropertyName("player")]
+    public required Get5PlayerInfo Player { get; init; }
+
+    // Without the port, as Get5 sends it.
+    [JsonPropertyName("ip_address")]
+    public required string IpAddress { get; init; }
+
+    public Get5PlayerConnectEvent()
+        : base("player_connect") { }
+}
+
+// A chat line (chat commands included). round_number is -1 while the match is not live, as in Get5.
+public class Get5PlayerSayEvent : Get5PlayerTimedRoundEvent
+{
+    // "say" | "say_team"
+    [JsonPropertyName("command")]
+    public required string Command { get; init; }
+
+    [JsonPropertyName("message")]
+    public required string Message { get; init; }
+
+    public Get5PlayerSayEvent()
+        : base("player_say") { }
+}
+
 // A round backup was restored. round_number is the round restored to (rounds played at its start).
 // Sent in both event formats; in the Get5 format it is followed by that round's round_start.
 public class MatchZyBackupLoadedEvent : MatchZyRoundEvent

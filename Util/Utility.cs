@@ -226,6 +226,9 @@ namespace MatchZy
                     // remaining players are not holding anything up.
                     if (perTeam > 0 && (p.TeamNum == (int)CsTeam.CounterTerrorist || p.TeamNum == (int)CsTeam.Terrorist) && IsTeamReady(p.TeamNum))
                         continue;
+                    // Coaches do not count towards the ready-up (GetTeamPlayerCount), so they hold nothing up.
+                    if (matchzyTeam1.coach.Contains(p) || matchzyTeam2.coach.Contains(p))
+                        continue;
                     unreadyPlayers.Add(p.PlayerName);
                 }
             }
@@ -4067,7 +4070,7 @@ namespace MatchZy
             string formattedTime = DateTime.Now.ToString("yyyy-MM-dd HH-mm-ss");
             (int team1Score, int team2Score) = GetTeamsScore();
 
-            var formattedValue = value.Replace("{TIME}", formattedTime.Replace(" ", "_")).Replace("{MATCH_ID}", $"{liveMatchId}").Replace("{MAP}", Server.MapName).Replace("{MAPNUMBER}", matchConfig.CurrentMapNumber.ToString()).Replace("{TEAM1}", matchzyTeam1.teamName.Replace(" ", "_")).Replace("{TEAM2}", matchzyTeam2.teamName.Replace(" ", "_")).Replace("{TEAM1_SCORE}", team1Score.ToString()).Replace("{TEAM2_SCORE}", team2Score.ToString());
+            var formattedValue = value.Replace("{TIME}", formattedTime.Replace(" ", "_")).Replace("{MATCH_ID}", $"{liveMatchId}").Replace("{MAP}", Server.MapName).Replace("{MAPNUMBER}", matchConfig.CurrentMapNumber.ToString()).Replace("{TEAM1}", matchzyTeam1.teamName).Replace("{TEAM2}", matchzyTeam2.teamName).Replace("{TEAM1_SCORE}", team1Score.ToString()).Replace("{TEAM2_SCORE}", team2Score.ToString());
             return formattedValue;
         }
 
@@ -4076,11 +4079,12 @@ namespace MatchZy
             string hostname = hostnameFormat.Value.Trim();
             if (hostname == "" || hostname == "\"\"")
                 return;
-            string formattedHostname = FormatCvarValue(hostname);
+            string formattedHostname = FormatCvarValue(hostname).Replace("\"", "");
             // Runs every round start; skip the console command when the hostname is already set.
             if (ConVar.Find("hostname")?.StringValue == formattedHostname)
                 return;
-            Server.ExecuteCommand($"hostname {formattedHostname}");
+            // Quoted: team names keep their spaces here (only the demo file name replaces them).
+            Server.ExecuteCommand($"hostname \"{formattedHostname}\"");
         }
 
         // Cached cs_gamerules proxy. FindAllEntitiesByDesignerName walks the WHOLE active

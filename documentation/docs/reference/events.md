@@ -31,6 +31,7 @@ Player stats objects (`team1.players[].stats` on `round_end` and `map_result`) u
 | `match_paused` | Any pause starts | `round_number`, `pause_type` (`pause`, `tech`, `admin`, `auto`), `team_name`, `max_duration` |
 | `match_unpaused` | Any pause ends | `round_number` |
 | `demo_upload_ended` | A demo upload finished | `map_number`, `filename`, `success` |
+| `player_connect` | A player joins while a match is loaded, and again after each map change. Players kicked for not being in the match are not sent | `player` (user id), `player_steamid`, `player_name`, `player_team`, `ip_address` (without the port) |
 | `player_disconnect` | A player leaves while a match is loaded | `player` (user id), `player_steamid`, `player_name`, `player_team`, `reason` |
 
 `match_cancelled` `reason` values: `ended_early` (stopped), `surrendered`, `restarted`, `no_show` (cancelled for a no-show) and `map_changed` (ended by a map change from outside MatchZy).
@@ -57,7 +58,7 @@ Sent with or without a loaded match, to `matchzy_remote_log_url` from `config.cf
 
 ### Get5 format
 
-Events that Get5 also has (`player_death`, `bomb_planted`, `bomb_defused`, `bomb_exploded`, `grenade_thrown`, `round_start`, `game_paused`, `game_unpaused`, `player_disconnect`, `backup_loaded`) use [Get5's event schema](https://splewis.github.io/get5/latest/events.html), so Get5 tooling can read them as is. MatchZy's own events use the same building blocks. Fields Get5 does not have (marked *extra*) are added on top; a Get5 consumer ignores them.
+Events that Get5 also has (`player_death`, `bomb_planted`, `bomb_defused`, `bomb_exploded`, `grenade_thrown`, `round_start`, `game_paused`, `game_unpaused`, `player_connect`, `player_disconnect`, `player_say`, `backup_loaded`) use [Get5's event schema](https://splewis.github.io/get5/latest/events.html), so Get5 tooling can read them as is. MatchZy's own events use the same building blocks. Fields Get5 does not have (marked *extra*) are added on top; a Get5 consumer ignores them.
 
 Building blocks:
 
@@ -81,11 +82,14 @@ Building blocks:
 | `freezetime_end` | Freeze time ended | `players` (player objects with `health`, `armor`, `has_helmet`, `has_defuser`, `money`), `ct_alive`, `t_alive` |
 | `round_start` | A live round starts | `round_number` |
 | `game_paused`, `game_unpaused` | Match paused / unpaused | `team`, `pause_type`; *extra* `round_number`, `max_duration` |
+| `player_connect` | A player joins while a match is loaded, and again after each map change | `player`, `ip_address` (without the port) |
 | `player_disconnect` | A player leaves while a match is loaded | `player`; *extra* `reason` (engine disconnect code) |
+| `player_say` | A player writes in chat while a match is loaded, chat commands such as `.ready` included | `player`, `command` (`say` or `say_team`), `message`, `round_time` |
 | `backup_loaded` | A round backup was restored | `round_number` (the round restored to), `filename` |
 
 - **`game_paused`, `game_unpaused`**: `team` is `team1`, `team2`, or `null` for admin, automatic and restore pauses. `pause_type` is `tactical`, `technical`, `admin`, or `backup` after a round restore. `max_duration` is the seconds of a timed technical pause.
 - **`backup_loaded`**: followed by that round's `round_start`; the engine's own round start after the load is not sent again.
+- **`player_say`**: `round_number` is `-1` and `round_time` is `0` while the match is not live (warmup, knife round, veto). A command that ends the match, such as `.stopmatch`, is still sent before the match is reset. Bots and the server console are not sent.
 
 All live events carry `matchid`, `map_number` and `round_number`. In this format `round_end`'s `round_number` is also Get5's: the rounds played when the round started (the legacy format sends the rounds played after it). `matchid` is a number, as in every other MatchZy event (Get5 sends a string).
 
@@ -156,6 +160,7 @@ Get5's per-grenade detonation events with victim lists (`hegrenade_detonated`, `
 | `grenade_thrown` | Grenade thrown | `player_name`, `player_steamid`, `player_team`, `grenade` (`smoke`, `flash`, `he`, `molotov`, `incendiary`, `decoy`) |
 | `grenade_detonated` | Grenade detonated | `player_name`, `player_steamid`, `player_team`, `grenade`, `x`, `y`, `z` |
 | `player_blinded` | A player is flashed | `attacker_*`, `victim_*`, `duration` (seconds), `team_flash` |
+| `player_say` | A player writes in chat while a match is loaded, chat commands included | `player_name`, `player_steamid`, `player_team`, `command` (`say`/`say_team`), `message`; `round_number` is `-1` while the match is not live |
 
 All legacy live events also carry `matchid`, `map_number` and `round_number`.
 

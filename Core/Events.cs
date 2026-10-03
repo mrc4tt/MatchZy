@@ -109,6 +109,57 @@ public class MatchZyPlayerDisconnectedEvent : MatchZyMatchEvent
         : base("player_disconnect") { }
 }
 
+public class MatchZyPlayerConnectedEvent : MatchZyMatchEvent
+{
+    // Engine user id of the player that joined.
+    [JsonPropertyName("player")]
+    public required int Player { get; init; }
+
+    [JsonPropertyName("player_steamid")]
+    public required string PlayerSteamId { get; init; }
+
+    [JsonPropertyName("player_name")]
+    public required string PlayerName { get; init; }
+
+    // "CT" / "T" / "SPEC" / "none"
+    [JsonPropertyName("player_team")]
+    public required string PlayerTeam { get; init; }
+
+    // Without the port.
+    [JsonPropertyName("ip_address")]
+    public required string IpAddress { get; init; }
+
+    public MatchZyPlayerConnectedEvent()
+        : base("player_connect") { }
+}
+
+// A chat line (chat commands included). round_number is -1 while the match is not live.
+public class PlayerSayLiveEvent : MatchZyMapEvent
+{
+    [JsonPropertyName("round_number")]
+    public required int RoundNumber { get; init; }
+
+    [JsonPropertyName("player_name")]
+    public required string PlayerName { get; init; }
+
+    [JsonPropertyName("player_steamid")]
+    public required string PlayerSteamId { get; init; }
+
+    // "CT" / "T" / "SPEC" / "none"
+    [JsonPropertyName("player_team")]
+    public required string PlayerTeam { get; init; }
+
+    // "say" | "say_team"
+    [JsonPropertyName("command")]
+    public required string Command { get; init; }
+
+    [JsonPropertyName("message")]
+    public required string Message { get; init; }
+
+    public PlayerSayLiveEvent()
+        : base("player_say") { }
+}
+
 public class MatchZySeriesStartedEvent : MatchZyMatchEvent
 {
     [JsonPropertyName("team1")]

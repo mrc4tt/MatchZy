@@ -151,7 +151,7 @@ namespace MatchZy
             }
 
             demoStartAttempts++;
-            string demoFileName = FormatCvarValue(demoNameFormat.Replace(" ", "_")) + ".dem";
+            string demoFileName = FormatCvarValue(demoNameFormat).Replace(" ", "_") + ".dem";
             string tempDemoPath = demoPath == "" ? demoFileName : demoPath + demoFileName;
 
             // Never record over an existing demo. A name format without {TIME} gives the watchdog

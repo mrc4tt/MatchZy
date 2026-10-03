@@ -2,6 +2,15 @@
 
 Based on [MatchZy](https://github.com/shobhit-pathak/MatchZy) by Shobhit Pathak, adapted for CS2 game-server hosting: remote log HTTP API, G5API compatibility, auto changelevel, advanced stats (HLTV 2.0 rating / KAST / clutch / opening duels), a coach system, a pause overhaul, and in-game admin and match-setup menus.
 
+# 1.0.0
+
+#### October 3, 2026
+
+- New `player_connect` event: sent when a player joins a loaded match (and again after each map change) with the player and their IP address without the port. Players kicked for not being in the match are not sent.
+- New `player_say` event: sent for every chat line (`say` and `say_team`, chat commands included) while a match is loaded, with the message as typed. `round_number` is `-1` while the match is not live. A command that ends the match, such as `.stopmatch`, is still sent to that match's URL.
+- `{TEAM1}` and `{TEAM2}` in `matchzy_hostname_format` and `matchzy_match_start_message` now keep the spaces in team names (`Team Name` instead of `Team_Name`). Demo file names still use `_`.
+- Coaches are no longer listed among the players who are not ready (they never counted towards the ready-up).
+
 # 0.8.99
 
 #### October 3, 2026

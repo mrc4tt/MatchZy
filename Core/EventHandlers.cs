@@ -48,10 +48,14 @@ public partial class MatchZy
                         Log($"[EventPlayerConnectFull] KICKING PLAYER STEAMID: {steamId}, Name: {player.PlayerName} (NOT ALLOWED!)");
                         PrintLocalizedToAll("matchzy.cmd.kicknotinmatch", player.PlayerName);
                         KickPlayerDeferred(player);
+                        return HookResult.Continue;
                     }
+                    SendPlayerConnectEvent(player);
                     return HookResult.Continue;
                 }
             }
+
+            SendPlayerConnectEvent(player);
 
             playerData[userId] = player;
             connectedPlayers++;

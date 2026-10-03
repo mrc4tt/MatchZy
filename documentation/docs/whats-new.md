@@ -2,6 +2,12 @@
 
 A short summary of each release. The [full changelog](changelog.md) has the details and background for every change.
 
+## 1.0.0 <small>October 3, 2026</small>
+
+- **New:** `player_connect` and `player_say` events (Get5 and legacy format). `player_say` covers chat commands too.
+- **Changed:** `{TEAM1}` / `{TEAM2}` in the hostname and the match start message keep spaces; demo file names still use `_`.
+- **Fixed:** Coaches are no longer listed as not ready.
+
 ## 0.8.99 <small>October 3, 2026</small>
 
 - **New:** `.friendlyfire` / `.ff` (outside practice) turns friendly fire on or off before a match, scrim or hill starts, like `.knife`. In practice `.ff` is still fast-forward.
