@@ -272,6 +272,6 @@ Run from the server console, RCON or a panel. Players cannot use these.
 | `matchzy_listbackups [matchid]` | Lists backups. Alias `get5_listbackups`. |
 | `get5_endmatch [team1\|team2]` | Cancels the match, or ends the series with the given team as winner (Get5 behavior). |
 | `get5_status` / `get5_web_available` | Status replies for Get5 panels. |
-| `matchzy_version` | Version info. |
+| `matchzy_version` | Version info. Alias `mikzy_version`. |
 
 Settings that can be set from the console are in [Configuration](convars.md).

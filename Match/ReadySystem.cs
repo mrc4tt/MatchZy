@@ -41,7 +41,9 @@ public partial class MatchZy
         if (perTeam > 0 && (team == (int)CsTeam.CounterTerrorist || team == (int)CsTeam.Terrorist))
         {
             (int sidePlayers, int sideReady) = GetTeamPlayerCount(team, false);
-            return sidePlayers > 0 && sideReady >= perTeam;
+            // .forceready readies everyone on the side, so honor it even when the side has fewer
+            // than N players (otherwise a short-handed team could never start the match).
+            return sidePlayers > 0 && (sideReady >= perTeam || IsTeamForcedReady((CsTeam)team));
         }
 
         int minPlayers = GetPlayersPerTeam(team);
@@ -110,6 +112,16 @@ public partial class MatchZy
         }
 
         return (playerCount, readyCount);
+    }
+
+    // Ready players a side contributes toward matchzy_ready_per_team (capped at N; a ready side
+    // counts as full, so .forceready and the bot side show as complete).
+    public int CountedReadyForSide(CsTeam side, int perTeam)
+    {
+        if (IsTeamReady((int)side))
+            return perTeam;
+        (_, int sideReady) = GetTeamPlayerCount((int)side, false);
+        return Math.Min(sideReady, perTeam);
     }
 
     public bool IsTeamForcedReady(CsTeam team)

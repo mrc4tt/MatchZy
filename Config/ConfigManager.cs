@@ -86,14 +86,7 @@ namespace MatchZy
         /// A default cfg as shipped in the repo's cfg/ folder, read from the plugin DLL's embedded
         /// resources ("MatchZy.cfg.live.cfg"). Null when it is not embedded.
         /// </summary>
-        public static string? ReadDefaultCfg(string fileName)
-        {
-            using var stream = typeof(ConfigManager).Assembly.GetManifestResourceStream("MatchZy.cfg." + fileName);
-            if (stream == null)
-                return null;
-            using var reader = new StreamReader(stream);
-            return reader.ReadToEnd();
-        }
+        public static string? ReadDefaultCfg(string fileName) => ReadResource(CfgResourcePrefix + fileName);
 
         public void InitializeConfigs()
         {
@@ -160,6 +153,13 @@ Getting a fresh default
 Delete (or rename) your own file, for example warmup.cfg, and restart the
 server or reload the plugin. MatchZy writes the current default in its place.
 
+Your own changes to a mode
+--------------------------
+Instead of editing warmup.cfg (or any other mode cfg), you can put only the
+lines you want to change in a file named after it with "_override" added,
+for example warmup_override.cfg, one folder up. MatchZy runs it right after
+warmup.cfg, so its values win. MatchZy never creates or changes these files.
+
 config.cfg
 ----------
 New settings are added to the bottom of your existing config.cfg
@@ -175,15 +175,10 @@ Copy the fields you need from here into that file.
 
 Files
 -----
-  config.cfg            Plugin settings (matchzy_* convars).
-  warmup.cfg            Ready phase / warmup.
-  knife.cfg             Knife round.
-  live.cfg              Live match (5v5).
-  live_wingman.cfg      Live match (wingman).
-  scrim.cfg, hill.cfg   Scrim and king-of-the-hill modes.
-  prac.cfg, dryrun.cfg  Practice mode and dry run.
-  sleep.cfg             Idle server.
-  matchzymaps.cfg       Map rotation.
+One copy of every default cfg this version ships: config.cfg holds the plugin
+settings (matchzy_* convars), matchzymaps.cfg the map rotation, and each other
+file is the game-mode config it is named after (warmup.cfg, knife.cfg,
+live.cfg, prac.cfg, ...).
 """;
 
         // Writes reference copies of the current defaults to <cfg dir>/defaults/: every embedded cfg,

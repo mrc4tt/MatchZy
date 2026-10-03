@@ -2,7 +2,23 @@
 
 Customized fork of [MatchZy](https://github.com/shobhit-pathak/MatchZy) by Shobhit Pathak, adapted for CS2 game-server hosting. On top of upstream it adds a remote log HTTP API, G5API compatibility, auto changelevel, advanced stats (HLTV 2.0 rating / KAST / clutch / opening duels), a coach system, a pause overhaul, and in-game admin and match-setup menus.
 
-Fork version numbering is independent of upstream. Upstream changelog: <https://github.com/shobhit-pathak/MatchZy/blob/main/CHANGELOG.md>
+Fork version numbering and this changelog are independent of upstream.
+
+# 0.8.95
+
+#### October 3, 2026
+
+- New optional per-mode override files: `warmup_override.cfg`, `knife_override.cfg`, `live_override.cfg`, `live_wingman_override.cfg`, `scrim_override.cfg`, `hill_override.cfg`, `prac_override.cfg`, `dryrun_override.cfg` and `sleep_override.cfg` in `cfg/MatchZy/`. Each runs right after its mode cfg, so a server can change a few settings without editing the mode cfg itself. MatchZy never ships, creates or changes these files, so they survive every update. Settings from a loaded match config still apply on top.
+- The default warmup.cfg is back to normal CS2 warmup values: `mp_respawn_immunitytime 0`, `mp_weapons_allow_typecount -1` (no purchase limit) and `ammo_grenade_limit_flashbang 2`. Existing warmup.cfg files are not rewritten. If you installed 0.8.94 fresh and want the normal values, compare your warmup.cfg with `cfg/MatchZy/defaults/warmup.cfg`. To keep the 0.8.94 values (5 s spawn protection, no flashbangs), put them in `warmup_override.cfg`.
+- Added `mikzy_version` and `css_mikzy_version` as aliases for `matchzy_version`.
+- `.forceready` now works with `matchzy_ready_per_team`: a force-readied side counts as ready even with fewer than N players, so a short-handed team can start the match and is no longer at risk of the forfeit timer.
+- `.readycheck` with `matchzy_ready_per_team` counts at most N ready players per side, so it no longer reports "waiting for 0" while one side still has nobody ready.
+- `matchzy_ready_hint_style 2` with `matchzy_ready_per_team`: the chat reminder only lists players on sides that are not ready yet, and shows the per-team minimum instead of `matchzy_minimum_ready_required`.
+- dryrun.cfg now sets `mp_weapons_allow_typecount 5`, so a dry run started from warmup no longer keeps the warmup purchase limit.
+- prac.cfg now sets `mp_respawn_immunitytime 0`, so practice started from warmup no longer gives 5 seconds of spawn protection (grenade damage on freshly spawned players and bots works again). Existing cfg files are not rewritten: add the line to your own dryrun.cfg and prac.cfg, or compare with `cfg/MatchZy/defaults/`.
+- When a live, scrim or hill cfg file is missing, the built-in fallback settings now show the round timer again (`sv_hide_roundtime_until_seconds 0`).
+- The `map_change` event is no longer sent at server start for the boot map (it had an empty `map_name` and arrived before `server_ready`).
+- The first `.rt` / `.throw` after a server start no longer stalls the server while the rethrow code is compiled.
 
 # 0.8.94
 

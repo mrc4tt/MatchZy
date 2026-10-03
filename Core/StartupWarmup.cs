@@ -39,6 +39,45 @@ namespace MatchZy
             nameof(UpdateAliveCounts),
         };
 
+        private const BindingFlags AllDeclaredMethods = BindingFlags.Instance | BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.DeclaredOnly;
+
+        // JIT-compiles (without running) every method of this plugin class that matches. Returns
+        // how many were prepared.
+        private int PrepareMatchingMethods(Func<MethodInfo, bool> match)
+        {
+            int prepared = 0;
+            foreach (MethodInfo method in typeof(MatchZy).GetMethods(AllDeclaredMethods))
+            {
+                if (method.ContainsGenericParameters || !match(method))
+                    continue;
+                if (PrepareMethodLogged(method))
+                    prepared++;
+            }
+            return prepared;
+        }
+
+        private bool PrepareMethodLogged(MethodInfo method)
+        {
+            try
+            {
+                RuntimeHelpers.PrepareMethod(method.MethodHandle);
+                return true;
+            }
+            catch (Exception e)
+            {
+                Log($"[Warmup] Could not prepare {method.Name}: {e.GetType().Name}: {e.Message}");
+                return false;
+            }
+        }
+
+        // matchzy_* / get5_* console-command handlers, the ones config.cfg calls.
+        private int PrepareConfigCommandHandlers()
+        {
+            return PrepareMatchingMethods(method =>
+                method.GetCustomAttributes<CounterStrikeSharp.API.Core.Attributes.Registration.ConsoleCommandAttribute>()
+                    .Any(attr => attr.Command.StartsWith("matchzy_", StringComparison.Ordinal) || attr.Command.StartsWith("get5_", StringComparison.Ordinal)));
+        }
+
         /// <summary>
         /// Pays the one-off costs of the live round_start path on a thread-pool thread at Load
         /// instead of on the game thread during the first live round of a match.
@@ -52,38 +91,6 @@ namespace MatchZy
         /// calls with throwaway data here means the real round finds them warm. Touches nothing
         /// in the engine, so it is safe off the game thread.
         /// </summary>
-        private int PrepareConfigCommandHandlers()
-        {
-            int prepared = 0;
-            const BindingFlags flags = BindingFlags.Instance | BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.DeclaredOnly;
-            foreach (MethodInfo method in typeof(MatchZy).GetMethods(flags))
-            {
-                if (method.ContainsGenericParameters)
-                    continue;
-                bool isConfigCommand = false;
-                foreach (var attr in method.GetCustomAttributes<CounterStrikeSharp.API.Core.Attributes.Registration.ConsoleCommandAttribute>())
-                {
-                    if (attr.Command.StartsWith("matchzy_", StringComparison.Ordinal) || attr.Command.StartsWith("get5_", StringComparison.Ordinal))
-                    {
-                        isConfigCommand = true;
-                        break;
-                    }
-                }
-                if (!isConfigCommand)
-                    continue;
-                try
-                {
-                    RuntimeHelpers.PrepareMethod(method.MethodHandle);
-                    prepared++;
-                }
-                catch (Exception e)
-                {
-                    Log($"[Warmup] Could not prepare {method.Name}: {e.GetType().Name}: {e.Message}");
-                }
-            }
-            return prepared;
-        }
-
         private void WarmRoundStartPaths()
         {
             _ = Task.Run(() =>
@@ -114,43 +121,23 @@ namespace MatchZy
 
                     // Prepare managed rethrow entry points without invoking them. Native
                     // signature resolution and entity creation must remain on the game thread.
+                    // Throw is a thin timing wrapper; the real body is the private ThrowInternal.
                     var throwMethod = typeof(GrenadeThrownData).GetMethod(nameof(GrenadeThrownData.Throw));
+                    var throwInternalMethod = typeof(GrenadeThrownData).GetMethod("ThrowInternal", BindingFlags.NonPublic | BindingFlags.Instance);
                     var createMethod = typeof(CounterStrikeSharp.API.Utilities).GetMethods()
                         .Single(m => m.Name == "CreateEntityByName" && m.IsGenericMethodDefinition)
                         .MakeGenericMethod(typeof(CounterStrikeSharp.API.Core.CFlashbangProjectile));
                     var spawnMethod = typeof(CounterStrikeSharp.API.Core.CBaseEntity)
                         .GetMethod("DispatchSpawn", Type.EmptyTypes);
-                    foreach (var method in new[] { throwMethod, createMethod, spawnMethod })
+                    foreach (var method in new[] { throwMethod, throwInternalMethod, createMethod, spawnMethod })
                     {
-                        if (method == null) continue;
-                        try
-                        {
-                            RuntimeHelpers.PrepareMethod(method.MethodHandle);
+                        if (method != null && PrepareMethodLogged(method))
                             prepared++;
-                        }
-                        catch (Exception e)
-                        {
-                            Log($"[Warmup] Could not prepare {method.Name}: {e.GetType().Name}: {e.Message}");
-                        }
                     }
 
                     // JIT the round_start methods themselves. PrepareMethod compiles without
                     // running anything.
-                    const BindingFlags flags = BindingFlags.Instance | BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.DeclaredOnly;
-                    foreach (MethodInfo method in typeof(MatchZy).GetMethods(flags))
-                    {
-                        if (method.ContainsGenericParameters || Array.IndexOf(RoundStartWarmMethods, method.Name) < 0)
-                            continue;
-                        try
-                        {
-                            RuntimeHelpers.PrepareMethod(method.MethodHandle);
-                            prepared++;
-                        }
-                        catch (Exception e)
-                        {
-                            Log($"[Warmup] Could not prepare {method.Name}: {e.GetType().Name}: {e.Message}");
-                        }
-                    }
+                    prepared += PrepareMatchingMethods(method => Array.IndexOf(RoundStartWarmMethods, method.Name) >= 0);
                 }
                 catch (Exception e)
                 {

@@ -64,7 +64,9 @@ namespace MatchZy
 
         private HookResult OnMapChangeCommand(CCSPlayerController? player, CommandInfo info)
         {
-            if (player != null)
+            // The boot map's own command (+map on the command line) also lands here, before the
+            // engine globals exist: there is no map to change from, and Server.MapName is null.
+            if (player != null || !AreServerGlobalsReady())
                 return HookResult.Continue;
             try
             {

@@ -66,9 +66,14 @@ namespace MatchZy
         {
             if (readyAvailable && !matchStarted)
             {
-                int totalPlayers = readyPerTeam.Value > 0 ? readyPerTeam.Value * 2 : minimumReadyRequired;
+                int perTeam = readyPerTeam.Value;
+                int totalPlayers = perTeam > 0 ? perTeam * 2 : minimumReadyRequired;
 
-                int readyPlayers = playerReadyStatus.Values.Count(status => status);
+                // Per-team mode: only up to N ready players per side count toward the start, and
+                // spectators or extra ready players on one side must not hide a side that is missing.
+                int readyPlayers = perTeam > 0
+                    ? CountedReadyForSide(CsTeam.CounterTerrorist, perTeam) + CountedReadyForSide(CsTeam.Terrorist, perTeam)
+                    : playerReadyStatus.Values.Count(status => status);
                 int notReadyPlayers = totalPlayers - readyPlayers;
 
                 if (notReadyPlayers < 0)
@@ -979,7 +984,7 @@ namespace MatchZy
                     ExecUnpracCommands();
                     CleanupAllCollisionTimers();
                     PrintLocalizedToAll("matchzy.cmd.adminstartedwarmup");
-                    Server.ExecuteCommand($"exec {warmupCfgPath};mp_freezetime 0");
+                    Server.ExecuteCommand($"exec {warmupCfgPath};{ModeOverrideExec(warmupCfgPath)};mp_freezetime 0");
                 }
             }
             else
@@ -1321,6 +1326,8 @@ namespace MatchZy
 
         [ConsoleCommand("matchzy_version", "Displays the current MatchZy version")]
         [ConsoleCommand("css_matchzy_version", "Displays the current MatchZy version")]
+        [ConsoleCommand("mikzy_version", "Displays the current MikZy version")]
+        [ConsoleCommand("css_mikzy_version", "Displays the current MikZy version")]
         [ConsoleCommand("css_version", "Displays the current MatchZy version")]
         [ConsoleCommand("version", "Returns server version")]
         public void OnMatchZyVersionCommand(CCSPlayerController? player, CommandInfo? command)

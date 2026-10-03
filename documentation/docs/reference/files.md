@@ -6,6 +6,7 @@
 |---|---|---|
 | `config.cfg` | `<cfg>` | All settings. Generated on first load, new settings appended on updates. |
 | `warmup.cfg`, `knife.cfg`, `live.cfg`, `live_wingman.cfg`, `scrim.cfg`, `hill.cfg`, `prac.cfg`, `dryrun.cfg`, `sleep.cfg` | `<cfg>` | Executed when the matching phase or mode starts. Written from the built-in defaults when missing, never overwritten. |
+| `<mode>_override.cfg` (e.g. `warmup_override.cfg`, `live_override.cfg`) | `<cfg>` | Optional, created by you. Executed right after the matching mode cfg, so its values win; settings from a loaded match config still win over both. MatchZy never ships, creates or changes these files. See [Server-specific settings](#server-specific-settings). |
 | `defaults/*.cfg`, `defaults/database.json.example`, `defaults/README.txt` | `<cfg>` | Reference copies of the current defaults, rewritten by MatchZy on every load and never executed. Compare your own files with them after an update; do not edit them. |
 | `matchzymaps.cfg` | `<cfg>` | Map list for automatic map changes and the `.matchsetup` wizard. One map per line, `#` for comments, `workshop/<id>` for workshop maps. |
 | `database.json` | `<cfg>` | Database backend. See below. |
@@ -21,6 +22,19 @@
 | `MatchZy_Stats/<matchid>/` | `csgo/` | CSV and advanced stats JSON per map. See [Stats](../guides/stats.md). |
 | `MatchZyDataBackup/` | `csgo/` | Round backups. |
 | Demos | `csgo/demos/` | Controlled by `matchzy_demo_path`. |
+
+## Server-specific settings
+
+To change a few settings of a mode, for example no flashbangs in warmup for a tournament, put only those lines in `<mode>_override.cfg` next to the mode cfg:
+
+```cfg
+// csgo/cfg/MatchZy/warmup_override.cfg
+mp_respawn_immunitytime 5
+mp_weapons_allow_typecount 0
+ammo_grenade_limit_flashbang 0
+```
+
+The file name is the mode cfg's name with `_override` added: `warmup`, `knife`, `live`, `live_wingman`, `scrim`, `hill`, `prac`, `dryrun` or `sleep`. MatchZy never writes these files, so they survive every update, and your mode cfgs can stay identical to the defaults. Every mode cfg sets the values it needs itself, so settings from `warmup_override.cfg` do not carry over into a live match.
 
 ## database.json
 

@@ -311,7 +311,7 @@ namespace MatchZy
             if (File.Exists(Path.Join(Server.GameDirectory + "/csgo/cfg", practiceCfgPath)))
             {
                 practiceUsesWarmup = false;
-                Server.ExecuteCommand($"execifexists {practiceCfgPath};mp_roundtime 60;mp_roundtime_defuse 60");
+                Server.ExecuteCommand($"execifexists {practiceCfgPath};{ModeOverrideExec(practiceCfgPath)};mp_roundtime 60;mp_roundtime_defuse 60");
             }
             else
             {
@@ -3500,7 +3500,7 @@ namespace MatchZy
             if (File.Exists(absolutePath))
             {
                 //Log($"[ExecDryRunCFG] Starting Dryrun! Executing Dryrun CFG from {dryrunCfgPath}");
-                Server.ExecuteCommand($"exec {dryrunCfgPath}");
+                Server.ExecuteCommand($"exec {dryrunCfgPath};{ModeOverrideExec(dryrunCfgPath)}");
                 Server.ExecuteCommand("mp_restartgame 1;mp_warmup_end;");
             }
             else
