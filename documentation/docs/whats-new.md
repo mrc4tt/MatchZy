@@ -6,6 +6,11 @@ A short summary of each release. The [full changelog](changelog.md) has the deta
 
 - **Fixed:** A short-handed team (4v5) can start with `.forceready` when the match config has no `min_players_to_ready`. The default is now 1, as in Get5.
 
+## 1.0.2 <small>October 4, 2026</small>
+
+- **Fixed:** Workshop servers (started with `+host_workshop_map` / `+host_workshop_collection`) no longer crash at match end. Every map change now uses the workshop commands for workshop maps.
+- **Changed:** A `changelevel` / `map` for a workshop map from the console or another plugin is replaced with the workshop command, or blocked when the map cannot be loaded.
+
 ## 1.0.1 <small>October 4, 2026</small>
 
 - **New:** `matchzy_team_clantag_enabled` shows each team's `tag` from the match config as the clan tag while live. Off by default.
