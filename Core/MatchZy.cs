@@ -16,7 +16,7 @@ namespace MatchZy
     public partial class MatchZy : BasePlugin
     {
         public override string ModuleName => "MatchZy";
-        public override string ModuleVersion => "1.0.0";
+        public override string ModuleVersion => "1.0.1";
         public override string ModuleAuthor => "Miksen/mrc4tt (based on MatchZy by WD-)";
         public override string ModuleDescription => "A plugin for running and managing CS2 practice/pugs/scrims/matches!";
         public string chatPrefix = $"{ChatColors.Green}[MatchZy]{ChatColors.Default}";
@@ -652,6 +652,11 @@ namespace MatchZy
             RegisterEventHandler<EventRoundStart>(EventRoundStartHandler);
             RegisterEventHandler<EventRoundFreezeEnd>(EventRoundFreezeEndHandler);
             RegisterEventHandler<EventPlayerSpawn>(OnCoachPlayerSpawn, HookMode.Post);
+            RegisterEventHandler<EventPlayerSpawn>((@event, info) =>
+            {
+                RefreshTeamClanTag(@event.Userid);
+                return HookResult.Continue;
+            }, HookMode.Post);
             RegisterEventHandler<EventPlayerGivenC4>(EventPlayerGivenC4);
             RegisterEventHandler<EventPlayerDeath>(EventPlayerDeathPreHandler, hookMode: HookMode.Pre);
             RegisterEventHandler<EventPlayerPing>(EventPlayerPingHandler);
@@ -748,6 +753,7 @@ namespace MatchZy
                     // Side counts in the ready data (panel, readycheck, clan tags) depend on teams.
                     _readyStatusDirty = true;
                     CCSPlayerController? player = @event.Userid;
+                    RefreshTeamClanTag(player);
                     if (!IsPlayerValid(player))
                         return HookResult.Continue;
 

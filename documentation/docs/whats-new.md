@@ -2,6 +2,11 @@
 
 A short summary of each release. The [full changelog](changelog.md) has the details and background for every change.
 
+## 1.0.1 <small>October 4, 2026</small>
+
+- **New:** `matchzy_team_clantag_enabled` shows each team's `tag` from the match config as the clan tag while live. Off by default.
+- **Fixed:** No `[UNREADY]` clan tags in join ready mode.
+
 ## 1.0.0 <small>October 3, 2026</small>
 
 - **New:** `player_connect` and `player_say` events (Get5 and legacy format). `player_say` covers chat commands too.

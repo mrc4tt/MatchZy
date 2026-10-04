@@ -1305,7 +1305,8 @@ namespace MatchZy
             // and that restart wipes an in-flight tv_record. ArmDemoStart waits for the restart to
             // land, starts on the first round_start after it, and verifies the file afterwards.
             ArmDemoStart();
-            ClearClanTags();
+            // Live flags are set: team tags (matchzy_team_clantag_enabled) or no tags.
+            HandleClanTags();
 
             // Storing 0-0 score backup file as lastBackupFileName, so that .stop functions properly in first round.
             lastBackupFileName = $"matchzy_{liveMatchId}_{matchConfig.CurrentMapNumber}_round00.txt";
@@ -1347,7 +1348,8 @@ namespace MatchZy
             // ArmDemoStart waits for the restart to land, starts on the first round_start after it,
             // and verifies the file afterwards.
             ArmDemoStart();
-            ClearClanTags();
+            // Live flags are set: team tags (matchzy_team_clantag_enabled) or no tags.
+            HandleClanTags();
 
             // Storing 0-0 score backup file as lastBackupFileName, so that .stop functions properly in first round.
             lastBackupFileName = $"matchzy_{liveMatchId}_{matchConfig.CurrentMapNumber}_round00.txt";
@@ -1382,7 +1384,8 @@ namespace MatchZy
             // ArmDemoStart waits for the restart to land, starts on the first round_start after it,
             // and verifies the file afterwards.
             ArmDemoStart();
-            ClearClanTags();
+            // Live flags are set: team tags (matchzy_team_clantag_enabled) or no tags.
+            HandleClanTags();
 
             // Storing 0-0 score backup file as lastBackupFileName, so that .stop functions properly in first round.
             lastBackupFileName = $"matchzy_{liveMatchId}_{matchConfig.CurrentMapNumber}_round00.txt";
@@ -1608,6 +1611,7 @@ namespace MatchZy
                 UnpauseMatch();
                 matchzyTeam1.teamName = "COUNTER-TERRORISTS";
                 matchzyTeam2.teamName = "TERRORISTS";
+                matchzyTeam1.teamTag = matchzyTeam2.teamTag = "";
                 RemoveBotTeamBots();
                 matchzyTeam1.teamPlayers = null;
                 matchzyTeam2.teamPlayers = null;
@@ -2265,6 +2269,16 @@ namespace MatchZy
 
         public void HandleClanTags(int? forceUpdateSlot = null)
         {
+            if (matchStarted && isMatchLive && !isPractice && !isDryRun && teamClanTagEnabled.Value)
+            {
+                bool changed = false;
+                foreach (var player in Utilities.GetPlayers())
+                    changed |= ApplyTeamClanTag(player);
+                if (changed)
+                    PokeClanNameRefresh();
+                return;
+            }
+
             // Clear clan tags if match is live or in practice/dryrun mode
             if (matchStarted || isPractice || isDryRun)
             {
@@ -2369,8 +2383,47 @@ namespace MatchZy
             gameRules.GameRules.NextUpdateTeamClanNamesTime = Server.CurrentTime - 0.01f;
         }
 
+        // The team tag (team1.tag / team2.tag from the match config) while live. Roster players get
+        // their team's tag; anyone else gets the tag of the team on their side. Coaches keep their
+        // coach tag. Returns true when the tag changed.
+        private bool ApplyTeamClanTag(CCSPlayerController? player)
+        {
+            if (player == null || !player.IsValid || player.IsBot || player.IsHLTV || IsMatchCoach(player))
+                return false;
+            string tag = "";
+            if (player.TeamNum == 2 || player.TeamNum == 3)
+            {
+                if (LookupRosterEntry(matchzyTeam1.teamPlayers, player.SteamID))
+                    tag = matchzyTeam1.teamTag;
+                else if (LookupRosterEntry(matchzyTeam2.teamPlayers, player.SteamID))
+                    tag = matchzyTeam2.teamTag;
+                else if (reverseTeamSides.TryGetValue(player.TeamNum == 3 ? "CT" : "TERRORIST", out Team? team))
+                    tag = team.teamTag;
+            }
+            if (player.Clan == tag)
+                return false;
+            ApplyClanTag(player, tag);
+            return true;
+        }
+
+        // Spawn / team change while live: the engine can reset m_szClan, and a halftime swap moves
+        // non-roster players to the other team's side. Next frame so TeamNum is the new team.
+        private void RefreshTeamClanTag(CCSPlayerController? player)
+        {
+            if (!isMatchLive || !teamClanTagEnabled.Value || player == null || !player.IsValid || player.IsBot)
+                return;
+            Server.NextFrame(() =>
+            {
+                if (isMatchLive && teamClanTagEnabled.Value && ApplyTeamClanTag(player))
+                    PokeClanNameRefresh();
+            });
+        }
+
         private string GetPlayerClanTag(CCSPlayerController player, int userId)
         {
+            // Join ready mode: nobody types .ready, so there is no ready status to show.
+            if (IsJoinReadyMode())
+                return string.Empty;
             if (readyAvailable && !matchStarted && !isPractice && !isDryRun)
             {
                 return playerReadyStatus.TryGetValue(userId, out bool isReady) && isReady ? "[READY]" : "[UNREADY]";

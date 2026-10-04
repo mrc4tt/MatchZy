@@ -37,7 +37,8 @@ Legend: **cfg** = present in the generated `config.cfg`.
 | `matchzy_ready_hint_style` | `0` | Y | `0` classic center text, `1` HTML ready-up panel, `2` chat reminder only. |
 | `matchzy_ready_hint_blink` | `false` | Y | Blink the "NOT READY" line on the HTML panel. |
 | `matchzy_loaded_match_hide_mode_hints` | `true` | Y | In a match loaded from a match config, joining players only see the ready-up hint (no `.scrim` / `.prac` / `.knife` hints or admin help line). |
-| `matchzy_ready_clantag_enabled` | `true` | Y | Show `[READY]` / `[UNREADY]` scoreboard clan tags. |
+| `matchzy_ready_clantag_enabled` | `true` | Y | Show `[READY]` / `[UNREADY]` scoreboard clan tags. Not shown in join ready mode (`matchzy_ready_mode 1`). |
+| `matchzy_team_clantag_enabled` | `false` | Y | While live, show each team's `tag` from the match config as the players' clan tag. Off: live clan tags stay empty. |
 | `matchzy_ready_up_by_ping` | `true` | Y | Pinging (middle mouse) toggles ready. |
 
 - **`matchzy_ready_per_team`**: the match starts when CT and T are both ready (`1` = one player per team). Works with and without a loaded match.

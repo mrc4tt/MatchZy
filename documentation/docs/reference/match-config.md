@@ -87,6 +87,7 @@ Prefer an in-game flow? Admins can build the same config with the [`.matchsetup`
 | Field | Type | Default | Description |
 |---|---|---|---|
 | `name` | string | **required** | Team name, shown on the scoreboard. |
+| `tag` | string | `""` | Short team tag, shown as the players' clan tag while live when `matchzy_team_clantag_enabled` is on. Letters, digits, space, `_` and `-`. |
 | `id` | string | `""` | Your own id for the team, echoed in events. |
 | `players` | object, array or `"any"` | **required** | Roster as `{ "<steamid64>": "<name>" }` or `["<steamid64>", ...]`, or `"any"` (see below). |
 | `coaches` | object or string[] | - | SteamID64s that coach this team. They become coach automatically. See [Coaching](../guides/coaching.md). |

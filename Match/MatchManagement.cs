@@ -392,6 +392,8 @@ namespace MatchZy
 
             matchzyTeam1.teamName = RemoveSpecialCharacters(team1["name"]!.ToString());
             matchzyTeam2.teamName = RemoveSpecialCharacters(team2["name"]!.ToString());
+            matchzyTeam1.teamTag = RemoveSpecialCharacters(team1["tag"]?.ToString() ?? "");
+            matchzyTeam2.teamTag = RemoveSpecialCharacters(team2["tag"]?.ToString() ?? "");
             matchzyTeam1.teamPlayers = team1["players"] == null || team1["players"]!.Type == JTokenType.Null ? null : team1["players"];
             matchzyTeam2.teamPlayers = team2["players"] == null || team2["players"]!.Type == JTokenType.Null ? null : team2["players"];
             matchzyTeam1.teamCoaches = CoachRosterFrom(team1);

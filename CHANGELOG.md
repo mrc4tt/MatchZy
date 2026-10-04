@@ -2,6 +2,14 @@
 
 Based on [MatchZy](https://github.com/shobhit-pathak/MatchZy) by Shobhit Pathak, adapted for CS2 game-server hosting: remote log HTTP API, G5API compatibility, auto changelevel, advanced stats (HLTV 2.0 rating / KAST / clutch / opening duels), a coach system, a pause overhaul, and in-game admin and match-setup menus.
 
+# 1.0.1
+
+#### October 4, 2026
+
+- New `matchzy_team_clantag_enabled` (default `false`): while the match is live, players get their team's `tag` from the match config (`team1.tag` / `team2.tag`) as their scoreboard clan tag. Coaches keep their coach tag. The tag is reapplied on spawn and team change.
+- New optional `tag` field for `team1` / `team2` in the match config.
+- No `[READY]` / `[UNREADY]` clan tags in join ready mode (`matchzy_ready_mode 1`), where nobody types `.ready` and every player showed `[UNREADY]` for the whole warmup.
+
 # 1.0.0
 
 #### October 3, 2026

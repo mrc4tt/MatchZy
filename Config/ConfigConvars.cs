@@ -95,6 +95,8 @@ namespace MatchZy
 
         public FakeConVar<bool> readyClanTagEnabled = new("matchzy_ready_clantag_enabled", "Whether to show [READY] / [UNREADY] clan tags on the scoreboard during the ready phase. Default: true", true);
 
+        public FakeConVar<bool> teamClanTagEnabled = new("matchzy_team_clantag_enabled", "Whether to show each team's tag from the match config (team1.tag / team2.tag) as the players' clan tag while the match is live. Off leaves live clan tags empty. Default: false", false);
+
         public FakeConVar<bool> grenadeLibraryLabels = new("matchzy_grenadelibrary_labels", "Whether .shownades draws a floating text label (CPointWorldText) above each grenade beam. false = beams only. Default: true", true);
 
         // Label facing: yaw (degrees) ADDED to the lineup's throw direction. CPointWorldText has no
