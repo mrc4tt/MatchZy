@@ -488,7 +488,7 @@ namespace MatchZy
                 playerReadyStatus[key] = false;
             }
 
-            if (IsMapReloadRequiredForGameMode(matchConfig.Wingman) || mapReloadRequired || currentMapName != mapToPlay)
+            if (IsMapReloadRequiredForGameMode(matchConfig.Wingman) || mapReloadRequired || !IsSameMap(mapToPlay, currentMapName))
             {
                 SetCorrectGameMode();
                 //float delay = 7.0f;

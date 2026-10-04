@@ -912,13 +912,11 @@ namespace MatchZy
 
             Server.NextFrame(() =>
             {
-                if (long.TryParse(currentMapName, out _))
+                // A workshop map reloads through its workshop id / collection, a stock map via changelevel.
+                string? command = BuildMapChangeCommand(currentMapName);
+                if (command != null)
                 {
-                    Server.ExecuteCommand($"host_workshop_map \"{currentMapName}\"");
-                }
-                else if (Server.IsMapValid(currentMapName))
-                {
-                    Server.ExecuteCommand($"changelevel \"{currentMapName}\"");
+                    Server.ExecuteCommand(command);
                 }
                 else
                 {

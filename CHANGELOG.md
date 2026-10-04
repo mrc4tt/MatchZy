@@ -2,6 +2,18 @@
 
 Based on [MatchZy](https://github.com/shobhit-pathak/MatchZy) by Shobhit Pathak, adapted for CS2 game-server hosting: remote log HTTP API, G5API compatibility, auto changelevel, advanced stats (HLTV 2.0 rating / KAST / clutch / opening duels), a coach system, a pause overhaul, and in-game admin and match-setup menus.
 
+# 1.0.2
+
+#### October 4, 2026
+
+- Workshop servers no longer crash at match end. A server started with `+host_workshop_map <id>` and/or `+host_workshop_collection <id>` and no `+map <name>` is detected as a workshop server. A plain `changelevel <name>` for a workshop map looked for `maps/<name>.vpk`, failed to mount it with players connected, and crashed the server (`~CServerChangelevelState with non empty m_Clients`).
+- Every map change MatchZy makes (map rotation, `.map`, match load, veto, backup restore, map reload) now uses `host_workshop_map <id>` for workshop maps, `ds_workshop_changelevel <name>` for collection maps and `changelevel` only for maps in the server's `maps/` folder. The boot map is linked to its `+host_workshop_map` id.
+- A console `changelevel` / `map` for a workshop map from the engine or another plugin is replaced with the workshop command, or blocked when the map cannot be loaded.
+- With auto changelevel disabled, a workshop server sets `mp_match_end_restart 1` at series end so the engine restarts the map instead of changing level by name.
+- Match config, veto, backup and map rotation entries in workshop form (`workshop/<id>`, `<id>`) now count as the current map when that workshop map is loaded, so no needless map change.
+- `.map` takes an unknown collection map only as `ws:<name>`; workshop ids must be digits only.
+- A backup for a workshop map whose id is not known is refused instead of leaving a restore pending for the wrong map.
+
 # 1.0.1
 
 #### October 4, 2026

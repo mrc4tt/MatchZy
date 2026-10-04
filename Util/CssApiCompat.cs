@@ -103,6 +103,12 @@ namespace MatchZy
         {
             return CommandLine.HasParam(flag);
         }
+
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        private static bool TryGetParamViaFork(string flag, out string value)
+        {
+            return CommandLine.TryGetString(flag, out value);
+        }
 #endif
 
         // Bare launch-option probe (e.g. "-nohltv", "-nobots").
@@ -158,6 +164,56 @@ namespace MatchZy
             {
                 return false;
             }
+        }
+
+        // Value of a launch option that takes an argument (e.g. "+map", "+host_workshop_map").
+        // Returns false when the option is not on the command line at all; true with value ""
+        // when it is present without a value. Same source order as HasLaunchOption.
+        private static bool TryGetLaunchOption(string flag, out string value)
+        {
+            value = "";
+#if HAS_CSS_COMMANDLINE
+            if (HasCssCommandLineApi)
+            {
+                try
+                {
+                    if (!TryGetParamViaFork(flag, out value))
+                    {
+                        value = "";
+                        return false;
+                    }
+                    value = (value ?? "").Trim();
+                    return true;
+                }
+                catch
+                {
+                    // Fall through to the process command line.
+                }
+            }
+#endif
+
+            string[] args;
+            try
+            {
+                args = File.Exists("/proc/self/cmdline")
+                    ? Encoding.UTF8.GetString(File.ReadAllBytes("/proc/self/cmdline")).Split('\0')
+                    : Environment.GetCommandLineArgs();
+            }
+            catch
+            {
+                return false;
+            }
+
+            for (int i = 0; i < args.Length; i++)
+            {
+                if (!args[i].Equals(flag, StringComparison.OrdinalIgnoreCase))
+                    continue;
+                // The next token is the value unless it is another option or missing.
+                string next = i + 1 < args.Length ? args[i + 1].Trim() : "";
+                value = next.StartsWith('+') || next.StartsWith('-') ? "" : next;
+                return true;
+            }
+            return false;
         }
     }
 }

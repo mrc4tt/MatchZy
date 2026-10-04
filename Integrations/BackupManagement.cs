@@ -552,8 +552,16 @@ namespace MatchZy
                 }
                 if (backupData.TryGetValue("map_name", out var map_name))
                 {
-                    if (map_name != Server.MapName)
+                    if (!IsSameMap(map_name, Server.MapName))
                     {
+                        // Backups store the plain map name; a workshop map whose id is not known
+                        // (e.g. after a server restart) cannot be loaded from it.
+                        if (BuildMapChangeCommand(map_name) == null)
+                        {
+                            Log($"[RestoreRoundBackup] Backup is for map '{map_name}', which cannot be loaded here (not a stock map, workshop id unknown). Load that map first, then restore.");
+                            ReplyToUserCommand(player, Localizer.ForPlayer(player, "matchzy.cc.invalidmap"));
+                            return false;
+                        }
                         ChangeMap(map_name, 0);
                         isRoundRestorePending = true;
                         pendingRestoreFileName = fileName;

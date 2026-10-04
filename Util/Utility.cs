@@ -1852,13 +1852,13 @@ namespace MatchZy
             }
 
             // A purely numeric argument is a Steam Workshop published-file id.
-            bool isWorkshopId = long.TryParse(mapName, out _);
+            bool isWorkshopId = IsWorkshopId(mapName);
 
             // "ws/<id>" is an explicit workshop-id form; strip the prefix and treat as id.
             if (!isWorkshopId && mapName.StartsWith("ws/", StringComparison.OrdinalIgnoreCase))
             {
                 string idPart = mapName["ws/".Length..];
-                if (!long.TryParse(idPart, out _))
+                if (!IsWorkshopId(idPart))
                 {
                     ReplyToUserCommand(player, Localizer.ForPlayer(player, "matchzy.cc.invalidmap"));
                     return;
@@ -1886,15 +1886,19 @@ namespace MatchZy
                 // (but "cs_office"/"ar_baggage"/workshop-mounted names validate as-is). Upstream
                 // stops the demo + kicks bots BEFORE validating, so a typo leaves the server torn
                 // down with no map change and the recording lost - validate first, act second.
-                if (!Server.IsMapValid(targetMap))
+                // A known workshop map by its plain name (e.g. the +host_workshop_map boot map) is
+                // loaded through its workshop id by BuildMapChangeCommand, never a plain changelevel.
+                if (!IsKnownWorkshopMap(targetMap) && !IsStockMap(targetMap))
                 {
                     string prefixed = "de_" + targetMap;
-                    if (Server.IsMapValid(prefixed))
+                    if (IsStockMap(prefixed) || IsKnownWorkshopMap(prefixed))
                     {
                         targetMap = prefixed;
                     }
                     else
                     {
+                        // Validate first, act second: a collection map that is not known yet must be
+                        // asked for explicitly as ws:<name>, so a typo never tears the server down.
                         ReplyToUserCommand(player, Localizer.ForPlayer(player, "matchzy.cc.invalidmap"));
                         return;
                     }
@@ -1934,12 +1938,11 @@ namespace MatchZy
             bool finalIsWorkshopName = isWorkshopName;
             Server.NextFrame(() =>
             {
-                if (finalIsWorkshop)
-                    Server.ExecuteCommand($"host_workshop_map \"{finalMap}\"");
-                else if (finalIsWorkshopName)
-                    Server.ExecuteCommand($"ds_workshop_changelevel \"{finalMap}\"");
-                else
-                    Server.ExecuteCommand($"changelevel \"{finalMap}\"");
+                string? command = finalIsWorkshop ? $"host_workshop_map {finalMap}"
+                    : finalIsWorkshopName ? $"ds_workshop_changelevel \"{finalMap}\""
+                    : BuildMapChangeCommand(finalMap);
+                if (command != null)
+                    Server.ExecuteCommand(command);
             });
         }
 
@@ -2625,32 +2628,14 @@ namespace MatchZy
                     // Execute actual map change on next frame for engine state safety
                     Server.NextFrame(() =>
                     {
-                        if (long.TryParse(mapName, out _))
+                        // Workshop ids/names -> host_workshop_map / ds_workshop_changelevel, stock maps
+                        // -> changelevel (see BuildMapChangeCommand). A plain changelevel of a workshop
+                        // map fails to mount and crashes the server.
+                        string? command = BuildMapChangeCommand(mapName);
+                        if (command != null)
                         {
-                            Server.ExecuteCommand($"host_workshop_map \"{mapName}\"");
-                        }
-                        else if (mapName.StartsWith("workshop/", StringComparison.OrdinalIgnoreCase)
-                                 && mapName.Split('/') is { Length: >= 2 } workshopParts
-                                 && long.TryParse(workshopParts[1], out _))
-                        {
-                            // "workshop/<id>" or "workshop/<id>/<name>" - the format the map-rotation
-                            // file documents (see ChangeMapFromRotation); only the id matters.
-                            Server.ExecuteCommand($"host_workshop_map \"{workshopParts[1]}\"");
-                        }
-                        else if (mapName.StartsWith("ws/", StringComparison.OrdinalIgnoreCase)
-                                 && long.TryParse(mapName["ws/".Length..], out _))
-                        {
-                            Server.ExecuteCommand($"host_workshop_map \"{mapName["ws/".Length..]}\"");
-                        }
-                        else if (mapName.StartsWith("ws:", StringComparison.OrdinalIgnoreCase))
-                        {
-                            // Workshop-collection map by name; cannot be validated with IsMapValid
-                            // (workshop maps are not mounted until loaded).
-                            Server.ExecuteCommand($"ds_workshop_changelevel \"{mapName["ws:".Length..]}\"");
-                        }
-                        else if (Server.IsMapValid(mapName))
-                        {
-                            Server.ExecuteCommand($"changelevel \"{mapName}\"");
+                            Log($"[ChangeMap] {command}");
+                            Server.ExecuteCommand(command);
                         }
                         else
                         {

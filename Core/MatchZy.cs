@@ -16,7 +16,7 @@ namespace MatchZy
     public partial class MatchZy : BasePlugin
     {
         public override string ModuleName => "MatchZy";
-        public override string ModuleVersion => "1.0.1";
+        public override string ModuleVersion => "1.0.2";
         public override string ModuleAuthor => "Miksen/mrc4tt (based on MatchZy by WD-)";
         public override string ModuleDescription => "A plugin for running and managing CS2 practice/pugs/scrims/matches!";
         public string chatPrefix = $"{ChatColors.Green}[MatchZy]{ChatColors.Default}";
@@ -662,6 +662,9 @@ namespace MatchZy
             RegisterEventHandler<EventPlayerPing>(EventPlayerPingHandler);
             //RegisterEventHandler<EventCsIntermission>(OnEventCsIntermissionPost);
             RegisterListener<Listeners.OnMapEnd>(OnMapEndHandler);
+            // Before the lifecycle hooks: a redirected workshop changelevel is announced once,
+            // by the workshop command it turns into.
+            RegisterWorkshopHooks(hotReload);
             RegisterServerLifecycleHooks();
             RegisterListener<Listeners.OnClientDisconnectPost>(playerSlot =>
             {
@@ -1069,8 +1072,12 @@ namespace MatchZy
                         if (!isPreVeto && !isVeto && matchConfig.CurrentMapNumber < matchConfig.Maplist.Count)
                         {
                             string expectedMap = matchConfig.Maplist[matchConfig.CurrentMapNumber];
+                            // Plain names only: a workshop id/spec carries no reliable name to compare
+                            // against, and changing to it on every map start could loop. A plain name
+                            // that is a known workshop map is reloaded through its workshop id.
                             bool plainMapName = !expectedMap.All(char.IsDigit) && !expectedMap.Contains('/') && !expectedMap.Contains(':');
-                            if (plainMapName && !string.Equals(expectedMap, mapName, StringComparison.OrdinalIgnoreCase) && Server.IsMapValid(expectedMap))
+                            if (plainMapName && !string.Equals(expectedMap, mapName, StringComparison.OrdinalIgnoreCase)
+                                && (IsStockMap(expectedMap) || IsKnownWorkshopMap(expectedMap)))
                             {
                                 Log($"[OnMapStart] Loaded match expects {expectedMap} but the server is on {mapName}; changing back.");
                                 ChangeMap(expectedMap, 3);

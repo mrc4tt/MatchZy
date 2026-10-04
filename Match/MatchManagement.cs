@@ -520,7 +520,7 @@ namespace MatchZy
                 string currentMapName = Server.MapName;
                 string mapName = matchConfig.Maplist[0].ToString();
 
-                if (!skipMapChange && (IsMapReloadRequiredForGameMode(matchConfig.Wingman) || mapReloadRequired || currentMapName != mapName))
+                if (!skipMapChange && (IsMapReloadRequiredForGameMode(matchConfig.Wingman) || mapReloadRequired || !IsSameMap(mapName, currentMapName)))
                 {
                     SetCorrectGameMode();
                     // The match needs a different map than the one we're on. Finishing setup here is
@@ -1293,6 +1293,16 @@ namespace MatchZy
                 // so the server hibernated 5s postgame once only spectators remained → CSTV
                 // disconnect. Restore the 300s grace at match end so the broadcast survives.
                 Server.ExecuteCommand("sv_hibernate_postgame_delay 300");
+                // With mp_match_end_restart 0 the engine itself changelevels to the next mapgroup map
+                // by NAME when the intermission ends. On a workshop server that map has no
+                // maps/<name>.vpk, the load fails with clients attached and the server crashes.
+                // Have the engine restart the current map instead (OnPlainChangelevelGuard is the
+                // second line of defence).
+                if (IsWorkshopServer)
+                {
+                    Log("[EndSeries] Workshop server: mp_match_end_restart 1 so the engine does not changelevel by map name.");
+                    Server.ExecuteCommand("mp_match_end_restart 1");
+                }
                 AddTimer(
                     restartDelay,
                     () =>
@@ -1323,7 +1333,7 @@ namespace MatchZy
 
             // Get the next map in rotation
             string currentMap = Server.MapName;
-            int currentIndex = mapRotationList.IndexOf(currentMap);
+            int currentIndex = mapRotationList.FindIndex(m => IsSameMap(m, currentMap));
             string nextMap = currentIndex >= 0 && currentIndex < mapRotationList.Count - 1 ? mapRotationList[currentIndex + 1] : mapRotationList[0];
 
             Log($"[EndSeries] Current map: {currentMap}, Next map: {nextMap}, Change in {mapChangeDelay}s");
@@ -1361,32 +1371,19 @@ namespace MatchZy
             Server.ExecuteCommand("mp_endmatch_votenextmap 0");
             KickAllBotsProtectCSTV();
 
-            // Check if it's a workshop map (starts with "workshop/" or is just a numeric ID)
-            bool isWorkshopMap = mapName.StartsWith("workshop/") || long.TryParse(mapName, out _);
-
             // Execute on next frame for engine state safety
             Server.NextFrame(() =>
             {
-                if (isWorkshopMap)
+                // workshop/<id>, bare ids and known workshop names -> host_workshop_map,
+                // collection maps -> ds_workshop_changelevel, stock maps -> changelevel.
+                string? command = IsSafeMapName(mapName) ? BuildMapChangeCommand(mapName) : null;
+                if (command == null)
                 {
-                    string workshopId = mapName;
-                    if (mapName.StartsWith("workshop/"))
-                    {
-                        string[] parts = mapName.Split('/');
-                        if (parts.Length >= 2)
-                        {
-                            workshopId = parts[1];
-                        }
-                    }
-
-                    Log($"[ChangeMapFromRotation] Workshop map, using host_workshop_map: {workshopId}");
-                    Server.ExecuteCommand($"host_workshop_map {workshopId}");
+                    Log($"[ChangeMapFromRotation] WARNING: cannot load '{mapName}' (not a stock map, no workshop id or collection). Staying on the current map.");
+                    return;
                 }
-                else
-                {
-                    Log($"[ChangeMapFromRotation] Standard map, using changelevel: {mapName}");
-                    Server.ExecuteCommand($"changelevel {mapName}");
-                }
+                Log($"[ChangeMapFromRotation] {command}");
+                Server.ExecuteCommand(command);
             });
         }
 

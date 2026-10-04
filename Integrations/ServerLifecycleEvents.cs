@@ -73,7 +73,12 @@ namespace MatchZy
                 string next = info.ArgCount > 1 ? info.ArgByIndex(1).Trim() : "";
                 if (next == "")
                     return HookResult.Continue; // usage error, no change follows
-                AnnounceMapChange(next, info.GetArg(0).ToLowerInvariant());
+                // A plain changelevel/map for a workshop map is redirected (or blocked) by
+                // OnPlainChangelevelGuard; the workshop command it becomes is announced instead.
+                string verb = info.GetArg(0).ToLowerInvariant();
+                if ((verb == "changelevel" || verb == "map") && IsGuardedChangelevelTarget(next.Trim('"')))
+                    return HookResult.Continue;
+                AnnounceMapChange(next, verb);
             }
             catch (Exception e)
             {
