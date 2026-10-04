@@ -2,6 +2,10 @@
 
 A short summary of each release. The [full changelog](changelog.md) has the details and background for every change.
 
+## 1.0.3 <small>October 4, 2026</small>
+
+- **Fixed:** A short-handed team (4v5) can start with `.forceready` when the match config has no `min_players_to_ready`. The default is now 1, as in Get5.
+
 ## 1.0.1 <small>October 4, 2026</small>
 
 - **New:** `matchzy_team_clantag_enabled` shows each team's `tag` from the match config as the clan tag while live. Off by default.

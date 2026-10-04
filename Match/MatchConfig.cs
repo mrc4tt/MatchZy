@@ -50,6 +50,11 @@ namespace MatchZy
         [JsonPropertyName("min_players_to_ready")]
         public int MinPlayersToReady { get; set; } = 12;
 
+        // False when the match config left min_players_to_ready out: then .forceready needs one
+        // player (Get5's default) and join ready mode waits for players_per_team.
+        [JsonIgnore]
+        public bool MinPlayersToReadySet { get; set; } = false;
+
         [JsonPropertyName("min_spectators_to_ready")]
         public int MinSpectatorsToReady { get; set; } = 0;
 

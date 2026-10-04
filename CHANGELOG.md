@@ -2,6 +2,13 @@
 
 Based on [MatchZy](https://github.com/shobhit-pathak/MatchZy) by Shobhit Pathak, adapted for CS2 game-server hosting: remote log HTTP API, G5API compatibility, auto changelevel, advanced stats (HLTV 2.0 rating / KAST / clutch / opening duels), a coach system, a pause overhaul, and in-game admin and match-setup menus.
 
+# 1.0.3
+
+#### October 4, 2026
+
+- A short-handed team (for example 4 players in a 5v5 match) can start with `.forceready` again when the match config has no `min_players_to_ready`. MatchZy used `matchzy_minimum_ready_required` (default 10, a pug's total over both teams) as the per-team minimum, so `.forceready` asked for 10 players. The default is now 1, as in Get5. A `min_players_to_ready` in the match config works as before.
+- Join ready mode (`matchzy_ready_mode 1`) without `min_players_to_ready` in the match config waits for `players_per_team` players per team.
+
 # 1.0.2
 
 #### October 4, 2026

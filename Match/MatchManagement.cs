@@ -430,7 +430,10 @@ namespace MatchZy
                 MapsPool = maplist.ToObject<List<string>>()!,
                 MapsLeftInVetoPool = maplist.ToObject<List<string>>()!,
                 NumMaps = jsonDataObject["num_maps"]!.Value<int>(),
-                MinPlayersToReady = minimumReadyRequired,
+                // Get5's default. Not matchzy_minimum_ready_required: that is a pug's total over
+                // both teams (10), and as a per-team minimum it made .forceready impossible for a
+                // short-handed team (4v5).
+                MinPlayersToReady = 1,
             };
             // The remote log settings come from config.cfg / the console, not the match JSON. Start
             // from the server's own settings (not the previous match's, which a "cvars" block may
@@ -699,7 +702,9 @@ namespace MatchZy
                 matchData["matchid"] = liveMatchId;
                 matchData["num_maps"] = matchConfig.NumMaps;
                 matchData["players_per_team"] = matchConfig.PlayersPerTeam;
-                matchData["min_players_to_ready"] = matchConfig.MinPlayersToReady;
+                // Only when the match config set it, so a reload keeps the unset fallbacks.
+                if (matchConfig.MinPlayersToReadySet)
+                    matchData["min_players_to_ready"] = matchConfig.MinPlayersToReady;
                 matchData["min_spectators_to_ready"] = matchConfig.MinSpectatorsToReady;
                 matchData["skip_veto"] = matchConfig.SkipVeto;
                 matchData["clinch_series"] = matchConfig.SeriesCanClinch;
@@ -934,6 +939,7 @@ namespace MatchZy
             if (jsonDataObject["min_players_to_ready"] != null)
             {
                 matchConfig.MinPlayersToReady = jsonDataObject["min_players_to_ready"]!.Value<int>();
+                matchConfig.MinPlayersToReadySet = true;
             }
 
             if (jsonDataObject["min_spectators_to_ready"] != null)

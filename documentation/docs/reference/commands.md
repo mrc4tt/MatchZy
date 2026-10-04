@@ -114,7 +114,7 @@ Before a match goes live, players ready up. The match starts when enough players
 | `.warmupbots [count]` | Map/prac | Adds bots to shoot at while you wait (default 4, 1 to 10). They leave by themselves when the knife round or the match starts. Run again to remove them. |
 | `.coach [t\|ct]` | Player | Become coach. See [Coaching](#coaching). |
 
-`.forceready` also needs at least `min_players_to_ready` players on your team and `matchzy_allow_force_ready` on.
+`.forceready` also needs at least `min_players_to_ready` players on your team (default `1`) and `matchzy_allow_force_ready` on. It is how a short-handed team starts: with 4 players in a 5v5 match, `.ready` alone never makes the team ready, `.forceready` does. The other team readies up normally.
 
 `.addreadytime` only works in a loaded match that has a ready-up time limit, and the time left can never go above the full limit.
 
