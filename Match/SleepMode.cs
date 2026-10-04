@@ -41,7 +41,7 @@ namespace MatchZy
             if (File.Exists(Path.Join(Server.GameDirectory + "/csgo/cfg", sleepCfgPath)))
             {
                 //Log($"Starting Sleep Mode! Executing Sleep CFG from {sleepCfgPath}");
-                Server.ExecuteCommand($"exec {sleepCfgPath};{ModeOverrideExec(sleepCfgPath)}");
+                ExecModeCfg(sleepCfgPath);
             }
             else
             {

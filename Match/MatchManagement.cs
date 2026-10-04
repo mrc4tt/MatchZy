@@ -713,6 +713,8 @@ namespace MatchZy
                 var team1Data = new JObject();
                 team1Data["id"] = matchzyTeam1.id;
                 team1Data["name"] = matchzyTeam1.teamName;
+                if (matchzyTeam1.teamTag != "")
+                    team1Data["tag"] = matchzyTeam1.teamTag;
                 team1Data["players"] = matchzyTeam1.teamPlayers;
                 if (matchzyTeam1.teamCoaches != null)
                     team1Data["coaches"] = matchzyTeam1.teamCoaches;
@@ -721,6 +723,8 @@ namespace MatchZy
                 var team2Data = new JObject();
                 team2Data["id"] = matchzyTeam2.id;
                 team2Data["name"] = matchzyTeam2.teamName;
+                if (matchzyTeam2.teamTag != "")
+                    team2Data["tag"] = matchzyTeam2.teamTag;
                 team2Data["players"] = matchzyTeam2.teamPlayers;
                 if (matchzyTeam2.teamCoaches != null)
                     team2Data["coaches"] = matchzyTeam2.teamCoaches;

@@ -2,6 +2,15 @@
 
 Based on [MatchZy](https://github.com/shobhit-pathak/MatchZy) by Shobhit Pathak, adapted for CS2 game-server hosting: remote log HTTP API, G5API compatibility, auto changelevel, advanced stats (HLTV 2.0 rating / KAST / clutch / opening duels), a coach system, a pause overhaul, and in-game admin and match-setup menus.
 
+# 1.0.4
+
+#### October 4, 2026
+
+- Each mode now starts from MatchZy's built-in default for that mode, then runs your mode cfg and its `<mode>_override.cfg` as before. Settings your cfg leaves out (for example in an older `live.cfg`) no longer keep the value from the previous mode. Before, `mp_weapons_allow_typecount 0` in `warmup_override.cfg` carried into a `live.cfg` without that line, and nobody could buy in the match. Values set in your cfgs and overrides still win. Applies to warmup, knife, live, live_wingman, scrim, hill, dryrun and sleep; not to practice mode. Server-level settings (`sv_hibernate_when_empty`, `tv_relayvoice`, `sv_lan`, `sv_pure`, `sv_steamgroup_exclusive`, `sv_kick_ban_duration`, `sv_competitive_minspec`, `mp_logdetail`) are not filled in, so your server.cfg values stay. If you left a setting out of a mode cfg on purpose to keep an earlier value, set it in that mode's override.
+- The match config `cvars` are now applied after every mode cfg, also in warmup and the knife round, so they always win over the mode cfg and its override. Before, warmup.cfg and knife.cfg could overwrite them until the match went live.
+- `player_connect` is now also sent for players who join while a match load is changing the map.
+- With `matchzy_team_clantag_enabled` turned off during a live match, team tags are removed at each player's next spawn.
+
 # 1.0.3
 
 #### October 4, 2026

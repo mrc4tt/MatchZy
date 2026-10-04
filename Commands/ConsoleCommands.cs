@@ -989,7 +989,7 @@ namespace MatchZy
                     ExecUnpracCommands();
                     CleanupAllCollisionTimers();
                     PrintLocalizedToAll("matchzy.cmd.adminstartedwarmup");
-                    Server.ExecuteCommand($"exec {warmupCfgPath};{ModeOverrideExec(warmupCfgPath)};mp_freezetime 0");
+                    ExecModeCfg(warmupCfgPath, ";mp_freezetime 0");
                 }
             }
             else

@@ -119,6 +119,95 @@ namespace MatchZy
         private static string ModeOverrideExec(string cfgPath) =>
             $"execifexists {cfgPath.Substring(0, cfgPath.Length - ".cfg".Length)}_override.cfg";
 
+        // Runs a mode cfg: the built-in default's settings first, then the server's mode cfg, then
+        // its override. A cvar the server's cfg does not set (an older or trimmed copy) used to keep
+        // whatever the previous mode left: mp_weapons_allow_typecount 0 from a warmup override
+        // carried into a live.cfg without that line, and nobody could buy in the match. The
+        // defaults only fill those gaps; every value the server's cfg or override sets still wins,
+        // and the match config cvars (applied after) win over all of it.
+        // The match config cvars are applied last, so they win in every mode (warmup and knife
+        // included), not only where a caller re-applies them.
+        private void ExecModeCfg(string cfgPath, string extraCommands = "")
+        {
+            foreach (string chunk in ModeDefaultSettings(Path.GetFileName(cfgPath)))
+                Server.ExecuteCommand(chunk);
+            Server.ExecuteCommand($"exec {cfgPath};{ModeOverrideExec(cfgPath)}{extraCommands}");
+            if (matchConfig.ChangedCvars.Count > 0)
+                ExecuteChangedConvars();
+        }
+
+        // Commands (mp_warmup_start/end, ...) are left out: only "name value" settings are applied,
+        // so nothing in the default runs twice. Server-level settings that some default cfgs carry
+        // (hibernation, CSTV voice, sv_lan, sv_pure, Steam group, ...) are left out too: they belong
+        // to the server's own config, and filling them in would override server.cfg on every mode
+        // switch. Split into short commands for the command buffer.
+        private static readonly Dictionary<string, List<string>> _modeDefaultSettings = new();
+        private static readonly HashSet<string> _modeDefaultSkip = new(StringComparer.OrdinalIgnoreCase)
+        {
+            "exec", "execifexists", "mp_restartgame", "mp_warmup_start", "mp_warmup_end",
+            "sv_hibernate_when_empty", "sv_hibernate_postgame_delay", "tv_relayvoice", "sv_lan",
+            "sv_pure", "sv_pure_kick_clients", "sv_pure_trace", "sv_steamgroup_exclusive",
+            "sv_kick_ban_duration", "sv_competitive_minspec", "mp_logdetail",
+        };
+
+        // Cuts a "//" comment and splits on ";", both only outside quotes, so a quoted value
+        // ("http://...", "a;b") stays whole.
+        private static List<string> SplitCfgLine(string line)
+        {
+            var parts = new List<string>();
+            var current = new System.Text.StringBuilder();
+            bool inQuotes = false;
+            for (int i = 0; i < line.Length; i++)
+            {
+                char c = line[i];
+                if (c == '"')
+                    inQuotes = !inQuotes;
+                else if (!inQuotes && c == '/' && i + 1 < line.Length && line[i + 1] == '/')
+                    break;
+                else if (!inQuotes && c == ';')
+                {
+                    parts.Add(current.ToString());
+                    current.Clear();
+                    continue;
+                }
+                current.Append(c);
+            }
+            parts.Add(current.ToString());
+            return parts;
+        }
+
+        private static List<string> ModeDefaultSettings(string fileName)
+        {
+            if (_modeDefaultSettings.TryGetValue(fileName, out var cached))
+                return cached;
+            var chunks = new List<string>();
+            var sb = new System.Text.StringBuilder();
+            string content = ConfigManager.ReadDefaultCfg(fileName) ?? "";
+            foreach (string rawLine in content.Split('\n'))
+            {
+                foreach (string part in SplitCfgLine(rawLine))
+                {
+                    string setting = part.Trim();
+                    int space = setting.IndexOfAny(new[] { ' ', '\t' });
+                    // No value: a command, not a setting.
+                    if (space <= 0 || _modeDefaultSkip.Contains(setting.Substring(0, space)))
+                        continue;
+                    if (sb.Length > 0 && sb.Length + setting.Length > 900)
+                    {
+                        chunks.Add(sb.ToString());
+                        sb.Clear();
+                    }
+                    if (sb.Length > 0)
+                        sb.Append(';');
+                    sb.Append(setting);
+                }
+            }
+            if (sb.Length > 0)
+                chunks.Add(sb.ToString());
+            _modeDefaultSettings[fileName] = chunks;
+            return chunks;
+        }
+
         private void LoadAdmins()
         {
             // Reset first so a reload actually drops admins removed from the file
@@ -892,7 +981,7 @@ namespace MatchZy
             var absolutePath = Path.Join(Server.GameDirectory, "csgo", "cfg", warmupCfgPath);
             if (File.Exists(Path.Join(Server.GameDirectory + "/csgo/cfg", warmupCfgPath)))
             {
-                Server.ExecuteCommand($"exec {warmupCfgPath};{ModeOverrideExec(warmupCfgPath)}");
+                ExecModeCfg(warmupCfgPath);
             }
             else
             {
@@ -1069,7 +1158,7 @@ namespace MatchZy
             var absolutePath = Path.Join(Server.GameDirectory + "/csgo/cfg", knifeCfgPath);
             if (File.Exists(Path.Join(Server.GameDirectory + "/csgo/cfg", knifeCfgPath)))
             {
-                Server.ExecuteCommand($"exec {knifeCfgPath};{ModeOverrideExec(knifeCfgPath)}");
+                ExecModeCfg(knifeCfgPath);
                 Server.ExecuteCommand("mp_restartgame 1;mp_warmup_end;");
             }
             else
@@ -2272,7 +2361,7 @@ namespace MatchZy
 
         public void HandleClanTags(int? forceUpdateSlot = null)
         {
-            if (matchStarted && isMatchLive && !isPractice && !isDryRun && teamClanTagEnabled.Value)
+            if (TeamClanTagsActive)
             {
                 bool changed = false;
                 foreach (var player in Utilities.GetPlayers())
@@ -2411,14 +2500,29 @@ namespace MatchZy
 
         // Spawn / team change while live: the engine can reset m_szClan, and a halftime swap moves
         // non-roster players to the other team's side. Next frame so TeamNum is the new team.
+        private bool TeamClanTagsActive =>
+            matchStarted && isMatchLive && !isPractice && !isDryRun && teamClanTagEnabled.Value;
+
+        // Also clears a team tag left from before the setting was turned off mid-match.
         private void RefreshTeamClanTag(CCSPlayerController? player)
         {
-            if (!isMatchLive || !teamClanTagEnabled.Value || player == null || !player.IsValid || player.IsBot)
+            if (!isMatchLive || player == null || !player.IsValid || player.IsBot)
                 return;
             Server.NextFrame(() =>
             {
-                if (isMatchLive && teamClanTagEnabled.Value && ApplyTeamClanTag(player))
+                if (!player.IsValid)
+                    return;
+                if (TeamClanTagsActive)
+                {
+                    if (ApplyTeamClanTag(player))
+                        PokeClanNameRefresh();
+                }
+                else if (!IsMatchCoach(player) && player.Clan.Length > 0
+                    && (player.Clan == matchzyTeam1.teamTag || player.Clan == matchzyTeam2.teamTag))
+                {
+                    ApplyClanTag(player, "");
                     PokeClanNameRefresh();
+                }
             });
         }
 
@@ -3345,11 +3449,9 @@ namespace MatchZy
             // We try to find the CFG in the cfg folder, if it is not there then we execute the default CFG.
             if (File.Exists(absolutePath))
             {
-                Server.ExecuteCommand($"exec {cfgPath};{ModeOverrideExec(cfgPath)}");
-                // Match config cvars go between the mode cfg and the restart, so round 1 already
-                // uses them (start money, freeze time, ...). They were only re-applied 3s after the
-                // restart, which left the pistol round on the cfg values.
-                ExecuteChangedConvars();
+                // ExecModeCfg applies the match config cvars after the mode cfg and before the
+                // restart, so round 1 already uses them (start money, freeze time, ...).
+                ExecModeCfg(cfgPath);
                 Server.ExecuteCommand("mp_restartgame 1;mp_warmup_end;");
             }
             else
@@ -3386,11 +3488,9 @@ namespace MatchZy
             // We try to find the CFG in the cfg folder, if it is not there then we execute the default CFG.
             if (File.Exists(absolutePath))
             {
-                Server.ExecuteCommand($"exec {cfgPath};{ModeOverrideExec(cfgPath)}");
-                // Match config cvars go between the mode cfg and the restart, so round 1 already
-                // uses them (start money, freeze time, ...). They were only re-applied 3s after the
-                // restart, which left the pistol round on the cfg values.
-                ExecuteChangedConvars();
+                // ExecModeCfg applies the match config cvars after the mode cfg and before the
+                // restart, so round 1 already uses them (start money, freeze time, ...).
+                ExecModeCfg(cfgPath);
                 Server.ExecuteCommand("mp_restartgame 1;mp_warmup_end;");
             }
             else
@@ -3427,11 +3527,9 @@ namespace MatchZy
             // We try to find the CFG in the cfg folder, if it is not there then we execute the default CFG.
             if (File.Exists(absolutePath))
             {
-                Server.ExecuteCommand($"exec {cfgPath};{ModeOverrideExec(cfgPath)}");
-                // Match config cvars go between the mode cfg and the restart, so round 1 already
-                // uses them (start money, freeze time, ...). They were only re-applied 3s after the
-                // restart, which left the pistol round on the cfg values.
-                ExecuteChangedConvars();
+                // ExecModeCfg applies the match config cvars after the mode cfg and before the
+                // restart, so round 1 already uses them (start money, freeze time, ...).
+                ExecModeCfg(cfgPath);
                 Server.ExecuteCommand("mp_restartgame 1;mp_warmup_end;");
             }
             else

@@ -3562,7 +3562,7 @@ namespace MatchZy
             if (File.Exists(absolutePath))
             {
                 //Log($"[ExecDryRunCFG] Starting Dryrun! Executing Dryrun CFG from {dryrunCfgPath}");
-                Server.ExecuteCommand($"exec {dryrunCfgPath};{ModeOverrideExec(dryrunCfgPath)}");
+                ExecModeCfg(dryrunCfgPath);
                 Server.ExecuteCommand("mp_restartgame 1;mp_warmup_end;");
             }
             else

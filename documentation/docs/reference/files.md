@@ -34,15 +34,16 @@ To change a few settings of a mode, for example no flashbangs in warmup for a to
 ```cfg
 // csgo/cfg/MatchZy/warmup_override.cfg
 mp_respawn_immunitytime 5
-mp_weapons_allow_typecount 0
 ammo_grenade_limit_flashbang 0
 ```
+
+Do not set `mp_weapons_allow_typecount 0`: `0` blocks all purchases (`-1` = no limit, `5` = the live default).
 
 The file name is the mode cfg's name with `_override` added: `warmup`, `knife`, `live`, `live_wingman`, `scrim`, `hill`, `prac`, `dryrun` or `sleep`. MatchZy never writes these files, so they survive every update.
 
 - **Only the lines you change go in the override.** Leave the mode cfg (`warmup.cfg`) identical to the default, or delete it to get the current default back on the next restart. Do not copy the whole mode cfg into the override: that pins every value, and you would miss new defaults from later releases.
-- **Order:** the mode cfg runs first, then its override, then the `cvars` of a loaded match config. The match config wins.
-- **Carry-over:** a value set in an override stays until something sets it again. Most settings are set by every mode cfg, but not all. If you set a cvar in `warmup_override.cfg` that the next mode cfg does not set, it carries over into that mode. Check with `grep <cvar> defaults/*.cfg` and set it back in the next mode's override if needed. For example, do not put `mp_ignore_round_win_conditions 1` in `warmup_override.cfg`: `knife.cfg` does not reset it, so the knife round would never end.
+- **Order:** MatchZy's built-in default for the mode runs first, then your mode cfg, then its override, then the `cvars` of a loaded match config. Each step wins over the one before. The built-in default only fills settings your mode cfg leaves out, for example a newer setting missing from an older `live.cfg`. It is never written to your files, and it leaves server-level settings alone (`sv_hibernate_when_empty`, `tv_relayvoice`, `sv_lan`, `sv_pure`, `sv_steamgroup_exclusive`, `sv_kick_ban_duration`, `sv_competitive_minspec`, `mp_logdetail`): set those in your server.cfg. Practice mode (`prac.cfg`) has no built-in step.
+- **Carry-over:** a value set in an override stays until something sets it again. The built-in defaults reset every setting MatchZy's own cfg for the next mode sets, even when your copy of that cfg does not. A cvar that the next mode's default does not set either still carries over. Check with `grep <cvar> defaults/*.cfg` and set it back in the next mode's override if needed. For example, do not put `mp_ignore_round_win_conditions 1` in `warmup_override.cfg`: `knife.cfg` does not reset it, so the knife round would never end.
 
 ## database.json
 

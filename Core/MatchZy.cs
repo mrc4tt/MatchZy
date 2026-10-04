@@ -16,7 +16,7 @@ namespace MatchZy
     public partial class MatchZy : BasePlugin
     {
         public override string ModuleName => "MatchZy";
-        public override string ModuleVersion => "1.0.3";
+        public override string ModuleVersion => "1.0.4";
         public override string ModuleAuthor => "Miksen/mrc4tt (based on MatchZy by WD-)";
         public override string ModuleDescription => "A plugin for running and managing CS2 practice/pugs/scrims/matches!";
         public string chatPrefix = $"{ChatColors.Green}[MatchZy]{ChatColors.Default}";
@@ -1056,6 +1056,7 @@ namespace MatchZy
                                 Log($"[OnMapStart] Pending match re-load FAILED on {mapName}; resetting.");
                                 ResetMatch();
                             }
+                            FlushPendingLoadConnects(ok);
                             return;
                         }
 
