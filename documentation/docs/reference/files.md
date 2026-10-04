@@ -38,7 +38,11 @@ mp_weapons_allow_typecount 0
 ammo_grenade_limit_flashbang 0
 ```
 
-The file name is the mode cfg's name with `_override` added: `warmup`, `knife`, `live`, `live_wingman`, `scrim`, `hill`, `prac`, `dryrun` or `sleep`. MatchZy never writes these files, so they survive every update, and your mode cfgs can stay identical to the defaults. Every mode cfg sets the values it needs itself, so settings from `warmup_override.cfg` do not carry over into a live match.
+The file name is the mode cfg's name with `_override` added: `warmup`, `knife`, `live`, `live_wingman`, `scrim`, `hill`, `prac`, `dryrun` or `sleep`. MatchZy never writes these files, so they survive every update.
+
+- **Only the lines you change go in the override.** Leave the mode cfg (`warmup.cfg`) identical to the default, or delete it to get the current default back on the next restart. Do not copy the whole mode cfg into the override: that pins every value, and you would miss new defaults from later releases.
+- **Order:** the mode cfg runs first, then its override, then the `cvars` of a loaded match config. The match config wins.
+- **Carry-over:** a value set in an override stays until something sets it again. Most settings are set by every mode cfg, but not all. If you set a cvar in `warmup_override.cfg` that the next mode cfg does not set, it carries over into that mode. Check with `grep <cvar> defaults/*.cfg` and set it back in the next mode's override if needed. For example, do not put `mp_ignore_round_win_conditions 1` in `warmup_override.cfg`: `knife.cfg` does not reset it, so the knife round would never end.
 
 ## database.json
 
