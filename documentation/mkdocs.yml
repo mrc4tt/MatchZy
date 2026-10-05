@@ -59,6 +59,43 @@ extra_css:
 
 plugins:
   - search
+  # Danish next to English: a page "x.da.md" is the Danish version of "x.md". Pages without one
+  # are shown in English on the Danish site. The language switch in the header (extra.alternate)
+  # links to each language's start page: the plugin's per-page switch does not work with
+  # navigation.instant and fails the strict build.
+  - i18n:
+      docs_structure: suffix
+      fallback_to_default: true
+      reconfigure_material: false
+      reconfigure_search: true
+      languages:
+        - locale: en
+          default: true
+          name: English
+          build: true
+        - locale: da
+          name: Dansk
+          build: true
+          theme:
+            language: da
+          site_description: MatchZy-fork til CS2-servere - kampstyring, practice mode, coaching, live events og statistik på CounterStrikeSharp.
+          nav_translations:
+            Home: Forside
+            Getting started: Kom i gang
+            Installation: Installation
+            Updating: Opdatering
+            Guides: Guides
+            Game modes: Spiltyper
+            Running a match: Kør en kamp
+            Ready system: Ready-systemet
+            Pauses and backups: Pauser og backups
+            Admin menus: Admin-menuer
+            Demos (GOTV): Demoer (GOTV)
+            Stats and database: Statistik og database
+            Reference: Reference
+            Commands: Kommandoer
+            Configuration (convars): Konfiguration (convars)
+            Files and folders: Filer og mapper
 
 markdown_extensions:
   - abbr
@@ -94,6 +131,13 @@ markdown_extensions:
 
 extra:
   generator: false
+  alternate:
+    - name: English
+      link: /
+      lang: en
+    - name: Dansk
+      link: /da/
+      lang: da
   social:
     - icon: fontawesome/brands/github
       link: https://github.com/mrc4tt/MatchZy
