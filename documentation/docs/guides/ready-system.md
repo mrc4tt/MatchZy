@@ -18,7 +18,7 @@ Without a match config, the server only counts ready players:
 - `matchzy_minimum_ready_required` (or `.readyrequired <n>`) is how many players must be ready in total. `0` means everyone on the server.
 - `matchzy_ready_per_team <n>` changes it to `n` ready players on CT **and** `n` on T (`1` = one player per team).
 
-## Loaded matches: team sizes come from the match config
+## Loaded matches: team sizes come from the match config { #loaded-matches }
 
 When a match is loaded (`matchzy_loadmatch_url`, `matchzy_loadmatch` or `.matchsetup`), MatchZy reads the `players` list of `team1` and `team2` and counts the SteamID64s in it. That is the number of players each team needs on the server. You do not have to set anything for this.
 

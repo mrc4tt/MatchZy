@@ -93,7 +93,7 @@ Need the optional [CS2MenuManager](../getting-started/installation.md#requiremen
 
 ## Warmup and ready check
 
-Before a match goes live, players ready up. The match starts when enough players are ready (`matchzy_minimum_ready_required`).
+Before a match goes live, players ready up. How many must be ready is explained in the [Ready system](../guides/ready-system.md) guide.
 
 | Command | Who | What it does |
 |---|---|---|
@@ -206,11 +206,11 @@ More in [Coaching](../guides/coaching.md).
 | `.autopause` | Root | Turns autopause (pause when a team is short) on or off. |
 | `!autopause_minplayers <1-5>` | Root | Players a team needs before autopause kicks in. |
 | `!autopause_delay <0-30>` | Root | Seconds to wait before resuming once both teams are full again. |
+| `!autopause_status` / `!autopause_check` | Root | Shows the autopause settings / runs the check once now. |
 
 The `.restore` number is the count of rounds already played when the backup was taken.
 
 `.backups` outside a live match lists the 5 newest backup files on disk with a `!loadbackup` hint, handy after a server crash.
-| `!autopause_status` / `!autopause_check` | Root | Shows the autopause settings / runs the check once now. |
 
 ### Examples
 

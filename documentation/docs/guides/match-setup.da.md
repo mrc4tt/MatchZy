@@ -13,7 +13,7 @@ Der er tre måder at køre en kamp på, fra hurtig pug til fuldt styret turnerin
 
 === "Guide i spillet"
 
-    En admin skriver `.matchsetup` (kræver [CS2MenuManager](../getting-started/installation.md#krav)).
+    En admin skriver `.matchsetup` (kræver [CS2MenuManager](../getting-started/installation.md#requirements)).
     Guiden går igennem seriens længde (BO1, BO2, BO3, BO5), baner, veto og hold og loader derefter
     kampen præcis som en match config. Se [Admin-menuer](menus.md).
 
@@ -31,7 +31,7 @@ Der er tre måder at køre en kamp på, fra hurtig pug til fuldt styret turnerin
     kører, hvis det er sat op, og events sendes til din [remote log URL](events.md).
 
     Hvor mange spillere hvert hold skal have inde, før kampen kan starte, tælles automatisk ud
-    fra holdets `players`-liste. Se [Ready-systemet](ready-system.md#loadede-kampe).
+    fra holdets `players`-liste. Se [Ready-systemet](ready-system.md#loaded-matches).
 
 ## Serier og veto
 

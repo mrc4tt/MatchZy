@@ -11,7 +11,7 @@ MatchZy runs the server in one mode at a time. Admins switch with a chat command
 | **Dryrun** | `.dry` | No | Live-like rounds until stopped | 16000 | Running executes against bots or your team. |
 | **Sleep** | `.sleep` | - | - | - | Idle server with nothing loaded. |
 
-Every mode executes its own cfg from `cfg/MatchZy/` (`live.cfg`, `scrim.cfg`, `hill.cfg`, `prac.cfg`, `dryrun.cfg`, `sleep.cfg`, plus `warmup.cfg` and `knife.cfg`). Edit those files to change the rules.
+Every mode executes its own cfg from `cfg/MatchZy/` (`live.cfg`, `scrim.cfg`, `hill.cfg`, `prac.cfg`, `dryrun.cfg`, `sleep.cfg`, plus `warmup.cfg` and `knife.cfg`). Edit those files, or better a `<mode>_override.cfg`, to change the rules. See [Files and folders](../reference/files.md#server-specific-settings).
 
 ## Mode on startup
 

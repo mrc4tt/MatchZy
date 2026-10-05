@@ -1,6 +1,6 @@
 # Installation
 
-## Krav
+## Krav { #requirements }
 
 | Komponent | Påkrævet | Bemærkninger |
 |---|---|---|

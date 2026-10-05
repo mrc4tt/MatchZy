@@ -6,7 +6,7 @@
 |---|---|---|
 | `config.cfg` | `<cfg>` | Alle indstillinger. Laves første gang, og nye indstillinger tilføjes ved opdateringer. |
 | `warmup.cfg`, `knife.cfg`, `live.cfg`, `live_wingman.cfg`, `scrim.cfg`, `hill.cfg`, `prac.cfg`, `dryrun.cfg`, `sleep.cfg` | `<cfg>` | Køres, når den tilhørende fase eller mode starter. Skrives, hvis de mangler, og overskrives aldrig. |
-| `<mode>_override.cfg` (fx `warmup_override.cfg`, `live_override.cfg`) | `<cfg>` | Valgfri og oprettes af dig. Køres lige efter den tilhørende mode-fil, så dens værdier vinder. Se [Serverens egne indstillinger](#serverens-egne-indstillinger). |
+| `<mode>_override.cfg` (fx `warmup_override.cfg`, `live_override.cfg`) | `<cfg>` | Valgfri og oprettes af dig. Køres lige efter den tilhørende mode-fil, så dens værdier vinder. Se [Serverens egne indstillinger](#server-specific-settings). |
 | `defaults/*.cfg`, `defaults/database.json.example`, `defaults/README.txt` | `<cfg>` | Referencekopier af de nuværende standarder. Skrives forfra ved hver opstart og køres aldrig. Ret ikke i dem. |
 | `matchzymaps.cfg` | `<cfg>` | Baneliste til automatiske baneskift og `.matchsetup`-guiden. Én bane pr. linje, `#` til kommentarer, `workshop/<id>` til workshop-baner. |
 | `database.json` | `<cfg>` | Database. Se nedenfor. |
@@ -27,7 +27,7 @@
 - **`<mode>_override.cfg`**: indstillinger fra en loadet match config vinder stadig over både mode-filen og override-filen. MatchZy medbringer, opretter eller ændrer aldrig disse filer.
 - **`defaults/`**: MatchZy skriver disse filer forfra ved hver opstart. Sammenlign dine egne filer med dem efter en opdatering.
 
-## Serverens egne indstillinger
+## Serverens egne indstillinger { #server-specific-settings }
 
 For at ændre nogle få indstillinger i en mode, fx ingen flashbangs i warmup til en turnering, skal du kun skrive de linjer i `<mode>_override.cfg` ved siden af mode-filen:
 

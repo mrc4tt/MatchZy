@@ -19,9 +19,9 @@
     These are defaults. Both `config.cfg` and `live.cfg` can be edited to your needs:
 
     - `matchzy_overtime_pauses_per_team` goes in `config.cfg`.
-    - The `mp_team_timeout_*` lines go in `cfg/MatchZy/live.cfg` (it runs when the match goes live, so the same lines in `config.cfg` would be overridden), or per match in the match config's `cvars` block.
+    - The `mp_team_timeout_*` lines go in `cfg/MatchZy/live_override.cfg` (it runs right after `live.cfg` when the match goes live, so the same lines in `config.cfg` would be overridden), or per match in the match config's `cvars` block.
 
-    `live.cfg` is part of the release zip, so extracting an update over the server replaces it. Keep a copy of your edits. `config.cfg` is never replaced.
+    Updates never replace `config.cfg`, `live.cfg` or an override file. See [Updating](../getting-started/updating.md#keeping-your-own-changes).
 
 Autopause replaces the game's own `sv_matchpause_auto_5v5` and ignores bot teams. Every pause and unpause is sent as a `match_paused` / `match_unpaused` [event](../reference/events.md).
 

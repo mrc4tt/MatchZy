@@ -18,7 +18,7 @@ Uden match config tæller serveren kun klare spillere:
 - `matchzy_minimum_ready_required` (eller `.readyrequired <n>`) er, hvor mange spillere der i alt skal være klar. `0` betyder alle på serveren.
 - `matchzy_ready_per_team <n>` ændrer det til `n` klare spillere på CT **og** `n` på T (`1` = én spiller pr. hold).
 
-## Loadede kampe: holdstørrelsen kommer fra match configen { #loadede-kampe }
+## Loadede kampe: holdstørrelsen kommer fra match configen { #loaded-matches }
 
 Når en kamp er loadet (`matchzy_loadmatch_url`, `matchzy_loadmatch` eller `.matchsetup`), læser MatchZy `players`-listen for `team1` og `team2` og tæller SteamID64'erne i den. Det tal er, hvor mange spillere hvert hold skal have på serveren. Du skal ikke sætte noget op for det.
 

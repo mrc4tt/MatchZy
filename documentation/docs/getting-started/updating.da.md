@@ -9,7 +9,7 @@ Release-zippen indeholder intet under `cfg/`. En opdatering overskriver derfor a
 | `config.cfg` | Ikke i zippen. Nye indstillinger **tilføjes** nederst i din fil; dine egne ændringer røres aldrig. Se nedenfor. |
 | `database.json` | Ikke i zippen, så dit MySQL-login bevares. En referencekopi ligger i `cfg/MatchZy/defaults/database.json.example`. |
 | `live.cfg`, `scrim.cfg`, `prac.cfg`, ... | Ikke i zippen og røres aldrig. De skrives kun, hvis de mangler. Se nedenfor. |
-| `<mode>_override.cfg` | Ikke i zippen og skrives aldrig af MatchZy. Det sikreste sted til dine egne ændringer af en mode. Se [Serverens egne indstillinger](../reference/files.md#serverens-egne-indstillinger). |
+| `<mode>_override.cfg` | Ikke i zippen og skrives aldrig af MatchZy. Det sikreste sted til dine egne ændringer af en mode. Se [Serverens egne indstillinger](../reference/files.md#server-specific-settings). |
 | `savednades.json`, `botpositions.json`, `whitelist.cfg`, `admins.json` | Ikke i zippen og røres aldrig. |
 | `defaults/` | Skrives forfra ved hver opstart. Referencekopier af de nuværende standard-cfg'er, som aldrig køres. Ret ikke i dem; dine ændringer ville gå tabt. |
 | `gamedata/matchzy.json` | Erstattes. Læg den altid på serveren sammen med pluginet. |
@@ -20,7 +20,7 @@ Release-zippen indeholder intet under `cfg/`. En opdatering overskriver derfor a
 !!! warning "Efter en CS2-opdatering"
     Valve-opdateringer kan flytte de native signaturer i `gamedata/matchzy.json`. Holder practice-rethrows, `.breakrestore` eller `.t`/`.ct` fra spectator op med at virke efter en spilopdatering, så opdater til den nyeste MatchZy-release. Manglende eller forældede signaturer slår kun den berørte funktion fra; de crasher aldrig serveren. Se [Gamedata](gamedata.md).
 
-## Behold dine egne ændringer
+## Behold dine egne ændringer { #keeping-your-own-changes }
 
 Ændringer i `warmup.cfg`, `live.cfg` og de andre mode-filer overlever alle opdateringer. Ulempen: når en release ændrer en standardværdi i en af de filer, får en server med sin egen rettede kopi ikke den nye standard.
 
@@ -36,6 +36,6 @@ ammo_grenade_limit_flashbang 0
 mp_respawn_immunitytime 5
 ```
 
-Når dine ændringer ligger i override-filen, kan du slette `warmup.cfg` for at få de nuværende standarder ved næste genstart, uden at miste dine ændringer. Se [Serverens egne indstillinger](../reference/files.md#serverens-egne-indstillinger).
+Når dine ændringer ligger i override-filen, kan du slette `warmup.cfg` for at få de nuværende standarder ved næste genstart, uden at miste dine ændringer. Se [Serverens egne indstillinger](../reference/files.md#server-specific-settings).
 
 Tjek [changelog'en](../changelog.md) for ting, der kræver handling før en opdatering.
