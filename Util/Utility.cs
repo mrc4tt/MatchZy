@@ -640,7 +640,7 @@ namespace MatchZy
             string line1 = Localizer.ForPlayer(player, "matchzy.hint.waitingforplayers", _rpReady, _rpTotal);
             string line2 = Localizer.ForPlayer(player, "matchzy.hint.usereadycommand");
             if (ShortHandedSide(player.TeamNum) is (int shortPresent, int shortRequired))
-                line2 += "\n" + Localizer.ForPlayer(player, "matchzy.ready.shorthanded", shortPresent, shortRequired);
+                line2 += "\n" + Localizer.ForPlayer(player, "matchzy.ready.shorthanded", shortPresent, shortRequired, shortRequired - shortPresent);
             return _rpWaiting.Length > 0
                 ? $"{line1}\n{line2}\n{Localizer.ForPlayer(player, "matchzy.hint.notready", _rpWaiting)}"
                 : $"{line1}\n{line2}";
@@ -897,9 +897,6 @@ namespace MatchZy
                     int ctOf = _rpCtNeed > 0 ? _rpCtNeed : _rpCtCount;
                     int tOf = _rpTNeed > 0 ? _rpTNeed : _rpTCount;
                     sb.Append($"<font class='fontSize-sm' color='#9ecbff'>CT {_rpCtReady}/{ctOf}</font><font class='fontSize-sm' color='#ffffff'> &nbsp; </font><font class='fontSize-sm' color='#ffb36b'>T {_rpTReady}/{tOf}</font>");
-                    // Short-handed team (a rostered player missing): say how to start without them.
-                    if (ShortHandedSide(target.TeamNum) is (int shortPresent, int shortRequired))
-                        sb.Append($"<br><font class='fontSize-sm' color='#ffcf3f'>{PanelSafe(Localizer.ForPlayer(target, "matchzy.ready.shorthanded", shortPresent, shortRequired))}</font>");
 
                     // Self-status (YOU ARE (NOT) READY) is the most important line, so render it
                     // BEFORE the "waiting on" list. CS2's center-HTML panel has a size cap and drops
@@ -915,6 +912,11 @@ namespace MatchZy
                         else
                             sb.Append("<br><font class='fontSize-m' color='#ff3b3b'>&nbsp;</font>"); // blink off-frame: keep height
                     }
+
+                    // Short-handed team (a rostered player missing): wait, or start without them. After
+                    // the self-status so the panel's size cap can only drop this and the list below.
+                    if (ShortHandedSide(target.TeamNum) is (int shortPresent, int shortRequired))
+                        sb.Append($"<br><font class='fontSize-sm' color='#ffcf3f'>{PanelSafe(Localizer.ForPlayer(target, "matchzy.ready.shorthanded", shortPresent, shortRequired, shortRequired - shortPresent))}</font>");
 
                     if (_rpWaiting.Length > 0)
                         sb.Append($"<br><font class='fontSize-sm' color='#9a9a9a'>{PanelSafe(Localizer.ForPlayer(target, "matchzy.ready.waitingon", _rpWaiting))}</font>");

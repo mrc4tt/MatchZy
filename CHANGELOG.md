@@ -2,6 +2,12 @@
 
 Based on [MatchZy](https://github.com/shobhit-pathak/MatchZy) by Shobhit Pathak, adapted for CS2 game-server hosting: remote log HTTP API, G5API compatibility, auto changelevel, advanced stats (HLTV 2.0 rating / KAST / clutch / opening duels), a coach system, a pause overhaul, and in-game admin and match-setup menus.
 
+# 1.0.5
+
+#### October 5, 2026
+
+- The ready panel and the center ready text now say the short-handed team is still waiting for its missing players, or can use `.forceready` to start without them, instead of only telling them to type `.forceready`. If the missing player joins, `.ready` is enough as usual.
+
 # 1.0.4
 
 #### October 5, 2026

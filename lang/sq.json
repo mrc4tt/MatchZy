@@ -210,7 +210,7 @@
     "matchzy.ready.mode": "Modaliteti: {0}",
     "matchzy.ready.youready": "Ju jeni GATI",
     "matchzy.ready.notready": "NUK JENI GATI - shkruani .ready",
-    "matchzy.ready.shorthanded": "Ekipi juaj: {0}/{1} lojtarë. Shkruani .forceready për të luajtur me {0}.",
+    "matchzy.ready.shorthanded": "Ekipi {0}/{1}: prit ose .forceready",
     "matchzy.ready.shorthandedchat": "Ekipi juaj ka {green}{0}/{1}{default} lojtarë. Ndeshja pret edhe {2}, ose shkruani {green}.forceready{default} për të luajtur me {0}.",
     "matchzy.ready.waitingon": "Duke pritur: {0}",
     "matchzy.ah.title": "=== Udhëzuesi i Komandave të Admin MatchZy ===",

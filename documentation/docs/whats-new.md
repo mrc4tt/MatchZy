@@ -2,6 +2,10 @@
 
 A short summary of each release. The [full changelog](changelog.md) has the details and background for every change.
 
+## 1.0.5 <small>October 5, 2026</small>
+
+- **Changed:** The ready panel tells a short-handed team it is waiting for the missing player, or can `.forceready`; `.forceready` is optional.
+
 ## 1.0.4 <small>October 5, 2026</small>
 
 - **Fixed:** A setting missing from an older mode cfg no longer keeps the previous mode's value. Each mode starts from MatchZy's built-in default; your cfgs, overrides and match config still win. Fixes no buying in the match after `mp_weapons_allow_typecount 0` in `warmup_override.cfg`.
