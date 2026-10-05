@@ -49,7 +49,14 @@ public partial class MatchZy
             (int sidePlayers, int sideReady) = GetTeamPlayerCount(team, false);
             // .forceready readies everyone on the side, so honor it even when the side has fewer
             // than N players (otherwise a short-handed team could never start the match).
-            return sidePlayers > 0 && (sideReady >= perTeam || IsTeamForcedReady((CsTeam)team));
+            if (sidePlayers > 0 && IsTeamForcedReady((CsTeam)team))
+                return true;
+            // Loaded match: N ready players only confirm for the team; its registered players
+            // (roster size, at most players_per_team) must still all be on the side, so the match
+            // cannot start while one of them is missing. A pug has no roster and only needs N.
+            if (isMatchSetup && sidePlayers < RequiredPlayersOnSide(team))
+                return false;
+            return sidePlayers > 0 && sideReady >= perTeam;
         }
 
         int minPlayers = GetPlayersPerTeam(team);
@@ -118,18 +125,18 @@ public partial class MatchZy
         return steamIds.Count(id => !ulong.TryParse(id, out ulong steamId) || !LookupRosterEntry(team.teamCoaches, steamId));
     }
 
-    // A side that is waiting for a player who has not joined, but has enough players to start
-    // with .forceready. Null otherwise (complete, ready, or too few for .forceready). Not used in
-    // join ready mode or with matchzy_ready_per_team, where .ready does not decide.
+    // A side that is still waiting for registered players who have not joined. Null otherwise
+    // (complete, ready, nobody on it). Not used in join ready mode, which has its own countdown.
+    // Only informs: the hint does not push .forceready, which stays available to teams that know it.
     private (int Present, int Required)? ShortHandedSide(int side)
     {
-        if (!isMatchSetup || !readyAvailable || matchStarted || !allowForceReady || IsJoinReadyMode() || readyPerTeam.Value > 0)
+        if (!isMatchSetup || !readyAvailable || matchStarted || IsJoinReadyMode())
             return null;
         if (side != (int)CsTeam.CounterTerrorist && side != (int)CsTeam.Terrorist)
             return null;
         int required = RequiredPlayersOnSide(side);
         (int present, _) = GetTeamPlayerCount(side, false);
-        if (present <= 0 || present >= required || present < ForceReadyMinimum(side) || IsTeamReady(side))
+        if (present <= 0 || present >= required || IsTeamReady(side))
             return null;
         return (present, required);
     }

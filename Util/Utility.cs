@@ -507,7 +507,10 @@ namespace MatchZy
             {
                 // Per-team ready-up: progress is N per side, extra ready players on one side do not
                 // count towards the other.
-                _rpReady = Math.Min(_rpCtReady, perTeam) + Math.Min(_rpTReady, perTeam);
+                // A side only counts as complete once it is ready: in a loaded match that also
+                // needs its registered players on the side, so N typed .ready can still be short.
+                _rpReady = (IsTeamReady((int)CsTeam.CounterTerrorist) ? perTeam : Math.Min(_rpCtReady, perTeam - 1))
+                    + (IsTeamReady((int)CsTeam.Terrorist) ? perTeam : Math.Min(_rpTReady, perTeam - 1));
                 _rpRequired = perTeam * 2;
                 _rpCtNeed = _rpTNeed = 0;
             }
@@ -912,7 +915,7 @@ namespace MatchZy
                             sb.Append("<br><font class='fontSize-m' color='#ff3b3b'>&nbsp;</font>"); // blink off-frame: keep height
                     }
 
-                    // Short-handed team (a rostered player missing): wait, or start without them. After
+                    // A registered player is missing: how many. After
                     // the self-status so the panel's size cap can only drop this and the list below.
                     if (ShortHandedSide(target.TeamNum) is (int shortPresent, int shortRequired))
                         sb.Append($"<br><font class='fontSize-sm' color='#ffcf3f'>{PanelSafe(Localizer.ForPlayer(target, "matchzy.ready.shorthanded", shortPresent, shortRequired, shortRequired - shortPresent))}</font>");

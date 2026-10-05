@@ -2,6 +2,13 @@
 
 Based on [MatchZy](https://github.com/shobhit-pathak/MatchZy) by Shobhit Pathak, adapted for CS2 game-server hosting: remote log HTTP API, G5API compatibility, auto changelevel, advanced stats (HLTV 2.0 rating / KAST / clutch / opening duels), a coach system, a pause overhaul, and in-game admin and match-setup menus.
 
+# 1.0.7
+
+#### October 5, 2026
+
+- `matchzy_ready_per_team` in a loaded match now also waits for the team's registered players: a team is ready once N of its players typed `.ready` and all players in its roster (at most `players_per_team`) are on the server. Before, one `.ready` with `matchzy_ready_per_team 1` started the match while teammates were still missing. A team can still start without a missing player with `.forceready`. Pugs without a match config are unchanged.
+- A team waiting for registered players is told in chat and on the ready panel how many are missing (for example `Team 3/4: 1 missing`), in every ready mode. The hint no longer suggests `.forceready`, which stays available but optional.
+
 # 1.0.6
 
 #### October 5, 2026

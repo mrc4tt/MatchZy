@@ -2,6 +2,11 @@
 
 A short summary of each release. The [full changelog](changelog.md) has the details and background for every change.
 
+## 1.0.7 <small>October 5, 2026</small>
+
+- **Changed:** `matchzy_ready_per_team` in a loaded match waits until each team's registered players are all in; one `.ready` no longer starts the match with players missing. `.forceready` still starts without a missing player.
+- **Changed:** The missing-player hint only says how many are missing; it no longer suggests `.forceready`.
+
 ## 1.0.6 <small>October 5, 2026</small>
 
 - **Changed:** No `.scrim` / `.prac` / `.knife` hints with `matchzy_kick_when_no_match_loaded` on.

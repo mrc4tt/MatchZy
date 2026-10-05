@@ -32,7 +32,7 @@ Legend: **cfg** = present in the generated `config.cfg`.
 |---|---|---|---|
 | `matchzy_warmup_enabled` | `true` | Y | Use warmup (execute `warmup.cfg`) before a match. |
 | `matchzy_minimum_ready_required` | `10` | Y | Ready players needed to start. `0` = every connected player. Also `.readyrequired <n>`. |
-| `matchzy_ready_per_team` | `0` | Y | Per-team ready-up: a team is ready once `N` of its players are ready. `0` = off. |
+| `matchzy_ready_per_team` | `0` | Y | Per-team ready-up: a team is ready once `N` of its players are ready. In a loaded match its registered players must also all be in. `0` = off. |
 | `matchzy_allow_force_ready` | `true` | Y | Allow `.forceready` (match setup only). Alias `get5_allow_force_ready`. |
 | `matchzy_forceready_max_missing` | `1` | Y | Loaded matches: how many players a team may be short of `players_per_team` and still use `.forceready` (`1` = 4 in a 5v5). `min_players_to_ready` can only make it stricter. `-1` = only `min_players_to_ready` decides (Get5). |
 | `matchzy_ready_hint_style` | `0` | Y | `0` classic center text, `1` HTML ready-up panel, `2` chat reminder only. |
@@ -42,7 +42,7 @@ Legend: **cfg** = present in the generated `config.cfg`.
 | `matchzy_team_clantag_enabled` | `false` | Y | While live, show each team's `tag` from the match config as the players' clan tag. Off: live clan tags stay empty. |
 | `matchzy_ready_up_by_ping` | `true` | Y | Pinging (middle mouse) toggles ready. |
 
-- **`matchzy_ready_per_team`**: the match starts when CT and T are both ready (`1` = one player per team). Works with and without a loaded match.
+- **`matchzy_ready_per_team`**: the match starts when CT and T are both ready (`1` = one player per team). Works with and without a loaded match. In a loaded match, `N` ready players only confirm for their team: the team's registered players (its roster in the match config, at most `players_per_team`) must also all be on the server, so the match does not start while one of them is missing. A team that wants to start without a missing player uses `.forceready`.
 - **`matchzy_ready_hint_style`**: `1` shows a progress bar, the team split and your own status, and hides the native warmup banner. `2` shows no center text; a chat reminder lists the players who are not ready every `matchzy_chat_messages_timer_delay` seconds, and the native warmup banner is hidden as well.
 
 ## Knife, sides and team names
