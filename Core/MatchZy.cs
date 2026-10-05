@@ -16,7 +16,7 @@ namespace MatchZy
     public partial class MatchZy : BasePlugin
     {
         public override string ModuleName => "MatchZy";
-        public override string ModuleVersion => "1.0.5";
+        public override string ModuleVersion => "1.0.6";
         public override string ModuleAuthor => "Miksen/mrc4tt (based on MatchZy by WD-)";
         public override string ModuleDescription => "A plugin for running and managing CS2 practice/pugs/scrims/matches!";
         public string chatPrefix = $"{ChatColors.Green}[MatchZy]{ChatColors.Default}";
@@ -344,7 +344,8 @@ namespace MatchZy
                 // dir was e.g. "MatchZy" → execifexists skipped → config.cfg (demo_path etc.) ignored.
                 var matchzyCfgDir = configManager.GetMatchZyCfgDir();
                 var cfgFolderName = Path.GetFileName(matchzyCfgDir.TrimEnd('/'));
-                Log($"[ConfigDir] Using csgo/cfg/{cfgFolderName} for all MatchZy config files.");
+                // One startup line instead of one per step; warnings and errors still log on their own.
+                Log($"MatchZy {ModuleVersion} loaded | config: csgo/cfg/{cfgFolderName} | maps: {mapRotationList.Count} | admins: {loadedAdmins.Count}");
                 var configPath = Path.Combine(matchzyCfgDir, ConfigFiles.Paths.Config);
                 if (File.Exists(configPath))
                 {

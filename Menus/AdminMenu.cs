@@ -51,12 +51,15 @@ namespace MatchZy
                 try
                 {
                     TouchMenuTypes();
-                    Log("[Menu] CS2MenuManager assembly warmed up (background)");
+                }
+                catch (Exception e) when (e is System.IO.FileNotFoundException or System.IO.FileLoadException or TypeLoadException)
+                {
+                    // Optional dependency not installed: say what that means instead of the exception name.
+                    Log("CS2MenuManager is not installed: the in-game menus (.matchadmin, .matchsetup, ...) are off. Everything else works.");
                 }
                 catch (Exception e)
                 {
-                    // Not installed (or failed to load) - menus will report it on first open as usual.
-                    Log($"[Menu] warmup skipped: {e.GetType().Name}");
+                    Log($"[Menu] CS2MenuManager failed to load: {e.GetType().Name}: {e.Message}");
                 }
             });
         }

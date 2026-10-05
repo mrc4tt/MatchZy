@@ -268,7 +268,6 @@ namespace MatchZy
                     }
                 }
 
-                Log($"[LoadAdmins] Loaded {loadedAdmins.Count} admin(s).");
             }
             catch (Exception e)
             {

@@ -37,7 +37,7 @@ Legend: **cfg** = present in the generated `config.cfg`.
 | `matchzy_forceready_max_missing` | `1` | Y | Loaded matches: how many players a team may be short of `players_per_team` and still use `.forceready` (`1` = 4 in a 5v5). `min_players_to_ready` can only make it stricter. `-1` = only `min_players_to_ready` decides (Get5). |
 | `matchzy_ready_hint_style` | `0` | Y | `0` classic center text, `1` HTML ready-up panel, `2` chat reminder only. |
 | `matchzy_ready_hint_blink` | `false` | Y | Blink the "NOT READY" line on the HTML panel. |
-| `matchzy_loaded_match_hide_mode_hints` | `true` | Y | In a match loaded from a match config, joining players only see the ready-up hint (no `.scrim` / `.prac` / `.knife` hints or admin help line). |
+| `matchzy_loaded_match_hide_mode_hints` | `true` | Y | In a match loaded from a match config, joining players only see the ready-up hint (no `.scrim` / `.prac` / `.knife` hints or admin help line). With `matchzy_kick_when_no_match_loaded` on, the mode hints are never shown. |
 | `matchzy_ready_clantag_enabled` | `true` | Y | Show `[READY]` / `[UNREADY]` scoreboard clan tags. Not shown in join ready mode (`matchzy_ready_mode 1`). |
 | `matchzy_team_clantag_enabled` | `false` | Y | While live, show each team's `tag` from the match config as the players' clan tag. Off: live clan tags stay empty. |
 | `matchzy_ready_up_by_ping` | `true` | Y | Pinging (middle mouse) toggles ready. |

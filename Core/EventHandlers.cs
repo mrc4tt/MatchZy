@@ -97,7 +97,9 @@ public partial class MatchZy
                     // did the same to scrim/hill and to an admin's .knife off.
                     // In a match loaded from a match config the mode hints (.scrim / .prac / .knife)
                     // do not apply; matchzy_loaded_match_hide_mode_hints keeps only the ready hint.
-                    bool hideModeHints = IsMatchLoadedOrPending() && loadedMatchHideModeHints.Value;
+                    // Also on a match-only server (matchzy_kick_when_no_match_loaded): .scrim / .prac
+                    // are not how that server is used, and only admins get in before a match loads.
+                    bool hideModeHints = (IsMatchLoadedOrPending() && loadedMatchHideModeHints.Value) || matchModeOnly;
                     if (!hideModeHints)
                         PrintToPlayerChat(player, Localizer.ForPlayer(player, "matchzy.eh.warmup"));
                     PrintToPlayerChat(player, Localizer.ForPlayer(player, "matchzy.eh.start"));

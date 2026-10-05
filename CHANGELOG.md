@@ -2,6 +2,14 @@
 
 Based on [MatchZy](https://github.com/shobhit-pathak/MatchZy) by Shobhit Pathak, adapted for CS2 game-server hosting: remote log HTTP API, G5API compatibility, auto changelevel, advanced stats (HLTV 2.0 rating / KAST / clutch / opening duels), a coach system, a pause overhaul, and in-game admin and match-setup menus.
 
+# 1.0.6
+
+#### October 5, 2026
+
+- With `matchzy_kick_when_no_match_loaded` on, a joining player no longer sees the mode hints (`.scrim`, `.prac`, `.knife`) in warmup, also before a match is loaded. Such a server only plays loaded matches.
+- Shorter console output on load: one line with the MatchZy version, config folder, map count and admin count, and one with the database type, instead of a line per step. Warnings and errors are logged as before.
+- When CS2MenuManager is not installed, the console now says that the in-game menus (`.matchadmin`, `.matchsetup`, ...) are off, instead of `[Menu] warmup skipped: FileNotFoundException`.
+
 # 1.0.5
 
 #### October 5, 2026

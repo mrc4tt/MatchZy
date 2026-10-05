@@ -104,7 +104,7 @@ namespace MatchZy
 
                 // Log the actual connection type being used
                 string dbType = (conn is SqliteConnection) ? "SQLite" : "MySQL";
-                Log($"[InitializeDatabase] Using {dbType} database");
+                Log($"Database: {dbType}");
 
                 // Create the `matchzy_stats_matches`, `matchzy_stats_players` and `matchzy_stats_maps` tables if they doesn't exist
                 if (conn is SqliteConnection)
@@ -219,7 +219,6 @@ namespace MatchZy
                     // two writers can briefly contend on the file lock.
                     _connectionString = $"Data Source={Path.Join(directory, "matchzy.db")};Default Timeout=30";
                     databaseType = DatabaseType.SQLite;
-                    Log("[ConnectDatabase] SQLite connection string configured");
                 }
             }
             catch (Exception ex)
@@ -1136,12 +1135,10 @@ namespace MatchZy
                 if (config != null && config.DatabaseType?.Trim().ToLower() == "sqlite")
                 {
                     databaseType = DatabaseType.SQLite;
-                    Log($"[SetDatabaseConfig] Database type set to: SQLite (from database.json)");
                 }
                 else if (config != null && config.DatabaseType?.Trim().ToLower() == "mysql")
                 {
                     databaseType = DatabaseType.MySQL;
-                    Log($"[SetDatabaseConfig] Database type set to: MySQL (from database.json)");
                 }
                 else
                 {

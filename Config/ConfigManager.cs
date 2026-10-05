@@ -508,7 +508,6 @@ de_ancient
 
                         maps.Add(trimmed);
                     }
-                    Console.WriteLine($"[MatchZy] Loaded {maps.Count} maps from map rotation");
                 }
                 else
                 {

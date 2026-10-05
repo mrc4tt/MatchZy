@@ -2,6 +2,11 @@
 
 A short summary of each release. The [full changelog](changelog.md) has the details and background for every change.
 
+## 1.0.6 <small>October 5, 2026</small>
+
+- **Changed:** No `.scrim` / `.prac` / `.knife` hints with `matchzy_kick_when_no_match_loaded` on.
+- **Changed:** Shorter console output on load, with the MatchZy version; a clear message when CS2MenuManager is missing.
+
 ## 1.0.5 <small>October 5, 2026</small>
 
 - **Changed:** The ready panel tells a short-handed team it is waiting for the missing player, or can `.forceready`; `.forceready` is optional.
