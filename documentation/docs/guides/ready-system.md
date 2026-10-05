@@ -7,7 +7,8 @@ In match, scrim and hill mode the server waits in warmup until enough players ar
 - `matchzy_ready_mode 1` (loaded matches): nobody types `.ready`. A team is ready once `min_players_to_ready` of its players are on its side, and the match starts `matchzy_join_start_delay` seconds after everyone has joined (someone leaving stops the countdown).
 - `matchzy_ready_per_team <n>` makes it per team instead: the match starts once `n` players on CT and `n` on T are ready (`1` = one player per team). In a loaded match it replaces the rule that every player must ready up.
 - `.readycheck` shows who is missing.
-- With a match config, `.forceready` readies a whole team once it has enough players.
+- With a match config, a team needs `players_per_team` ready players, or fewer when its roster lists fewer: a team registered with 4 players in a 5v5 is ready once those 4 have typed `.ready`. A sixth player still cannot join the side.
+- With a match config, `.forceready` readies a whole team when a registered player does not show up. By default a team may be at most one player short (4 in a 5v5, `matchzy_forceready_max_missing`), whatever `min_players_to_ready` says; a higher `min_players_to_ready` makes it stricter. Such a team is told in chat (and on the ready panel) how many are missing and that `.forceready` starts without them.
 - Coaches do not count and do not need to ready.
 - Admins can skip it all with `.start`.
 

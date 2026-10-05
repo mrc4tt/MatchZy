@@ -210,6 +210,8 @@
     "matchzy.ready.mode": "Tilstand: {0}",
     "matchzy.ready.youready": "Du er KLAR",
     "matchzy.ready.notready": "DU ER IKKE KLAR - skriv .ready",
+    "matchzy.ready.shorthanded": "Dit hold: {0}/{1} spillere. Skriv .forceready for at spille som {0}.",
+    "matchzy.ready.shorthandedchat": "Dit hold har {green}{0}/{1}{default} spillere. Kampen venter på {2} mere, eller skriv {green}.forceready{default} for at spille som {0}.",
     "matchzy.ready.waitingon": "Venter på: {0}",
     "matchzy.ah.title": "=== MatchZy Admin Kommandobetjeningsvejledning ===",
     "matchzy.ah.checkconsole": "Se konsol for den fulde kommandoliste",

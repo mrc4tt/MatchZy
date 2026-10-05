@@ -92,6 +92,9 @@ namespace MatchZy
             }
         }
 
+        // Last short-handed hint per side after .ready, so a team readying up one by one is told once.
+        private readonly Dictionary<int, DateTime> shortHandedHintAt = new();
+
         [ConsoleCommand("css_gaben", "Marks the player ready")]
         [ConsoleCommand("css_ready", "Marks the player ready")]
         public void OnPlayerReady(CCSPlayerController? player, CommandInfo? command)
@@ -124,6 +127,13 @@ namespace MatchZy
                         {
                             string teamName = team == 3 ? "CT" : "Terrorists";
                             PrintLocalizedToAll("matchzy.cmd.teamready", teamName);
+                        }
+                        else if (ShortHandedSide(team) != null
+                            && (!shortHandedHintAt.TryGetValue(team, out DateTime last) || DateTime.UtcNow - last > TimeSpan.FromSeconds(15)))
+                        {
+                            // Everyone here may be ready while a rostered player is missing: say so.
+                            shortHandedHintAt[team] = DateTime.UtcNow;
+                            SendShortHandedHints(team);
                         }
                     }
 

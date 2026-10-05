@@ -349,10 +349,30 @@ namespace MatchZy
                     PrintLocalizedToAll("matchzy.utility.minimumreadyplayers", minimumReadyRequired, countOfReadyPlayers);
                 }
             }
+            SendShortHandedHints();
         }
 
         // Arms the style-2 chat reminder while it is selected, and stops it otherwise. Called from
         // the 1 s ready timer, so changing matchzy_ready_hint_style mid-warmup takes effect at once.
+        // Chat line to the players of a short-handed side (see ShortHandedSide): how many are
+        // missing and that .forceready starts without them. side = null: both sides.
+        private void SendShortHandedHints(int? onlySide = null)
+        {
+            foreach (int side in new[] { (int)CsTeam.CounterTerrorist, (int)CsTeam.Terrorist })
+            {
+                if (onlySide.HasValue && onlySide.Value != side)
+                    continue;
+                if (ShortHandedSide(side) is not (int present, int required))
+                    continue;
+                foreach (var p in Utilities.GetPlayers())
+                {
+                    if (p == null || !p.IsValid || p.IsBot || p.IsHLTV || p.TeamNum != side || IsMatchCoach(p))
+                        continue;
+                    PrintToPlayerChat(p, Localizer.ForPlayer(p, "matchzy.ready.shorthandedchat", present, required, required - present));
+                }
+            }
+        }
+
         private void SyncUnreadyChatReminder()
         {
             if (readyHintStyle.Value == 2 && readyAvailable && !matchStarted && !isDryRun)
@@ -417,6 +437,8 @@ namespace MatchZy
         // Cached ready-panel DATA (recomputed only on change). Localized HTML is built per
         // player each tick so every player sees the panel in their own language.
         private int _rpReady, _rpRequired, _rpTotal, _rpFilled, _rpCtCount, _rpCtReady, _rpTCount, _rpTReady;
+        // Loaded match: players each side needs (roster-sized), 0 otherwise.
+        private int _rpCtNeed, _rpTNeed;
         private string _rpWaiting = "";
         private uint _readyTickCounter;
         // Bumped every time ComputeReadyData actually recomputes. Everything the panel renders
@@ -488,9 +510,22 @@ namespace MatchZy
                 // count towards the other.
                 _rpReady = Math.Min(_rpCtReady, perTeam) + Math.Min(_rpTReady, perTeam);
                 _rpRequired = perTeam * 2;
+                _rpCtNeed = _rpTNeed = 0;
+            }
+            else if (isMatchSetup)
+            {
+                // Loaded match: what each team needs (players_per_team, or its roster size when
+                // smaller), not matchzy_minimum_ready_required, which is the pug total. A side
+                // that is ready (incl. .forceready) counts as complete.
+                _rpCtNeed = RequiredPlayersOnSide((int)CsTeam.CounterTerrorist);
+                _rpTNeed = RequiredPlayersOnSide((int)CsTeam.Terrorist);
+                _rpReady = (IsTeamReady((int)CsTeam.CounterTerrorist) ? _rpCtNeed : Math.Min(_rpCtReady, _rpCtNeed))
+                    + (IsTeamReady((int)CsTeam.Terrorist) ? _rpTNeed : Math.Min(_rpTReady, _rpTNeed));
+                _rpRequired = _rpCtNeed + _rpTNeed;
             }
             else
             {
+                _rpCtNeed = _rpTNeed = 0;
                 _rpReady = readyCount;
                 _rpRequired = minimumReadyRequired > 0 ? minimumReadyRequired : totalPlayers;
             }
@@ -604,6 +639,8 @@ namespace MatchZy
         {
             string line1 = Localizer.ForPlayer(player, "matchzy.hint.waitingforplayers", _rpReady, _rpTotal);
             string line2 = Localizer.ForPlayer(player, "matchzy.hint.usereadycommand");
+            if (ShortHandedSide(player.TeamNum) is (int shortPresent, int shortRequired))
+                line2 += "\n" + Localizer.ForPlayer(player, "matchzy.ready.shorthanded", shortPresent, shortRequired);
             return _rpWaiting.Length > 0
                 ? $"{line1}\n{line2}\n{Localizer.ForPlayer(player, "matchzy.hint.notready", _rpWaiting)}"
                 : $"{line1}\n{line2}";
@@ -856,7 +893,13 @@ namespace MatchZy
                     sb.Append($"<font class='fontSize-m' color='#ffcf3f'>{PanelSafe(Localizer.ForPlayer(target, "matchzy.ready.title"))}</font><br>");
                     sb.Append($"<font class='fontSize-sm' color='#c8c8c8'>{PanelSafe(Localizer.ForPlayer(target, "matchzy.ready.mode", mode))}</font><br>");
                     sb.Append($"{bar} <font class='fontSize-m' color='#ffffff'>{_rpReady} / {_rpRequired}</font><br>");
-                    sb.Append($"<font class='fontSize-sm' color='#9ecbff'>CT {_rpCtReady}/{_rpCtCount}</font><font class='fontSize-sm' color='#ffffff'> &nbsp; </font><font class='fontSize-sm' color='#ffb36b'>T {_rpTReady}/{_rpTCount}</font>");
+                    // Loaded match: ready / needed per side; otherwise ready / on the side.
+                    int ctOf = _rpCtNeed > 0 ? _rpCtNeed : _rpCtCount;
+                    int tOf = _rpTNeed > 0 ? _rpTNeed : _rpTCount;
+                    sb.Append($"<font class='fontSize-sm' color='#9ecbff'>CT {_rpCtReady}/{ctOf}</font><font class='fontSize-sm' color='#ffffff'> &nbsp; </font><font class='fontSize-sm' color='#ffb36b'>T {_rpTReady}/{tOf}</font>");
+                    // Short-handed team (a rostered player missing): say how to start without them.
+                    if (ShortHandedSide(target.TeamNum) is (int shortPresent, int shortRequired))
+                        sb.Append($"<br><font class='fontSize-sm' color='#ffcf3f'>{PanelSafe(Localizer.ForPlayer(target, "matchzy.ready.shorthanded", shortPresent, shortRequired))}</font>");
 
                     // Self-status (YOU ARE (NOT) READY) is the most important line, so render it
                     // BEFORE the "waiting on" list. CS2's center-HTML panel has a size cap and drops

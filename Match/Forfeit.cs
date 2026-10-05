@@ -38,6 +38,9 @@ namespace MatchZy
             // a team forced ready before the veto or on map 1 stayed forced on the next map.
             foreach (var team in teamReadyOverride.Keys.ToList())
                 teamReadyOverride[team] = false;
+            // The ready data depends on isMatchSetup (roster-sized team requirements), which a
+            // match load sets only after StartWarmup computed it.
+            _readyStatusDirty = true;
         }
 
         private void CheckForfeits()

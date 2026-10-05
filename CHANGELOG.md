@@ -4,11 +4,15 @@ Based on [MatchZy](https://github.com/shobhit-pathak/MatchZy) by Shobhit Pathak,
 
 # 1.0.4
 
-#### October 4, 2026
+#### October 5, 2026
 
 - Each mode now starts from MatchZy's built-in default for that mode, then runs your mode cfg and its `<mode>_override.cfg` as before. Settings your cfg leaves out (for example in an older `live.cfg`) no longer keep the value from the previous mode. Before, `mp_weapons_allow_typecount 0` in `warmup_override.cfg` carried into a `live.cfg` without that line, and nobody could buy in the match. Values set in your cfgs and overrides still win. Applies to warmup, knife, live, live_wingman, scrim, hill, dryrun and sleep; not to practice mode. Server-level settings (`sv_hibernate_when_empty`, `tv_relayvoice`, `sv_lan`, `sv_pure`, `sv_steamgroup_exclusive`, `sv_kick_ban_duration`, `sv_competitive_minspec`, `mp_logdetail`) are not filled in, so your server.cfg values stay. If you left a setting out of a mode cfg on purpose to keep an earlier value, set it in that mode's override.
 - The match config `cvars` are now applied after every mode cfg, also in warmup and the knife round, so they always win over the mode cfg and its override. Before, warmup.cfg and knife.cfg could overwrite them until the match went live.
 - `player_connect` is now also sent for players who join while a match load is changing the map.
+- 4v5 in loaded matches: a team whose roster in the match config lists fewer players than `players_per_team` now readies up with that many. A team registered with 4 players is ready once those 4 have typed `.ready`, without `.forceready`; a team of 5 still needs all 5. Coaches listed as players do not count; open (`"any"`) and bot rosters are unchanged.
+- New `matchzy_forceready_max_missing` (default `1`): `.forceready` needs at least `players_per_team` minus this many players, so by default a team may be at most one player short (4 in a 5v5). `min_players_to_ready` in the match config can only make it stricter; before, a match config with `min_players_to_ready 1` (common in panels) let a single player force-start the match. `-1` keeps the old rule (only `min_players_to_ready`).
+- A team that is waiting for a registered player who has not joined, but has enough players for `.forceready`, is told in chat and on the ready panel how many are missing and that `.forceready` starts without them.
+- The ready panel (`matchzy_ready_hint_style 1`) in a loaded match now counts towards what the teams need (for example `7 / 9` in a 4v5) and shows ready / needed per side, instead of using `matchzy_minimum_ready_required`.
 - With `matchzy_team_clantag_enabled` turned off during a live match, team tags are removed at each player's next spawn.
 
 # 1.0.3

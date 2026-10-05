@@ -34,6 +34,7 @@ Legend: **cfg** = present in the generated `config.cfg`.
 | `matchzy_minimum_ready_required` | `10` | Y | Ready players needed to start. `0` = every connected player. Also `.readyrequired <n>`. |
 | `matchzy_ready_per_team` | `0` | Y | Per-team ready-up: a team is ready once `N` of its players are ready. `0` = off. |
 | `matchzy_allow_force_ready` | `true` | Y | Allow `.forceready` (match setup only). Alias `get5_allow_force_ready`. |
+| `matchzy_forceready_max_missing` | `1` | Y | Loaded matches: how many players a team may be short of `players_per_team` and still use `.forceready` (`1` = 4 in a 5v5). `min_players_to_ready` can only make it stricter. `-1` = only `min_players_to_ready` decides (Get5). |
 | `matchzy_ready_hint_style` | `0` | Y | `0` classic center text, `1` HTML ready-up panel, `2` chat reminder only. |
 | `matchzy_ready_hint_blink` | `false` | Y | Blink the "NOT READY" line on the HTML panel. |
 | `matchzy_loaded_match_hide_mode_hints` | `true` | Y | In a match loaded from a match config, joining players only see the ready-up hint (no `.scrim` / `.prac` / `.knife` hints or admin help line). |

@@ -1,3 +1,4 @@
+using Newtonsoft.Json.Linq;
 using CounterStrikeSharp.API.Core;
 using CounterStrikeSharp.API.Core.Attributes.Registration;
 using CounterStrikeSharp.API.Core.Translations;
@@ -52,7 +53,7 @@ public partial class MatchZy
         }
 
         int minPlayers = GetPlayersPerTeam(team);
-        int minReady = GetTeamMinReady(team);
+        int minReady = ForceReadyMinimum(team);
         (int playerCount, int readyCount) = GetTeamPlayerCount(team, false);
 
         if (team == (int)CsTeam.Spectator && minReady == 0)
@@ -82,10 +83,69 @@ public partial class MatchZy
     public int GetPlayersPerTeam(int team)
     {
         if (team == (int)CsTeam.CounterTerrorist || team == (int)CsTeam.Terrorist)
-            return matchConfig.PlayersPerTeam;
+            return RequiredPlayersOnSide(team);
         if (team == (int)CsTeam.Spectator)
             return matchConfig.MinSpectatorsToReady;
         return 0;
+    }
+
+    // Players a side needs before .ready alone makes it ready: players_per_team, or fewer when the
+    // team on that side has fewer players in its match config roster. A team registered with 4
+    // players in a 5v5 then readies up as 4 without .forceready; a team of 5 still needs all 5.
+    // players_per_team stays the most a side can have. Coaches listed under "players" do not
+    // count, and open ("any") and bot rosters keep players_per_team.
+    private int RequiredPlayersOnSide(int side)
+    {
+        int perTeam = matchConfig.PlayersPerTeam;
+        if (!isMatchSetup || (side != (int)CsTeam.CounterTerrorist && side != (int)CsTeam.Terrorist))
+            return perTeam;
+        if (!reverseTeamSides.TryGetValue(side == (int)CsTeam.CounterTerrorist ? "CT" : "TERRORIST", out Team? team))
+            return perTeam;
+        int roster = RosterPlayerCount(team);
+        return roster > 0 ? Math.Min(perTeam, roster) : perTeam;
+    }
+
+    private static int RosterPlayerCount(Team team)
+    {
+        if (team.openRoster || team.botTeam || team.teamPlayers == null)
+            return 0;
+        IEnumerable<string> steamIds = team.teamPlayers switch
+        {
+            JObject rosterObject => rosterObject.Properties().Select(p => p.Name),
+            JArray rosterArray => rosterArray.Select(e => e.ToString()),
+            _ => Enumerable.Empty<string>(),
+        };
+        return steamIds.Count(id => !ulong.TryParse(id, out ulong steamId) || !LookupRosterEntry(team.teamCoaches, steamId));
+    }
+
+    // A side that is waiting for a player who has not joined, but has enough players to start
+    // with .forceready. Null otherwise (complete, ready, or too few for .forceready). Not used in
+    // join ready mode or with matchzy_ready_per_team, where .ready does not decide.
+    private (int Present, int Required)? ShortHandedSide(int side)
+    {
+        if (!isMatchSetup || !readyAvailable || matchStarted || !allowForceReady || IsJoinReadyMode() || readyPerTeam.Value > 0)
+            return null;
+        if (side != (int)CsTeam.CounterTerrorist && side != (int)CsTeam.Terrorist)
+            return null;
+        int required = RequiredPlayersOnSide(side);
+        (int present, _) = GetTeamPlayerCount(side, false);
+        if (present <= 0 || present >= required || present < ForceReadyMinimum(side) || IsTeamReady(side))
+            return null;
+        return (present, required);
+    }
+
+    // Players a side needs for .forceready: min_players_to_ready, but never fewer than
+    // players_per_team - matchzy_forceready_max_missing (default 1: at most one player short, so
+    // 4 in a 5v5). A match config value can only make it stricter. Panels often send
+    // min_players_to_ready 1 without meaning it, which let a single player force-start a 5v5.
+    // -1 = only min_players_to_ready (Get5's rule). Spectators keep min_spectators_to_ready.
+    private int ForceReadyMinimum(int side)
+    {
+        int minReady = GetTeamMinReady(side);
+        int maxMissing = forceReadyMaxMissing.Value;
+        if (maxMissing < 0 || (side != (int)CsTeam.CounterTerrorist && side != (int)CsTeam.Terrorist))
+            return minReady;
+        return Math.Max(minReady, Math.Max(1, matchConfig.PlayersPerTeam - maxMissing));
     }
 
     public int GetTeamMinReady(int team)
@@ -141,7 +201,7 @@ public partial class MatchZy
         if (!readyAvailable || !isMatchSetup || !allowForceReady || !IsPlayerValid(player))
             return;
 
-        int minReady = GetTeamMinReady(player!.TeamNum);
+        int minReady = ForceReadyMinimum(player!.TeamNum);
         (int playerCount, int readyCount) = GetTeamPlayerCount(player!.TeamNum, false);
 
         if (playerCount < minReady)

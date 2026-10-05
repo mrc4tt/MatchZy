@@ -2,9 +2,12 @@
 
 A short summary of each release. The [full changelog](changelog.md) has the details and background for every change.
 
-## 1.0.4 <small>October 4, 2026</small>
+## 1.0.4 <small>October 5, 2026</small>
 
 - **Fixed:** A setting missing from an older mode cfg no longer keeps the previous mode's value. Each mode starts from MatchZy's built-in default; your cfgs, overrides and match config still win. Fixes no buying in the match after `mp_weapons_allow_typecount 0` in `warmup_override.cfg`.
+- **New:** 4v5: a team registered with fewer players than `players_per_team` readies up with that many, no `.forceready` needed. A short-handed team is told in chat and on the ready panel that `.forceready` starts without the missing player.
+- **New:** `matchzy_forceready_max_missing` (default `1`): `.forceready` works with at most one player short (4 in a 5v5), even when the match config says `min_players_to_ready 1`.
+- **Fixed:** The ready panel in a loaded match counts towards what the teams need instead of `matchzy_minimum_ready_required`.
 
 ## 1.0.3 <small>October 4, 2026</small>
 

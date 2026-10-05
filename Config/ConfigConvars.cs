@@ -50,6 +50,7 @@ namespace MatchZy
 
         public FakeConVar<int> forfeitVetoReadyTimeout = new("matchzy_forfeit_veto_ready_timeout", "Like matchzy_forfeit_ready_timeout, for the ready-up before the map veto. -1 = same as matchzy_forfeit_ready_timeout, 0 = no limit. Get5 name: get5_time_to_start_veto. Default: -1", -1);
 
+        public FakeConVar<int> forceReadyMaxMissing = new("matchzy_forceready_max_missing", "Loaded matches: how many players a team may be short of players_per_team and still use .forceready (1 = at most one short, 4 in a 5v5). min_players_to_ready in the match config can only make it stricter. -1 = only min_players_to_ready decides (Get5). Default: 1", 1);
         public FakeConVar<int> readyMode = new("matchzy_ready_mode", "How teams get ready in a loaded match. 0 = players type .ready. 1 = join mode: a team is ready once min_players_to_ready of its players are on its side, and the match starts matchzy_join_start_delay seconds later. Default: 0", 0);
 
         public FakeConVar<int> joinStartDelay = new("matchzy_join_start_delay", "matchzy_ready_mode 1: seconds between everyone having joined and the match starting. Default: 10", 10);

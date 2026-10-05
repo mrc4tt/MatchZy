@@ -71,8 +71,8 @@ Prefer an in-game flow? Admins can build the same config with the [`.matchsetup`
 | `veto_first` | string | - | `team1`, `team2` or `random`: who starts a generated veto. |
 | `veto_mode` | string[] | generated | Veto order using `team1_ban`, `team2_ban`, `team1_pick`, `team2_pick`. Generated if omitted. |
 | `map_sides` | string[] | `knife` | Per map: `team1_ct`, `team1_t`, `team2_ct`, `team2_t` or `knife`. A fixed side means no knife round on that map. |
-| `players_per_team` | integer | `5` | Players per side at a time. Extra roster players (substitutes) wait on Spectator while their side is full. Also the number of bots on a bot team. |
-| `min_players_to_ready` | integer | `1` | Players a team needs before `.forceready` can ready the whole team, e.g. `4` lets a team of 4 start a 4v5. In join ready mode, the players a team needs on its side (default: `players_per_team`). |
+| `players_per_team` | integer | `5` | Players per side at a time. Extra roster players (substitutes) wait on Spectator while their side is full. Also the number of bots on a bot team. A team whose `players` roster has fewer players readies up with that many: 4 players listed in a 5v5 means the team is ready once those 4 have typed `.ready`, no `.forceready` needed. |
+| `min_players_to_ready` | integer | `1` | Players a team needs before `.forceready` can ready the whole team. Never fewer than `players_per_team` minus `matchzy_forceready_max_missing` (default: at most one player short, so 4 in a 5v5); a higher value here makes it stricter. In join ready mode, the players a team needs on its side (default: the team's roster size, at most `players_per_team`). |
 | `min_spectators_to_ready` | integer | `0` | Ready spectators needed. |
 | `spectators` | object | `{}` | `{ "players": { "<steamid64>": "<name>" } }`. |
 | `clinch_series` | bool | `true` | End the series once a team has won the majority of maps. |
