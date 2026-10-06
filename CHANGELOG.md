@@ -2,6 +2,12 @@
 
 Based on [MatchZy](https://github.com/shobhit-pathak/MatchZy) by Shobhit Pathak, adapted for CS2 game-server hosting: remote log HTTP API, G5API compatibility, auto changelevel, advanced stats (HLTV 2.0 rating / KAST / clutch / opening duels), a coach system, a pause overhaul, and in-game admin and match-setup menus.
 
+# 1.0.8
+
+#### October 6, 2026
+
+- Killing a coach at the end of freeze time (or moving a coach back to their team) no longer gives money to the other team. A suicide in CS2 pays a random enemy the kill reward, and the coach removal counted as one.
+
 # 1.0.7
 
 #### October 5, 2026

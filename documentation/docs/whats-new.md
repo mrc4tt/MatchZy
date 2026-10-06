@@ -2,6 +2,10 @@
 
 A short summary of each release. The [full changelog](changelog.md) has the details and background for every change.
 
+## 1.0.8 <small>October 6, 2026</small>
+
+- **Fixed:** The automatic coach kill at the end of freeze time no longer gives money to the other team.
+
 ## 1.0.7 <small>October 5, 2026</small>
 
 - **Changed:** `matchzy_ready_per_team` in a loaded match waits until each team's registered players are all in; one `.ready` no longer starts the match with players missing. `.forceready` still starts without a missing player.

@@ -1088,7 +1088,7 @@ public partial class MatchZy
             // first, like the practice side switch.
             if (playerController.PawnIsAlive)
             {
-                playerController.CommitSuicide(false, true);
+                WithCoachSuicideCashSuppressed(() => playerController.CommitSuicide(false, true));
                 Server.NextFrame(() =>
                 {
                     if (IsPlayerValid(playerController) && playerController.Team != oldTeam)
@@ -1104,6 +1104,46 @@ public partial class MatchZy
             playerController.InGameMoneyServices.Account = 0;
     }
 
+    /// <summary>
+    /// Runs a coach suicide with every suicide-related cash rule zeroed, then restores them.
+    /// A suicide in CS2 pays a random enemy the kill reward ("An enemy player was awarded
+    /// compensation for the suicide of ...", cash_player_killed_enemy_default * _factor), and the
+    /// short-handed side can also trigger cash_team_*_shorthanded. Without this every forced
+    /// coach suicide gifts the opposing team money. ConVar objects are written directly
+    /// (SetConvarValue): Server.ExecuteCommand queues to frame-end, after the inline suicide.
+    /// </summary>
+    private void WithCoachSuicideCashSuppressed(Action suicide)
+    {
+        string[] names =
+        {
+            "mp_suicide_penalty",
+            "cash_player_killed_enemy_default",
+            "cash_player_killed_enemy_factor",
+            "cash_team_bonus_shorthanded",
+            "cash_team_loser_bonus_shorthanded",
+            "spec_freeze_time",
+            "spec_freeze_time_lock",
+            "spec_freeze_deathanim_time",
+        };
+        var saved = new List<(ConVar? cvar, string value)>();
+        foreach (string name in names)
+        {
+            ConVar? cvar = ConVar.Find(name);
+            saved.Add((cvar, GetConvarStringValue(cvar)));
+            SetConvarValue(cvar, "0");
+        }
+        try
+        {
+            suicide();
+        }
+        finally
+        {
+            // Restore originals synchronously, even if a suicide threw.
+            foreach (var (cvar, value) in saved)
+                SetConvarValue(cvar, value);
+        }
+    }
+
     private void KillCoaches()
     {
         if (isPaused || IsTacticalTimeoutActive())
@@ -1111,37 +1151,7 @@ public partial class MatchZy
         HashSet<CCSPlayerController> coaches = GetAllCoaches();
         if (coaches.Count == 0)
             return;
-        // Capture the ConVar objects (not just their values) so we can mutate them
-        // synchronously. Server.ExecuteCommand queues to the command buffer and runs at
-        // frame-end, AFTER the CommitSuicide() calls below execute inline - so the old
-        // ExecuteCommand("mp_suicide_penalty 0") never took effect before the suicides and
-        // coaches still ate the suicide penalty. SetConvarValue writes the live cvar now.
-        ConVar? suicidePenaltyCvar = ConVar.Find("mp_suicide_penalty");
-        ConVar? specFreezeTimeCvar = ConVar.Find("spec_freeze_time");
-        ConVar? specFreezeTimeLockCvar = ConVar.Find("spec_freeze_time_lock");
-        ConVar? specFreezeDeathanimCvar = ConVar.Find("spec_freeze_deathanim_time");
-        // Coach suicide makes the side momentarily shorthanded, so the engine hands the
-        // opposing team "compensation" money ("An enemy player was awarded compensation for
-        // the suicide of <coach>"). Zero the shorthanded bonuses across the suicides so the
-        // coach removal never gifts the enemy economy, then restore them in finally.
-        ConVar? shorthandedBonusCvar = ConVar.Find("cash_team_bonus_shorthanded");
-        ConVar? shorthandedLoserBonusCvar = ConVar.Find("cash_team_loser_bonus_shorthanded");
-
-        string suicidePenalty = GetConvarStringValue(suicidePenaltyCvar);
-        string specFreezeTime = GetConvarStringValue(specFreezeTimeCvar);
-        string specFreezeTimeLock = GetConvarStringValue(specFreezeTimeLockCvar);
-        string specFreezeDeathanim = GetConvarStringValue(specFreezeDeathanimCvar);
-        string shorthandedBonus = GetConvarStringValue(shorthandedBonusCvar);
-        string shorthandedLoserBonus = GetConvarStringValue(shorthandedLoserBonusCvar);
-
-        SetConvarValue(suicidePenaltyCvar, "0");
-        SetConvarValue(specFreezeTimeCvar, "0");
-        SetConvarValue(specFreezeTimeLockCvar, "0");
-        SetConvarValue(specFreezeDeathanimCvar, "0");
-        SetConvarValue(shorthandedBonusCvar, "0");
-        SetConvarValue(shorthandedLoserBonusCvar, "0");
-
-        try
+        WithCoachSuicideCashSuppressed(() =>
         {
             foreach (var coach in coaches)
             {
@@ -1179,17 +1189,7 @@ public partial class MatchZy
                         Log($"[KillCoaches] WARNING: {coachRef.PlayerName} still alive after CommitSuicide");
                 });
             }
-        }
-        finally
-        {
-            // Restore originals synchronously, even if a suicide above threw.
-            SetConvarValue(suicidePenaltyCvar, suicidePenalty);
-            SetConvarValue(specFreezeTimeCvar, specFreezeTime);
-            SetConvarValue(specFreezeTimeLockCvar, specFreezeTimeLock);
-            SetConvarValue(specFreezeDeathanimCvar, specFreezeDeathanim);
-            SetConvarValue(shorthandedBonusCvar, shorthandedBonus);
-            SetConvarValue(shorthandedLoserBonusCvar, shorthandedLoserBonus);
-        }
+        });
     }
 
     /// <summary>
