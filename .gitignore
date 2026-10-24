@@ -12,3 +12,6 @@ documentation/site/
 *.bak
 *.bak.*
 tools/ship.sh
+
+# Release output (tools/package.sh)
+dist/

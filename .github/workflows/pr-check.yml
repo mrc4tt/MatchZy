@@ -1,6 +1,11 @@
 name: PR checks
+# Build and tests run on pull requests and on every push to main. Releases are never
+# made here: they are built and published locally.
 on:
   pull_request:
+    branches:
+      - main
+  push:
     branches:
       - main
 
@@ -11,6 +16,7 @@ jobs:
   # Checks that need no secrets, so they also run for pull requests from forks.
   lint:
     name: Lint
+    if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
