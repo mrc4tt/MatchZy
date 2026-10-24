@@ -405,6 +405,18 @@ namespace MatchZy
             seriesEnded = false;
             currentMapFinished = false;
 
+            // A fresh load must not inherit a matchid from before it. A pug started with .start
+            // (no match config, so isMatchSetup stays false and the load is allowed) has its own
+            // database row in liveMatchId; without a "matchid" in the JSON, the eager allocation
+            // below saw that id as preassigned, skipped creating a row and the loaded match's
+            // stats, events and demo name went to the pug's match. The changelevel resume
+            // (skipMapChange) re-loads the same match and is left alone.
+            if (!skipMapChange && liveMatchId > 0)
+            {
+                Log($"[LoadMatchFromJSON] Clearing matchid {liveMatchId} left from before this load.");
+                liveMatchId = -1;
+            }
+
             if (jsonDataObject["matchid"] != null)
             {
                 long.TryParse(jsonDataObject["matchid"]!.ToString(), out long parsedId);
