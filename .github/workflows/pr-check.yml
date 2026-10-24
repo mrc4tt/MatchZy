@@ -1,6 +1,6 @@
 name: PR checks
-# Build and tests run on pull requests and on every push to main. Releases are never
-# made here: they are built and published locally.
+# Build and tests run on pull requests and on every push to main. Releases come from
+# release.yml (a version tag), which is disabled on mrc4tt/MatchZy.
 on:
   pull_request:
     branches:
