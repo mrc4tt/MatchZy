@@ -2,6 +2,12 @@
 
 Based on [MatchZy](https://github.com/shobhit-pathak/MatchZy) by Shobhit Pathak, adapted for CS2 game-server hosting: remote log HTTP API, G5API compatibility, auto changelevel, advanced stats (HLTV 2.0 rating / KAST / clutch / opening duels), a coach system, a pause overhaul, and in-game admin and match-setup menus.
 
+# 1.0.21
+
+#### October 25, 2026
+
+- Warmup, knife round, scrim and all live cfgs now set `mp_drop_knife_enable 0`, and `warmup.cfg` / `knife.cfg` also set `mp_defuser_allocation 0`. A knife-drop or free-defuser value from `server.cfg` or another plugin used to carry into these modes. Servers with their own cfg copies get the new values automatically unless their cfg sets them.
+
 # 1.0.20
 
 #### October 24, 2026

@@ -2,6 +2,10 @@
 
 A short summary of each release. The [full changelog](changelog.md) has the details and background for every change.
 
+## 1.0.21 <small>October 25, 2026</small>
+
+- **Fixed:** Warmup, the knife round, scrims and live matches always turn off knife dropping (`mp_drop_knife_enable 0`), and warmup and the knife round no longer hand out free defuse kits (`mp_defuser_allocation 0`). A value set by `server.cfg` or another plugin no longer carries into these modes.
+
 ## 1.0.20 <small>October 24, 2026</small>
 
 - **Fixed:** A match config loaded during a `.start` pug no longer reuses the pug's match id (stats, events, demo name and backups went to the pug).
@@ -22,15 +26,15 @@ A short summary of each release. The [full changelog](changelog.md) has the deta
 - **Changed:** A remote log setting run without a value prints what it is set to (header and auth values masked).
 - **Changed:** `matchzy_loadmatch_url` tries the match config download up to 3 times on timeouts, network errors and HTTP 5xx/408/429.
 
-## 1.0.16 <small>October 24, 2026</small>
-
-- **New:** `.ffire nades` and `"friendly_fire": "grenades"` in the match config: only HE and molotov/incendiary damage teammates. `.ffire on` / `.ffire off` and `"friendly_fire": true` / `false` also work.
-- **Fixed:** Demo uploads no longer fail for team names with letters outside ASCII (for example `Ærø`).
-- **Fixed:** A pause asked for during the knife round or side selection starts in the first live round.
-- **Fixed:** In a series, a `mp_match_restart_delay` below 18 in the match config no longer lets the game load another map before the next map of the series.
-- **Fixed:** The hostname set by `matchzy_hostname_format` is put back to the one from before the match when the series ends or the match is stopped (with `matchzy_reset_cvars_on_series_end`).
-
 ## Older releases
+
+??? note "1.0.16 - October 24, 2026"
+
+    - **New:** `.ffire nades` and `"friendly_fire": "grenades"` in the match config: only HE and molotov/incendiary damage teammates. `.ffire on` / `.ffire off` and `"friendly_fire": true` / `false` also work.
+    - **Fixed:** Demo uploads no longer fail for team names with letters outside ASCII (for example `Ærø`).
+    - **Fixed:** A pause asked for during the knife round or side selection starts in the first live round.
+    - **Fixed:** In a series, a `mp_match_restart_delay` below 18 in the match config no longer lets the game load another map before the next map of the series.
+    - **Fixed:** The hostname set by `matchzy_hostname_format` is put back to the one from before the match when the series ends or the match is stopped (with `matchzy_reset_cvars_on_series_end`).
 
 ??? note "1.0.15 - October 23, 2026"
 
