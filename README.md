@@ -4,6 +4,7 @@
 [![CS2](https://img.shields.io/badge/game-CS2-orange)](https://www.counter-strike.net/)
 [![CounterStrikeSharp](https://img.shields.io/badge/CounterStrikeSharp-.NET%2010-512bd4)](https://github.com/roflmuffin/CounterStrikeSharp)
 [![Docs](https://img.shields.io/badge/docs-matchzy.miksen.me-blue)](https://matchzy.miksen.me/)
+[![Discord](https://img.shields.io/badge/Discord-support-5865F2?logo=discord&logoColor=white)](https://discord.gg/zuQN3U2ZEh)
 
 MikZy is a CounterStrikeSharp plugin for running CS2 matches, scrims, pugs and practice on your own server. It is a customized fork of [MatchZy](https://github.com/shobhit-pathak/MatchZy) built for game-server hosting. The plugin still loads as `MatchZy`, so file names, folders, commands and settings (`MatchZy.dll`, `cfg/MatchZy/`, `matchzy_*`) are unchanged.
 
@@ -76,6 +77,18 @@ dotnet build -c Release
 The output is `bin/Release/net10.0/MatchZy.dll` with its dependencies. The project compiles against a local CounterStrikeSharp API DLL; point it at yours with `-p:CssApiDir=/path/to/CounterStrikeSharp.API/bin/Release/net10.0`, and build against the same CounterStrikeSharp version the server runs.
 
 There is no test suite: the plugin only runs inside a CS2 dedicated server, so test changes on a server before opening a pull request.
+
+## Support
+
+Need help, found a bug, or have a feature idea? Join the Discord support server:
+
+[![Discord](https://img.shields.io/badge/Discord-Join%20the%20server-5865F2?logo=discord&logoColor=white)](https://discord.gg/zuQN3U2ZEh)
+
+- **Questions and setup help:** ask in the support channels on Discord.
+- **Bug reports:** open a GitHub issue, see [Reporting bugs](#reporting-bugs) below. Discord is fine for a quick check first.
+- **Feature requests:** post them on Discord or open an [issue](https://github.com/mrc4tt/MatchZy/issues).
+
+Please do not send support requests by direct message. Asking in the public channels means others can help and find the answer later.
 
 ## Reporting bugs
 
