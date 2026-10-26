@@ -170,14 +170,8 @@ namespace MatchZy
         readonly List<Position> activeSpawnMarkers = new();
         readonly Dictionary<int, float> lastSpawnMarkerUseTime = new();
         const float spawnMarkerUseCooldown = 0.3f;      // seconds between accepted +use teleports
-        // Aim tolerance in world units around a marker's vertical line (floor box up to the number),
-        // so far markers are not easier to hit than near ones (an angular cone grew to ~350u at 2000u
-        // and could grab a marker next to the one aimed at).
-        const float spawnMarkerAimRadius = 24.0f;
-        const float spawnMarkerAimMaxDistance = 4096.0f;
-        const float spawnMarkerAimMinDot = 0.985f;      // ~10 degree aim cone, still used by the .shownades markers
-        const float spawnMarkerStandRadiusSq = 8.0f * 8.0f;  // issue #11: only the spawn you're exactly on is excluded
-        const float spawnMarkerStandHeight = 90.0f;     // vertical band for the standing-on check
+        // Spawn marker aim geometry lives in Logic/SpawnPickLogic.cs (unit tested).
+        const float spawnMarkerAimMinDot = 0.985f;      // ~10 degree aim cone, used by the .shownades markers
         Dictionary<int, Dictionary<string, GrenadeThrownData>> nadeSpecificLastGrenadeData = new();
         Dictionary<int, DateTime> lastGrenadeThrownTime = new();
         // Molotov/incendiary detonation time is tracked PER PROJECTILE (entity index -> throw time +
@@ -1080,17 +1074,17 @@ namespace MatchZy
 
         // Spawn marker = a flat square outline on the floor (4 beams) plus the spawn number floating
         // above it, so the number to use with .spawn / css_spawn is visible in the world.
-        const float spawnMarkerHalfSize = 16.0f;   // 32u box = player hull footprint
+        const float spawnMarkerHalfSize = SpawnPickLogic.HalfSize;   // 32u box = player hull footprint
         // Lift the box +8u off the floor (issue MatchZy-Enhanced#11): at +0 the marker sinks under
         // shallow water (e.g. de_ancient) and is invisible.
-        const float spawnMarkerFloorLift = 8.0f;
-        const float spawnMarkerLabelHeight = 40.0f;
+        const float spawnMarkerFloorLift = SpawnPickLogic.FloorLift;
+        const float spawnMarkerLabelHeight = SpawnPickLogic.LabelHeight;
         // Floor lookup: nav mesh point within this range of the spawn, and no further than
         // spawnMarkerMaxFloorDrop below/above it (a different floor level is not this spawn's floor).
         const float spawnMarkerNavSearchDistance = 128.0f;
         const float spawnMarkerMaxFloorDrop = 32.0f;
         // Standing inside a box (this far up from its floor) + USE snaps onto that spawn.
-        const float spawnMarkerStandInHeight = 36.0f;
+        const float spawnMarkerStandInHeight = SpawnPickLogic.StandInHeight;
 
         // Per drawn marker, indexed like activeSpawnMarkers: the entities to recolor on hover.
         sealed class SpawnMarkerVisual
@@ -4931,6 +4925,9 @@ namespace MatchZy
         // The marker USE would teleport to, or -1: the one the player aims at, else the box they
         // stand in. Shared by the USE handler and the hover highlight so the highlighted marker is
         // always the one E picks.
+        // Reused by TargetSpawnMarkerIndex (game thread only; the hover timer calls it per player at 10 Hz).
+        readonly List<(System.Numerics.Vector3 Spawn, float FloorZ)> spawnMarkerPickBuffer = new();
+
         private int TargetSpawnMarkerIndex(CCSPlayerController player)
         {
             if (player.TeamNum != (byte)CsTeam.CounterTerrorist && player.TeamNum != (byte)CsTeam.Terrorist)
@@ -4943,80 +4940,17 @@ namespace MatchZy
             Vector origin = pawn.AbsOrigin;
             var eye = new System.Numerics.Vector3(origin.X, origin.Y, origin.Z + pawn.ViewOffset.Z);
             QAngle ang = pawn.EyeAngles;
-            double pitch = ang.X * Math.PI / 180.0;
-            double yaw = ang.Y * Math.PI / 180.0;
-            var forward = new System.Numerics.Vector3(
-                (float)(Math.Cos(pitch) * Math.Cos(yaw)),
-                (float)(Math.Cos(pitch) * Math.Sin(yaw)),
-                (float)(-Math.Sin(pitch)));
+            var forward = SpawnPickLogic.Forward(ang.X, ang.Y);
 
-            int bestIndex = -1;
-            float bestAlong = float.MaxValue;
-            for (int i = 0; i < activeSpawnMarkers.Count; i++)
-            {
-                Vector sp = activeSpawnMarkers[i].PlayerPosition;
-                // Exclude the spawn you're standing exactly on (issue #11: 8u radius) so you can
-                // still re-center onto a neighbouring marker you're merely near.
-                float hdx = sp.X - origin.X, hdy = sp.Y - origin.Y, vdz = sp.Z - origin.Z;
-                if (hdx * hdx + hdy * hdy <= spawnMarkerStandRadiusSq && Math.Abs(vdz) <= spawnMarkerStandHeight)
-                    continue;
-                // Aiming anywhere between the floor box and the number above it registers. When
-                // several markers are in tolerance, the nearest along the view wins, so a marker
-                // behind another one is not picked.
-                float floorZ = i < spawnMarkerVisuals.Count ? spawnMarkerVisuals[i].FloorZ : sp.Z;
-                var (dist, along) = RayToVerticalSegment(eye, forward, spawnMarkerAimMaxDistance,
-                    sp.X, sp.Y, floorZ + spawnMarkerFloorLift, floorZ + spawnMarkerLabelHeight);
-                if (dist <= spawnMarkerAimRadius && along < bestAlong)
-                {
-                    bestAlong = along;
-                    bestIndex = i;
-                }
-            }
-
-            if (bestIndex >= 0)
-                return bestIndex;
-
-            // Not aiming at a marker: standing inside a box on the floor + USE snaps onto that
-            // spawn (exact position and view angle). Nearest box center wins when boxes overlap.
-            float bestDistSq = float.MaxValue;
+            var markers = spawnMarkerPickBuffer;
+            markers.Clear();
             for (int i = 0; i < activeSpawnMarkers.Count; i++)
             {
                 Vector sp = activeSpawnMarkers[i].PlayerPosition;
                 float floorZ = i < spawnMarkerVisuals.Count ? spawnMarkerVisuals[i].FloorZ : sp.Z;
-                float dx = origin.X - sp.X, dy = origin.Y - sp.Y, dz = origin.Z - floorZ;
-                if (Math.Abs(dx) > spawnMarkerHalfSize || Math.Abs(dy) > spawnMarkerHalfSize
-                    || dz < -spawnMarkerStandInHeight || dz > spawnMarkerStandInHeight)
-                    continue;
-                float distSq = dx * dx + dy * dy;
-                if (distSq < bestDistSq)
-                {
-                    bestDistSq = distSq;
-                    bestIndex = i;
-                }
+                markers.Add((new System.Numerics.Vector3(sp.X, sp.Y, sp.Z), floorZ));
             }
-            return bestIndex;
-        }
-
-        // Closest distance between the view ray (eye + forward * t, 0 <= t <= maxDistance, forward a
-        // unit vector) and the vertical segment (x, y, zBottom..zTop), and the ray distance t at
-        // that point.
-        private static (float Distance, float Along) RayToVerticalSegment(System.Numerics.Vector3 eye,
-            System.Numerics.Vector3 forward, float maxDistance, float x, float y, float zBottom, float zTop)
-        {
-            var a = new System.Numerics.Vector3(x, y, zBottom);
-            float height = zTop - zBottom;
-            System.Numerics.Vector3 w = eye - a;
-            float fz = forward.Z;               // forward . (0, 0, 1)
-            float fw = System.Numerics.Vector3.Dot(forward, w);
-            float denom = 1.0f - fz * fz;       // 0 when looking straight up/down along the segment
-            float t = denom < 1e-6f ? 0.0f : Math.Clamp((fz * w.Z - fw) / denom, 0.0f, maxDistance);
-            // Clamp onto the segment, then re-project the ray onto that point.
-            float s = Math.Clamp(w.Z + fz * t, 0.0f, height);
-            var onSegment = new System.Numerics.Vector3(x, y, zBottom + s);
-            t = Math.Clamp(System.Numerics.Vector3.Dot(onSegment - eye, forward), 0.0f, maxDistance);
-            s = Math.Clamp(w.Z + fz * t, 0.0f, height);
-            onSegment = new System.Numerics.Vector3(x, y, zBottom + s);
-            return (System.Numerics.Vector3.Distance(eye + forward * t, onSegment), t);
+            return SpawnPickLogic.PickMarker(new System.Numerics.Vector3(origin.X, origin.Y, origin.Z), eye, forward, markers);
         }
 
         [ConsoleCommand("css_hidespawns", "Hides the highlighted spawns")]
