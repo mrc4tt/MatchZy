@@ -1,12 +1,9 @@
 name: Build and Release
-# Releases only from a version tag (0.8.96), never from a plain push to main: a push used to
-# publish ModuleVersion as a release straight away, before it was tested on a server.
-# This workflow is disabled on mrc4tt/MatchZy (releases there are built and published from a
-# local machine). It is kept for forks: enable Actions in your fork and push a version tag.
+# Manual only. Releases of mrc4tt/MatchZy are built, tagged and published by the build server
+# (cs2-build-system build-all.sh), so a tag push must not start a second release here.
+# Kept for forks and as a fallback: Actions -> Build and Release -> Run workflow releases the
+# ModuleVersion in Core/MatchZy.cs.
 on:
-  push:
-    tags:
-      - '[0-9]*.[0-9]*.[0-9]*'
   workflow_dispatch:
 
 # Needed by softprops/action-gh-release to create the GitHub release.
