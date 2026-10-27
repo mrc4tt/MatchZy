@@ -123,7 +123,8 @@ namespace MatchZy
             if (team != (int)CsTeam.CounterTerrorist && team != (int)CsTeam.Terrorist)
                 return null;
             // Never ready with nobody on the side, forced or not (as IsTeamReady's own rule).
-            int needed = matchConfig.MinPlayersToReadySet ? matchConfig.MinPlayersToReady : RequiredPlayersOnSide(team);
+            // matchzy_ready_max_missing caps how far min_players_to_ready can lower it.
+            int needed = matchConfig.MinPlayersToReadySet ? Math.Max(matchConfig.MinPlayersToReady, ReadyFloor()) : RequiredPlayersOnSide(team);
             return players > 0 && (players >= Math.Max(1, needed) || IsTeamForcedReady((CsTeam)team));
         }
 

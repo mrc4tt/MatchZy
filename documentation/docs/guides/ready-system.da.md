@@ -85,6 +85,10 @@ Kommer spilleren ikke, kan én spiller på holdet skrive `.forceready`. Det gør
 - `min_players_to_ready` i match configen kan kun gøre det strengere for `.forceready` (fx `5` betyder, at `.forceready` kræver hele holdet).
 - Slå `.forceready` helt fra med `matchzy_allow_force_ready false`.
 
+### Minimum holdstørrelse
+
+Som standard kan et hold, der er registreret med færre spillere end `players_per_team`, eller en match config med lav `min_players_to_ready` (paneler sender tit `1`), gøre sig klar med almindelig `.ready`, selvom holdet er for lille. `matchzy_ready_max_missing` sætter en bund for alle måder at gøre sig klar på: med `1` skal et hold have mindst 4 spillere i en 5v5, uanset roster eller match config. `0` = kun fulde hold, `-1` (standard) = slået fra. En admin kan stadig starte kampen med `.start`.
+
 ## Join ready mode
 
 `matchzy_ready_mode 1` (kun loadede kampe) fjerner `.ready` helt: et hold er klar, så snart dets spillere er joinet, og kampen starter `matchzy_join_start_delay` sekunder efter, at alle er inde (forlader nogen serveren, stopper nedtællingen). Hvor mange spillere et hold skal have, er `min_players_to_ready` fra match configen, eller holdets registrerede spillere, hvis den ikke er sat.

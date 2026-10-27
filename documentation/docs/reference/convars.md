@@ -31,11 +31,13 @@ Legend: **cfg** = present in the generated `config.cfg`.
 | Setting | Default | cfg | Description |
 |---|---|---|---|
 | `matchzy_warmup_enabled` | `true` | Y | Use warmup (execute `warmup.cfg`) before a match. |
+| `matchzy_warmup_instant_respawn` | `false` | Y | Instant-respawn warmup: the dead respawn at once at their team spawn with 2 seconds of spawn protection, no bomb, no friendly fire, buying all warmup and full money on every respawn. Set after `warmup.cfg`, so older cfg copies work too. `false` = `warmup.cfg` decides. |
 | `matchzy_ready_enabled` | `true` | Y | Players can ready up. `false` = `.ready`, `.r`, `.unready`, `.forceready`, `.readycheck`, ready by ping and join ready mode are off; only an admin starts the match with `.start` (also before the map veto). The ready time limit does not run and the ready clan tags are hidden. |
 | `matchzy_minimum_ready_required` | `10` | Y | Ready players needed to start. `0` = every connected player. Also `.readyrequired <n>`. In a 1v1, wingman or rush pug it is capped at 2, 4 or 6. |
 | `matchzy_ready_per_team` | `0` | Y | Per-team ready-up: a team is ready once `N` of its players are ready. In a loaded match its registered players must also all be in. `0` = off. |
 | `matchzy_allow_force_ready` | `true` | Y | Allow `.forceready` (match setup only). Alias `get5_allow_force_ready`. |
 | `matchzy_forceready_max_missing` | `1` | Y | Loaded matches: how many players a team may be short of `players_per_team` and still use `.forceready` (`1` = 4 in a 5v5). `min_players_to_ready` can only make it stricter. `-1` = only `min_players_to_ready` decides (Get5). |
+| `matchzy_ready_max_missing` | `-1` | Y | Loaded matches: the fewest players a team can ready up with, whichever way (`.ready` with a smaller roster, `min_players_to_ready`, join mode, `matchzy_ready_per_team`, `.forceready`): `players_per_team` minus this. `1` = at least 4 in a 5v5, `0` = full teams only. Admins can still `.start`. `-1` = off. |
 | `matchzy_ready_hint_style` | `0` | Y | `0` classic center text, `1` HTML ready-up panel, `2` chat reminder only. |
 | `matchzy_ready_hint_blink` | `false` | Y | Blink the "NOT READY" line on the HTML panel. |
 | `matchzy_hide_failed_connect_messages` | `false` | Y | Hide the chat line when a player leaves before they were fully connected ("failed to connect", a timed out or cancelled join). Leave messages of players who were in the game are still shown. |

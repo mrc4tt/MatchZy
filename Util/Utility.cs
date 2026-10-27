@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Globalization;
 using System.Drawing;
 using System.Text;
 using System.Text.Json;
@@ -131,6 +132,14 @@ namespace MatchZy
         // included), not only where a caller re-applies them.
         private void ExecModeCfg(string cfgPath, string extraCommands = "")
         {
+            // matchzy_warmup_instant_respawn changed friendly fire, buy time and respawn cash for the
+            // warmup; give the next mode the values from before (knife.cfg, prac.cfg and most live
+            // cfgs do not set all of them).
+            if (_cvarsBeforeWarmup != null && cfgPath != warmupCfgPath)
+            {
+                Server.ExecuteCommand(_cvarsBeforeWarmup);
+                _cvarsBeforeWarmup = null;
+            }
             // The cfg's bot_quota 0 must not find leftover bots, or the engine's quota sweep can
             // kick the CSTV bot along with them.
             KickBotsBeforeQuotaReset();
@@ -315,14 +324,15 @@ namespace MatchZy
             }
             List<string> unreadyPlayers = new();
             int perTeam = EffectiveReadyPerTeam();
+            (bool ctDone, bool tDone) = ReadySidesDone();
 
             foreach (var key in playerReadyStatus.Keys)
             {
                 if (playerReadyStatus[key] == false && playerData.TryGetValue(key, out var p) && p != null && p.IsValid)
                 {
-                    // Per-team mode: a side that already has N ready players is done, so its
-                    // remaining players are not holding anything up.
-                    if (perTeam > 0 && (p.TeamNum == (int)CsTeam.CounterTerrorist || p.TeamNum == (int)CsTeam.Terrorist) && IsTeamReady(p.TeamNum))
+                    // A side that is already ready (N ready players, min_players_to_ready, .forceready)
+                    // is done, so its remaining players are not holding anything up.
+                    if ((p.TeamNum == (int)CsTeam.CounterTerrorist && ctDone) || (p.TeamNum == (int)CsTeam.Terrorist && tDone))
                         continue;
                     // Coaches do not count towards the ready-up (GetTeamPlayerCount), so they hold nothing up.
                     if (matchzyTeam1.coach.Contains(p) || matchzyTeam2.coach.Contains(p))
@@ -338,7 +348,11 @@ namespace MatchZy
                 {
                     if (player == null || !player.IsValid || player.IsBot || player.IsHLTV)
                         continue;
-                    string minimumReadyRequiredMessage = isMatchSetup || EffectiveReadyPerTeam() > 0 ? "" : Localizer.ForPlayer(player, "matchzy.minimum.ready.required", $"{ChatColors.Green}{EffectiveMinimumReadyRequired()}{ChatColors.Default}");
+                    // Loaded match: say how many each side needs, so a list of every unready player
+                    // does not read as "everyone has to type .ready" when fewer are enough.
+                    string minimumReadyRequiredMessage = isMatchSetup
+                        ? Localizer.ForPlayer(player, "matchzy.ready.neededperside", ReadyNeededOnSide((int)CsTeam.CounterTerrorist), ReadyNeededOnSide((int)CsTeam.Terrorist))
+                        : EffectiveReadyPerTeam() > 0 ? "" : Localizer.ForPlayer(player, "matchzy.minimum.ready.required", $"{ChatColors.Green}{EffectiveMinimumReadyRequired()}{ChatColors.Default}");
                     player.PrintToChat($"{chatPrefix} {Localizer.ForPlayer(player, key, unreadyPlayerList, minimumReadyRequiredMessage)}");
                 }
             }
@@ -445,7 +459,7 @@ namespace MatchZy
 
         // Cached ready-panel DATA (recomputed only on change). Localized HTML is built per
         // player each tick so every player sees the panel in their own language.
-        private int _rpReady, _rpRequired, _rpTotal, _rpFilled, _rpCtCount, _rpCtReady, _rpTCount, _rpTReady;
+        private int _rpReady, _rpRequired, _rpFilled, _rpCtCount, _rpCtReady, _rpTCount, _rpTReady;
         // Loaded match: players each side needs (roster-sized), 0 otherwise.
         private int _rpCtNeed, _rpTNeed;
         // Ready count shown per side: capped at what the side needs (loaded match), so extra ready
@@ -490,6 +504,16 @@ namespace MatchZy
         // convars). Reset when leaving the ready phase so it never leaks into live play.
         private bool _fakeWarmupActive;
 
+        // Sides that are already ready, so their unready players are not listed as holding the start
+        // up. Loaded match or matchzy_ready_per_team only: a pug without it counts ready players in
+        // total, not per side.
+        private (bool Ct, bool T) ReadySidesDone()
+        {
+            if (!isMatchSetup && EffectiveReadyPerTeam() <= 0)
+                return (false, false);
+            return (IsTeamReady((int)CsTeam.CounterTerrorist), IsTeamReady((int)CsTeam.Terrorist));
+        }
+
         // Recompute the shared ready numbers only when ready status changed.
         private void ComputeReadyData()
         {
@@ -498,6 +522,7 @@ namespace MatchZy
 
             int readyCount = 0, totalPlayers = 0;
             List<string> notReady = new();
+            (bool ctDone, bool tDone) = ReadySidesDone();
             foreach (var key in playerReadyStatus.Keys)
             {
                 if (playerData.TryGetValue(key, out var p) && p != null && p.IsValid)
@@ -508,7 +533,7 @@ namespace MatchZy
                     totalPlayers++;
                     if (playerReadyStatus[key])
                         readyCount++;
-                    else
+                    else if (!(p.TeamNum == (int)CsTeam.CounterTerrorist ? ctDone : tDone))
                         notReady.Add(p.PlayerName);
                 }
             }
@@ -547,7 +572,6 @@ namespace MatchZy
                 int minReady = EffectiveMinimumReadyRequired();
                 _rpRequired = minReady > 0 ? minReady : totalPlayers;
             }
-            _rpTotal = totalPlayers;
             _rpFilled = Math.Clamp((int)Math.Round(12.0 * _rpReady / Math.Max(1, _rpRequired)), 0, 12);
 
             string list = string.Join(", ", notReady.Take(6));
@@ -657,7 +681,8 @@ namespace MatchZy
         {
             if (!readyEnabled.Value)
                 return Localizer.ForPlayer(player, "matchzy.ready.waitingforadmin");
-            string line1 = Localizer.ForPlayer(player, "matchzy.hint.waitingforplayers", _rpReady, _rpTotal);
+            // Ready against what the start needs (as the HTML panel), not against everyone present.
+            string line1 = Localizer.ForPlayer(player, "matchzy.hint.waitingforplayers", _rpReady, _rpRequired);
             string line2 = Localizer.ForPlayer(player, "matchzy.hint.usereadycommand");
             if (ShortHandedSide(player.TeamNum) is (int shortPresent, int shortRequired))
                 line2 += "\n" + Localizer.ForPlayer(player, "matchzy.ready.shorthanded", shortPresent, shortRequired, shortRequired - shortPresent);
@@ -800,7 +825,7 @@ namespace MatchZy
                             // behaviour - the round would start counting and could end. Re-create a
                             // "fake warmup" so the ready phase still plays like warmup: round never
                             // ends, no time expiry, respawn on death. Reset on leaving ready (above).
-                            Server.ExecuteCommand("mp_ignore_round_win_conditions 1; mp_respawn_on_death_ct 1; mp_respawn_on_death_t 1; mp_roundtime 60; mp_roundtime_defuse 60; mp_roundtime_hostage 60");
+                            Server.ExecuteCommand(FakeWarmupCommands);
                             _fakeWarmupActive = true;
                         }
                     }
@@ -1089,6 +1114,46 @@ namespace MatchZy
             }
         }
 
+        // Fake-warmup rules (matchzy_ready_hint_style 1/2 with real warmup forced off): the round never
+        // ends or times out, and the dead respawn.
+        private const string FakeWarmupCommands = "mp_ignore_round_win_conditions 1; mp_respawn_on_death_ct 1; mp_respawn_on_death_t 1; mp_roundtime 60; mp_roundtime_defuse 60; mp_roundtime_hostage 60";
+
+        // Commands that put back what matchzy_warmup_instant_respawn changed and no mode cfg resets
+        // everywhere (friendly fire, buy time, respawn cash); null = nothing changed.
+        private string? _cvarsBeforeWarmup;
+
+        // matchzy_warmup_instant_respawn: instant-respawn warmup, run after warmup.cfg and its override
+        // (a match config's "cvars" still win). Instant respawn at the team spawns with 2 s spawn
+        // protection, no bomb, no friendly fire, buying all the time, and full money again on every
+        // respawn (up to mp_maxmoney). Every other mode cfg sets mp_respawn_immunitytime back to 0.
+        // Empty when off: warmup.cfg decides.
+        private string WarmupInstantRespawnCommands()
+        {
+            if (!warmupInstantRespawn.Value)
+                return "";
+            if (_cvarsBeforeWarmup == null)
+            {
+                bool friendlyFire = ConVar.Find("mp_friendlyfire")?.GetPrimitiveValue<bool>() ?? true;
+                float buyTime = ConVar.Find("mp_buytime")?.GetPrimitiveValue<float>() ?? 15f;
+                int respawnCash = ConVar.Find("cash_player_respawn_amount")?.GetPrimitiveValue<int>() ?? 0;
+                _cvarsBeforeWarmup = string.Create(CultureInfo.InvariantCulture,
+                    $"mp_friendlyfire {(friendlyFire ? 1 : 0)};mp_buytime {buyTime};cash_player_respawn_amount {respawnCash}");
+            }
+            return ";mp_respawn_on_death_ct 1;mp_respawn_on_death_t 1;mp_respawnwavetime_ct 0;mp_respawnwavetime_t 0;mp_respawn_immunitytime 2;mp_give_player_c4 0;mp_friendlyfire 0;mp_buytime 999999;cash_player_respawn_amount 16000";
+        }
+
+        // warmup.cfg (with mp_respawn_on_death 0 and mp_ignore_round_win_conditions 0) also runs
+        // when a warmup restarts while the fake warmup is already active (match loaded during
+        // warmup, veto ended, map reload). The fake-warmup rules were only set when it began, so
+        // the cfg left them off: rounds ended on eliminations and the dead waited for the next
+        // round. Put them back after the cfg.
+        private void ExecWarmupModeCfg(string extraCommands = "")
+        {
+            ExecModeCfg(warmupCfgPath, extraCommands + WarmupInstantRespawnCommands());
+            if (_fakeWarmupActive)
+                Server.ExecuteCommand(FakeWarmupCommands);
+        }
+
         private void ExecWarmupCfg()
         {
             if (!warmupEnabled.Value)
@@ -1100,12 +1165,14 @@ namespace MatchZy
             var absolutePath = Path.Join(Server.GameDirectory, "csgo", "cfg", warmupCfgPath);
             if (File.Exists(Path.Join(Server.GameDirectory + "/csgo/cfg", warmupCfgPath)))
             {
-                ExecModeCfg(warmupCfgPath);
+                ExecWarmupModeCfg();
             }
             else
             {
                 KickAllBotsProtectCSTV();
-                Server.ExecuteCommand("mp_autokick 0;mp_autoteambalance 0;mp_buy_anywhere 0;mp_buytime 15;mp_death_drop_gun 0;mp_free_armor 1;mp_defuser_allocation 0;mp_drop_knife_enable 0;mp_ignore_round_win_conditions 0;mp_limitteams 0;mp_radar_showall 0;mp_respawn_on_death_ct 0;mp_respawn_on_death_t 0;mp_solid_teammates 0;mp_spectators_max 20;mp_maxmoney 16000;mp_startmoney 16000;mp_timelimit 0;sv_alltalk 0;sv_auto_full_alltalk_during_warmup_half_end 0;sv_deadtalk 1;sv_full_alltalk 0;sv_grenade_trajectory 0;sv_hibernate_when_empty 0;sv_hide_roundtime_until_seconds 1;mp_weapons_allow_typecount -1;ammo_grenade_limit_flashbang 2;mp_respawn_immunitytime 0;sv_infinite_ammo 0;sv_showimpacts 0;sv_voiceenable 1;sm_cvar sv_mute_players_with_social_penalties 0;sv_mute_players_with_social_penalties 0;tv_relayvoice 0;sv_cheats 0;mp_ct_default_melee weapon_knife;mp_ct_default_secondary weapon_hkp2000;mp_ct_default_primary \"\";mp_t_default_melee weapon_knife;mp_t_default_secondary weapon_glock;mp_t_default_primary \"\";mp_maxrounds 24;mp_warmuptime 9999;cash_team_bonus_shorthanded 0;mp_restartgame 1;mp_warmup_online_enabled 1;mp_warmup_start;mp_warmup_pausetimer 1");
+                Server.ExecuteCommand("mp_autokick 0;mp_autoteambalance 0;mp_buy_anywhere 0;mp_buytime 15;mp_death_drop_gun 0;mp_free_armor 1;mp_defuser_allocation 0;mp_drop_knife_enable 0;mp_ignore_round_win_conditions 0;mp_limitteams 0;mp_radar_showall 0;mp_respawn_on_death_ct 0;mp_respawn_on_death_t 0;mp_solid_teammates 0;mp_spectators_max 20;mp_maxmoney 16000;mp_startmoney 16000;mp_timelimit 0;sv_alltalk 0;sv_auto_full_alltalk_during_warmup_half_end 0;sv_deadtalk 1;sv_full_alltalk 0;sv_grenade_trajectory 0;sv_hibernate_when_empty 0;sv_hide_roundtime_until_seconds 1;mp_weapons_allow_typecount -1;ammo_grenade_limit_flashbang 2;mp_respawn_immunitytime 0;sv_infinite_ammo 0;sv_showimpacts 0;sv_voiceenable 1;sm_cvar sv_mute_players_with_social_penalties 0;sv_mute_players_with_social_penalties 0;tv_relayvoice 0;sv_cheats 0;mp_ct_default_melee weapon_knife;mp_ct_default_secondary weapon_hkp2000;mp_ct_default_primary \"\";mp_t_default_melee weapon_knife;mp_t_default_secondary weapon_glock;mp_t_default_primary \"\";mp_maxrounds 24;mp_warmuptime 9999;cash_team_bonus_shorthanded 0;mp_restartgame 1;mp_warmup_online_enabled 1;mp_warmup_start;mp_warmup_pausetimer 1" + WarmupInstantRespawnCommands());
+                if (_fakeWarmupActive)
+                    Server.ExecuteCommand(FakeWarmupCommands);
             }
             // The warmup cfg sets bot_quota 0; put a bot team back.
             ApplyBotTeam();

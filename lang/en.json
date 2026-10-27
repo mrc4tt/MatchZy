@@ -315,6 +315,7 @@
     "matchzy.ready.notready": "YOU ARE NOT READY - type .ready",
     "matchzy.ready.shorthanded": "Team {0}/{1}: {2} missing",
     "matchzy.ready.shorthandedchat": "Your team has {green}{0}/{1}{default} players. The match waits for {2} more.",
+    "matchzy.ready.neededperside": "[Ready needed: CT {green}{0}{default}, T {green}{1}{default}]",
     "matchzy.ready.waitingon": "Waiting on: {0}",
     "matchzy.ah.title": "=== MatchZy Admin Commands Guide ===",
     "matchzy.ah.checkconsole": "Check console for full command list",

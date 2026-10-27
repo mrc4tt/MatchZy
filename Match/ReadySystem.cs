@@ -107,8 +107,9 @@ public partial class MatchZy
     // Players a side needs before .ready alone makes it ready: players_per_team, or fewer when the
     // team on that side has fewer players in its match config roster. A team registered with 4
     // players in a 5v5 then readies up as 4 without .forceready; a team of 5 still needs all 5.
-    // players_per_team stays the most a side can have. Coaches listed under "players" do not
-    // count, and open ("any") and bot rosters keep players_per_team.
+    // players_per_team stays the most a side can have, matchzy_ready_max_missing the fewest.
+    // Coaches listed under "players" do not count, and open ("any") and bot rosters keep
+    // players_per_team.
     private int RequiredPlayersOnSide(int side)
     {
         int perTeam = matchConfig.PlayersPerTeam;
@@ -116,21 +117,25 @@ public partial class MatchZy
             return perTeam;
         if (!reverseTeamSides.TryGetValue(side == (int)CsTeam.CounterTerrorist ? "CT" : "TERRORIST", out Team? team))
             return perTeam;
-        int roster = RosterPlayerCount(team);
-        return roster > 0 ? Math.Min(perTeam, roster) : perTeam;
+        return ReadyLogic.RequiredOnSide(perTeam, RosterPlayerCount(team), ReadyFloor());
+    }
+
+    // matchzy_ready_max_missing: the fewest players a side of a loaded match can ready up with
+    // (roster size, min_players_to_ready, join mode and .forceready all stop there). 0 = off.
+    private int ReadyFloor()
+    {
+        return isMatchSetup ? ReadyLogic.ReadyFloor(matchConfig.PlayersPerTeam, readyMaxMissing.Value) : 0;
     }
 
     // Players a side needs ready when the match config sets min_players_to_ready below what the
-    // side would otherwise need (players_per_team or the roster size). 0 = not set, or not lower:
-    // then every player on the side has to be ready.
+    // side would otherwise need (players_per_team or the roster size), never below
+    // matchzy_ready_max_missing. 0 = not set, or not lower: then every player on the side has to be
+    // ready. Panels often send min_players_to_ready 1, which let one .ready per team start a 5v5.
     private int ConfigReadyMinimum(int side)
     {
-        if (!isMatchSetup || !matchConfig.MinPlayersToReadySet || matchConfig.MinPlayersToReady < 1)
+        if (!isMatchSetup || (side != (int)CsTeam.CounterTerrorist && side != (int)CsTeam.Terrorist))
             return 0;
-        if (side != (int)CsTeam.CounterTerrorist && side != (int)CsTeam.Terrorist)
-            return 0;
-        int required = RequiredPlayersOnSide(side);
-        return matchConfig.MinPlayersToReady < required ? matchConfig.MinPlayersToReady : 0;
+        return ReadyLogic.ConfigMinimum(matchConfig.MinPlayersToReadySet, matchConfig.MinPlayersToReady, RequiredPlayersOnSide(side), ReadyFloor());
     }
 
     // Players a side must have ready before it counts as ready by .ready alone.
@@ -173,14 +178,14 @@ public partial class MatchZy
     // players_per_team - matchzy_forceready_max_missing (default 1: at most one player short, so
     // 4 in a 5v5). A match config value can only make it stricter. Panels often send
     // min_players_to_ready 1 without meaning it, which let a single player force-start a 5v5.
-    // -1 = only min_players_to_ready (Get5's rule). Spectators keep min_spectators_to_ready.
+    // -1 = only min_players_to_ready (Get5's rule). matchzy_ready_max_missing still applies.
+    // Spectators keep min_spectators_to_ready.
     private int ForceReadyMinimum(int side)
     {
         int minReady = GetTeamMinReady(side);
-        int maxMissing = forceReadyMaxMissing.Value;
-        if (maxMissing < 0 || (side != (int)CsTeam.CounterTerrorist && side != (int)CsTeam.Terrorist))
+        if (side != (int)CsTeam.CounterTerrorist && side != (int)CsTeam.Terrorist)
             return minReady;
-        return Math.Max(minReady, Math.Max(1, matchConfig.PlayersPerTeam - maxMissing));
+        return ReadyLogic.ForceReadyMinimum(matchConfig.PlayersPerTeam, minReady, forceReadyMaxMissing.Value, ReadyFloor());
     }
 
     public int GetTeamMinReady(int team)

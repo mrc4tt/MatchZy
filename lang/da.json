@@ -315,6 +315,7 @@
     "matchzy.ready.notready": "DU ER IKKE KLAR - skriv .ready",
     "matchzy.ready.shorthanded": "Hold {0}/{1}: mangler {2}",
     "matchzy.ready.shorthandedchat": "Dit hold har {green}{0}/{1}{default} spillere. Kampen venter på {2} mere.",
+    "matchzy.ready.neededperside": "[Klar påkrævet: CT {green}{0}{default}, T {green}{1}{default}]",
     "matchzy.ready.waitingon": "Venter på: {0}",
     "matchzy.ah.title": "=== MatchZy Admin Kommandobetjeningsvejledning ===",
     "matchzy.ah.checkconsole": "Se konsol for den fulde kommandoliste",
