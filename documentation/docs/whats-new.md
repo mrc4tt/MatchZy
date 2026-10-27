@@ -2,9 +2,10 @@
 
 A short summary of each release. The [full changelog](changelog.md) has the details and background for every change.
 
-## 1.0.21 <small>October 25, 2026</small>
+## 1.0.21 <small>October 27, 2026</small>
 
 - **Fixed:** Warmup, the knife round, scrims and live matches always turn off knife dropping (`mp_drop_knife_enable 0`), and warmup and the knife round no longer hand out free defuse kits (`mp_defuser_allocation 0`). A value set by `server.cfg` or another plugin no longer carries into these modes.
+- **Fixed:** A pause called in the final round of a series (also an auto-pause after a disconnect) is cleared when the map ends instead of staying queued through the intermission.
 
 ## 1.0.20 <small>October 24, 2026</small>
 

@@ -2753,6 +2753,17 @@ namespace MatchZy
                 }
             });
 
+            // A pause still pending when the map ends (an auto-pause after a disconnect in the last
+            // round, a .pause or .tech called during it) never reaches a freeze time. It used to be
+            // cleared only between maps of a series, so a series end ran the intermission and the
+            // reset with mp_pause_match still queued and the auto-pause state left set.
+            if (isPaused)
+                UnpauseMatch();
+            autoResumeTimer?.Kill();
+            autoResumeTimer = null;
+            isAutoPaused = false;
+            autoPauseReason = null;
+
             // The series winner (null on a tie). Passing null for every series end printed
             // "have tied the match" and reported winner "none" even for a 2-0.
             if (seriesOver)
@@ -2776,9 +2787,6 @@ namespace MatchZy
 
             matchConfig.CurrentMapNumber += 1;
             string nextMap = matchConfig.Maplist[matchConfig.CurrentMapNumber];
-
-            if (isPaused)
-                UnpauseMatch();
 
             stopData["ct"] = false;
             stopData["t"] = false;

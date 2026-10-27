@@ -4,9 +4,10 @@ Based on [MatchZy](https://github.com/shobhit-pathak/MatchZy) by Shobhit Pathak,
 
 # 1.0.21
 
-#### October 25, 2026
+#### October 27, 2026
 
 - Warmup, knife round, scrim and all live cfgs now set `mp_drop_knife_enable 0`, and `warmup.cfg` / `knife.cfg` also set `mp_defuser_allocation 0`. A knife-drop or free-defuser value from `server.cfg` or another plugin used to carry into these modes. Servers with their own cfg copies get the new values automatically unless their cfg sets them.
+- A pause still pending when the last map of a series ended (for example an auto-pause after a player left during the final round) stayed queued through the end-of-match intermission and the reset. It is now cleared when the map ends, as it already was between the maps of a series.
 
 # 1.0.20
 
