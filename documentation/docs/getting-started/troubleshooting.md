@@ -54,6 +54,7 @@ Most commands only work in one phase: warmup, live, practice and so on. `.help` 
 ### `.restore` fails or there are no backups
 
 - The server must be started with `-allow_round_backup_files`. Without it the console says "Round backup files are disabled" and MatchZy refuses `.restore` with a chat message. See [Launch options](installation.md#launch-options).
+- "Backup ... contains no usable round data, nothing was restored": the backup JSON exists, but CS2 wrote no round file for it, usually because the match was played without `-allow_round_backup_files` (or on MatchZy 1.0.9 or older, see below). Those backups cannot be restored; add the option and restart the server, and new rounds are backed up again.
 - "Rejecting round backup file path" in the console: CS2 (since the update of October 15, 2026) rejects absolute backup paths. Update MatchZy to 1.0.10 or newer.
 - The backup files are in `csgo/` or `csgo/addons/metamod/`, MatchZy's own state in `csgo/MatchZyDataBackup/`. See [Round backups](../guides/pauses-backups.md#round-backups).
 

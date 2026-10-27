@@ -402,6 +402,7 @@
     "matchzy.backupmsg.noprevbackup": "Nuk u gjet asnje backup i meparshem!",
     "matchzy.backupmsg.nousabledata": "Backup-i {0} nuk permban te dhena te perdorshme te raundit, asgje nuk u rikthye.",
     "matchzy.backupmsg.flagmissing": "Backup-et e raundeve jane te çaktivizuara ne kete server: u nis pa {green}-allow_round_backup_files{default}. Kerkoji pronarit te serverit ta shtoje te parametrat e nisjes.",
+    "matchzy.backupmsg.flagmissingwarn": "Kujdes: ky server u nis pa {green}-allow_round_backup_files{default}, prandaj nuk ruhen backup-e te raundeve dhe {green}.restore{default} nuk do te punoje ne kete ndeshje. Shtoje te parametrat e nisjes se serverit.",
     "matchzy.backupmsg.restorefailed": "{red}Rikthimi i {0} deshtoi.{default} Serveri nuk ngarkoi backup-in e raundit, gjendja e ndeshjes nuk ndryshoi.",
     "matchzy.backupmsg.restorefaileddetails": "mp_backup_restore_load_file nuk pati efekt. Shikoni konsolen e serverit per detajet e skedarit te backup-it.",
     "matchzy.backupmsg.restoredunpausein": "Raundi u rikthye. Pauza hiqet pas {green}{0}{default} sekondash. Perdorni {green}.pause{default} nese nuk jeni gati.",

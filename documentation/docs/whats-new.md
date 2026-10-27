@@ -2,8 +2,9 @@
 
 A short summary of each release. The [full changelog](changelog.md) has the details and background for every change.
 
-## 1.0.21 <small>October 25, 2026</small>
+## 1.0.21 <small>October 27, 2026</small>
 
+- **Changed:** A server started without `-allow_round_backup_files` warns admins in chat when a match is loaded and when it goes live, so missing round backups are noticed before a `.restore` is needed.
 - **Fixed:** Warmup, the knife round, scrims and live matches always turn off knife dropping (`mp_drop_knife_enable 0`), and warmup and the knife round no longer hand out free defuse kits (`mp_defuser_allocation 0`). A value set by `server.cfg` or another plugin no longer carries into these modes.
 
 ## 1.0.20 <small>October 24, 2026</small>

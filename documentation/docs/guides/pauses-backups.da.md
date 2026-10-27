@@ -30,7 +30,7 @@ Autopause erstatter spillets egen `sv_matchpause_auto_5v5` og ignorerer bot-hold
 MatchZy gemmer en backup ved starten af hver live-runde (Valves backup-system plus MatchZys egen tilstand). Backups ligger i `csgo/MatchZyDataBackup/` og kan også sendes med POST til `matchzy_remote_backup_url`.
 
 !!! warning "Startparameter påkrævet"
-    CS2 skriver og indlæser kun round-backups, når serveren er startet med `-allow_round_backup_files`. Uden den skriver konsollen "Round backup files are disabled", og alle restores fejler. MatchZy logger en advarsel, når parameteren mangler, og afviser `.restore` med en besked i chatten.
+    CS2 skriver og indlæser kun round-backups, når serveren er startet med `-allow_round_backup_files`. Uden den skriver konsollen "Round backup files are disabled", og alle restores fejler. Når parameteren mangler, advarer MatchZy admins i chatten (og i konsollen), når en kamp indlæses, og når den går live, og afviser `.restore` med en besked i chatten.
 
 | Situation | Kommando |
 |---|---|

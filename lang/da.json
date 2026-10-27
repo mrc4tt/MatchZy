@@ -402,6 +402,7 @@
     "matchzy.backupmsg.noprevbackup": "Ingen tidligere backup fundet!",
     "matchzy.backupmsg.nousabledata": "Backup {0} indeholder ingen brugbare round-data, intet blev restoret.",
     "matchzy.backupmsg.flagmissing": "Round-backups er slået fra på denne server: den er startet uden {green}-allow_round_backup_files{default}. Bed serverejeren tilføje det til startparametrene.",
+    "matchzy.backupmsg.flagmissingwarn": "Advarsel: serveren er startet uden {green}-allow_round_backup_files{default}, så der gemmes ingen round-backups, og {green}.restore{default} virker ikke i denne kamp. Tilføj det til serverens startparametre.",
     "matchzy.backupmsg.restorefailed": "{red}Restore af {0} mislykkedes.{default} Serveren indlæste ikke round backuppen, kampens tilstand er uændret.",
     "matchzy.backupmsg.restorefaileddetails": "mp_backup_restore_load_file havde ingen effekt. Se serverkonsollen for detaljer om backup-filen.",
     "matchzy.backupmsg.restoredunpausein": "Round restoret. Kampen unpauses om {green}{0}{default} sekunder. Brug {green}.pause{default} hvis du ikke er klar.",

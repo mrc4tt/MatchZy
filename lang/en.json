@@ -402,6 +402,7 @@
     "matchzy.backupmsg.noprevbackup": "No previous backup found!",
     "matchzy.backupmsg.nousabledata": "Backup {0} contains no usable round data, nothing was restored.",
     "matchzy.backupmsg.flagmissing": "Round backups are disabled on this server: it was started without {green}-allow_round_backup_files{default}. Ask the server owner to add it to the launch options.",
+    "matchzy.backupmsg.flagmissingwarn": "Warning: this server was started without {green}-allow_round_backup_files{default}, so no round backups are saved and {green}.restore{default} will not work in this match. Add it to the server launch options.",
     "matchzy.backupmsg.restorefailed": "{red}Restore of {0} failed.{default} The server did not load the round backup, match state is unchanged.",
     "matchzy.backupmsg.restorefaileddetails": "mp_backup_restore_load_file did not take effect. See the server console for the backup file details.",
     "matchzy.backupmsg.restoredunpausein": "Round restored. Match unpauses in {green}{0}{default} seconds. Use {green}.pause{default} if you are not ready.",

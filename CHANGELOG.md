@@ -4,8 +4,9 @@ Based on [MatchZy](https://github.com/shobhit-pathak/MatchZy) by Shobhit Pathak,
 
 # 1.0.21
 
-#### October 25, 2026
+#### October 27, 2026
 
+- A server started without `-allow_round_backup_files` now warns admins in chat when a match is loaded and when it goes live, not only in the log. CS2 saves no round backups without it, so the missing option used to show up only when a `.restore` failed with every round already lost.
 - Warmup, knife round, scrim and all live cfgs now set `mp_drop_knife_enable 0`, and `warmup.cfg` / `knife.cfg` also set `mp_defuser_allocation 0`. A knife-drop or free-defuser value from `server.cfg` or another plugin used to carry into these modes. Servers with their own cfg copies get the new values automatically unless their cfg sets them.
 
 # 1.0.20

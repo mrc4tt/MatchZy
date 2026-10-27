@@ -74,15 +74,21 @@ namespace MatchZy
         // every .restore fails.
         private bool RoundBackupFilesAllowed() => HasLaunchOption("-allow_round_backup_files");
 
-        private bool roundBackupFlagWarned;
+        // Logged only, a missing flag went unnoticed until a .restore failed, by then
+        // with every round of the match already lost. Tell the admins in chat as well, when a match
+        // is loaded and again when it goes live (SetupRoundBackupFile), so it can be fixed first.
+        private bool WarnIfRoundBackupFlagMissing()
+        {
+            if (RoundBackupFilesAllowed())
+                return false;
+            Log("[RoundBackup] WARNING: the server was started without -allow_round_backup_files. CS2 writes no round backup files and .restore cannot work. Add -allow_round_backup_files to the server's launch options.");
+            PrintLocalizedToAdmins("matchzy.backupmsg.flagmissingwarn");
+            return true;
+        }
 
         public void SetupRoundBackupFile()
         {
-            if (!roundBackupFlagWarned && !RoundBackupFilesAllowed())
-            {
-                roundBackupFlagWarned = true;
-                Log("[RoundBackup] WARNING: the server was started without -allow_round_backup_files. CS2 writes no round backup files and .restore cannot work. Add -allow_round_backup_files to the server's launch options.");
-            }
+            WarnIfRoundBackupFlagMissing();
             // A bare file name. Since CS2 1.41.9.1 (Oct 15 2026) the engine rejects a round backup
             // path that is absolute or contains ".." or ':' ("Rejecting round backup file path"),
             // for writing and for mp_backup_restore_load_file alike, so the absolute csgo path sent
