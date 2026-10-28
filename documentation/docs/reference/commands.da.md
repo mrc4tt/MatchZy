@@ -348,6 +348,7 @@ Kommandoerne til rethrow pr. type virker også som `.rethrowsmoke`, `.rethrowfla
 | `.blind` | Kaster en flashbang i hovedet på dig, til træning af reaktion på pop-flashes. |
 | `.god` | Du tager ingen skade. Skriv igen for at slå det fra. |
 | `.expire` | Smokes og molotovs udløber ikke: en smoke fornys på stedet, før den forsvinder, og ild bliver ved med at brænde (for ild startet efter du slog det til). Skriv igen for at slå det fra. |
+| `.smoketimer` | Spawn-smoke-timer, slået til som standard: efter en spawn-teleport (E på en spawn-markør, `.spawn`, `.ctspawn`, `.tspawn`) starter et ur ved din første bevægelse, hop eller skud, og hver smoke du kaster viser, hvornår den blev kastet og poppede (med flyvetid) efter starten. Skriv det for at slå det fra eller til for dig. |
 | `.coloredsmokes` | Slår farvede smokes (holdfarve) til eller fra; samme som `matchzy_smoke_color_enabled`. |
 | `.xray` | Alle spillere og bots lyser gennem vægge (T orange, CT blå). For alle på serveren. Skriv igen for at slå det fra. |
 | `.liferegon` | Slår din egen livsregenerering fra / til. Til som standard, så du ikke kan dø; slå den fra for at træne mod `.botshoot`-bots. |

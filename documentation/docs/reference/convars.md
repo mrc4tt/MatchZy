@@ -174,7 +174,7 @@ Database connection settings are in [`database.json`](files.md#databasejson), no
 | `matchzy_max_saved_last_grenades` | `512` | Y | Grenade history per player per map. `0` disables. |
 | `matchzy_smoke_color_enabled` | `false` | Y | Player-colored smokes. |
 | `matchzy_botjiggle_range` | `30` | N | Strafe width for `.botjiggle`. |
-| `matchzy_spawn_markers_enabled_default` | `false` | Y | Show the `.showspawns` markers automatically when practice starts. |
+| `matchzy_spawn_markers_enabled_default` | `true` | Y | Show the `.showspawns` markers automatically when practice starts. |
 | `matchzy_grenadelibrary_labels` | `true` | N | Text labels above `.shownades` markers. |
 | `matchzy_grenadelibrary_label_scale` | `0.2` | N | Size of those labels. |
 | `matchzy_prac_disable_magazine_drop` | `true` | N | Keep leftover ammo on reload in practice. |

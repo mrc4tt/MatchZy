@@ -22,7 +22,7 @@ namespace MatchZy
 
         public FakeConVar<float> botJiggleRange = new("matchzy_botjiggle_range", "Practice .botjiggle: how far (units) bots strafe side-to-side. Default: 30", 30.0f);
 
-        public FakeConVar<bool> spawnMarkersEnabledDefault = new("matchzy_spawn_markers_enabled_default", "Show the .showspawns markers automatically when practice mode starts. Default: false", false);
+        public FakeConVar<bool> spawnMarkersEnabledDefault = new("matchzy_spawn_markers_enabled_default", "Show the .showspawns markers automatically when practice mode starts. Default: true", true);
 
 
         // Coach viewing-spot source. 1 = use a spawns/coach/<map>.json spot when one exists (hand-tuned

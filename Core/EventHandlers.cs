@@ -555,6 +555,8 @@ public partial class MatchZy
                     uint projIndex = projectile.Index;
 
                     lastGrenadeThrownTime[(int)projIndex] = DateTime.Now;
+                    if (nadeType == "smoke")
+                        OnSmokeTimerThrow(player, (int)projIndex);
                     // Molotov/incendiary: track throw time + thrower per PROJECTILE (see OnEntityDeletedHandler).
                     if (nadeType == "molotov" || nadeType == "incendiary")
                         molotovProjectileThrows[(int)projIndex] = (DateTime.Now, client);
@@ -672,6 +674,7 @@ public partial class MatchZy
         if (lastGrenadeThrownTime.TryGetValue(@event.Entityid, out var thrownTime))
         {
             PrintToPlayerChat(player!, Localizer.ForPlayer(player, "matchzy.pracc.smoke", player!.PlayerName, $"{(DateTime.Now - thrownTime).TotalSeconds:0.00}"));
+            OnSmokeTimerDetonate(player!, @event.Entityid, thrownTime);
             lastGrenadeThrownTime.Remove(@event.Entityid);
         }
 

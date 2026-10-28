@@ -20,6 +20,7 @@ namespace MatchZy
             RegisterXray();
             RegisterStrategyRecorder();
             RegisterUtilityExpire();
+            RegisterListener<Listeners.OnPlayerButtonsChanged>(OnSmokeTimerButtonHandler);
         }
 
         // Practice start and end: every extra goes back to its default, so a new session never
@@ -41,6 +42,7 @@ namespace MatchZy
             ResetXray();
             ResetStrats();
             ResetUtilityExpire();
+            ResetSmokeSpawnTimer();
         }
 
         // Chat dispatch for the extras (both the bare and the argument forms). Returns true when the
@@ -68,6 +70,7 @@ namespace MatchZy
                 case ".strats": OnStratsMenuCommand(player, null); return true;
                 case ".xray": OnXrayConsoleCommand(player, null); return true;
                 case ".expire": OnExpireConsoleCommand(player, null); return true;
+                case ".smoketimer": OnSmokeTimerConsoleCommand(player, null); return true;
                 case ".shownades": ShowNadesWithFilter(player, arg); return true;
                 case ".coloredsmokes": OnColoredSmokesConsoleCommand(player, null); return true;
                 case ".botreactiontime": HandleBotReactionTimeCommand(player, arg); return true;

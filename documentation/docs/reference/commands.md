@@ -348,6 +348,7 @@ The per-type rethrow commands also work as `.rethrowsmoke`, `.rethrowflash`, `.r
 | `.blind` | Throws a flashbang at your face, for pop-flash reaction practice. |
 | `.god` | You take no damage. Type again to turn it off. |
 | `.expire` | Smokes and molotovs do not run out: a smoke is renewed on the spot before it fades, fires burn on (for fires started after turning it on). Type again to turn it off. |
+| `.smoketimer` | Spawn smoke timer, on by default: after a spawn teleport (E on a spawn marker, `.spawn`, `.ctspawn`, `.tspawn`) a clock starts on your first move, jump or shot, and each smoke you throw reports when it was thrown and when it popped (with flight time) after that start. Type it to turn it off or on for you. |
 | `.coloredsmokes` | Turns colored smokes (teammate color) on or off; same as `matchzy_smoke_color_enabled`. |
 | `.xray` | Every player and bot glows through walls (T orange, CT blue). For everyone on the server. Type again to turn it off. |
 | `.liferegon` | Turns your own health regeneration off / on. On by default, so you cannot die; turn it off to practice against `.botshoot` bots. |

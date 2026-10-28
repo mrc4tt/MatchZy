@@ -468,6 +468,7 @@ namespace MatchZy
                         // Route through TeleportUpright so a steep spawn angle doesn't tilt the
                         // whole body (issue MatchZy-Enhanced#8).
                         TeleportUpright(player, spawnsData[teamNum][spawnNumber].PlayerPosition, spawnsData[teamNum][spawnNumber].PlayerAngle);
+                        ArmSmokeSpawnTimer(player);
                     }
                     ReplyToUserCommand(player, Localizer.ForPlayer(player, "matchzy.pm.movedtospawn", $"{spawnNumber + 1}/{spawnsData[teamNum].Count}"));
                 }
@@ -4919,6 +4920,7 @@ namespace MatchZy
                 if (!IsPlayerValid(player))
                     return;
                 TeleportUpright(player, target.PlayerPosition, target.PlayerAngle);
+                ArmSmokeSpawnTimer(player);
             });
         }
 

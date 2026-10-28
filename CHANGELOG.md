@@ -12,6 +12,8 @@ Based on [MatchZy](https://github.com/shobhit-pathak/MatchZy) by Shobhit Pathak,
 # 1.0.20
 
 #### October 24, 2026
+- `matchzy_spawn_markers_enabled_default` is now `true`: the `.showspawns` markers are drawn as soon as practice starts, so players can walk into a spawn box (or aim at it) and press E to teleport there without knowing the command. `.hidespawns` hides them; set it to `false` for the old behaviour.
+- New `.smoketimer` spawn smoke timer in practice (on by default, `.smoketimer` turns it off for you): after a spawn teleport (E on a spawn marker, `.spawn`, `.ctspawn`, `.tspawn`) a clock starts on your first move, jump or shot. A smoke you throw then reports how many seconds after that start it was thrown and when it popped, with its flight time, so a spawn smoke can be checked against the round start.
 
 - Fixed a match loaded with `matchzy_loadmatch` / `matchzy_loadmatch_url` during a running `.start` pug reusing the pug's match id when the match config has no `matchid`. Its stats, events, demo name and round backups went to the pug's match. The loaded match now gets its own id; a `matchid` in the match config is still used as before.
 - `.showspawns`: pressing E on a spawn marker now picks the marker you aim at more precisely. The aim tolerance is a fixed distance around the marker instead of an angle, so a far marker next to the one you aim at is no longer picked, and the aim is taken from your real eye height (also while crouched).
