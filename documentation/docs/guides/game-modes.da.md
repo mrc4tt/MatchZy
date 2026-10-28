@@ -52,3 +52,5 @@ flowchart LR
 ```
 
 Med en match config kører vetoet før warmup. Scrim og hill springer knife-runden over.
+
+Vil du have en warmup med respawn med det samme ved holdets spawn, 2 sekunders spawn protection, ingen bombe, ingen friendly fire, køb hele warmup og fulde penge ved hver respawn, så sæt `matchzy_warmup_instant_respawn true`. Den sættes efter `warmup.cfg`, så du behøver ikke rette i din cfg.

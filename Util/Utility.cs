@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Globalization;
 using System.Drawing;
 using System.Text;
 using System.Text.Json;
@@ -131,6 +132,14 @@ namespace MatchZy
         // included), not only where a caller re-applies them.
         private void ExecModeCfg(string cfgPath, string extraCommands = "")
         {
+            // matchzy_warmup_instant_respawn changed friendly fire, buy time and respawn cash for the
+            // warmup; give the next mode the values from before (knife.cfg, prac.cfg and most live
+            // cfgs do not set all of them).
+            if (_cvarsBeforeWarmup != null && cfgPath != warmupCfgPath)
+            {
+                Server.ExecuteCommand(_cvarsBeforeWarmup);
+                _cvarsBeforeWarmup = null;
+            }
             // The cfg's bot_quota 0 must not find leftover bots, or the engine's quota sweep can
             // kick the CSTV bot along with them.
             KickBotsBeforeQuotaReset();
@@ -1093,6 +1102,30 @@ namespace MatchZy
         // ends or times out, and the dead respawn.
         private const string FakeWarmupCommands = "mp_ignore_round_win_conditions 1; mp_respawn_on_death_ct 1; mp_respawn_on_death_t 1; mp_roundtime 60; mp_roundtime_defuse 60; mp_roundtime_hostage 60";
 
+        // Commands that put back what matchzy_warmup_instant_respawn changed and no mode cfg resets
+        // everywhere (friendly fire, buy time, respawn cash); null = nothing changed.
+        private string? _cvarsBeforeWarmup;
+
+        // matchzy_warmup_instant_respawn: instant-respawn warmup, run after warmup.cfg and its override
+        // (a match config's "cvars" still win). Instant respawn at the team spawns with 2 s spawn
+        // protection, no bomb, no friendly fire, buying all the time, and full money again on every
+        // respawn (up to mp_maxmoney). Every other mode cfg sets mp_respawn_immunitytime back to 0.
+        // Empty when off: warmup.cfg decides.
+        private string WarmupInstantRespawnCommands()
+        {
+            if (!warmupInstantRespawn.Value)
+                return "";
+            if (_cvarsBeforeWarmup == null)
+            {
+                bool friendlyFire = ConVar.Find("mp_friendlyfire")?.GetPrimitiveValue<bool>() ?? true;
+                float buyTime = ConVar.Find("mp_buytime")?.GetPrimitiveValue<float>() ?? 15f;
+                int respawnCash = ConVar.Find("cash_player_respawn_amount")?.GetPrimitiveValue<int>() ?? 0;
+                _cvarsBeforeWarmup = string.Create(CultureInfo.InvariantCulture,
+                    $"mp_friendlyfire {(friendlyFire ? 1 : 0)};mp_buytime {buyTime};cash_player_respawn_amount {respawnCash}");
+            }
+            return ";mp_respawn_on_death_ct 1;mp_respawn_on_death_t 1;mp_respawnwavetime_ct 0;mp_respawnwavetime_t 0;mp_respawn_immunitytime 2;mp_give_player_c4 0;mp_friendlyfire 0;mp_buytime 999999;cash_player_respawn_amount 16000";
+        }
+
         // warmup.cfg (with mp_respawn_on_death 0 and mp_ignore_round_win_conditions 0) also runs
         // when a warmup restarts while the fake warmup is already active (match loaded during
         // warmup, veto ended, map reload). The fake-warmup rules were only set when it began, so
@@ -1100,7 +1133,7 @@ namespace MatchZy
         // round. Put them back after the cfg.
         private void ExecWarmupModeCfg(string extraCommands = "")
         {
-            ExecModeCfg(warmupCfgPath, extraCommands);
+            ExecModeCfg(warmupCfgPath, extraCommands + WarmupInstantRespawnCommands());
             if (_fakeWarmupActive)
                 Server.ExecuteCommand(FakeWarmupCommands);
         }
@@ -1121,7 +1154,7 @@ namespace MatchZy
             else
             {
                 KickAllBotsProtectCSTV();
-                Server.ExecuteCommand("mp_autokick 0;mp_autoteambalance 0;mp_buy_anywhere 0;mp_buytime 15;mp_death_drop_gun 0;mp_free_armor 1;mp_defuser_allocation 0;mp_drop_knife_enable 0;mp_ignore_round_win_conditions 0;mp_limitteams 0;mp_radar_showall 0;mp_respawn_on_death_ct 0;mp_respawn_on_death_t 0;mp_solid_teammates 0;mp_spectators_max 20;mp_maxmoney 16000;mp_startmoney 16000;mp_timelimit 0;sv_alltalk 0;sv_auto_full_alltalk_during_warmup_half_end 0;sv_deadtalk 1;sv_full_alltalk 0;sv_grenade_trajectory 0;sv_hibernate_when_empty 0;sv_hide_roundtime_until_seconds 1;mp_weapons_allow_typecount -1;ammo_grenade_limit_flashbang 2;mp_respawn_immunitytime 0;sv_infinite_ammo 0;sv_showimpacts 0;sv_voiceenable 1;sm_cvar sv_mute_players_with_social_penalties 0;sv_mute_players_with_social_penalties 0;tv_relayvoice 0;sv_cheats 0;mp_ct_default_melee weapon_knife;mp_ct_default_secondary weapon_hkp2000;mp_ct_default_primary \"\";mp_t_default_melee weapon_knife;mp_t_default_secondary weapon_glock;mp_t_default_primary \"\";mp_maxrounds 24;mp_warmuptime 9999;cash_team_bonus_shorthanded 0;mp_restartgame 1;mp_warmup_online_enabled 1;mp_warmup_start;mp_warmup_pausetimer 1");
+                Server.ExecuteCommand("mp_autokick 0;mp_autoteambalance 0;mp_buy_anywhere 0;mp_buytime 15;mp_death_drop_gun 0;mp_free_armor 1;mp_defuser_allocation 0;mp_drop_knife_enable 0;mp_ignore_round_win_conditions 0;mp_limitteams 0;mp_radar_showall 0;mp_respawn_on_death_ct 0;mp_respawn_on_death_t 0;mp_solid_teammates 0;mp_spectators_max 20;mp_maxmoney 16000;mp_startmoney 16000;mp_timelimit 0;sv_alltalk 0;sv_auto_full_alltalk_during_warmup_half_end 0;sv_deadtalk 1;sv_full_alltalk 0;sv_grenade_trajectory 0;sv_hibernate_when_empty 0;sv_hide_roundtime_until_seconds 1;mp_weapons_allow_typecount -1;ammo_grenade_limit_flashbang 2;mp_respawn_immunitytime 0;sv_infinite_ammo 0;sv_showimpacts 0;sv_voiceenable 1;sm_cvar sv_mute_players_with_social_penalties 0;sv_mute_players_with_social_penalties 0;tv_relayvoice 0;sv_cheats 0;mp_ct_default_melee weapon_knife;mp_ct_default_secondary weapon_hkp2000;mp_ct_default_primary \"\";mp_t_default_melee weapon_knife;mp_t_default_secondary weapon_glock;mp_t_default_primary \"\";mp_maxrounds 24;mp_warmuptime 9999;cash_team_bonus_shorthanded 0;mp_restartgame 1;mp_warmup_online_enabled 1;mp_warmup_start;mp_warmup_pausetimer 1" + WarmupInstantRespawnCommands());
                 if (_fakeWarmupActive)
                     Server.ExecuteCommand(FakeWarmupCommands);
             }

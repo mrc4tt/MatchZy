@@ -6,6 +6,7 @@ Based on [MatchZy](https://github.com/shobhit-pathak/MatchZy) by Shobhit Pathak,
 
 #### October 27, 2026
 
+- New `matchzy_warmup_instant_respawn` (default `false`): a warmup where the dead respawn at once at their team spawn with 2 seconds of spawn protection, no bomb, no friendly fire, buying all warmup and full money on every respawn. It is set after `warmup.cfg`, so servers with an older `warmup.cfg` copy do not have to edit it. Friendly fire, buy time and respawn cash return to their previous values when the warmup ends.
 - With `matchzy_ready_hint_style 1` or `2`, a warmup that restarted while the ready phase was already running (match loaded during warmup, veto finished, map reload) ran `warmup.cfg` again, which turned the ready phase's respawn and no-round-end rules off. Rounds then ended when one side was eliminated and the dead only came back with the next round. The rules are now put back after the cfg.
 - Warmup, knife round, scrim and all live cfgs now set `mp_drop_knife_enable 0`, and `warmup.cfg` / `knife.cfg` also set `mp_defuser_allocation 0`. A knife-drop or free-defuser value from `server.cfg` or another plugin used to carry into these modes. Servers with their own cfg copies get the new values automatically unless their cfg sets them.
 - Chat messages are now also translated to German (`de`), Spanish (`es`), French (`fr`), Norwegian (`nb`), Polish (`pl`), Russian (`ru`) and Swedish (`sv`). Each player sees their own language (`!lang <code>`); messages without a translation stay in English.

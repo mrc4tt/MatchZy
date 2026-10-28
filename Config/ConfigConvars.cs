@@ -32,6 +32,7 @@ namespace MatchZy
 
         public FakeConVar<int> coachingMode = new("matchzy_coaching_mode", "Coach spot source: 1 = spawns/coach JSON override then computed, 2 = always computed (ignore JSON). Default: 1", 1);
 
+        public FakeConVar<bool> warmupInstantRespawn = new("matchzy_warmup_instant_respawn", "Instant-respawn warmup: the dead respawn at once at their team spawn with 2 seconds of spawn protection, no bomb, no friendly fire, buying all warmup and full money on every respawn. Set after warmup.cfg, so it works with older warmup.cfg copies. false = warmup.cfg decides. Default: false", false);
         public FakeConVar<bool> warmupEnabled = new("matchzy_warmup_enabled", "Whether warmup mode is enabled. If false, warmup.cfg will not be loaded. Default: true", true);
 
         public FakeConVar<bool> techPauseEnabled = new("matchzy_enable_tech_pause", "Whether .tech command is enabled or not. Default: true", true);

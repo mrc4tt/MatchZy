@@ -31,6 +31,7 @@ Legend: **cfg** = present in the generated `config.cfg`.
 | Setting | Default | cfg | Description |
 |---|---|---|---|
 | `matchzy_warmup_enabled` | `true` | Y | Use warmup (execute `warmup.cfg`) before a match. |
+| `matchzy_warmup_instant_respawn` | `false` | Y | Instant-respawn warmup: the dead respawn at once at their team spawn with 2 seconds of spawn protection, no bomb, no friendly fire, buying all warmup and full money on every respawn. Set after `warmup.cfg`, so older cfg copies work too. `false` = `warmup.cfg` decides. |
 | `matchzy_ready_enabled` | `true` | Y | Players can ready up. `false` = `.ready`, `.r`, `.unready`, `.forceready`, `.readycheck`, ready by ping and join ready mode are off; only an admin starts the match with `.start` (also before the map veto). The ready time limit does not run and the ready clan tags are hidden. |
 | `matchzy_minimum_ready_required` | `10` | Y | Ready players needed to start. `0` = every connected player. Also `.readyrequired <n>`. In a 1v1, wingman or rush pug it is capped at 2, 4 or 6. |
 | `matchzy_ready_per_team` | `0` | Y | Per-team ready-up: a team is ready once `N` of its players are ready. In a loaded match its registered players must also all be in. `0` = off. |
