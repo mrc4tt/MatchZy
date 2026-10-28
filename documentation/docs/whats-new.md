@@ -5,6 +5,7 @@ A short summary of each release. The [full changelog](changelog.md) has the deta
 ## 1.0.21 <small>October 27, 2026</small>
 
 - **New:** Chat translations in German, Spanish, French, Norwegian, Polish, Russian and Swedish (`!lang <code>`).
+- **Fixed:** With `matchzy_ready_hint_style 1` or `2`, players who died in warmup sometimes only respawned when the round ended (after a match was loaded during warmup, a veto or a map reload).
 - **Fixed:** Warmup, the knife round, scrims and live matches always turn off knife dropping (`mp_drop_knife_enable 0`), and warmup and the knife round no longer hand out free defuse kits (`mp_defuser_allocation 0`). A value set by `server.cfg` or another plugin no longer carries into these modes.
 - **Fixed:** A pause called in the final round of a series (also an auto-pause after a disconnect) is cleared when the map ends instead of staying queued through the intermission.
 

@@ -1019,7 +1019,7 @@ namespace MatchZy
                     ExecUnpracCommands();
                     CleanupAllCollisionTimers();
                     PrintLocalizedToAll("matchzy.cmd.adminstartedwarmup");
-                    ExecModeCfg(warmupCfgPath, ";mp_freezetime 0");
+                    ExecWarmupModeCfg(";mp_freezetime 0");
                 }
             }
             else

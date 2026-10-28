@@ -6,6 +6,7 @@ Based on [MatchZy](https://github.com/shobhit-pathak/MatchZy) by Shobhit Pathak,
 
 #### October 27, 2026
 
+- With `matchzy_ready_hint_style 1` or `2`, a warmup that restarted while the ready phase was already running (match loaded during warmup, veto finished, map reload) ran `warmup.cfg` again, which turned the ready phase's respawn and no-round-end rules off. Rounds then ended when one side was eliminated and the dead only came back with the next round. The rules are now put back after the cfg.
 - Warmup, knife round, scrim and all live cfgs now set `mp_drop_knife_enable 0`, and `warmup.cfg` / `knife.cfg` also set `mp_defuser_allocation 0`. A knife-drop or free-defuser value from `server.cfg` or another plugin used to carry into these modes. Servers with their own cfg copies get the new values automatically unless their cfg sets them.
 - Chat messages are now also translated to German (`de`), Spanish (`es`), French (`fr`), Norwegian (`nb`), Polish (`pl`), Russian (`ru`) and Swedish (`sv`). Each player sees their own language (`!lang <code>`); messages without a translation stay in English.
 - A pause still pending when the last map of a series ended (for example an auto-pause after a player left during the final round) stayed queued through the end-of-match intermission and the reset. It is now cleared when the map ends, as it already was between the maps of a series.

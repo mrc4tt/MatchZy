@@ -800,7 +800,7 @@ namespace MatchZy
                             // behaviour - the round would start counting and could end. Re-create a
                             // "fake warmup" so the ready phase still plays like warmup: round never
                             // ends, no time expiry, respawn on death. Reset on leaving ready (above).
-                            Server.ExecuteCommand("mp_ignore_round_win_conditions 1; mp_respawn_on_death_ct 1; mp_respawn_on_death_t 1; mp_roundtime 60; mp_roundtime_defuse 60; mp_roundtime_hostage 60");
+                            Server.ExecuteCommand(FakeWarmupCommands);
                             _fakeWarmupActive = true;
                         }
                     }
@@ -1089,6 +1089,22 @@ namespace MatchZy
             }
         }
 
+        // Fake-warmup rules (matchzy_ready_hint_style 1/2 with real warmup forced off): the round never
+        // ends or times out, and the dead respawn.
+        private const string FakeWarmupCommands = "mp_ignore_round_win_conditions 1; mp_respawn_on_death_ct 1; mp_respawn_on_death_t 1; mp_roundtime 60; mp_roundtime_defuse 60; mp_roundtime_hostage 60";
+
+        // warmup.cfg (with mp_respawn_on_death 0 and mp_ignore_round_win_conditions 0) also runs
+        // when a warmup restarts while the fake warmup is already active (match loaded during
+        // warmup, veto ended, map reload). The fake-warmup rules were only set when it began, so
+        // the cfg left them off: rounds ended on eliminations and the dead waited for the next
+        // round. Put them back after the cfg.
+        private void ExecWarmupModeCfg(string extraCommands = "")
+        {
+            ExecModeCfg(warmupCfgPath, extraCommands);
+            if (_fakeWarmupActive)
+                Server.ExecuteCommand(FakeWarmupCommands);
+        }
+
         private void ExecWarmupCfg()
         {
             if (!warmupEnabled.Value)
@@ -1100,12 +1116,14 @@ namespace MatchZy
             var absolutePath = Path.Join(Server.GameDirectory, "csgo", "cfg", warmupCfgPath);
             if (File.Exists(Path.Join(Server.GameDirectory + "/csgo/cfg", warmupCfgPath)))
             {
-                ExecModeCfg(warmupCfgPath);
+                ExecWarmupModeCfg();
             }
             else
             {
                 KickAllBotsProtectCSTV();
                 Server.ExecuteCommand("mp_autokick 0;mp_autoteambalance 0;mp_buy_anywhere 0;mp_buytime 15;mp_death_drop_gun 0;mp_free_armor 1;mp_defuser_allocation 0;mp_drop_knife_enable 0;mp_ignore_round_win_conditions 0;mp_limitteams 0;mp_radar_showall 0;mp_respawn_on_death_ct 0;mp_respawn_on_death_t 0;mp_solid_teammates 0;mp_spectators_max 20;mp_maxmoney 16000;mp_startmoney 16000;mp_timelimit 0;sv_alltalk 0;sv_auto_full_alltalk_during_warmup_half_end 0;sv_deadtalk 1;sv_full_alltalk 0;sv_grenade_trajectory 0;sv_hibernate_when_empty 0;sv_hide_roundtime_until_seconds 1;mp_weapons_allow_typecount -1;ammo_grenade_limit_flashbang 2;mp_respawn_immunitytime 0;sv_infinite_ammo 0;sv_showimpacts 0;sv_voiceenable 1;sm_cvar sv_mute_players_with_social_penalties 0;sv_mute_players_with_social_penalties 0;tv_relayvoice 0;sv_cheats 0;mp_ct_default_melee weapon_knife;mp_ct_default_secondary weapon_hkp2000;mp_ct_default_primary \"\";mp_t_default_melee weapon_knife;mp_t_default_secondary weapon_glock;mp_t_default_primary \"\";mp_maxrounds 24;mp_warmuptime 9999;cash_team_bonus_shorthanded 0;mp_restartgame 1;mp_warmup_online_enabled 1;mp_warmup_start;mp_warmup_pausetimer 1");
+                if (_fakeWarmupActive)
+                    Server.ExecuteCommand(FakeWarmupCommands);
             }
             // The warmup cfg sets bot_quota 0; put a bot team back.
             ApplyBotTeam();
