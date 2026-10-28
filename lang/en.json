@@ -1,5 +1,6 @@
 {
     "matchzy.minimum.ready.required": "[Minimum ready players required: {0}]",
+    "matchzy.ready.neededperside": "[Ready needed: CT {green}{0}{default}, T {green}{1}{default}]",
     "matchzy.ready.markedready": "You have been marked as {green}ready{default}.",
     "matchzy.ready.disabled": "Ready-up is turned off on this server. An admin starts the match.",
     "matchzy.ready.waitingforadmin": "Waiting for an admin to start the match",
@@ -406,6 +407,7 @@
     "matchzy.backupmsg.noprevbackup": "No previous backup found!",
     "matchzy.backupmsg.nousabledata": "Backup {0} contains no usable round data, nothing was restored.",
     "matchzy.backupmsg.flagmissing": "Round backups are disabled on this server: it was started without {green}-allow_round_backup_files{default}. Ask the server owner to add it to the launch options.",
+    "matchzy.backupmsg.flagmissingwarn": "{red}Warning:{default} the server was started without {green}-allow_round_backup_files{default}. No round backups are written and .restore will not work. Add it to the launch options.",
     "matchzy.backupmsg.restorefailed": "{red}Restore of {0} failed.{default} The server did not load the round backup, match state is unchanged.",
     "matchzy.backupmsg.restorefaileddetails": "mp_backup_restore_load_file did not take effect. See the server console for the backup file details.",
     "matchzy.backupmsg.restoredunpausein": "Round restored. Match unpauses in {green}{0}{default} seconds. Use {green}.pause{default} if you are not ready.",

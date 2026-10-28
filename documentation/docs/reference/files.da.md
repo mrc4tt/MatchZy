@@ -19,7 +19,7 @@
 | `spawns/coach/<bane>.json` | plugin-mappen | Håndplacerede udsigtspladser til coaches. Følger med til ancient, ancient_night, anubis, cache, dust2, inferno, mirage, nuke, overpass, train og vertigo. |
 | `gamemode_competitive_server.cfg`, `gamemode_competitive2v2_server.cfg` | `csgo/cfg/` | Køres af motoren ved hver level load. MatchZy sørger for at de indeholder `bot_quota 0` (opretter filen, eller tilføjer linjen når der ikke er sat nogen `bot_quota`), så der ikke joiner bots mens spillerne i en serie reconnecter. En anden `bot_quota` som du selv har sat, bliver beholdt. |
 | `matchzy.json` | `addons/counterstrikesharp/gamedata/` | Native signaturer. Se [Gamedata](../getting-started/gamedata.md). |
-| `lang/*.json` | plugin-mappen | Oversættelser: engelsk, dansk, albansk. |
+| `lang/*.json` | plugin-mappen | Oversættelser: engelsk, dansk, albansk, tysk, spansk, fransk, norsk, polsk, russisk, svensk. Spillere vælger deres med `!lang <kode>` (CounterStrikeSharp). |
 | `matchzy.db` | plugin-mappen | SQLite-database (standard). |
 | `MatchZy_Stats/<matchid>/` | `csgo/` | CSV og avanceret statistik som JSON pr. bane. Se [Statistik](../guides/stats.md). |
 | `MatchZyDataBackup/` | `csgo/` | Backups af runder. |

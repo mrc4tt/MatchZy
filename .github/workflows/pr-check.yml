@@ -27,8 +27,8 @@ jobs:
       - name: Language files are valid and have the same keys
         run: |
           python3 - <<'PY'
-          import json, sys
-          files = {"en": "lang/en.json", "da": "lang/da.json", "sq": "lang/sq.json"}
+          import glob, json, os, sys
+          files = {os.path.basename(p)[:-5]: p for p in sorted(glob.glob("lang/*.json"))}
           data = {}
           for name, path in files.items():
               try:

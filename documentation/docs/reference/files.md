@@ -19,7 +19,7 @@
 | `spawns/coach/<map>.json` | plugin folder | Hand-tuned coach viewing spots. Shipped for ancient, ancient_night, anubis, cache, dust2, inferno, mirage, nuke, overpass, train and vertigo. |
 | `gamemode_competitive_server.cfg`, `gamemode_competitive2v2_server.cfg` | `csgo/cfg/` | Run by the engine on every level load. MatchZy makes sure they contain `bot_quota 0` (creates the file, or appends the line when no `bot_quota` is set) so no bots join while series players reconnect. A different `bot_quota` you set is kept. |
 | `matchzy.json` | `addons/counterstrikesharp/gamedata/` | Native signatures. See [Gamedata](../getting-started/gamedata.md). |
-| `lang/*.json` | plugin folder | Translations: English, Danish, Albanian. |
+| `lang/*.json` | plugin folder | Translations: English, Danish, Albanian, German, Spanish, French, Norwegian, Polish, Russian, Swedish. Players pick theirs with `!lang <code>` (CounterStrikeSharp). |
 | `matchzy.db` | plugin folder | SQLite database (default backend). |
 | `MatchZy_Stats/<matchid>/` | `csgo/` | CSV and advanced stats JSON per map. See [Stats](../guides/stats.md). |
 | `MatchZyDataBackup/` | `csgo/` | Round backups. |
