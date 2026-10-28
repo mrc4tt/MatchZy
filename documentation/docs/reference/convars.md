@@ -37,6 +37,7 @@ Legend: **cfg** = present in the generated `config.cfg`.
 | `matchzy_ready_per_team` | `0` | Y | Per-team ready-up: a team is ready once `N` of its players are ready. In a loaded match its registered players must also all be in. `0` = off. |
 | `matchzy_allow_force_ready` | `true` | Y | Allow `.forceready` (match setup only). Alias `get5_allow_force_ready`. |
 | `matchzy_forceready_max_missing` | `1` | Y | Loaded matches: how many players a team may be short of `players_per_team` and still use `.forceready` (`1` = 4 in a 5v5). `min_players_to_ready` can only make it stricter. `-1` = only `min_players_to_ready` decides (Get5). |
+| `matchzy_ready_max_missing` | `-1` | Y | Loaded matches: the fewest players a team can ready up with, whichever way (`.ready` with a smaller roster, `min_players_to_ready`, join mode, `matchzy_ready_per_team`, `.forceready`): `players_per_team` minus this. `1` = at least 4 in a 5v5, `0` = full teams only. Admins can still `.start`. `-1` = off. |
 | `matchzy_ready_hint_style` | `0` | Y | `0` classic center text, `1` HTML ready-up panel, `2` chat reminder only. |
 | `matchzy_ready_hint_blink` | `false` | Y | Blink the "NOT READY" line on the HTML panel. |
 | `matchzy_hide_failed_connect_messages` | `false` | Y | Hide the chat line when a player leaves before they were fully connected ("failed to connect", a timed out or cancelled join). Leave messages of players who were in the game are still shown. |

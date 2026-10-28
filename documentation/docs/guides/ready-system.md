@@ -84,6 +84,10 @@ If the player will not come, one player on the team can type `.forceready`. That
 - `min_players_to_ready` in the match config can only make that stricter for `.forceready` (for example `5` means `.forceready` needs the whole team).
 - Turn `.forceready` off completely with `matchzy_allow_force_ready false`.
 
+### Minimum team size
+
+By default a team registered with fewer players than `players_per_team`, or a match config with a low `min_players_to_ready` (panels often send `1`), lets a short team ready up with plain `.ready`. `matchzy_ready_max_missing` sets a floor for every way of readying up: with `1`, a team needs at least 4 players in a 5v5, whatever the roster or match config say. `0` = full teams only, `-1` (default) = off. An admin can still start the match with `.start`.
+
 ## Join ready mode
 
 `matchzy_ready_mode 1` (loaded matches only) removes `.ready` altogether: a team is ready as soon as its players have joined, and the match starts `matchzy_join_start_delay` seconds after everyone is in (someone leaving stops the countdown). How many players a team needs is `min_players_to_ready` from the match config, or the team's registered players when it is not set.

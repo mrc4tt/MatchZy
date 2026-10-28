@@ -324,14 +324,15 @@ namespace MatchZy
             }
             List<string> unreadyPlayers = new();
             int perTeam = EffectiveReadyPerTeam();
+            (bool ctDone, bool tDone) = ReadySidesDone();
 
             foreach (var key in playerReadyStatus.Keys)
             {
                 if (playerReadyStatus[key] == false && playerData.TryGetValue(key, out var p) && p != null && p.IsValid)
                 {
-                    // Per-team mode: a side that already has N ready players is done, so its
-                    // remaining players are not holding anything up.
-                    if (perTeam > 0 && (p.TeamNum == (int)CsTeam.CounterTerrorist || p.TeamNum == (int)CsTeam.Terrorist) && IsTeamReady(p.TeamNum))
+                    // A side that is already ready (N ready players, min_players_to_ready, .forceready)
+                    // is done, so its remaining players are not holding anything up.
+                    if ((p.TeamNum == (int)CsTeam.CounterTerrorist && ctDone) || (p.TeamNum == (int)CsTeam.Terrorist && tDone))
                         continue;
                     // Coaches do not count towards the ready-up (GetTeamPlayerCount), so they hold nothing up.
                     if (matchzyTeam1.coach.Contains(p) || matchzyTeam2.coach.Contains(p))
@@ -347,7 +348,11 @@ namespace MatchZy
                 {
                     if (player == null || !player.IsValid || player.IsBot || player.IsHLTV)
                         continue;
-                    string minimumReadyRequiredMessage = isMatchSetup || EffectiveReadyPerTeam() > 0 ? "" : Localizer.ForPlayer(player, "matchzy.minimum.ready.required", $"{ChatColors.Green}{EffectiveMinimumReadyRequired()}{ChatColors.Default}");
+                    // Loaded match: say how many each side needs, so a list of every unready player
+                    // does not read as "everyone has to type .ready" when fewer are enough.
+                    string minimumReadyRequiredMessage = isMatchSetup
+                        ? Localizer.ForPlayer(player, "matchzy.ready.neededperside", ReadyNeededOnSide((int)CsTeam.CounterTerrorist), ReadyNeededOnSide((int)CsTeam.Terrorist))
+                        : EffectiveReadyPerTeam() > 0 ? "" : Localizer.ForPlayer(player, "matchzy.minimum.ready.required", $"{ChatColors.Green}{EffectiveMinimumReadyRequired()}{ChatColors.Default}");
                     player.PrintToChat($"{chatPrefix} {Localizer.ForPlayer(player, key, unreadyPlayerList, minimumReadyRequiredMessage)}");
                 }
             }
@@ -454,7 +459,7 @@ namespace MatchZy
 
         // Cached ready-panel DATA (recomputed only on change). Localized HTML is built per
         // player each tick so every player sees the panel in their own language.
-        private int _rpReady, _rpRequired, _rpTotal, _rpFilled, _rpCtCount, _rpCtReady, _rpTCount, _rpTReady;
+        private int _rpReady, _rpRequired, _rpFilled, _rpCtCount, _rpCtReady, _rpTCount, _rpTReady;
         // Loaded match: players each side needs (roster-sized), 0 otherwise.
         private int _rpCtNeed, _rpTNeed;
         // Ready count shown per side: capped at what the side needs (loaded match), so extra ready
@@ -499,6 +504,16 @@ namespace MatchZy
         // convars). Reset when leaving the ready phase so it never leaks into live play.
         private bool _fakeWarmupActive;
 
+        // Sides that are already ready, so their unready players are not listed as holding the start
+        // up. Loaded match or matchzy_ready_per_team only: a pug without it counts ready players in
+        // total, not per side.
+        private (bool Ct, bool T) ReadySidesDone()
+        {
+            if (!isMatchSetup && EffectiveReadyPerTeam() <= 0)
+                return (false, false);
+            return (IsTeamReady((int)CsTeam.CounterTerrorist), IsTeamReady((int)CsTeam.Terrorist));
+        }
+
         // Recompute the shared ready numbers only when ready status changed.
         private void ComputeReadyData()
         {
@@ -507,6 +522,7 @@ namespace MatchZy
 
             int readyCount = 0, totalPlayers = 0;
             List<string> notReady = new();
+            (bool ctDone, bool tDone) = ReadySidesDone();
             foreach (var key in playerReadyStatus.Keys)
             {
                 if (playerData.TryGetValue(key, out var p) && p != null && p.IsValid)
@@ -517,7 +533,7 @@ namespace MatchZy
                     totalPlayers++;
                     if (playerReadyStatus[key])
                         readyCount++;
-                    else
+                    else if (!(p.TeamNum == (int)CsTeam.CounterTerrorist ? ctDone : tDone))
                         notReady.Add(p.PlayerName);
                 }
             }
@@ -556,7 +572,6 @@ namespace MatchZy
                 int minReady = EffectiveMinimumReadyRequired();
                 _rpRequired = minReady > 0 ? minReady : totalPlayers;
             }
-            _rpTotal = totalPlayers;
             _rpFilled = Math.Clamp((int)Math.Round(12.0 * _rpReady / Math.Max(1, _rpRequired)), 0, 12);
 
             string list = string.Join(", ", notReady.Take(6));
@@ -666,7 +681,8 @@ namespace MatchZy
         {
             if (!readyEnabled.Value)
                 return Localizer.ForPlayer(player, "matchzy.ready.waitingforadmin");
-            string line1 = Localizer.ForPlayer(player, "matchzy.hint.waitingforplayers", _rpReady, _rpTotal);
+            // Ready against what the start needs (as the HTML panel), not against everyone present.
+            string line1 = Localizer.ForPlayer(player, "matchzy.hint.waitingforplayers", _rpReady, _rpRequired);
             string line2 = Localizer.ForPlayer(player, "matchzy.hint.usereadycommand");
             if (ShortHandedSide(player.TeamNum) is (int shortPresent, int shortRequired))
                 line2 += "\n" + Localizer.ForPlayer(player, "matchzy.ready.shorthanded", shortPresent, shortRequired, shortRequired - shortPresent);
