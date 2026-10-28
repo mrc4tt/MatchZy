@@ -54,6 +54,7 @@ De fleste kommandoer virker kun i én fase: warmup, live, practice og så videre
 ### `.restore` fejler, eller der er ingen backups { #restore-fails-or-there-are-no-backups }
 
 - Serveren skal startes med `-allow_round_backup_files`. Uden den skriver konsollen "Round backup files are disabled", og MatchZy afviser `.restore` med en besked i chatten. Se [Startparametre](installation.md#launch-options).
+- "Backup ... contains no usable round data, nothing was restored": backup-JSON'en findes, men CS2 skrev ingen rundefil til den, typisk fordi kampen blev spillet uden `-allow_round_backup_files` (eller på MatchZy 1.0.9 eller ældre, se nedenfor). De backups kan ikke gendannes; tilføj parameteren og genstart serveren, så tages der backup af nye runder igen.
 - "Rejecting round backup file path" i konsollen: CS2 (siden opdateringen 15. oktober 2026) afviser absolutte backup-stier. Opdater MatchZy til 1.0.10 eller nyere.
 - Backup-filerne ligger i `csgo/` eller `csgo/addons/metamod/`, MatchZys egen tilstand i `csgo/MatchZyDataBackup/`. Se [Backups af runder](../guides/pauses-backups.md#round-backups).
 

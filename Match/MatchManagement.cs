@@ -549,6 +549,7 @@ namespace MatchZy
 
             });
 
+            WarnIfRoundBackupFlagMissing();
             return true;
         }
 
