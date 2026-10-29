@@ -4,8 +4,9 @@ Based on [MatchZy](https://github.com/shobhit-pathak/MatchZy) by Shobhit Pathak,
 
 # 1.0.21
 
-#### October 27, 2026
+#### October 29, 2026
 
+- With `matchzy_ready_hint_style 1` or `2`, a player who joined a team during warmup while the round was running stayed in the observer view until the round ended. The join respawn checked for a player pawn, which someone who just joined from the team menu or Spectator does not have yet, so it never ran. Joiners now spawn as soon as their team is set, and with `matchzy_warmup_instant_respawn true` also in the native warmup.
 - New `matchzy_warmup_instant_respawn` (default `false`): a warmup where the dead respawn at once at their team spawn with 2 seconds of spawn protection, no bomb, no friendly fire, buying all warmup and full money on every respawn. It is set after `warmup.cfg`, so servers with an older `warmup.cfg` copy do not have to edit it. Friendly fire, buy time and respawn cash return to their previous values when the warmup ends.
 - With `matchzy_ready_hint_style 1` or `2`, a warmup that restarted while the ready phase was already running (match loaded during warmup, veto finished, map reload) ran `warmup.cfg` again, which turned the ready phase's respawn and no-round-end rules off. Rounds then ended when one side was eliminated and the dead only came back with the next round. The rules are now put back after the cfg.
 - New `matchzy_ready_max_missing` (default `-1` = off): the fewest players a team can ready up with in a loaded match, `players_per_team` minus this. It applies to every way of readying up (a smaller roster, `min_players_to_ready` in the match config, join mode, `matchzy_ready_per_team`, `.forceready`). Before, `matchzy_forceready_max_missing` only limited `.forceready`, so a panel sending `min_players_to_ready 1` or a 3-player roster still let a short team start with plain `.ready`.

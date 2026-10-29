@@ -53,4 +53,4 @@ flowchart LR
 
 With a match config the veto runs before warmup. Scrim and hill skip the knife round.
 
-For a warmup with instant respawn at the team spawn, 2 seconds of spawn protection, no bomb, no friendly fire, buying all warmup and full money on every respawn, set `matchzy_warmup_instant_respawn true`. It is applied after `warmup.cfg`, so you do not have to edit your cfg.
+For a warmup with instant respawn at the team spawn, 2 seconds of spawn protection, no bomb, no friendly fire, buying all warmup and full money on every respawn, set `matchzy_warmup_instant_respawn true`. It is applied after `warmup.cfg`, so you do not have to edit your cfg. Players who join a team during the warmup spawn at once as well.

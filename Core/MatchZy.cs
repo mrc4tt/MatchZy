@@ -910,36 +910,31 @@ namespace MatchZy
             // which also disables warmup's automatic respawn of someone who just picked a team - so
             // they get stuck in the observer/spectator cam for several seconds until a later respawn
             // wave. Respawn them promptly. T/CT only (never respawn a spectator -> crash), and only if
-            // they aren't already alive.
+            // they aren't already alive. matchzy_warmup_instant_respawn promises the same in a real
+            // warmup: mp_respawn_on_death only brings back the dead, not someone joining mid-round.
+            // Controller-level validity only: a fresh joiner (from None or Spectator) has no player
+            // pawn yet, so IsPlayerValid failed for exactly the players this is for.
             RegisterEventHandler<EventPlayerTeam>(
                 (@event, info) =>
                 {
-                    if (!readyAvailable || matchStarted || !_fakeWarmupActive)
+                    if (!readyAvailable || matchStarted || !(_fakeWarmupActive || warmupInstantRespawn.Value))
                         return HookResult.Continue;
                     if (@event.Team != (int)CsTeam.Terrorist && @event.Team != (int)CsTeam.CounterTerrorist)
                         return HookResult.Continue;
 
                     CCSPlayerController? player = @event.Userid;
-                    if (!IsHumanPlayerValid(player))
+                    if (player == null || !player.IsValid || player.IsBot || player.IsHLTV || player.Connected != PlayerConnectedState.Connected)
                         return HookResult.Continue;
                     // Coaches are intentionally unspawned - never respawn them.
-                    if (matchzyTeam1.coach.Contains(player!) || matchzyTeam2.coach.Contains(player!))
+                    if (matchzyTeam1.coach.Contains(player) || matchzyTeam2.coach.Contains(player))
                         return HookResult.Continue;
 
-                    // Defer off the team-change event, then re-validate: they may have moved again.
-                    AddTimer(0.2f, () =>
-                    {
-                        if (!IsPlayerValid(player))
-                            return;
-                        if (player!.TeamNum != (byte)CsTeam.Terrorist && player.TeamNum != (byte)CsTeam.CounterTerrorist)
-                            return;
-                        if (matchzyTeam1.coach.Contains(player) || matchzyTeam2.coach.Contains(player))
-                            return;
-                        // Already spawned (alive) -> leave them; only rescue the stuck observer.
-                        if (player.PlayerPawn?.Value != null && player.PlayerPawn.Value.Health > 0)
-                            return;
-                        player.Respawn();
-                    });
+                    // Polls until the team has applied, then respawns (recreating the pawn when the
+                    // handle is empty); stops once alive or when the ready phase ends.
+                    CsTeam team = (CsTeam)@event.Team;
+                    RespawnWhenTeamApplied(player, team, RespawnRetryAttempts,
+                        keepGoing: () => readyAvailable && !matchStarted && (_fakeWarmupActive || warmupInstantRespawn.Value)
+                            && !matchzyTeam1.coach.Contains(player) && !matchzyTeam2.coach.Contains(player));
 
                     return HookResult.Continue;
                 },

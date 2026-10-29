@@ -317,6 +317,12 @@ namespace MatchZy
 
             var absolutePath = Path.Join(Server.GameDirectory + "/csgo/cfg", practiceCfgPath);
 
+            // A mode loaded before (fshost css_dmon: a deathmatch plugin or gamemode cfg) can leave
+            // mp_randomspawn and mp_teammates_are_enemies on, and an older prac.cfg copy does not
+            // set them, so practice spawned everyone at random. Reset them first: prac.cfg and its
+            // override still win.
+            Server.ExecuteCommand("mp_randomspawn 0;mp_teammates_are_enemies 0");
+
             if (File.Exists(Path.Join(Server.GameDirectory + "/csgo/cfg", practiceCfgPath)))
             {
                 practiceUsesWarmup = false;

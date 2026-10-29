@@ -2,7 +2,7 @@
 
 A short summary of each release. The [full changelog](changelog.md) has the details and background for every change.
 
-## 1.0.21 <small>October 27, 2026</small>
+## 1.0.21 <small>October 29, 2026</small>
 
 - **New:** `matchzy_warmup_instant_respawn true` gives a warmup with instant respawn at the team spawn, 2 seconds of spawn protection, no bomb, no friendly fire, buying all warmup and full money on every respawn. Off by default.
 - **New:** `matchzy_ready_max_missing` sets the fewest players a team can ready up with in a loaded match (`1` = at least 4 in a 5v5), however it readies up. Off by default.
@@ -10,6 +10,7 @@ A short summary of each release. The [full changelog](changelog.md) has the deta
 - **New:** Chat translations in German, Spanish, French, Norwegian, Polish, Russian and Swedish (`!lang <code>`).
 - **Changed:** The `.showspawns` markers are shown when practice starts (`matchzy_spawn_markers_enabled_default true`), so E on a spawn box teleports you there without knowing the command.
 - **Changed:** A server started without `-allow_round_backup_files` warns admins in chat when a match is loaded and when it goes live, so missing round backups are noticed before a `.restore` is needed.
+- **Fixed:** With `matchzy_ready_hint_style 1` or `2` (or `matchzy_warmup_instant_respawn true`), players who join a team during warmup spawn at once instead of watching until the round ends.
 - **Fixed:** With `matchzy_ready_hint_style 1` or `2`, players who died in warmup sometimes only respawned when the round ended (after a match was loaded during warmup, a veto or a map reload).
 - **Fixed:** Ready reminders no longer suggest every player has to type `.ready` when the match needs fewer: ready teams drop out of the waiting list, and the counts show what the start needs.
 - **Fixed:** Warmup, the knife round, scrims and live matches always turn off knife dropping (`mp_drop_knife_enable 0`), and warmup and the knife round no longer hand out free defuse kits (`mp_defuser_allocation 0`). A value set by `server.cfg` or another plugin no longer carries into these modes.
