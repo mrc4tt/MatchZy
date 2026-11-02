@@ -43,7 +43,7 @@
          Our replacement = SQLite 3.50.2 (patched) compiled at GLIBC_2.14 (runs everywhere).
          Do NOT bump to 3.x expecting it to "just work" on the container. -->
     <PackageReference Include="SQLitePCLRaw.bundle_e_sqlite3" Version="2.1.11" />
-    <PackageReference Include="MySqlConnector" Version="2.4.0" />
+    <PackageReference Include="MySqlConnector" Version="2.6.2" />
     <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
     <PackageReference Include="CS2MenuManager" Version="1.0.42">
       <PrivateAssets>none</PrivateAssets>

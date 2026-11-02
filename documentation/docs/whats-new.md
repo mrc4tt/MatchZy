@@ -16,6 +16,7 @@ A short summary of each release. The [full changelog](changelog.md) has the deta
 - **Fixed:** Warmup, the knife round, scrims and live matches always turn off knife dropping (`mp_drop_knife_enable 0`), and warmup and the knife round no longer hand out free defuse kits (`mp_defuser_allocation 0`). A value set by `server.cfg` or another plugin no longer carries into these modes.
 - **Fixed:** A pause called in the final round of a series (also an auto-pause after a disconnect) is cleared when the map ends instead of staying queued through the intermission.
 - **Security:** `noclip` in the console only works in practice mode. Before, MatchZy's own `noclip` handler skipped the `sv_cheats` check and let any alive player noclip in warmup, the knife round, scrims and live matches.
+- **Security:** MySqlConnector updated to 2.6.2 (GHSA-473q-m89c-ghf8). With MySQL stats, the older version could send the database password before checking the server's TLS certificate, so someone on the network between the game server and a remote MySQL server could read it.
 
 ## 1.0.20 <small>October 24, 2026</small>
 
