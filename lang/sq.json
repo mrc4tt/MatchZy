@@ -464,6 +464,7 @@
     "matchzy.cmd.hillnoknife": "Raundi me thikë është i çaktivizuar për këtë modalitet.",
     "matchzy.cmd.pracnotactive": "Modaliteti i praktikës nuk është aktiv!",
     "matchzy.cmd.exitingprac": "Po dal nga modaliteti i praktikës, po nis modalitetin e ndeshjes!",
+    "matchzy.cmd.noclippracticeonly": "Noclip është i disponueshëm vetëm në modalitetin e praktikës.",
     "matchzy.cmd.sidechoicetimeleft": "{green}{0}{default} ka edhe {1} sekonda për të zgjedhur anën!",
     "matchzy.cmd.teamfullspectator": "Ekipi yt ka tashmë {0} lojtarë. Je vendosur si spektator.",
     "matchzy.cmd.teamfull": "Ekipi yt ka tashmë {0} lojtarë.",

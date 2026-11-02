@@ -464,6 +464,7 @@
     "matchzy.cmd.hillnoknife": "La manche au couteau est désactivée pour ce mode.",
     "matchzy.cmd.pracnotactive": "Le mode entraînement n'est pas actif !",
     "matchzy.cmd.exitingprac": "Sortie du mode entraînement, lancement du mode match !",
+    "matchzy.cmd.noclippracticeonly": "Le noclip n'est disponible qu'en mode entraînement.",
     "matchzy.cmd.sidechoicetimeleft": "Il reste {1} secondes à {green}{0}{default} pour choisir son côté !",
     "matchzy.cmd.teamfullspectator": "Ton équipe a déjà {0} joueurs. Tu es placé en spectateur.",
     "matchzy.cmd.teamfull": "Ton équipe a déjà {0} joueurs.",

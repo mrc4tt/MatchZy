@@ -464,6 +464,7 @@
     "matchzy.cmd.hillnoknife": "La ronda de cuchillos está desactivada en este modo.",
     "matchzy.cmd.pracnotactive": "¡El modo práctica no está activo!",
     "matchzy.cmd.exitingprac": "¡Saliendo del modo práctica, iniciando el modo partida!",
+    "matchzy.cmd.noclippracticeonly": "Noclip solo está disponible en el modo de práctica.",
     "matchzy.cmd.sidechoicetimeleft": "¡A {green}{0}{default} le quedan {1} segundos para elegir lado!",
     "matchzy.cmd.teamfullspectator": "Tu equipo ya tiene {0} jugadores. Has sido colocado como espectador.",
     "matchzy.cmd.teamfull": "Tu equipo ya tiene {0} jugadores.",

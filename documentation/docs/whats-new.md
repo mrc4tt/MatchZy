@@ -2,7 +2,7 @@
 
 A short summary of each release. The [full changelog](changelog.md) has the details and background for every change.
 
-## 1.0.21 <small>October 29, 2026</small>
+## 1.0.21 <small>November 2, 2026</small>
 
 - **New:** `matchzy_warmup_instant_respawn true` gives a warmup with instant respawn at the team spawn, 2 seconds of spawn protection, no bomb, no friendly fire, buying all warmup and full money on every respawn. Off by default.
 - **New:** `matchzy_ready_max_missing` sets the fewest players a team can ready up with in a loaded match (`1` = at least 4 in a 5v5), however it readies up. Off by default.
@@ -15,6 +15,7 @@ A short summary of each release. The [full changelog](changelog.md) has the deta
 - **Fixed:** Ready reminders no longer suggest every player has to type `.ready` when the match needs fewer: ready teams drop out of the waiting list, and the counts show what the start needs.
 - **Fixed:** Warmup, the knife round, scrims and live matches always turn off knife dropping (`mp_drop_knife_enable 0`), and warmup and the knife round no longer hand out free defuse kits (`mp_defuser_allocation 0`). A value set by `server.cfg` or another plugin no longer carries into these modes.
 - **Fixed:** A pause called in the final round of a series (also an auto-pause after a disconnect) is cleared when the map ends instead of staying queued through the intermission.
+- **Security:** `noclip` in the console only works in practice mode. Before, MatchZy's own `noclip` handler skipped the `sv_cheats` check and let any alive player noclip in warmup, the knife round, scrims and live matches.
 
 ## 1.0.20 <small>October 24, 2026</small>
 

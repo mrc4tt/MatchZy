@@ -1406,8 +1406,18 @@ namespace MatchZy
         }
 
         // Overrides noclip console command. Perform the changes on server side.
+        //
+        // Practice-only: the listener runs before the engine's sv_cheats gate, so without
+        // this check any alive T/CT could noclip during warmup, knife or a live match.
+        // Dry run clears isPractice, so it is blocked there too.
         public HookResult OnConsoleNoClip(CCSPlayerController? player, CommandInfo cmd)
         {
+            if (!isPractice)
+            {
+                NotifyNoClipPracticeOnly(player);
+                return HookResult.Stop;
+            }
+
             if (player == null || !player.PawnIsAlive || player.Team == CsTeam.Spectator || player.Team == CsTeam.None)
                 return HookResult.Stop;
 
@@ -1428,6 +1438,12 @@ namespace MatchZy
             }
 
             return HookResult.Stop;
+        }
+
+        private void NotifyNoClipPracticeOnly(CCSPlayerController? player)
+        {
+            if (!IsHumanPlayerValid(player)) return;
+            PrintToPlayerChat(player!, Localizer.ForPlayer(player, "matchzy.cmd.noclippracticeonly"));
         }
     }
 }

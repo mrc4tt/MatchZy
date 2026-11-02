@@ -4,8 +4,9 @@ Based on [MatchZy](https://github.com/shobhit-pathak/MatchZy) by Shobhit Pathak,
 
 # 1.0.21
 
-#### October 29, 2026
+#### November 2, 2026
 
+- `noclip` in the console now only works in practice mode. MatchZy takes over the `noclip` command to apply it server-side, and that handler ran before the engine's `sv_cheats` check without checking for practice, so any alive player could noclip during warmup, the knife round, scrims and live matches. Dry run counts as outside practice.
 - With `matchzy_ready_hint_style 1` or `2`, a player who joined a team during warmup while the round was running stayed in the observer view until the round ended. The join respawn checked for a player pawn, which someone who just joined from the team menu or Spectator does not have yet, so it never ran. Joiners now spawn as soon as their team is set, and with `matchzy_warmup_instant_respawn true` also in the native warmup.
 - New `matchzy_warmup_instant_respawn` (default `false`): a warmup where the dead respawn at once at their team spawn with 2 seconds of spawn protection, no bomb, no friendly fire, buying all warmup and full money on every respawn. It is set after `warmup.cfg`, so servers with an older `warmup.cfg` copy do not have to edit it. Friendly fire, buy time and respawn cash return to their previous values when the warmup ends.
 - With `matchzy_ready_hint_style 1` or `2`, a warmup that restarted while the ready phase was already running (match loaded during warmup, veto finished, map reload) ran `warmup.cfg` again, which turned the ready phase's respawn and no-round-end rules off. Rounds then ended when one side was eliminated and the dead only came back with the next round. The rules are now put back after the cfg.

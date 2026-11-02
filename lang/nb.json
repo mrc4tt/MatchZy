@@ -464,6 +464,7 @@
     "matchzy.cmd.hillnoknife": "Knivrunde er deaktivert for denne modusen.",
     "matchzy.cmd.pracnotactive": "Treningsmodus er ikke aktiv!",
     "matchzy.cmd.exitingprac": "Avslutter treningsmodus, starter kampmodus!",
+    "matchzy.cmd.noclippracticeonly": "Noclip er kun tilgjengelig i treningsmodus.",
     "matchzy.cmd.sidechoicetimeleft": "{green}{0}{default} har {1} sekunder igjen til å velge side!",
     "matchzy.cmd.teamfullspectator": "Laget ditt har allerede {0} spillere. Du er satt som tilskuer.",
     "matchzy.cmd.teamfull": "Laget ditt har allerede {0} spillere.",

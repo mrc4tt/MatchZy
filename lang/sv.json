@@ -464,6 +464,7 @@
     "matchzy.cmd.hillnoknife": "Knivrundan är inaktiverad i detta läge.",
     "matchzy.cmd.pracnotactive": "Träningsläget är inte aktivt!",
     "matchzy.cmd.exitingprac": "Lämnar träningsläget, startar matchläget!",
+    "matchzy.cmd.noclippracticeonly": "Noclip är endast tillgängligt i träningsläge.",
     "matchzy.cmd.sidechoicetimeleft": "{green}{0}{default} har {1} sekunder kvar att välja sida!",
     "matchzy.cmd.teamfullspectator": "Ditt lag har redan {0} spelare. Du placeras som åskådare.",
     "matchzy.cmd.teamfull": "Ditt lag har redan {0} spelare.",

@@ -464,6 +464,7 @@
     "matchzy.cmd.hillnoknife": "Die Messerrunde ist in diesem Modus deaktiviert.",
     "matchzy.cmd.pracnotactive": "Der Trainingsmodus ist nicht aktiv!",
     "matchzy.cmd.exitingprac": "Verlasse den Trainingsmodus, starte den Match-Modus!",
+    "matchzy.cmd.noclippracticeonly": "Noclip ist nur im Trainingsmodus verfügbar.",
     "matchzy.cmd.sidechoicetimeleft": "{green}{0}{default} hat noch {1} Sekunden, um die Seite zu wählen!",
     "matchzy.cmd.teamfullspectator": "Dein Team hat bereits {0} Spieler. Du wurdest als Zuschauer eingeteilt.",
     "matchzy.cmd.teamfull": "Dein Team hat bereits {0} Spieler.",

@@ -464,6 +464,7 @@
     "matchzy.cmd.hillnoknife": "Knife Round is disabled for this mode.",
     "matchzy.cmd.pracnotactive": "Practice mode is not active!",
     "matchzy.cmd.exitingprac": "Exiting practice mode, starting match mode!",
+    "matchzy.cmd.noclippracticeonly": "Noclip is only available in practice mode.",
     "matchzy.cmd.sidechoicetimeleft": "{green}{0}{default} has {1} seconds left to choose side!",
     "matchzy.cmd.teamfullspectator": "Your team already has {0} players. You are placed as a spectator.",
     "matchzy.cmd.teamfull": "Your team already has {0} players.",

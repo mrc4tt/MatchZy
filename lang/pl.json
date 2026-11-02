@@ -464,6 +464,7 @@
     "matchzy.cmd.hillnoknife": "Runda nożowa jest wyłączona w tym trybie.",
     "matchzy.cmd.pracnotactive": "Tryb treningu nie jest aktywny!",
     "matchzy.cmd.exitingprac": "Wychodzę z trybu treningu, włączam tryb meczu!",
+    "matchzy.cmd.noclippracticeonly": "Noclip jest dostępny tylko w trybie treningowym.",
     "matchzy.cmd.sidechoicetimeleft": "{green}{0}{default} mają {1} sek. na wybór strony!",
     "matchzy.cmd.teamfullspectator": "Twoja drużyna ma już {0} graczy. Zostajesz obserwatorem.",
     "matchzy.cmd.teamfull": "Twoja drużyna ma już {0} graczy.",

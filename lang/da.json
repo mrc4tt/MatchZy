@@ -464,6 +464,7 @@
     "matchzy.cmd.hillnoknife": "Knife round er slået fra i denne mode.",
     "matchzy.cmd.pracnotactive": "Practice mode er ikke aktiv!",
     "matchzy.cmd.exitingprac": "Forlader practice mode, starter match mode!",
+    "matchzy.cmd.noclippracticeonly": "Noclip er kun tilgængelig i træningstilstand.",
     "matchzy.cmd.sidechoicetimeleft": "{green}{0}{default} har {1} sekunder tilbage til at vælge side!",
     "matchzy.cmd.teamfullspectator": "Dit hold har allerede {0} spillere. Du er sat som spectator.",
     "matchzy.cmd.teamfull": "Dit hold har allerede {0} spillere.",

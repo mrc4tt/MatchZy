@@ -464,6 +464,7 @@
     "matchzy.cmd.hillnoknife": "Ножевой раунд в этом режиме отключён.",
     "matchzy.cmd.pracnotactive": "Режим тренировки не активен!",
     "matchzy.cmd.exitingprac": "Выходим из режима тренировки, запускаем режим матча!",
+    "matchzy.cmd.noclippracticeonly": "Noclip доступен только в режиме тренировки.",
     "matchzy.cmd.sidechoicetimeleft": "У {green}{0}{default} осталось {1} сек. на выбор стороны!",
     "matchzy.cmd.teamfullspectator": "В твоей команде уже {0} игроков. Ты переведён в зрители.",
     "matchzy.cmd.teamfull": "В твоей команде уже {0} игроков.",
