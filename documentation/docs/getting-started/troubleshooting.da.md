@@ -56,7 +56,8 @@ De fleste kommandoer virker kun i én fase: warmup, live, practice og så videre
 - Serveren skal startes med `-allow_round_backup_files`. Uden den skriver konsollen "Round backup files are disabled", og MatchZy afviser `.restore` med en besked i chatten. Se [Startparametre](installation.md#launch-options).
 - "Backup ... contains no usable round data, nothing was restored": backup-JSON'en findes, men CS2 skrev ingen rundefil til den, typisk fordi kampen blev spillet uden `-allow_round_backup_files` (eller på MatchZy 1.0.9 eller ældre, se nedenfor). De backups kan ikke gendannes; tilføj parameteren og genstart serveren, så tages der backup af nye runder igen.
 - "Rejecting round backup file path" i konsollen: CS2 (siden opdateringen 15. oktober 2026) afviser absolutte backup-stier. Opdater MatchZy til 1.0.10 eller nyere.
-- Backup-filerne ligger i `csgo/` eller `csgo/addons/metamod/`, MatchZys egen tilstand i `csgo/MatchZyDataBackup/`. Se [Backups af runder](../guides/pauses-backups.md#round-backups).
+- Rundefilerne mangler i `csgo/`, men ligger i en anden mappe (fx `csgo/backups/`): `mp_backup_round_file_pattern` er ændret af hosting-egget, `server.cfg` eller et andet plugin. MatchZy 1.0.22 og nyere sætter den tilbage til `%prefix%_round%round%.txt`, når en kamp går live, og logger den gamle værdi; på ældre versioner skal indstillingen fjernes. Backups taget, mens mønstret var ændret, har ingen rundedata.
+- Backup-filerne ligger i `csgo/` (på Metamod-servere skriver CS2 dem først til `csgo/addons/metamod/`, og MatchZy flytter dem til `csgo/` inden for få sekunder) (eller `csgo/backups/`, når `gameinfo.gi` tilføjer den mappe, som nogle Pelican/Pterodactyl-eggs gør), MatchZys egen tilstand i `csgo/MatchZyDataBackup/`. Se [Backups af runder](../guides/pauses-backups.md#round-backups).
 
 ## Demoer { #demos }
 

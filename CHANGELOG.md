@@ -2,6 +2,15 @@
 
 Based on [MatchZy](https://github.com/shobhit-pathak/MatchZy) by Shobhit Pathak, adapted for CS2 game-server hosting: remote log HTTP API, G5API compatibility, auto changelevel, advanced stats (HLTV 2.0 rating / KAST / clutch / opening duels), a coach system, a pause overhaul, and in-game admin and match-setup menus.
 
+# 1.0.22
+
+#### November 5, 2026
+
+- Round backups are found again on servers where a hosting egg, `server.cfg` or another plugin changed `mp_backup_round_file_pattern` (for example to `backups/%prefix%_round%round%.txt`). CS2 then wrote the round files to a folder MatchZy does not read, so the backups had no round data and `.restore` failed. MatchZy now sets the pattern back to `%prefix%_round%round%.txt` when a match goes live and logs the old value.
+- On Metamod servers the round backup files no longer stay in `csgo/addons/metamod/`. CS2 writes them to the first game search path, which Metamod's `gameinfo.gi` line makes `csgo/addons/metamod/`, and it no longer accepts a full path to `csgo/`. MatchZy now moves each round file to `csgo/` about two seconds after the round starts, once CS2 has finished writing it (also files left there by older versions). Restores load them from `csgo/` as before. If `csgo/` is not writable, the files stay where they are and a warning is logged once.
+- Round backup files are now also looked for in `csgo/backups/`, for servers whose `gameinfo.gi` adds that folder as a game search path (some Pelican/Pterodactyl eggs). CS2 writes the round files to the first such folder, so MatchZy found no round data there and `.restore` failed. Servers without it still use `csgo/` or `csgo/addons/metamod/`.
+- The startup line and `css_matchzy_version` now also say that this is the fork by mrc4tt and not the original MatchZy by WD-, with where to get support (`github.com/mrc4tt/MatchZy`), so a log or console output tells this fork (1.0.x) apart from the original MatchZy (0.9.x). The `MatchZy version: x` line is unchanged.
+
 # 1.0.21
 
 #### November 2, 2026

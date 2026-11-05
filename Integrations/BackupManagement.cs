@@ -95,15 +95,41 @@ namespace MatchZy
             // before made it write nothing. A relative file lands in the first Game search path:
             // csgo/, or csgo/addons/metamod/ on Metamod servers (see EngineRoundBackupDirs).
             Server.ExecuteCommand($"mp_backup_round_file \"matchzy_{liveMatchId}_{matchConfig.CurrentMapNumber}\"");
+            EnforceRoundBackupFilePattern();
+        }
+
+        // The engine builds each round file name from mp_backup_round_file_pattern. Every lookup
+        // here (valve_backup fill-in, restore, backup list) expects the stock "<prefix>_roundXX.txt"
+        // in csgo/ or csgo/addons/metamod/. A pattern changed by a hosting egg, server.cfg or
+        // another plugin (a "backups/" subfolder, %date%, %map%, ...) makes the engine write the
+        // files where MatchZy never finds them, so valve_backup stays empty and .restore fails with
+        // "no usable round data". Put the stock pattern back for the match.
+        private const string DefaultRoundBackupFilePattern = "%prefix%_round%round%.txt";
+
+        private void EnforceRoundBackupFilePattern()
+        {
+            try
+            {
+                string? current = ConVar.Find("mp_backup_round_file_pattern")?.StringValue;
+                if (current != null && current != DefaultRoundBackupFilePattern)
+                    Log($"[RoundBackup] mp_backup_round_file_pattern was \"{current}\"; set to \"{DefaultRoundBackupFilePattern}\" so MatchZy can find the round backup files.");
+            }
+            catch (Exception ex)
+            {
+                Log($"[RoundBackup] Could not read mp_backup_round_file_pattern: {ex.Message}");
+            }
+            Server.ExecuteCommand($"mp_backup_round_file_pattern \"{DefaultRoundBackupFilePattern}\"");
         }
 
         // Folders the engine's own round backup files can be in: it writes a relative file to the
         // first Game search path (csgo/, or csgo/addons/metamod/ with Metamod) and loads one from
-        // any of them.
+        // any of them. Some hosting setups (Pelican/Pterodactyl eggs) add csgo/backups/ as a Game
+        // search path in gameinfo.gi, which then receives the files instead; it is only read
+        // here, nothing is ever written there by MatchZy.
         private string[] EngineRoundBackupDirs()
         {
             string csgoDir = EngineCsgoDirectory();
-            return new[] { csgoDir, Path.Combine(csgoDir, "addons", "metamod") };
+            return new[] { csgoDir, Path.Combine(csgoDir, "addons", "metamod"), Path.Combine(csgoDir, "backups") };
         }
 
         // Every place the engine may have written this round file, for the off-thread readers.
@@ -521,7 +547,7 @@ namespace MatchZy
                 // queued restore left the server in warmup with everyone ready).
                 if (!HasUsableValveRoundData(backupData, fileName))
                 {
-                    Log($"[RestoreRoundBackup] {fileName} has no usable valve_backup data and no complete .txt in csgo/, nothing to restore.");
+                    Log($"[RestoreRoundBackup] {fileName} has no usable valve_backup data and no complete .txt in csgo/, csgo/addons/metamod/ or csgo/backups/, nothing to restore.");
                     ReplyToUserCommand(player, Localizer.ForPlayer(player, "matchzy.backupmsg.nousabledata", fileName));
                     return false;
                 }
@@ -749,7 +775,7 @@ namespace MatchZy
                         {
                             // Nothing to load: the round would stay exactly as it is while we announce a
                             // successful restore and pause the match. Report it instead.
-                            Log($"[RestoreRoundBackup] {fileName} has no usable valve_backup data and no complete .txt in csgo/, nothing to restore.");
+                            Log($"[RestoreRoundBackup] {fileName} has no usable valve_backup data and no complete .txt in csgo/, csgo/addons/metamod/ or csgo/backups/, nothing to restore.");
                             ReplyToUserCommand(player, Localizer.ForPlayer(player, "matchzy.backupmsg.nousabledata", fileName));
                             pendingRestoreTechPauses = null;
                             return false;
@@ -1487,9 +1513,6 @@ namespace MatchZy
                 backupWriteLock.Release();
             }
 
-            if (!needsFillIn)
-                return;
-
             // The engine writes its own round file (mp_backup_round_auto) around the same tick as this
             // round_start snapshot, so it is often not on disk yet and the JSON ends up with an empty
             // valve_backup - which used to make the restore of that round a no-op. Fill it in once the
@@ -1498,8 +1521,26 @@ namespace MatchZy
             // the game thread, so unlike the timer it is not cancelled by unload or map change. That is
             // intentional: the work only repairs a backup file already on disk and is guarded by the
             // File.Exists / IsCompleteValveBackup checks below.
+            //
+            // The same pass then moves the engine's round files out of csgo/addons/metamod/ (see
+            // MoveRoundFilesOutOfMetamod), which is why it runs even when no fill-in is needed.
             await Task.Delay(TimeSpan.FromSeconds(2)).ConfigureAwait(false);
             await backupWriteLock.WaitAsync().ConfigureAwait(false);
+            try
+            {
+                if (needsFillIn)
+                    await FillInValveBackupAsync(filePath, lastBackupCandidates, options).ConfigureAwait(false);
+                MoveRoundFilesOutOfMetamod(lastBackupCandidates);
+            }
+            finally
+            {
+                backupWriteLock.Release();
+            }
+        }
+
+        // Caller holds backupWriteLock. File IO only, safe off the game thread.
+        private async Task FillInValveBackupAsync(string filePath, string[] lastBackupCandidates, JsonSerializerOptions options)
+        {
             try
             {
                 string lastBackupFilePath = NewestExistingFile(lastBackupCandidates);
@@ -1524,9 +1565,48 @@ namespace MatchZy
             {
                 Log($"[CreateMatchZyRoundDataBackup valve_backup fill-in] {ex.Message}");
             }
-            finally
+        }
+
+        private bool metamodMoveFailureLogged;
+
+        // CS2 writes a relative round file into the FIRST Game search path, which on a Metamod server
+        // is csgo/addons/metamod/ (Metamod's gameinfo.gi line goes before csgo). Since CS2 1.41.9.1 the
+        // path cannot be pointed at csgo/ instead (absolute, ".." and ':' are rejected), so the files
+        // are moved there once the engine is done with them. mp_backup_restore_load_file searches every
+        // Game path, so a moved file still loads by its bare name.
+        //
+        // Every matchzy_*_round*.txt in that folder is moved, not only this round's: files from rounds
+        // the engine wrote while a restore ran, and ones left by older builds, go too. Only complete
+        // files untouched for a second are moved, so a file the engine is still writing stays put
+        // until the next round. Caller holds backupWriteLock; file IO only, safe off the game thread.
+        private void MoveRoundFilesOutOfMetamod(string[] lastBackupCandidates)
+        {
+            if (lastBackupCandidates.Length < 2)
+                return;
+            string? csgoDir = Path.GetDirectoryName(lastBackupCandidates[0]);
+            string? metamodDir = Path.GetDirectoryName(lastBackupCandidates[1]);
+            if (csgoDir == null || metamodDir == null || !Directory.Exists(metamodDir))
+                return;
+            foreach (var source in Directory.EnumerateFiles(metamodDir, "matchzy_*_round*.txt"))
             {
-                backupWriteLock.Release();
+                string name = Path.GetFileName(source);
+                try
+                {
+                    if (DateTime.UtcNow - File.GetLastWriteTimeUtc(source) < TimeSpan.FromSeconds(1))
+                        continue;
+                    if (!IsCompleteValveBackup(File.ReadAllText(source)))
+                        continue;
+                    File.Move(source, Path.Combine(csgoDir, name), overwrite: true);
+                }
+                catch (Exception ex)
+                {
+                    // Not fatal: the file stays readable where it is. Log once, not every round.
+                    if (!metamodMoveFailureLogged)
+                    {
+                        metamodMoveFailureLogged = true;
+                        Log($"[RoundBackup] Could not move {name} from csgo/addons/metamod/ to csgo/ ({ex.Message}). Round backups keep working from csgo/addons/metamod/; check that csgo/ is writable for the server user.");
+                    }
+                }
             }
         }
 

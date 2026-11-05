@@ -2,6 +2,13 @@
 
 A short summary of each release. The [full changelog](changelog.md) has the details and background for every change.
 
+## 1.0.22 <small>November 5, 2026</small>
+
+- **Changed:** The startup line and `css_matchzy_version` say that this is the fork by mrc4tt, not the original MatchZy by WD- (0.9.x), and where to get support.
+- **Fixed:** Round backups work on servers where `mp_backup_round_file_pattern` was changed (for example by a hosting egg to a `backups/` folder). MatchZy sets it back to the default during a match, so `.restore` finds the round files.
+- **Changed:** On Metamod servers the round backup files are moved from `csgo/addons/metamod/` to `csgo/` after each round start, so they no longer end up in the Metamod folder.
+- **Fixed:** Round backups are found in `csgo/backups/` on servers whose `gameinfo.gi` adds that folder (some Pelican/Pterodactyl eggs).
+
 ## 1.0.21 <small>November 2, 2026</small>
 
 - **New:** `matchzy_warmup_instant_respawn true` gives a warmup with instant respawn at the team spawn, 2 seconds of spawn protection, no bomb, no friendly fire, buying all warmup and full money on every respawn. Off by default.
@@ -32,13 +39,13 @@ A short summary of each release. The [full changelog](changelog.md) has the deta
 - **New:** `matchzy_ready_enabled false` turns off the player ready-up (`.ready`, `.forceready`, ping, join ready mode). Only an admin starts the match with `.start`, and the ready time limit does not run.
 - **New:** `matchzy_hide_failed_connect_messages true` hides the chat line for players who leave before they were fully connected ("failed to connect").
 
-## 1.0.17 <small>October 24, 2026</small>
-
-- **Fixed:** `matchzy_remote_log_url ""` clears the remote log URL and stops sending events (also the header and auth settings). Before, the old webhook kept receiving events.
-- **Changed:** A remote log setting run without a value prints what it is set to (header and auth values masked).
-- **Changed:** `matchzy_loadmatch_url` tries the match config download up to 3 times on timeouts, network errors and HTTP 5xx/408/429.
-
 ## Older releases
+
+??? note "1.0.17 - October 24, 2026"
+
+    - **Fixed:** `matchzy_remote_log_url ""` clears the remote log URL and stops sending events (also the header and auth settings). Before, the old webhook kept receiving events.
+    - **Changed:** A remote log setting run without a value prints what it is set to (header and auth values masked).
+    - **Changed:** `matchzy_loadmatch_url` tries the match config download up to 3 times on timeouts, network errors and HTTP 5xx/408/429.
 
 ??? note "1.0.16 - October 24, 2026"
 
