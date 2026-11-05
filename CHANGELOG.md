@@ -2,6 +2,12 @@
 
 Based on [MatchZy](https://github.com/shobhit-pathak/MatchZy) by Shobhit Pathak, adapted for CS2 game-server hosting: remote log HTTP API, G5API compatibility, auto changelevel, advanced stats (HLTV 2.0 rating / KAST / clutch / opening duels), a coach system, a pause overhaul, and in-game admin and match-setup menus.
 
+# 1.0.23
+
+#### November 5, 2026
+
+- A player who left a live match and came back in the same round got back the money they had at the start of that round. CS2 keeps an in-memory round backup for reconnecting players (`mp_backup_round_auto`) and restores their cash from it, so money spent that round was refunded while the bought weapons stayed on the ground for teammates (players reported 4000 turning into 6000). MatchZy now remembers the money a player leaves with and sets it back to that if they return in the same round with more. A reconnect in a later round, and money earned after coming back, are not touched. Each correction is logged.
+
 # 1.0.22
 
 #### November 5, 2026

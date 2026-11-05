@@ -16,7 +16,7 @@ namespace MatchZy
     public partial class MatchZy : BasePlugin
     {
         public override string ModuleName => "MatchZy";
-        public override string ModuleVersion => "1.0.22";
+        public override string ModuleVersion => "1.0.23";
 
         // Shown next to the version in the load line and the version command, so a log or a
         // support question tells this fork (1.0.x) apart from the original MatchZy (0.x).
@@ -683,6 +683,7 @@ namespace MatchZy
             };
 
             RegisterEventHandler<EventPlayerConnectFull>(EventPlayerConnectFullHandler);
+            RegisterReconnectMoneyGuard();
             RegisterEventHandler<EventPlayerDisconnect>(EventPlayerDisconnectHandler);
             RegisterEventHandler<EventPlayerDisconnect>(EventPlayerDisconnectPreHandler, hookMode: HookMode.Pre);
             RegisterEventHandler<EventCsWinPanelRound>(EventCsWinPanelRoundHandler, hookMode: HookMode.Pre);

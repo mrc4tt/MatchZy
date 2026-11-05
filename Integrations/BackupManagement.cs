@@ -835,6 +835,7 @@ namespace MatchZy
 
                             isRoundRestoring = true;
                             isSpawnKeeping = true;
+                            ClearReconnectMoneyCaps();
                             Log(
                                 $"[RestoreRoundBackup] Loading {loadFileName}. Rounds played: {preRoundsPlayed}, score: {preTeam1Score}-{preTeam2Score}, target round: {restoredRoundsPlayed}."
                             );

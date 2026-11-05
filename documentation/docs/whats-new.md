@@ -2,6 +2,10 @@
 
 A short summary of each release. The [full changelog](changelog.md) has the details and background for every change.
 
+## 1.0.23 <small>November 5, 2026</small>
+
+- **Fixed:** Reconnecting during a live round no longer refunds the money spent that round. Players keep the money they left with.
+
 ## 1.0.22 <small>November 5, 2026</small>
 
 - **Changed:** The startup line and `css_matchzy_version` say that this is the fork by mrc4tt, not the original MatchZy by WD- (0.9.x), and where to get support.
@@ -34,12 +38,12 @@ A short summary of each release. The [full changelog](changelog.md) has the deta
 
 - **Fixed:** GOTV demos are recorded again on Windows servers. The current CS2 build rejected the demo path MatchZy sent (`couldn't open file ... for writing`), so no demo was saved.
 
-## 1.0.18 <small>October 24, 2026</small>
-
-- **New:** `matchzy_ready_enabled false` turns off the player ready-up (`.ready`, `.forceready`, ping, join ready mode). Only an admin starts the match with `.start`, and the ready time limit does not run.
-- **New:** `matchzy_hide_failed_connect_messages true` hides the chat line for players who leave before they were fully connected ("failed to connect").
-
 ## Older releases
+
+??? note "1.0.18 - October 24, 2026"
+
+    - **New:** `matchzy_ready_enabled false` turns off the player ready-up (`.ready`, `.forceready`, ping, join ready mode). Only an admin starts the match with `.start`, and the ready time limit does not run.
+    - **New:** `matchzy_hide_failed_connect_messages true` hides the chat line for players who leave before they were fully connected ("failed to connect").
 
 ??? note "1.0.17 - October 24, 2026"
 
