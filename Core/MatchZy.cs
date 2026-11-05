@@ -16,7 +16,11 @@ namespace MatchZy
     public partial class MatchZy : BasePlugin
     {
         public override string ModuleName => "MatchZy";
-        public override string ModuleVersion => "1.0.21";
+        public override string ModuleVersion => "1.0.22";
+
+        // Shown next to the version in the load line and the version command, so a log or a
+        // support question tells this fork (1.0.x) apart from the original MatchZy (0.x).
+        public const string ForkLabel = "fork by mrc4tt, not the original MatchZy by WD-; support: github.com/mrc4tt/MatchZy";
         public override string ModuleAuthor => "Miksen/mrc4tt (based on MatchZy by WD-)";
         public override string ModuleDescription => "A plugin for running and managing CS2 practice/pugs/scrims/matches!";
         public string chatPrefix = $"{ChatColors.Green}[MatchZy]{ChatColors.Default}";
@@ -361,7 +365,7 @@ namespace MatchZy
                 var matchzyCfgDir = configManager.GetMatchZyCfgDir();
                 var cfgFolderName = Path.GetFileName(matchzyCfgDir.TrimEnd('/'));
                 // One startup line instead of one per step; warnings and errors still log on their own.
-                Log($"MatchZy {ModuleVersion} loaded | config: csgo/cfg/{cfgFolderName} | maps: {mapRotationList.Count} | admins: {loadedAdmins.Count}");
+                Log($"MatchZy {ModuleVersion} ({ForkLabel}) loaded | config: csgo/cfg/{cfgFolderName} | maps: {mapRotationList.Count} | admins: {loadedAdmins.Count}");
                 var configPath = Path.Combine(matchzyCfgDir, ConfigFiles.Paths.Config);
                 if (File.Exists(configPath))
                 {

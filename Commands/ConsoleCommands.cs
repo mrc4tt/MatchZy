@@ -1403,6 +1403,8 @@ namespace MatchZy
             {
                 reply("Unable to get server version");
             }
+            // Own line so tools that parse "MatchZy version: x" keep working.
+            reply($"Build: {ForkLabel}");
         }
 
         // Overrides noclip console command. Perform the changes on server side.
