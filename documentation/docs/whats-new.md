@@ -4,6 +4,7 @@ A short summary of each release. The [full changelog](changelog.md) has the deta
 
 ## 1.0.24 <small>November 6, 2026</small>
 
+- **Fixed:** Players who join while practice mode is already running get the practice command list in chat.
 - **Fixed:** Players are placed on their correct team already in warmup, also after a map change, instead of being moved when the match starts.
 - **Fixed:** Players moved to their roster side when the match starts no longer die and miss the knife round or the first live round.
 

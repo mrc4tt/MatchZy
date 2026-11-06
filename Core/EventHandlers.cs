@@ -134,6 +134,19 @@ public partial class MatchZy
                 }
             }
 
+            // Practice already running when this player joined (started automatically at map start,
+            // e.g. coming from another mode, or by someone else): StartPracticeMode printed the
+            // command list before they were in. Send it now, after the join chat spam.
+            if (isPractice)
+            {
+                AddTimer(5.0f, () =>
+                {
+                    if (!isPractice || !IsPlayerValid(player) || player!.UserId != userId)
+                        return;
+                    SendPracticeHelp(player);
+                }, CounterStrikeSharp.API.Modules.Timers.TimerFlags.STOP_ON_MAPCHANGE);
+            }
+
             if (isMatchLive && autoPauseEnabled.Value)
             {
                 AddTimer(1.0f, () => CheckAutoResumeOrAutoPause());

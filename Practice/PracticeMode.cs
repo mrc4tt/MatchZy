@@ -377,19 +377,28 @@ namespace MatchZy
             AddTimer(1.5f, () => { if (isPractice) WarmSpawnFloorCache(); }, TimerFlags.STOP_ON_MAPCHANGE);
             if (spawnMarkersEnabledDefault.Value)
                 AddTimer(2.0f, () => { if (isPractice) ShowAllSpawnMarkers(); }, TimerFlags.STOP_ON_MAPCHANGE);
-            string[] practiceHelpKeys =
-            {
-                "matchzy.prac.help.spawns", "matchzy.prac.help.bots", "matchzy.prac.help.botpositions",
-                "matchzy.prac.help.nades", "matchzy.prac.help.nadethrow", "matchzy.prac.help.utility",
-                "matchzy.prac.help.positions", "matchzy.prac.help.sides", "matchzy.prac.help.full"
-            };
             foreach (var helpPlayer in Utilities.GetPlayers())
-            {
-                if (helpPlayer == null || !helpPlayer.IsValid || helpPlayer.IsBot || helpPlayer.IsHLTV)
-                    continue;
-                foreach (var helpKey in practiceHelpKeys)
-                    helpPlayer.PrintToChat($" {Localizer.ForPlayer(helpPlayer, helpKey)}");
-            }
+                SendPracticeHelp(helpPlayer);
+        }
+
+        private static readonly string[] PracticeHelpKeys =
+        {
+            "matchzy.prac.help.spawns", "matchzy.prac.help.bots", "matchzy.prac.help.botpositions",
+            "matchzy.prac.help.nades", "matchzy.prac.help.nadethrow", "matchzy.prac.help.utility",
+            "matchzy.prac.help.positions", "matchzy.prac.help.sides", "matchzy.prac.help.full"
+        };
+
+        /// <summary>
+        /// Prints the short practice command list to one player. Sent to everyone when practice
+        /// starts, and to a player who joins while practice is already running (they used to get
+        /// no hint at all which commands exist).
+        /// </summary>
+        private void SendPracticeHelp(CCSPlayerController? helpPlayer)
+        {
+            if (helpPlayer == null || !helpPlayer.IsValid || helpPlayer.IsBot || helpPlayer.IsHLTV)
+                return;
+            foreach (var helpKey in PracticeHelpKeys)
+                helpPlayer.PrintToChat($" {Localizer.ForPlayer(helpPlayer, helpKey)}");
         }
 
         public void GetSpawns()
