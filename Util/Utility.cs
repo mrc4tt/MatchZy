@@ -2513,6 +2513,12 @@ namespace MatchZy
                         SetupRoundBackupFile();
                         GetSpawns();
 
+                        // Put everyone on their roster side BEFORE the knife/live restart that the
+                        // Start* calls below queue (mp_restartgame), so that restart spawns them
+                        // on the right side. Not before a veto (sides are not decided yet).
+                        if (!isPreVeto)
+                            PlaceMatchPlayers();
+
                         if (isPreVeto)
                         {
                             // The veto is not the match start: the players ready up again afterwards and
@@ -5615,6 +5621,55 @@ namespace MatchZy
             }
         }
 
+        /// <summary>
+        /// Puts a player who just finished connecting on their roster side. After a map change
+        /// (series map, the veto's map) the engine gives a reconnecting player back their old
+        /// team while they are still connecting: the player_team event for that fires before the
+        /// controller is Connected, so the team-lock handler skips it and the player stayed on
+        /// the wrong side for the whole warmup (warmups of 6v4 with both teams mixed). Checked
+        /// twice, because the restored team can land a moment after player_connect_full.
+        /// Players still in the team menu (team None) are left alone: the jointeam lock handles them.
+        /// </summary>
+        private void PlaceMatchPlayerAfterConnect(CCSPlayerController player)
+        {
+            if (!isMatchSetup || matchStarted || !IsTeamWhitelistConfigured())
+                return;
+            int? userId = player.UserId;
+            foreach (float delay in new[] { 0.5f, 3.0f })
+            {
+                AddTimer(delay, () =>
+                {
+                    try
+                    {
+                        if (!isMatchSetup || matchStarted || isVeto || !IsTeamWhitelistConfigured())
+                            return;
+                        if (player == null || !player.IsValid || player.UserId != userId || player.Connected != PlayerConnectedState.Connected)
+                            return;
+                        if (player.IsBot || player.IsHLTV || IsMatchCoach(player))
+                            return;
+                        if (player.TeamNum == (byte)CsTeam.None)
+                            return;
+                        CsTeam target = GetPlayerTeam(player);
+                        if (target == CsTeam.None)
+                            target = CsTeam.Spectator;
+                        if (player.Team == target)
+                            return;
+                        // A full side (players_per_team) takes no more players: substitutes watch.
+                        if (target is CsTeam.Terrorist or CsTeam.CounterTerrorist && IsSideFull(target, player))
+                            target = CsTeam.Spectator;
+                        if (player.Team == target)
+                            return;
+                        Log($"[PlaceMatchPlayerAfterConnect] {player.PlayerName} is on {player.Team} after connecting, moving to {target}");
+                        SwitchPlayerTeam(player, target);
+                    }
+                    catch (Exception ex)
+                    {
+                        Log($"[PlaceMatchPlayerAfterConnect FATAL] {ex}");
+                    }
+                }, TimerFlags.STOP_ON_MAPCHANGE);
+            }
+        }
+
         public void SwitchPlayerTeam(CCSPlayerController player, CsTeam team)
         {
             // None is what GetPlayerTeam returns for a player who is not part of the match.
@@ -5669,13 +5724,71 @@ namespace MatchZy
                 else
                 {
                     player.SwitchTeam(team);
-                    var gameRules = GetGameRules();
-                    if (gameRules != null && gameRules.WarmupPeriod && IsPlayerValid(player))
+                    // Respawn so the player actually plays on the new side. SwitchTeam only writes
+                    // the team number: without a respawn the pawn stays where it was (in the other
+                    // side's spawn) or stays dead when the engine already killed it for the move.
+                    // The ready phase counts even when the HTML ready panel has forced
+                    // m_bWarmupPeriod off, and the freeze time of the first knife/live round counts
+                    // too: a correction there used to leave the player dead for the whole round.
+                    if (IsPlayerValid(player) && IsTeamCorrectionRespawnWindow())
                     {
                         player.Respawn();
                     }
                 }
             });
+        }
+
+        /// <summary>
+        /// True while a player whose side was corrected may be respawned: warmup, the ready phase
+        /// (also the "fake warmup" with m_bWarmupPeriod forced off) and the freeze time of the
+        /// knife round or of the first live round. Never mid-round.
+        /// </summary>
+        private bool IsTeamCorrectionRespawnWindow()
+        {
+            var gameRules = GetGameRules();
+            if (gameRules == null)
+                return false;
+            if (gameRules.WarmupPeriod || (readyAvailable && !matchStarted))
+                return true;
+            if (!gameRules.FreezePeriod)
+                return false;
+            return isKnifeRound || (isMatchLive && gameRules.TotalRoundsPlayed == 0);
+        }
+
+        /// <summary>
+        /// Knife round / first live round safety net: a roster player who is dead at the start of
+        /// the freeze time (moved to their roster side by the server around the warmup-end restart)
+        /// is respawned instead of sitting out the round. T/CT only, never coaches.
+        /// </summary>
+        private void RespawnDeadMatchPlayersInFreeze()
+        {
+            if (!isMatchSetup || !IsTeamCorrectionRespawnWindow() || (!isKnifeRound && !isMatchLive))
+                return;
+            HashSet<CCSPlayerController> coaches = GetAllCoaches();
+            foreach (var p in Utilities.GetPlayers())
+            {
+                if (p == null || !p.IsValid || p.IsBot || p.IsHLTV || p.Connected != PlayerConnectedState.Connected)
+                    continue;
+                if (p.Team != CsTeam.Terrorist && p.Team != CsTeam.CounterTerrorist)
+                    continue;
+                if (coaches.Contains(p) || IsMatchCoach(p))
+                    continue;
+                if (p.PawnIsAlive)
+                    continue;
+                var pawn = p.PlayerPawn.Value;
+                // No pawn = still joining (observer state): respawning that is the crash class.
+                if (pawn == null || !pawn.IsValid || pawn.LifeState == (byte)LifeState_t.LIFE_ALIVE)
+                    continue;
+                try
+                {
+                    Log($"[RespawnDeadMatchPlayersInFreeze] Respawning {p.PlayerName} (dead at freeze time start)");
+                    p.Respawn();
+                }
+                catch (Exception ex)
+                {
+                    Log($"[RespawnDeadMatchPlayersInFreeze] respawn failed: {ex.Message}");
+                }
+            }
         }
 
         /// <summary>

@@ -55,6 +55,9 @@ public partial class MatchZy
                     if (isMatchSetup)
                     {
                         SendPlayerConnectEvent(player);
+                        // Not in the match: a team the engine restored after a map change must
+                        // not keep them on a side.
+                        PlaceMatchPlayerAfterConnect(player);
                         return HookResult.Continue;
                     }
                 }
@@ -66,7 +69,10 @@ public partial class MatchZy
             connectedPlayers++;
 
             if (isMatchSetup)
+            {
                 AssignRosteredCoach(player);
+                PlaceMatchPlayerAfterConnect(player);
+            }
 
 
             // Set ready status based on game state
@@ -424,6 +430,15 @@ public partial class MatchZy
             // round restores, and refills bots the engine dropped.
             if (isMatchSetup)
                 ApplyBotTeam();
+            // Knife round / first live round: nobody may sit the round out dead because the
+            // server moved them to their roster side around the warmup-end restart. Off the
+            // event (respawn is engine re-entry) and once more shortly after for corrections that
+            // land a few frames late.
+            if (isMatchSetup && (isKnifeRound || isMatchLive))
+            {
+                Server.NextFrame(RespawnDeadMatchPlayersInFreeze);
+                AddTimer(1.0f, RespawnDeadMatchPlayersInFreeze, CounterStrikeSharp.API.Modules.Timers.TimerFlags.STOP_ON_MAPCHANGE);
+            }
             HandlePostRoundStartEvent(@event);
             return HookResult.Continue;
         }

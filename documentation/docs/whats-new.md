@@ -2,6 +2,11 @@
 
 A short summary of each release. The [full changelog](changelog.md) has the details and background for every change.
 
+## 1.0.24 <small>November 6, 2026</small>
+
+- **Fixed:** Players are placed on their correct team already in warmup, also after a map change, instead of being moved when the match starts.
+- **Fixed:** Players moved to their roster side when the match starts no longer die and miss the knife round or the first live round.
+
 ## 1.0.23 <small>November 5, 2026</small>
 
 - **Fixed:** Reconnecting during a live round no longer refunds the money spent that round. Players keep the money they left with.
@@ -34,11 +39,11 @@ A short summary of each release. The [full changelog](changelog.md) has the deta
 - **Fixed:** A match config loaded during a `.start` pug no longer reuses the pug's match id (stats, events, demo name and backups went to the pug).
 - **Changed:** `.showspawns`: E on a spawn marker picks the marker you aim at more precisely, also at a distance and while crouched.
 
-## 1.0.19 <small>October 24, 2026</small>
-
-- **Fixed:** GOTV demos are recorded again on Windows servers. The current CS2 build rejected the demo path MatchZy sent (`couldn't open file ... for writing`), so no demo was saved.
-
 ## Older releases
+
+??? note "1.0.19 - October 24, 2026"
+
+    - **Fixed:** GOTV demos are recorded again on Windows servers. The current CS2 build rejected the demo path MatchZy sent (`couldn't open file ... for writing`), so no demo was saved.
 
 ??? note "1.0.18 - October 24, 2026"
 
