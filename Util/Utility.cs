@@ -3640,15 +3640,9 @@ namespace MatchZy
             if (matchStarted || (!isSleep && !isDryRun && !isPractice))
                 return;
 
-            isDryRun = false;
-
-            ResetAllPlayerPracticeSettings(enteringPractice: false);
-            CleanupAllCollisionTimers();
-            ExecUnpracCommands();
+            EndPracticeMode();
             ResetMatch();
-            RemoveSpawnBeams();
             isMatchModeEnabled = true;
-            isPractice = false; // Set it here to be safe
             ScheduleRoundHistoryWipe();
         }
 

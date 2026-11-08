@@ -73,6 +73,9 @@ namespace MatchZy
                 {
                     // command.ReplyToCommand("Match load failed! Resetting current match");
                     ReplyToUserCommand(player, Localizer.ForPlayer(player, "matchzy.mm.matchloadfailed"));
+                    // ResetMatch clears isPractice but not the practice cvars.
+                    if (isPractice || isDryRun)
+                        EndPracticeMode();
                     ResetMatch();
                 }
 
@@ -157,6 +160,9 @@ namespace MatchZy
                                     if (!success)
                                     {
                                         ReplyToUserCommand(player, Localizer.ForPlayer(player, "matchzy.mm.matchloadfailed"));
+                                        // ResetMatch clears isPractice but not the practice cvars.
+                                        if (isPractice || isDryRun)
+                                            EndPracticeMode();
                                         ResetMatch();
                                         return;
                                     }
@@ -238,6 +244,16 @@ namespace MatchZy
             {
                 Log($"[LoadMatchDataCommand] {validationError}");
                 return false;
+            }
+
+            // Loading a match ends practice mode and a dry run, like .exitprac but keeping this
+            // match. Before the changelevel, the match's cvars and warmup.cfg below, so those run
+            // after the unprac commands and win.
+            if (isPractice || isDryRun)
+            {
+                Log("[LoadMatchFromJSON] Ending practice mode / dry run to load the match.");
+                EndPracticeMode();
+                ScheduleRoundHistoryWipe();
             }
 
             // A new match: the previous series' end state must not block this one.

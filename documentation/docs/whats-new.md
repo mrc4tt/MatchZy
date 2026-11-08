@@ -2,8 +2,9 @@
 
 A short summary of each release. The [full changelog](changelog.md) has the details and background for every change.
 
-## 1.0.24 <small>November 6, 2026</small>
+## 1.0.24 <small>November 7, 2026</small>
 
+- **Fixed:** Loading a match while practice mode or a dry run is running ends it like `.exitprac`. Practice settings such as free grenades no longer carry into the match.
 - **Fixed:** Players who join while practice mode is already running get the practice command list in chat.
 - **Fixed:** Players are placed on their correct team already in warmup, also after a map change, instead of being moved when the match starts.
 - **Fixed:** Players moved to their roster side when the match starts no longer die and miss the knife round or the first live round.

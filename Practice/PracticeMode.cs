@@ -3987,6 +3987,27 @@ namespace MatchZy
             Server.ExecuteCommand("""sv_magazine_drop_enabled "true";""");
         }
 
+        // Leaves practice mode (and a dry run) without resetting the match: .exitprac / .match reset
+        // it right after, a match load keeps the config it is loading. A match loaded during .prac
+        // used to keep isPractice on through its warmup (practice commands worked) and never ran the
+        // unprac commands, so prac.cfg values no mode cfg resets (default grenades, infinite ammo)
+        // carried into the knife round and the live match. The unprac commands are queued, so what
+        // the caller queues next (the match's cvars, warmup.cfg, a changelevel) runs after them.
+        private void EndPracticeMode()
+        {
+            isPractice = false;
+            isDryRun = false;
+            ResetAllPlayerPracticeSettings(enteringPractice: false);
+            CleanupAllCollisionTimers();
+            ExecUnpracCommands();
+            RemoveSpawnBeams();
+            // ResetMatch clears these as well, but a successful match load does not run it.
+            pracUsedBots = new Dictionary<int, Dictionary<string, object>>();
+            noFlashList = new();
+            lastGrenadesData = new();
+            nadeSpecificLastGrenadeData = new();
+        }
+
         public bool IsValidPositionForLastGrenade(CCSPlayerController player, int position)
         {
             int userId = player.UserId!.Value;

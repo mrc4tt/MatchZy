@@ -4,8 +4,9 @@ Based on [MatchZy](https://github.com/shobhit-pathak/MatchZy) by Shobhit Pathak,
 
 # 1.0.24
 
-#### November 6, 2026
+#### November 7, 2026
 
+- Loading a match (`matchzy_loadmatch`, `matchzy_loadmatch_url`, `.matchsetup`) while practice mode or a dry run is running now ends it like `.exitprac`, and the match loads normally. Before, the server stayed in practice through the match warmup (practice commands such as `.bot` and `.god` still worked), and practice settings that the match cfgs do not reset (for example free default grenades) stayed on into the knife round and the live match. A failed load during practice also turns the practice settings off before going back to warmup.
 - A player who joins while practice mode is already running (for example started automatically at map start after switching from another mode) now gets the short practice command list in chat. Before, it was only printed to the players on the server when practice started.
 - Players are put on their roster side during warmup again after a map change (series map, the veto's map). CS2 gives a reconnecting player back their old team while they are still connecting, before MatchZy's team lock sees them, so warmups could run with both teams mixed. MatchZy now checks each player's side right after they finish connecting and moves them if needed.
 - Players who were on the wrong side in warmup and were moved to their roster side when the match started no longer sit out the knife round (or the first live round) dead. MatchZy now puts everyone on their roster side before the knife/live restart, respawns a player it moves during the ready phase (also with the HTML ready panel, which turns the native warmup off) or the first freeze time, and respawns any roster player who is still dead when that freeze time starts.

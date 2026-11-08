@@ -38,6 +38,8 @@ En kamp spilles som competitive (5v5), medmindre dens match config sætter `game
 
 Mode-kommandoerne (`.prac`, `.match`, `.scrim`, `.sleep`, `.exitprac`) sætter også denne værdi, så en practice-server bliver i practice efter `.map`.
 
+Når en match loades (`matchzy_loadmatch`, `matchzy_loadmatch_url`, `.matchsetup`) under practice eller dry run, afsluttes den som med `.exitprac`, så ingen practice-indstillinger følger med ind i matchen. `matchzy_autostart_mode` beholder sin værdi, så et map der starter efter matchen, kommer op i practice igen.
+
 ## Kampens forløb { #match-flow }
 
 ```mermaid
