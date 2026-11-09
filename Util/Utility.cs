@@ -3292,24 +3292,17 @@ namespace MatchZy
 
             bool halftimeEnabled = ConVar.Find("mp_halftime")!.GetPrimitiveValue<bool>();
 
-            if (halftimeEnabled)
-            {
-                if (roundsPlayed == roundsPerHalf)
-                {
-                    return true;
-                }
-                // Now in OT.
-                if (roundsPlayed >= 2 * roundsPerHalf)
-                {
-                    int otround = roundsPlayed - 2 * roundsPerHalf; // round 33 -> round 3, etc.
-                    // Do side swaps at OT halves (rounds 3, 9, ...)
-                    if ((otround + roundsPerOTHalf) % (2 * roundsPerOTHalf) == 0)
-                    {
-                        return true;
-                    }
-                }
-            }
-            return false;
+            return SideSwapLogic.IsSwapAfterRound(roundsPlayed, roundsPerHalf, roundsPerOTHalf, halftimeEnabled);
+        }
+
+        // Whether the team that started the map as CT is playing T after roundsPlayed rounds, i.e.
+        // whether the engine currently shows mp_teamname_1 on the T side.
+        public bool AreSidesSwitchedAfter(int roundsPlayed)
+        {
+            int roundsPerHalf = ConVar.Find("mp_maxrounds")!.GetPrimitiveValue<int>() / 2;
+            int roundsPerOTHalf = ConVar.Find("mp_overtime_maxrounds")!.GetPrimitiveValue<int>() / 2;
+            bool halftimeEnabled = ConVar.Find("mp_halftime")!.GetPrimitiveValue<bool>();
+            return SideSwapLogic.AreSidesSwitched(roundsPlayed, roundsPerHalf, roundsPerOTHalf, halftimeEnabled);
         }
 
         private void PauseMatch(CCSPlayerController? player, CommandInfo? command)

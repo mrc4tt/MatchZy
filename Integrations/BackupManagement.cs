@@ -851,8 +851,14 @@ namespace MatchZy
                             // the reset that setting the match live again does).
                             RestoreAdvancedStatsSnapshot(advancedStatsJson);
                             ApplySideScores(restoredSideScores, keepStartingSide);
-                            Server.ExecuteCommand($"mp_teamname_1 {TeamNameArg(matchzyTeam1.teamName)}");
-                            Server.ExecuteCommand($"mp_teamname_2 {TeamNameArg(matchzyTeam2.teamName)}");
+                            // mp_teamname_1 belongs to the team that started the map as CT and the
+                            // engine swaps what it shows at halftime / OT halves, so the names follow
+                            // the restored round's half, not team1/team2. Setting team1's name as
+                            // mp_teamname_1 put the names on the wrong sides whenever team1 started T
+                            // or the restore crossed a halftime. The flag also has to match for the
+                            // next SetTeamNames (halftime, live cfg re-apply).
+                            isConvarMappingSwapped = AreSidesSwitchedAfter(restoredRoundsPlayed);
+                            SetTeamNames();
                             // Settle the pause state after the load, not before it: the live cfgs set
                             // mp_backup_restore_load_autopause 1, so the engine pauses on its own here and
                             // our own pause/unpause has to be the last thing that touches it.
