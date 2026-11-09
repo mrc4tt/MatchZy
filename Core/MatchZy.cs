@@ -731,6 +731,7 @@ namespace MatchZy
             // string has no server xref), so no print hook can suppress it. The hook only spammed
             // the DynoHook "could not allocate trampoline" error for zero benefit.
             RegisterListener<Listeners.OnTick>(RenderReadyPanel);
+            RegisterListener<Listeners.OnTick>(TechPauseHudAntiFlashTick);
 
             // Hot load/reload while a ready phase is already up: run the panel render immediately on
             // the next frame instead of waiting for the natural OnTick, so the native "Warmup" HUD is

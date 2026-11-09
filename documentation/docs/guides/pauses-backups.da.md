@@ -13,6 +13,8 @@
 !!! note "Tekniske pauser"
     Hvert hold får `matchzy_max_tech_pauses_allowed` pr. bane. Med `matchzy_tech_pause_mode 1` (Get5-regler) slutter en teknisk pause aldrig af sig selv: når den har varet `matchzy_tech_pause_duration` sekunder i freeze time, kan hvert hold skrive `.unpause`, og holdet, der pausede, kan annullere den med `.unpause` før freeze time uden at bruge den op.
 
+    Så længe en teknisk pause varer, ser alle spillere en boks midt på skærmen: holdet og spilleren, der kaldte den, tiden der er tilbage (eller hvem der kan unpause), de tekniske pauser der er tilbage, og hvilke hold der har skrevet `.unpause`. `matchzy_pause_hud 1` viser i stedet en enkelt linje tekst, `0` slår den fra.
+
 **Overtid**: taktiske timeouts (`.tac`) følger engine-indstillingerne i live.cfg: 4 pr. hold i ordinær tid (`mp_team_timeout_max`) og én mere, når overtiden starter (`mp_team_timeout_ot_add_once 1`, op til `mp_team_timeout_ot_max 5`). Wingman og rush (`live_wingman.cfg`, `live_rush.cfg`) giver 1 timeout på 60 sekunder pr. hold og 1 mere i hver overtid. I hver overtidsperiode må hvert hold også bruge `.pause` `matchzy_overtime_pauses_per_team` gange (1 som standard). Admin-pauser er ikke begrænset.
 
 !!! tip "Tilpas efter behov"

@@ -28,6 +28,7 @@ public partial class MatchZy
         techPauseTimer = null;
         techPauseToken++;
         StopGet5TechPause();
+        StopTechPauseHud();
     }
 
     // Auto-pause tracking
@@ -185,6 +186,7 @@ public partial class MatchZy
         techPauseTimer?.Kill();
         techPauseTimer = null;
         int duration = techPauseDuration.Value;
+        StartTechPauseHud(playerTeam, player.PlayerName);
         if (Get5TechPauseMode)
             StartGet5TechPause(playerTeam);
         else if (duration > 0)

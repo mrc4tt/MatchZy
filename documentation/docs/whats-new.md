@@ -4,6 +4,7 @@ A short summary of each release. The [full changelog](changelog.md) has the deta
 
 ## 1.0.24 <small>November 9, 2026</small>
 
+- **New:** A technical pause (`.tech`) shows an on-screen box with who called it, the time left, the technical pauses left and which teams have typed `.unpause`. `matchzy_pause_hud` sets it to a small text (`1`) or off (`0`).
 - **Fixed:** Loading a match while practice mode or a dry run is running ends it like `.exitprac`. Practice settings such as free grenades no longer carry into the match.
 - **Fixed:** Players who join while practice mode is already running get the practice command list in chat.
 - **Fixed:** Players are placed on their correct team already in warmup, also after a map change, instead of being moved when the match starts.

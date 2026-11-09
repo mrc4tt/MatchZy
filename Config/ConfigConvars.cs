@@ -63,6 +63,8 @@ namespace MatchZy
 
         public FakeConVar<int> joinStartDelay = new("matchzy_join_start_delay", "matchzy_ready_mode 1: seconds between everyone having joined and the match starting. Default: 10", 10);
 
+        public FakeConVar<int> pauseHud = new("matchzy_pause_hud", "On-screen box during a technical pause (.tech): who called it, time left, who can unpause, tech pauses left and which teams typed .unpause. 0 = off, 1 = small center text, 2 = center box. Default: 2", 2);
+
         public FakeConVar<int> techPauseMode = new("matchzy_tech_pause_mode", "0 = a technical pause ends on its own after matchzy_tech_pause_duration seconds. 1 = Get5 rules: after matchzy_tech_pause_duration seconds in freeze time either team can unpause (0 = both teams always have to), the pausing team can cancel the pause before it takes effect, and matchzy_max_tech_pauses_allowed 0 means unlimited. get5_max_tech_pauses / get5_tech_pause_time switch to 1. Default: 0", 0);
 
         public FakeConVar<int> forfeitLeaveTimeout = new("matchzy_forfeit_leave_timeout", "Seconds a team may have no players left during a live map of a loaded match before it forfeits the series. 0 = off. Default: 0", 0);

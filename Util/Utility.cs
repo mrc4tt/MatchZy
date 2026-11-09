@@ -704,6 +704,8 @@ namespace MatchZy
             if (!hotReload)
                 AnnounceShutdown("plugin_unload", waitForSend: false);
             CloseEventQueue();
+            // A tech pause box's anti-flash m_bGameRestart must not outlive the plugin.
+            ResetTechPauseAntiFlash();
             if (_fakeWarmupActive)
             {
                 // Hot reload: the new instance takes the ready phase over, so park the server in a

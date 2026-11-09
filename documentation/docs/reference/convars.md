@@ -68,6 +68,7 @@ Legend: **cfg** = present in the generated `config.cfg`.
 | `matchzy_tech_pause_duration` | `300` | Y | Tech pause length in seconds; the match unpauses on its own when it runs out. `-1` = unlimited. |
 | `matchzy_max_tech_pauses_allowed` | `2` | Y | Tech pauses per team per map. |
 | `matchzy_tech_pause_mode` | `0` | Y | `0` = a tech pause ends on its own when its time runs out. `1` = Get5 rules (see below). |
+| `matchzy_pause_hud` | `2` | Y | On-screen info during a technical pause: who called it, time left, who can unpause, tech pauses left, which teams typed `.unpause`. `0` = off, `1` = small center text, `2` = center box. |
 | `matchzy_overtime_pauses_per_team` | `1` | Y | `.pause` uses per team in each overtime period. `0` = no limit. |
 | `matchzy_autopause_enabled` | `true` | Y | Pause automatically when a team drops below the minimum player count. |
 | `matchzy_autopause_minplayers` | `5` | Y | Players per team below which autopause triggers. Autopause is active once the map has had at least twice this many players. |

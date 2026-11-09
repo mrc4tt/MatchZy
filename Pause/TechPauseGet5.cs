@@ -111,13 +111,7 @@ public partial class MatchZy
                 if (limit > 0 && get5TechPauseElapsed == limit)
                     PrintLocalizedToAll("matchzy.pause.anyonecanunpause");
             }
-
-            foreach (var p in playerData.Values)
-            {
-                if (p == null || !p.IsValid || p.IsBot)
-                    continue;
-                p.PrintToCenter(Get5TechPauseHint(p, team.teamName));
-            }
+            // The on-screen text is drawn by TechPauseHud.cs (matchzy_pause_hud).
         }
         catch (Exception e)
         {
