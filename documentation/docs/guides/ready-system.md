@@ -96,11 +96,11 @@ By default a team registered with fewer players than `players_per_team`, or a ma
 
 | `matchzy_ready_hint_style` | Look |
 |---|---|
-| `0` (default) | Classic center text with the ready count. |
-| `1` | HTML **READY-UP** panel per player with a progress bar, ready count and your own status. |
+| `0` | Classic center text with the ready count. |
+| `1` (default) | HTML **READY-UP** panel per player with a progress bar, ready count and your own status. |
 | `2` | A chat reminder listing the players who are not ready. |
 
-In a loaded match the panel counts towards what the teams need (`7 / 9` in the 4v5 above) and shows ready / needed per side. Style `1` also shows the current mode, in your language. The native WARMUP banner is hidden and the round timer shows a frozen `1:00`.
+In a loaded match the panel shows the ready players per side and the minimum each side needs (`Ready (min. 4): CT 2  T 3`), and a short-handed side sees how many of its players have joined (`3 joined (min. 4): 1 missing`, shown 30 seconds after the last player joined). Style `0` shows the same per-side line. Style `1` also shows the current mode, in your language. The native WARMUP banner is hidden and the round timer shows a frozen `1:00`.
 
 Related: `matchzy_ready_hint_blink` blinks the NOT READY line (style 1), `matchzy_ready_clantag_enabled` shows `[READY]` / `[UNREADY]` on the scoreboard (not in join ready mode, where nobody types `.ready`). Once live, `matchzy_team_clantag_enabled` shows each team's `tag` from the match config instead.
 

@@ -174,6 +174,29 @@ public partial class MatchZy
         return (present, required);
     }
 
+    // How long the short-handed line stays hidden after a player joins a side (or the side first
+    // gets a player): players are often still loading in, and "2 missing" while they do reads as
+    // if something is wrong.
+    private const int ShortHandedHintGraceSeconds = 30;
+    private readonly Dictionary<int, (int Present, DateTime At)> shortHandedLastJoin = new();
+
+    // ShortHandedSide for the ready hints (panel, center text, chat), hidden for
+    // ShortHandedHintGraceSeconds after the side last gained a player. Forfeit messages and other
+    // logic keep using ShortHandedSide directly.
+    private (int Present, int Required)? ShortHandedHintSide(int side)
+    {
+        var shortHanded = ShortHandedSide(side);
+        (int present, _) = GetTeamPlayerCount(side, false);
+        DateTime now = DateTime.UtcNow;
+        if (!shortHandedLastJoin.TryGetValue(side, out var last) || present > last.Present)
+            shortHandedLastJoin[side] = (present, now);
+        else if (present < last.Present)
+            shortHandedLastJoin[side] = (present, last.At);
+        if (shortHanded == null)
+            return null;
+        return now - shortHandedLastJoin[side].At < TimeSpan.FromSeconds(ShortHandedHintGraceSeconds) ? null : shortHanded;
+    }
+
     // Players a side needs for .forceready: min_players_to_ready, but never fewer than
     // players_per_team - matchzy_forceready_max_missing (default 1: at most one player short, so
     // 4 in a 5v5). A match config value can only make it stricter. Panels often send

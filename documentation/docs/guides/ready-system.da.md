@@ -97,11 +97,11 @@ Som standard kan et hold, der er registreret med færre spillere end `players_pe
 
 | `matchzy_ready_hint_style` | Udseende |
 |---|---|
-| `0` (standard) | Klassisk tekst midt på skærmen med antal klar. |
-| `1` | HTML-panelet **READY-UP** for hver spiller med statuslinje, antal klar og din egen status. |
+| `0` | Klassisk tekst midt på skærmen med antal klar. |
+| `1` (standard) | HTML-panelet **READY-UP** for hver spiller med statuslinje, antal klar og din egen status. |
 | `2` | En påmindelse i chatten med de spillere, der ikke er klar. |
 
-I en loadet kamp tæller panelet mod det, holdene skal bruge (`7 / 9` i 4v5-eksemplet ovenfor), og viser klar / påkrævet pr. side. Style `1` viser også den aktuelle mode på dit sprog. Det almindelige WARMUP-banner skjules, og rundeuret viser et frosset `1:00`.
+I en loadet kamp viser panelet antal klar pr. side og det minimum, hver side skal bruge (`Klar (min. 4): CT 2  T 3`), og et hold, der mangler spillere, ser hvor mange der er joinet (`3 joinet (min. 4): 1 mangler`, vist 30 sekunder efter at den seneste spiller joinede). Style `0` viser samme linje pr. side. Style `1` viser også den aktuelle mode på dit sprog. Det almindelige WARMUP-banner skjules, og rundeuret viser et frosset `1:00`.
 
 Relateret: `matchzy_ready_hint_blink` får IKKE KLAR-linjen til at blinke (style 1), `matchzy_ready_clantag_enabled` viser `[READY]` / `[UNREADY]` på scoreboardet (ikke i join ready mode, hvor ingen skriver `.ready`). Når kampen er live, viser `matchzy_team_clantag_enabled` i stedet hvert holds `tag` fra match configen.
 

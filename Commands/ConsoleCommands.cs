@@ -132,7 +132,7 @@ namespace MatchZy
                             string teamName = team == 3 ? "CT" : "Terrorists";
                             PrintLocalizedToAll("matchzy.cmd.teamready", teamName);
                         }
-                        else if (ShortHandedSide(team) != null
+                        else if (ShortHandedHintSide(team) != null
                             && (!shortHandedHintAt.TryGetValue(team, out DateTime last) || DateTime.UtcNow - last > TimeSpan.FromSeconds(15)))
                         {
                             // Everyone here may be ready while a rostered player is missing: say so.

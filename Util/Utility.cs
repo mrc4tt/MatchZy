@@ -385,7 +385,7 @@ namespace MatchZy
             {
                 if (onlySide.HasValue && onlySide.Value != side)
                     continue;
-                if (ShortHandedSide(side) is not (int present, int required))
+                if (ShortHandedHintSide(side) is not (int present, int required))
                     continue;
                 foreach (var p in Utilities.GetPlayers())
                 {
@@ -677,14 +677,28 @@ namespace MatchZy
             }
         }
 
+        // "Ready (min. 4): CT 2  T 3" for a loaded match, or "Ready: CT 2 (min. 4)  T 3 (min. 5)" when
+        // the sides need different numbers. Plain text for the classic center hint.
+        private string ReadySidesPlain(CCSPlayerController player)
+        {
+            string label = Localizer.ForPlayer(player, "matchzy.ready.readylabel");
+            if (_rpCtNeed == _rpTNeed)
+                return $"{label} ({Localizer.ForPlayer(player, "matchzy.ready.minshort", _rpCtNeed)}): CT {_rpCtShown}  T {_rpTShown}";
+            return $"{label}: CT {_rpCtShown} ({Localizer.ForPlayer(player, "matchzy.ready.minshort", _rpCtNeed)})  T {_rpTShown} ({Localizer.ForPlayer(player, "matchzy.ready.minshort", _rpTNeed)})";
+        }
+
         private string BuildClassicReadyHint(CCSPlayerController player)
         {
             if (!readyEnabled.Value)
                 return Localizer.ForPlayer(player, "matchzy.ready.waitingforadmin");
             // Ready against what the start needs (as the HTML panel), not against everyone present.
-            string line1 = Localizer.ForPlayer(player, "matchzy.hint.waitingforplayers", _rpReady, _rpRequired);
+            // Loaded match: per side with the minimum, as the HTML panel ("Ready (min. 4): CT 2  T 3").
+            // A total like "5/8" read as the most players the match can have.
+            string line1 = _rpCtNeed > 0
+                ? ReadySidesPlain(player)
+                : Localizer.ForPlayer(player, "matchzy.hint.waitingforplayers", _rpReady, _rpRequired);
             string line2 = Localizer.ForPlayer(player, "matchzy.hint.usereadycommand");
-            if (ShortHandedSide(player.TeamNum) is (int shortPresent, int shortRequired))
+            if (ShortHandedHintSide(player.TeamNum) is (int shortPresent, int shortRequired))
                 line2 += "\n" + Localizer.ForPlayer(player, "matchzy.ready.shorthanded", shortPresent, shortRequired, shortRequired - shortPresent);
             return _rpWaiting.Length > 0
                 ? $"{line1}\n{line2}\n{Localizer.ForPlayer(player, "matchzy.hint.notready", _rpWaiting)}"
@@ -990,13 +1004,34 @@ namespace MatchZy
                     if (readyEnabled.Value)
                     {
                         sb.Append("<br>");
-                        sb.Append($"{bar} <font class='fontSize-m' color='#ffffff'>{_rpReady} / {_rpRequired}</font><br>");
+                        // Loaded match: bar only. The per-side line below has the numbers, and a total
+                        // like "5 / 8" read as the most players the match can have.
+                        sb.Append(_rpCtNeed > 0
+                            ? $"{bar}<br>"
+                            : $"{bar} <font class='fontSize-m' color='#ffffff'>{_rpReady} / {_rpRequired}</font><br>");
                         // Loaded match: ready / needed per side; otherwise ready / on the side.
                         int ctOf = _rpCtNeed > 0 ? _rpCtNeed : _rpCtCount;
                         int tOf = _rpTNeed > 0 ? _rpTNeed : _rpTCount;
                         int ctShown = _rpCtNeed > 0 ? _rpCtShown : _rpCtReady;
                         int tShown = _rpTNeed > 0 ? _rpTShown : _rpTReady;
-                        sb.Append($"<font class='fontSize-sm' color='#9ecbff'>CT {ctShown}/{ctOf}</font><font class='fontSize-sm' color='#ffffff'> &nbsp; </font><font class='fontSize-sm' color='#ffb36b'>T {tShown}/{tOf}</font>");
+                        // Labelled ("Ready (min. 4): CT 2  T 1"): a bare "CT 2/4" read as the most
+                        // players a side can have. One short line, so it fits the panel's fixed width.
+                        string ctSeg = $"CT {ctShown}", tSeg = $"T {tShown}";
+                        string readyLabel = Localizer.ForPlayer(target, "matchzy.ready.readylabel");
+                        if (_rpCtNeed <= 0)
+                        {
+                            // Pug / per-team ready-up: ready out of the players on the side, no minimum.
+                            ctSeg += $"/{ctOf}";
+                            tSeg += $"/{tOf}";
+                        }
+                        else if (ctOf != tOf)
+                        {
+                            ctSeg += $" ({Localizer.ForPlayer(target, "matchzy.ready.minshort", ctOf)})";
+                            tSeg += $" ({Localizer.ForPlayer(target, "matchzy.ready.minshort", tOf)})";
+                        }
+                        else
+                            readyLabel += $" ({Localizer.ForPlayer(target, "matchzy.ready.minshort", ctOf)})";
+                        sb.Append($"<font class='fontSize-sm' color='#c8c8c8'>{PanelSafe(readyLabel)}: </font><font class='fontSize-sm' color='#9ecbff'>{PanelSafe(ctSeg)}</font><font class='fontSize-sm' color='#ffffff'> &nbsp; </font><font class='fontSize-sm' color='#ffb36b'>{PanelSafe(tSeg)}</font>");
 
                         // Self-status (YOU ARE (NOT) READY) is the most important line, so render it
                         // BEFORE the "waiting on" list. CS2's center-HTML panel has a size cap and drops
@@ -1015,7 +1050,7 @@ namespace MatchZy
 
                         // A registered player is missing: how many. After
                         // the self-status so the panel's size cap can only drop this and the list below.
-                        if (ShortHandedSide(target.TeamNum) is (int shortPresent, int shortRequired))
+                        if (ShortHandedHintSide(target.TeamNum) is (int shortPresent, int shortRequired))
                             sb.Append($"<br><font class='fontSize-sm' color='#ffcf3f'>{PanelSafe(Localizer.ForPlayer(target, "matchzy.ready.shorthanded", shortPresent, shortRequired, shortRequired - shortPresent))}</font>");
 
                         if (_rpWaiting.Length > 0)
