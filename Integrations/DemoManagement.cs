@@ -421,7 +421,6 @@ namespace MatchZy
 
                     if (sizeNow > sizeAtFirstCheck)
                     {
-                        Log($"[Demo] Recording verified: {expectedDemoFile} is growing on disk ({sizeAtFirstCheck} -> {sizeNow} bytes).");
                         StartDemoWatchdog(expectedDemoFile, sizeNow);
                         return;
                     }
