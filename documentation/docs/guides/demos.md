@@ -2,10 +2,14 @@
 
 When GOTV is enabled (`tv_enable 1`, from the launch options or any cfg), MatchZy records a demo of every live map.
 
+MatchZy only records live maps (match, scrim, hill), never practice mode or an idle server. CS2's own `tv_autorecord 1` is separate: it records every map from the moment it loads, also an idle server for hours, and some hosts turn it on by default. If you only want match demos, set `matchzy_demo_live_only true`: MatchZy then sets `tv_autorecord 0` and stops any recording outside a live map (checked when it turns on and a few seconds after every map load, since `server.cfg` can turn `tv_autorecord` back on). With `false` (default) MatchZy leaves `tv_autorecord` as you set it. Removing `tv_autorecord 1` from `server.cfg` and the launch options also works, and avoids the few seconds of recording at each map load.
+
 | Setting | Default | Purpose |
 |---|---|---|
 | `matchzy_demo_path` | `demos/` | Folder relative to `csgo/`. |
 | `matchzy_demo_name_format` | `{TIME}_{MATCH_ID}_{MAP}_{TEAM1}_vs_{TEAM2}` | File name. Also `{MAPNUMBER}`. Letters outside ASCII are converted (`æ` to `ae`, `é` to `e`) or dropped, so the upload headers stay valid. |
+
+Old demos can be deleted automatically: `matchzy_demo_keep_days 7` (or any number of days) removes `.dem` files in `matchzy_demo_path` older than that, at plugin load and at series end. Off (`0`) by default. The demo being recorded and demos still uploading are never deleted.
 
 ## Reliable recording
 

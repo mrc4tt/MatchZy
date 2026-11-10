@@ -8,6 +8,8 @@ All settings live in `cfg/MatchZy/config.cfg`, which MatchZy executes on every l
 !!! danger "Keep secrets out of config.cfg"
     Settings marked :material-lock: hold URLs or tokens (remote log, remote backup, demo upload). `config.cfg` is readable by anyone with file access to the server, so set these from a private cfg (for example one exec'd from `server.cfg`) or from your panel's startup commands.
 
+Want to change a few settings? The [settings generator](config-generator.md) lists every `config.cfg` setting, searchable, and writes the lines for you.
+
 Legend: **cfg** = present in the generated `config.cfg`.
 
 ## General and admin
@@ -30,6 +32,9 @@ Legend: **cfg** = present in the generated `config.cfg`.
 
 | Setting | Default | cfg | Description |
 |---|---|---|---|
+| `matchzy_admin_call_enabled` | `false` | Y | Turns on admin tickets: `.admin` (the match's ticket, seen by every player in the match) and `.report` (private). |
+| `matchzy_admin_call_cooldown` | `5` | Y | Seconds between two `.admin` / `.report` messages from the same player. |
+| `matchzy_admin_ticket_timeout` | `30` | Y | Minutes without a message after which a ticket counts as closed. Tickets of a loaded match also close when the match ends. `0` = no timeout. |
 | `matchzy_warmup_enabled` | `true` | Y | Use warmup (execute `warmup.cfg`) before a match. |
 | `matchzy_warmup_instant_respawn` | `false` | Y | Instant-respawn warmup: the dead respawn at once at their team spawn with 2 seconds of spawn protection, no bomb, no friendly fire, buying all warmup and full money on every respawn. Set after `warmup.cfg`, so older cfg copies work too. `false` = `warmup.cfg` decides. |
 | `matchzy_ready_enabled` | `true` | Y | Players can ready up. `false` = `.ready`, `.r`, `.unready`, `.forceready`, `.readycheck`, ready by ping and join ready mode are off; only an admin starts the match with `.start` (also before the map veto). The ready time limit does not run and the ready clan tags are hidden. |
@@ -68,7 +73,7 @@ Legend: **cfg** = present in the generated `config.cfg`.
 | `matchzy_tech_pause_duration` | `300` | Y | Tech pause length in seconds; the match unpauses on its own when it runs out. `-1` = unlimited. |
 | `matchzy_max_tech_pauses_allowed` | `2` | Y | Tech pauses per team per map. |
 | `matchzy_tech_pause_mode` | `0` | Y | `0` = a tech pause ends on its own when its time runs out. `1` = Get5 rules (see below). |
-| `matchzy_pause_hud` | `2` | Y | On-screen info during a technical pause: who called it, time left, who can unpause, tech pauses left, which teams typed `.unpause`. `0` = off, `1` = small center text, `2` = center box. |
+| `matchzy_pause_hud` | `2` | Y | On-screen info during a pause (`.tech`, `.pause`, `.tac`): who called it, time left, who can unpause, tech pauses or tactical timeouts left, which teams typed `.unpause`. `0` = off, `1` = small center text, `2` = center box. |
 | `matchzy_overtime_pauses_per_team` | `1` | Y | `.pause` uses per team in each overtime period. `0` = no limit. |
 | `matchzy_autopause_enabled` | `true` | Y | Pause automatically when a team drops below the minimum player count. |
 | `matchzy_autopause_minplayers` | `5` | Y | Players per team below which autopause triggers. Autopause is active once the map has had at least twice this many players. |
@@ -119,6 +124,8 @@ Tactical timeouts in overtime are set in `live.cfg` (`mp_team_timeout_ot_add_onc
 | Setting | Default | cfg | Description |
 |---|---|---|---|
 | `matchzy_demo_path` | `demos/` | Y | Demo folder relative to `csgo/`. Must end with `/`. |
+| `matchzy_demo_keep_days` | `0` | Y | Delete `.dem` files in `matchzy_demo_path` older than this many days (for example `7` or `14`), at plugin load and at series end. The demo being recorded and demos still uploading are kept. Only the top level of the demo folder is cleaned. `0` = keep everything. |
+| `matchzy_demo_live_only` | `false` | Y | Only record live maps (match, scrim, hill). MatchZy sets `tv_autorecord 0` and stops any GOTV recording outside a live map, so practice mode and an idle server do not write demos. MatchZy's own match demos are not affected. `false` leaves `tv_autorecord` as the server sets it. |
 | `matchzy_demo_name_format` | `{TIME}_{MATCH_ID}_{MAP}_{TEAM1}_vs_{TEAM2}` | Y | Demo file name. Also `{MAPNUMBER}`. Non-ASCII letters are converted (`æ` to `ae`) or dropped. |
 | `matchzy_demo_upload_url` :material-lock: | `""` | N | Upload the demo here when the map ends. Alias `get5_demo_upload_url`. |
 | `matchzy_demo_upload_s3` | `false` | Y | Upload with HTTP `PUT` and the raw `.dem` as body, for S3 presigned URLs (sign with `Content-Type: application/octet-stream`). Alias `get5_demo_upload_s3`. |
@@ -141,6 +148,7 @@ An empty value (`matchzy_remote_log_url ""`) clears a setting; with no value at 
 
 | Setting | Default | cfg | Description |
 |---|---|---|---|
+| `matchzy_backup_keep_days` | `0` | Y | Delete round backup files (`MatchZyDataBackup/matchzy_*_round*.json` and the engine's `matchzy_*_round*.txt`, wherever the engine writes them) older than this many days, at plugin load and at series end. The running match's backups are kept. `0` = keep everything. |
 | `matchzy_stop_command_available` | `true` | Y | Enable `.stop` (both teams vote to replay the current round). |
 | `matchzy_stop_command_no_damage` | `false` | Y | `.stop` is refused once an opponent has been damaged that round. |
 | `matchzy_pause_after_restore` | `true` | Y | Pause the match after a round restore. |

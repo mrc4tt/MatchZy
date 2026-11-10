@@ -394,8 +394,10 @@ namespace MatchZy
 
             GetCvarValues(jsonDataObject);
 
-            Log($"[LOADMATCH] MinPlayersToReady: {matchConfig.MinPlayersToReady} SeriesClinch: {matchConfig.SeriesCanClinch}");
+            Log($"[LOADMATCH] PlayersPerTeam: {matchConfig.PlayersPerTeam} MinPlayersToReady: {matchConfig.MinPlayersToReady} SeriesClinch: {matchConfig.SeriesCanClinch}");
             Log($"[LOADMATCH] MapsPool: {string.Join(", ", matchConfig.MapsPool)} MapsLeftInVetoPool: {string.Join(", ", matchConfig.MapsLeftInVetoPool)}");
+            try { WarnAboutMatchConfig(jsonDataObject); }
+            catch (Exception e) { Log($"[LOADMATCH] Match config warnings failed: {e.Message}"); }
 
             LoadClientNames();
 
@@ -958,7 +960,14 @@ namespace MatchZy
 
             if (jsonDataObject["players_per_team"] == null)
             {
-                matchConfig.PlayersPerTeam = DefaultPlayersPerTeam(MatchGameMode());
+                // Not in the match config: take the team size from the rosters (two rosters of 4 =
+                // 4v4), at most the mode's default. Get5 always used 5, which made a 4v4 config
+                // without players_per_team wait for a fifth player on each side forever.
+                int modeDefault = DefaultPlayersPerTeam(MatchGameMode());
+                matchConfig.PlayersPerTeam = ReadyLogic.PlayersPerTeamFromRosters(
+                    ListedRosterSize(matchzyTeam1), ListedRosterSize(matchzyTeam2), modeDefault);
+                if (matchConfig.PlayersPerTeam != modeDefault)
+                    Log($"[LOADMATCH] players_per_team not set: using {matchConfig.PlayersPerTeam} from the team rosters.");
             }
 
             if (jsonDataObject["veto_mode"] != null)
@@ -1154,6 +1163,53 @@ namespace MatchZy
         /// configs use: a JObject keyed by steamid ({"765...": "Name"}) and a plain JArray of
         /// steamids. A JArray indexed with a string key throws, which took the whole lookup down.
         /// </summary>
+        // Logs what in a valid match config will probably not behave as the panel meant (see
+        // MatchConfigWarnings), as [LOADMATCH] WARNING lines, and tells the admins on the server.
+        // Esportligaen's 4v4 never started because team2 listed 6 players (one also as spectator)
+        // with players_per_team 5, and nothing said so.
+        private void WarnAboutMatchConfig(JObject jsonDataObject)
+        {
+            static List<string> Ids(JToken? token) => token switch
+            {
+                JObject o => o.Properties().Select(p => p.Name).ToList(),
+                JArray a => a.Select(e => e.ToString()).ToList(),
+                _ => new List<string>(),
+            };
+            // A matchzy_ready_per_team in the match's "cvars" block applies to this match.
+            int perTeam = readyPerTeam.Value;
+            if (jsonDataObject["cvars"]?["matchzy_ready_per_team"] is JToken perTeamToken
+                && int.TryParse(perTeamToken.ToString(), out int cvarPerTeam))
+                perTeam = cvarPerTeam;
+
+            var warnings = MatchConfigWarnings.Collect(new MatchConfigWarnings.Input
+            {
+                Team1Name = $"team1 ({matchzyTeam1.teamName})",
+                Team2Name = $"team2 ({matchzyTeam2.teamName})",
+                Team1Players = RosterPlayerIds(matchzyTeam1).ToList(),
+                Team2Players = RosterPlayerIds(matchzyTeam2).ToList(),
+                Spectators = Ids(matchConfig.Spectators),
+                PlayersPerTeam = matchConfig.PlayersPerTeam,
+                PlayersPerTeamSet = jsonDataObject["players_per_team"] != null,
+                MinPlayersToReady = matchConfig.MinPlayersToReady,
+                MinPlayersToReadySet = matchConfig.MinPlayersToReadySet,
+                ReadyPerTeam = perTeam,
+            });
+            if (warnings.Count == 0)
+                return;
+            foreach (string warning in warnings)
+                Log($"[LOADMATCH] WARNING: {warning}");
+            int count = warnings.Count;
+            Server.NextFrame(() =>
+            {
+                foreach (var p in Utilities.GetPlayers())
+                {
+                    if (p == null || !p.IsValid || p.IsBot || p.IsHLTV || !IsPlayerAdmin(p, "", "@css/config"))
+                        continue;
+                    PrintToPlayerChat(p, Localizer.ForPlayer(p, "matchzy.loadmatch.warnings", count));
+                }
+            });
+        }
+
         private static bool LookupRosterEntry(JToken? roster, ulong steamId)
         {
             if (roster == null)
@@ -1182,6 +1238,8 @@ namespace MatchZy
 
         public void EndSeries(string? winnerName, int restartDelay, int t1score, int t2score, bool writeEndData = true, bool noWinner = false, bool kickPlayers = true)
         {
+            try { CleanupOldRoundBackups(); } catch (Exception e) { Log($"[BackupCleanup] {e.Message}"); }
+            try { CleanupOldDemos(); } catch (Exception e) { Log($"[DemoCleanup] {e.Message}"); }
             if (seriesEnded)
             {
                 Log($"[EndSeries] Series {liveMatchId} has already ended; ignoring the second end.");

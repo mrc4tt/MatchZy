@@ -44,4 +44,8 @@ Task-focused walkthroughs. For every command and setting, see the [Reference](..
 
     Webhooks for scoreboards, bots and panels.
 
+-   :material-ticket-account: **[Admin tickets](admin-tickets.md)**
+
+    `.admin` / `.report` from the game, answered from your website or Discord bot.
+
 </div>

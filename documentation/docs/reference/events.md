@@ -1,6 +1,6 @@
 # Events
 
-Every event is sent as an HTTP `POST` with a JSON body to `matchzy_remote_log_url`. The `event` field names the event. See the [Live events guide](../guides/events.md) for setup.
+Every event is sent as an HTTP `POST` with a JSON body to `matchzy_remote_log_url`. The [event explorer](event-explorer.md) lists every event with its fields and an example payload, searchable. The `event` field names the event. See the [Live events guide](../guides/events.md) for setup.
 
 ## Common fields
 
@@ -30,13 +30,36 @@ Player stats objects (`team1.players[].stats` on `round_end` and `map_result`) u
 | `map_result` | The map ends | `map_number`, `winner`, `team1`, `team2`, `demo_filename` |
 | `series_end` | The series ends | `winner`, `team1_series_score`, `team2_series_score`, `time_until_restore` |
 | `match_cancelled` | A loaded or running match ends without a result (see `reason` below) | `reason`, `demo_filename`, `team1`, `team2`, `team1_score`, `team2_score` |
-| `match_paused` | Any pause starts | `round_number`, `pause_type` (`pause`, `tech`, `admin`, `auto`), `team_name`, `max_duration` |
+| `match_paused` | Any pause starts | `round_number`, `pause_type` (`pause`, `tech`, `admin`, `auto`, `backup`, `tactical`), `team_name`, `max_duration` |
 | `match_unpaused` | Any pause ends | `round_number` |
+| `player_ready` / `player_unready` | A player types `.ready` / `.unready` (not sent for `.forceready` or a player leaving; `team_ready` covers those) | `matchid`, `map_number`, `player{steamid,name,team}`, `team` (`team1`/`team2`/`spectator`), `ready_count_team1`, `ready_count_team2`, `total_ready`, `expected_total` |
+| `team_ready` | A team becomes ready (`.ready`, `.forceready`, join mode). Sent again if the team drops out of ready and readies up again, and for the ready-up before a veto as well as the one before going live | `matchid`, `map_number`, `team`, `ready_count`, `total_ready`, `expected_total`, `forced` |
+| `all_players_ready` | Both teams are ready | `matchid`, `map_number`, `ready_count_team1`, `ready_count_team2`, `total_ready`, `countdown_started` (`true` in join ready mode) |
+| `unpause_requested` | One team typed `.unpause`, the other still has to | `matchid`, `map_number`, `team`, `teams_ready`, `teams_needed`, `round_number` |
+| `knife_round_started` / `knife_round_ended` | The knife round starts / ends | `matchid`, `map_number`, `round_number`; `knife_round_ended` also `winner` (`team1`/`team2`) |
+| `halftime_started` | The sides swap at halftime or an overtime half | `matchid`, `map_number`, `round_number` |
+| `side_swap` | Right after `halftime_started` | `matchid`, `map_number`, `round_number`, `team1_side` (`ct`/`t` after the swap) |
+| `overtime_started` | An overtime begins (the score is level) | `matchid`, `map_number`, `round_number`, `overtime_number` (1, 2, ...) |
+| `demo_recording_start` | The demo recording starts | `matchid`, `map_number`, `filename` |
 | `demo_upload_ended` | A demo upload finished | `map_number`, `filename`, `success` |
 | `player_connect` | A player joins while a match is loaded, and again after each map change. Players kicked for not being in the match are not sent | `player` (user id), `player_steamid`, `player_name`, `player_team`, `ip_address` (without the port) |
 | `player_disconnect` | A player leaves while a match is loaded. Not sent for players kicked for not being in the match, or who leave before Steam has authenticated them | `player` (user id), `player_steamid`, `player_name`, `player_team`, `reason` |
 
 `match_cancelled` `reason` values: `ended_early` (stopped), `surrendered`, `restarted`, `no_show` (cancelled for a no-show) and `map_changed` (ended by a map change from outside MatchZy).
+
+### Admin tickets
+
+Players talk to the admins with `.admin` (the match's ticket: one open thread per match, every player in the match sees the messages and the answers) and `.report` (a private thread per player: only the reporter and the admins). A panel or ticket system receives these events, with or without a loaded match, at the same URLs as the server lifecycle events below.
+
+| Event | When | Fields |
+|---|---|---|
+| `admin_called` | A player writes `.admin` / `.report` | `call_id` (unique per message), `new_thread` (`true` on a thread's first message: create the ticket), `player{steamid64,name,team,side}`, `message` (at most 200 characters, may be empty), `called_at` |
+| `admin_reply` | An admin answered with `matchzy_admin_reply` | `from`, `message`, `sent_at` |
+| `admin_thread_closed` | The ticket ended | `reason` (`admin`: `matchzy_admin_close`, `match_end`, `timeout`: no message for `matchzy_admin_ticket_timeout` minutes, sent with the next message), `closed_at` |
+
+All three also carry `thread_id` (the conversation; use it as the ticket's key), `kind` (`admin` or `report`), `server{hostname,address}` (`address` is `ip:port` as the server binds it, usually `0.0.0.0:<port>`), `matchid`, `map_number`, `map_name` and `plugin_version`. `team` is `team1` / `team2` / `spectator` (`null` without a match), `side` is `ct` / `t` / `null`.
+
+To answer, send `matchzy_admin_reply <thread_id> <message>` over RCON; `matchzy_admin_close <thread_id> [message]` ends the ticket. The rest of the chat is in `player_say` while a match is loaded, and `css_asay <message>` writes to everyone. `matchzy_test_event` sends a `test_event` (`timestamp`) to check the connection.
 
 ## Server lifecycle
 
@@ -89,7 +112,7 @@ Building blocks:
 | `player_say` | A player writes in chat while a match is loaded, chat commands such as `.ready` included | `player`, `command` (`say` or `say_team`), `message`, `round_time` |
 | `backup_loaded` | A round backup was restored | `round_number` (the round restored to), `filename` |
 
-- **`game_paused`, `game_unpaused`**: `team` is `team1`, `team2`, or `null` for admin, automatic and restore pauses. `pause_type` is `tactical`, `technical`, `admin`, or `backup` after a round restore. `max_duration` is the seconds of a timed technical pause.
+- **`game_paused`, `game_unpaused`**: `team` is `team1`, `team2`, or `null` for admin, automatic and restore pauses. `pause_type` is `tactical`, `technical`, `admin`, or `backup` after a round restore. A tactical timeout (`.tac`) is sent as `tactical` when it is called, and `game_unpaused` follows when it ends. `max_duration` is the seconds of a timed technical pause, or of a tactical timeout (`mp_team_timeout_time`).
 - **`backup_loaded`**: followed by that round's `round_start`; the engine's own round start after the load is not sent again.
 - **`player_say`**: `round_number` is `-1` and `round_time` is `0` while the match is not live (warmup, knife round, veto). A command that ends the match, such as `.stopmatch`, is still sent before the match is reset. Bots and the server console are not sent.
 
@@ -147,7 +170,7 @@ Get5's per-grenade detonation events with victim lists (`hegrenade_detonated`, `
 
 ### Legacy format
 
-`matchzy_events_format legacy` sends the flat format below, unchanged from 0.8.94 and older. Pauses are sent as `match_paused` (`pause_type` `tech`, `pause`, `admin` or `auto`, `team_name`, `max_duration`) and `match_unpaused`.
+`matchzy_events_format legacy` sends the flat format below, unchanged from 0.8.94 and older. Pauses are sent as `match_paused` (`pause_type` `tech`, `pause`, `admin`, `auto`, `backup` or `tactical`, `team_name`, `max_duration`) and `match_unpaused`.
 
 
 | Event | When | Fields |

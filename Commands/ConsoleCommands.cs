@@ -75,13 +75,21 @@ namespace MatchZy
                 // spectators or extra ready players on one side must not hide a side that is missing.
                 int readyPlayers = perTeam > 0
                     ? CountedReadyForSide(CsTeam.CounterTerrorist, perTeam) + CountedReadyForSide(CsTeam.Terrorist, perTeam)
-                    : playerReadyStatus.Values.Count(status => status);
+                    : CountReadyGatePlayers().Ready;
                 int notReadyPlayers = totalPlayers - readyPlayers;
 
                 if (notReadyPlayers < 0)
                     notReadyPlayers = 0; // safety check
 
-                if (player != null)
+                // Loaded match: per team, what it is waiting for (players on the side, ready count, the
+                // registered players who are missing). The totals alone did not say why a match
+                // with everyone ready did not start.
+                if (isMatchSetup)
+                {
+                    foreach (string line in ReadyCheckTeamLines(player))
+                        ReplyToUserCommand(player, line);
+                }
+                else if (player != null)
                 {
                     player.PrintToChat($" {Localizer.ForPlayer(player, "matchzy.cmd.readycheck.readyplayers", readyPlayers, totalPlayers)}");
                     player.PrintToChat($" {Localizer.ForPlayer(player, "matchzy.cmd.readycheck.waitingfor", notReadyPlayers)}");
@@ -108,6 +116,8 @@ namespace MatchZy
             {
                 if (ReplyReadyDisabled(player))
                     return;
+                if (RejectNonPlayerReady(player))
+                    return;
                 if (player.UserId.HasValue)
                 {
                     int userId = player.UserId.Value;
@@ -124,6 +134,7 @@ namespace MatchZy
                     {
                         playerReadyStatus[userId] = true;
                         PrintToPlayerChat(player, Localizer.ForPlayer(player, "matchzy.ready.markedready"));
+                        PublishPlayerReadyChanged(player, true);
 
                         // NEW: Check if this team is now ready
                         bool isTeamReady = IsTeamReady(team);
@@ -164,6 +175,8 @@ namespace MatchZy
             {
                 if (ReplyReadyDisabled(player))
                     return;
+                if (RejectNonPlayerReady(player))
+                    return;
                 if (player.UserId.HasValue)
                 {
                     if (!playerReadyStatus.ContainsKey(player.UserId.Value))
@@ -179,6 +192,7 @@ namespace MatchZy
                     {
                         playerReadyStatus[player.UserId.Value] = false;
                         PrintToPlayerChat(player, Localizer.ForPlayer(player, "matchzy.ready.markedunready"));
+                        PublishPlayerReadyChanged(player, false);
                     }
 
                     _readyStatusDirty = true;
@@ -590,6 +604,8 @@ namespace MatchZy
                 else
                 {
                     PrintLocalizedToAll("matchzy.pause.teamwantstounpause", unpauseTeamName, remainingUnpauseTeam);
+                    if (player != null && player.IsValid)
+                        PublishUnpauseRequested(player.TeamNum);
                 }
 
                 if (!isPaused && pausedStateTimer != null)
@@ -628,9 +644,13 @@ namespace MatchZy
                     {
                         bool alreadyActive = gameRules.TerroristTimeOutActive;
                         int left = gameRules.TerroristTimeOuts - 1;
+                        pauseNoticeGraceUntil = DateTime.UtcNow.AddSeconds(2);
                         Server.ExecuteCommand("timeout_terrorist_start");
                         if (!alreadyActive)
+                        {
                             PrintLocalizedToAll("matchzy.pause.tacleft", GetTacTeamName(player), left);
+                            PublishTacticalTimeoutStarted(player);
+                        }
                     }
                     else
                     {
@@ -643,9 +663,13 @@ namespace MatchZy
                     {
                         bool alreadyActive = gameRules.CTTimeOutActive;
                         int left = gameRules.CTTimeOuts - 1;
+                        pauseNoticeGraceUntil = DateTime.UtcNow.AddSeconds(2);
                         Server.ExecuteCommand("timeout_ct_start");
                         if (!alreadyActive)
+                        {
                             PrintLocalizedToAll("matchzy.pause.tacleft", GetTacTeamName(player), left);
+                            PublishTacticalTimeoutStarted(player);
+                        }
                     }
                     else
                     {

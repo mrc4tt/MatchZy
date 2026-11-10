@@ -21,3 +21,15 @@ Valve-opdateringer kan flytte disse funktioner. En forældet eller manglende nø
 - Loggen viser linjer som `CCSPlayer_WeaponServices_SelectItem offset missing`.
 
 Løsningen er en ny `matchzy.json` til det nye CS2-build (Linux `libserver.so`, Windows `server.dll`). Opdater MatchZy, eller generér signaturerne selv og erstat filen.
+
+
+## Automatiske opdateringer (Miksens CounterStrikeSharp-fork) { #automatic-updates-miksens-counterstrikesharp-fork }
+
+På den CounterStrikeSharp-fork, MatchZy bygges mod, retter core'en selv en forældet `matchzy.json` efter en CS2-opdatering, før en ny MatchZy-release er ude. Det er slået til som standard (`PluginGamedataAutoUpdate` i `configs/core.json`) og bruger gamedata-feedet i `AutoUpdateURL`.
+
+- Kun signaturer, der ikke længere virker på serveren, bliver skiftet ud, og kun med en signatur fra feedet, der virker her. Fungerende nøgler, offsets og nøgler, feedet ikke kender, bliver som de er.
+- Feedets manifest er signeret, og hver fil tjekkes mod sin sha256. Hver ændring gemmes som backup, og en ændring, serveren dør af, rulles tilbage ved næste start.
+- `addons/counterstrikesharp/logs/gamedata-status.json` viser, hvad der virker efter starten.
+- `PluginGamedataFeeds` i `core.json` angiver feed-filen for en plugin-fil, når core'en ikke selv kan afgøre det (fx en omdøbt kopi).
+
+På almindelig CounterStrikeSharp: opdatér MatchZy (eller udskift `matchzy.json`) som beskrevet ovenfor.

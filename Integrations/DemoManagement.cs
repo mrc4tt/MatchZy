@@ -169,6 +169,85 @@ namespace MatchZy
             demoRestartPollTimer = null;
         }
 
+        // matchzy_demo_keep_days: deletes .dem files in the demo folder (matchzy_demo_path, in every
+        // folder the engine can write it to) older than that many days. The current recording, its
+        // earlier parts and the last stopped demo are kept, and nothing is deleted while an upload
+        // runs. Only the top level of the demo folder and only *.dem, so other files a server keeps
+        // there are untouched. Runs at load and at series end, off the game thread.
+        private void CleanupOldDemos()
+        {
+            int days = demoKeepDays.Value;
+            if (days <= 0)
+                return;
+            if (Interlocked.CompareExchange(ref _pendingUploads, 0, 0) > 0)
+            {
+                Log("[DemoCleanup] A demo upload is running; old demos are cleaned up next time.");
+                return;
+            }
+            string folder = demoPath ?? "";
+            string[] dirs = EngineDemoDirs().Select(d => Path.GetFullPath(Path.Join(d, folder))).Distinct().ToArray();
+            var keep = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            foreach (string f in previousDemoSegments.Append(activeDemoFile).Append(lastStoppedDemoFile))
+                if (!string.IsNullOrEmpty(f))
+                    keep.Add(Path.GetFileName(f));
+            DateTime cutoff = DateTime.UtcNow.AddDays(-days);
+            Task.Run(() =>
+            {
+                int deleted = 0;
+                long bytes = 0;
+                foreach (string dir in dirs)
+                {
+                    if (!Directory.Exists(dir))
+                        continue;
+                    foreach (string file in Directory.EnumerateFiles(dir, "*.dem", SearchOption.TopDirectoryOnly))
+                    {
+                        try
+                        {
+                            if (keep.Contains(Path.GetFileName(file)))
+                                continue;
+                            var info = new FileInfo(file);
+                            if (info.LastWriteTimeUtc >= cutoff)
+                                continue;
+                            long size = info.Length;
+                            info.Delete();
+                            deleted++;
+                            bytes += size;
+                        }
+                        catch (Exception) { }
+                    }
+                }
+                if (deleted > 0)
+                    Log($"[DemoCleanup] Deleted {deleted} demo file(s) older than {days} day(s), {bytes / (1024 * 1024)} MB.");
+            });
+        }
+
+        // matchzy_demo_live_only: CS2's tv_autorecord records every map from the moment it loads, so a
+        // server left idle (or in practice mode) for hours writes a demo of nothing. With the convar on,
+        // MatchZy turns tv_autorecord off and stops a recording it did not start itself. Its own demo
+        // (isDemoRecording / demoStartPending, a live map) is never touched.
+        private void EnforceDemoLiveOnly(string reason)
+        {
+            if (!demoLiveOnly.Value)
+                return;
+            if (ConVar.Find("tv_autorecord") != null)
+                Server.ExecuteCommand("tv_autorecord 0");
+            if (isDemoRecording || demoStartPending || cstvRestartPending || isMatchLive || matchStarted)
+                return;
+            // tv_stoprecord with nothing recording only prints "Not recording" in the console.
+            Server.ExecuteCommand("tv_stoprecord");
+            Log($"[Demo] matchzy_demo_live_only ({reason}): tv_autorecord 0, stopped any recording outside a live map.");
+        }
+
+        // Called at map start. server.cfg runs on every map load and can turn tv_autorecord back on,
+        // and the engine starts its auto recording during the load, so check again a few seconds in.
+        private void ScheduleDemoLiveOnlyCheck()
+        {
+            if (!demoLiveOnly.Value)
+                return;
+            AddTimer(5.0f, () => EnforceDemoLiveOnly("map start"), TimerFlags.STOP_ON_MAPCHANGE);
+            AddTimer(20.0f, () => EnforceDemoLiveOnly("map start"), TimerFlags.STOP_ON_MAPCHANGE);
+        }
+
         private bool IsGOTVEnabled()
         {
             // -nohltv is a bare flag with no value, so probe the raw process command line for it.
@@ -371,6 +450,9 @@ namespace MatchZy
                 Server.ExecuteCommand("tv_record_immediate 1");
             Server.ExecuteCommand($"tv_record {recordArg}");
             isDemoRecording = true;
+            // Once per demo: a retry (another tv_record attempt) is the same recording for a panel.
+            if (demoStartAttempts == 1)
+                PublishDemoRecordingStart(tempDemoPath);
             Log($"[StartDemoRecording] tv_record {recordArg} (attempt {demoStartAttempts}/{DemoStartMaxAttempts})");
             VerifyDemoRecording(tempDemoPath);
         }

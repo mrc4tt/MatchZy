@@ -86,6 +86,13 @@ public partial class MatchZy
             }
             _readyStatusDirty = true;
 
+            // A player only counts towards the ready-up once fully connected (playerData). The
+            // engine can put a reconnecting player on their old side while they are still loading,
+            // so no player_team follows: re-check the start here too, for the case where the team
+            // typed .ready while waiting for this player.
+            if (readyAvailable && !matchStarted && !IsJoinReadyMode())
+                AddTimer(Math.Max(1, afterReadyDelay), () => CheckLiveRequired(), CounterStrikeSharp.API.Modules.Timers.TimerFlags.STOP_ON_MAPCHANGE);
+
             // First player connection handling
             if (GetRealPlayersCount() == 1)
             {
@@ -850,6 +857,9 @@ public partial class MatchZy
 
             CCSPlayerController? player = @event.Userid;
             if (!IsPlayerValid(player) || !player!.UserId.HasValue)
+                return HookResult.Continue;
+            // Spectators and coaches do not ready up; a ping from them stays a ping (no chat line).
+            if (!IsReadyGatePlayer(player))
                 return HookResult.Continue;
 
             int userId = player.UserId.Value;

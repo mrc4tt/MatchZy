@@ -415,6 +415,8 @@ namespace MatchZy
                 autoStartModeCvar.ValueChanged += OnAutoStartModeCvarChanged;
                 // Ready panel, hints and clan tags follow matchzy_ready_enabled at once, not on the next ready toggle.
                 readyEnabled.ValueChanged += (_, _) => _readyStatusDirty = true;
+                // Turned on mid-map (config.cfg exec at load, or rcon): stop an idle recording now.
+                demoLiveOnly.ValueChanged += (_, _) => Server.NextFrame(() => EnforceDemoLiveOnly("enabled"));
 
                 _loadedMidMap = !hotReload && AreServerGlobalsReady();
                 if (!hotReload)
@@ -470,6 +472,10 @@ namespace MatchZy
             // Warm the optional CS2MenuManager assembly on a background thread so the first .ma/.nades
             // open doesn't JIT the whole menu dependency graph on the game thread (1.7s frame stall).
             WarmupMenuAssembly();
+            // matchzy_backup_keep_days: once config.cfg has been applied.
+            AddTimer(30.0f, () => { try { CleanupOldRoundBackups(); } catch (Exception e) { Log($"[BackupCleanup] {e.Message}"); } });
+            // matchzy_demo_keep_days: same moment.
+            AddTimer(30.0f, () => { try { CleanupOldDemos(); } catch (Exception e) { Log($"[DemoCleanup] {e.Message}"); } });
 
             SetupRestartConfirmationCleanup();
 
@@ -480,6 +486,8 @@ namespace MatchZy
                 { ".gaben", OnPlayerReady },
                 { ".rdy", OnPlayerReady },
                 { ".forceready", OnForceReadyCommandCommand },
+                { ".admin", (p, _) => HandleAdminCall(p, "", report: false) },
+                { ".calladmin", (p, _) => HandleAdminCall(p, "", report: false) },
                 { ".unready", OnPlayerUnReady },
                 { ".notready", OnPlayerUnReady },
                 { ".ur", OnPlayerUnReady },
@@ -732,6 +740,7 @@ namespace MatchZy
             // the DynoHook "could not allocate trampoline" error for zero benefit.
             RegisterListener<Listeners.OnTick>(RenderReadyPanel);
             RegisterListener<Listeners.OnTick>(TechPauseHudAntiFlashTick);
+            RegisterPauseNoticeFilter();
 
             // Hot load/reload while a ready phase is already up: run the panel render immediately on
             // the next frame instead of waiting for the natural OnTick, so the native "Warmup" HUD is
@@ -820,6 +829,30 @@ namespace MatchZy
                     return HookResult.Continue;
                 },
                 HookMode.Pre
+            );
+
+            // A team can type .ready while a player is still missing; the side only counts as ready
+            // once that player is on it. The start check used to run on .ready / ping / .forceready
+            // only, so the match sat in warmup after the last player joined until someone typed
+            // .ready again. Re-check after a player joins T or CT (same delay as after .ready).
+            RegisterEventHandler<EventPlayerTeam>(
+                (@event, info) =>
+                {
+                    try
+                    {
+                        if (!readyAvailable || matchStarted || IsJoinReadyMode())
+                            return HookResult.Continue;
+                        if (@event.Team != (int)CsTeam.CounterTerrorist && @event.Team != (int)CsTeam.Terrorist)
+                            return HookResult.Continue;
+                        AddTimer(Math.Max(1, afterReadyDelay), () => CheckLiveRequired(), TimerFlags.STOP_ON_MAPCHANGE);
+                    }
+                    catch (Exception e)
+                    {
+                        Log($"[EventPlayerTeam ReadyCheck FATAL] {e}");
+                    }
+                    return HookResult.Continue;
+                },
+                HookMode.Post
             );
 
             // A veto captain who changes team can no longer ban or pick for their team (the
@@ -1036,6 +1069,8 @@ namespace MatchZy
                     CarryPendingPauseToLive();
                     isSideSelectionPhase = true;
                     isKnifeRound = false;
+                    try { PublishKnifeRoundEnded(knifeWinner); }
+                    catch (Exception e) { Log($"[PhaseEvents] knife_round_ended: {e.Message}"); }
                     StartAfterKnifeWarmup();
 
                     return HookResult.Changed;
@@ -1099,6 +1134,7 @@ namespace MatchZy
                 // without this isDemoRecording stayed true and every later match silently refused to
                 // start a demo on the "already recording" guard.
                 ResetDemoStateOnMapStart();
+                ScheduleDemoLiveOnlyCheck();
 
                 // Coach-spawn markers: the beams/labels are destroyed by the map change but the toggle
                 // stayed "on" (stale entity handles). Refresh so .showcoachspawns keeps working across
@@ -1767,6 +1803,13 @@ namespace MatchZy
                     if ((cmdWord == ".ffire" || cmdWord == ".friendlyfire") && messageCommandArg != "")
                     {
                         HandleFriendlyFireCommand(player, messageCommandArg);
+                        return HookResult.Continue;
+                    }
+
+                    // .report is handled (and hidden) by the say listener, before the line reaches chat.
+                    if ((cmdWord == ".admin" || cmdWord == ".calladmin") && messageCommandArg != "")
+                    {
+                        HandleAdminCall(player, messageCommandArg, report: false);
                         return HookResult.Continue;
                     }
 

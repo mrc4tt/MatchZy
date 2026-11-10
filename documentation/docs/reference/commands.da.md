@@ -42,6 +42,11 @@ Argumenter i `<vinkelparenteser>` er påkrævede, argumenter i `[firkantede pare
 | `.help` | Player | Viser de kommandoer, der giver mening i den nuværende fase (practice, warmup, live...). Også `!matchhelp` og `!matchzyhelp`. |
 | `.mhelp` | Enhver admin | Chat: de admin-kommandoer, du kan bruge, grupperet efter kategori. Konsol: hele listen med et flueben pr. kommando og den rettighed, du mangler. |
 | `.version` | Player | Viser CS2-build og MatchZy-version. Også `!matchzy_version` og `!mikzy_version`. |
+| `.admin [besked]` | Player | Kun med `matchzy_admin_call_enabled true`. Skriver i kampens admin-ticket. Alle spillere i kampen ser beskeden og admins' svar, så begge hold ser, hvad der er aftalt (fx en round restore). Skriv så tit du vil (én besked pr. `matchzy_admin_call_cooldown` sekunder). Også `.calladmin`. |
+| `.report [besked]` | Player | En privat ticket: kun du og admins ser den. Linjen vises ikke i chatten. Til at reporte det andet hold. |
+| `matchzy_admin_reply <thread_id\|call_id\|steamid64> <besked>` | Admin, RCON | Svarer på en ticket: alle i kampen ser svaret i kampens ticket, kun den, der reportede, ser svaret på en report. |
+| `matchzy_admin_close <thread_id\|call_id\|steamid64> [besked]` | Admin, RCON | Lukker en ticket, med en valgfri sidste besked. Næste `.admin` åbner en ny. |
+| `matchzy_test_event` | Config, RCON | Sender et `test_event` til remote log URL'en, så man kan tjekke, at panelet kan nås. |
 | `!color <0-4>` | Player | Vælger din holdfarve på radaren og scoreboardet (0 blå, 1 grøn, 2 gul, 3 orange, 4 lilla). |
 | `.asay <besked>` | Chat | Sender en meddelelse til hele chatten med admin-præfikset. `.asay` virker altid. |
 | `.map <bane>` | Map | Skifter bane, før en kamp er startet. Tager `mirage`, `de_mirage`, et workshop-id, `ws/<id>` eller `ws:<navn>`. |
@@ -100,7 +105,7 @@ Før en kamp går live, gør spillerne sig klar. Hvor mange der skal være klar,
 |---|---|---|
 | `.ready` `.r` `.rdy` `.gaben` | Player | Markerer dig som klar. Et ping (midterste museknap) skifter også. Mens en live-kamp er pauset, stemmer `.r` i stedet for at genoptage. |
 | `.unready` `.ur` `.notready` `.nr` `.urdy` | Player | Fortryder din klar-status. |
-| `.readycheck` `.rc` `.rcheck` | Player | Viser, hvor mange der er klar, og hvor mange der stadig mangler. |
+| `.readycheck` `.rc` `.rcheck` | Player | Viser, hvor mange der er klar, og hvor mange der stadig mangler. I en loadet kamp pr. hold: spillere på siden og klar-spillere i forhold til, hvad holdet skal have, de registrerede spillere, der mangler (loader stadig, står på Spectator eller er ikke på serveren), med navn, og hvem på siden der ikke har skrevet `.ready`. Virker også fra serverkonsollen / RCON. |
 | `.forceready` | Player | Gør hele dit hold klar på én gang. Kun loadede match configs. |
 | `.addreadytime <sekunder>` | Config | Giver holdene mere tid, før tidsgrænsen for ready-up (`matchzy_forfeit_ready_timeout`) udløber. Aldrig over den fulde grænse. |
 | `.start` `.force` `.forcestart` | Config | Starter kampen nu og springer ready-check over. Ikke i practice eller dryrun. |
@@ -420,6 +425,7 @@ Køres fra serverkonsollen, RCON eller et panel. Spillere kan ikke bruge dem.
 |---|---|
 | `matchzy_loadmatch <fil>` | Loader en [match config](match-config.md)-fil (sti i forhold til `csgo/`). Afvises, mens en anden kamp er loadet. |
 | `matchzy_loadmatch_url <url> [header] [værdi]` | Loader en match config fra en URL, evt. med én HTTP-header (sendes kun, når både headernavn og værdi er angivet). Alias `get5_loadmatch_url`. |
+| `matchzy_validate_match <fil\|url> [header] [værdi]` | Tjekker en match config uden at loade den (også mens en kamp kører): om den kan loades, holdene, holdstørrelsen, banerne og den ready-up, den giver, og [load-advarslerne](match-config.md). En fil svarer med det samme (også over RCON); en URL svarer efter download i konsollen og loggen. |
 | `matchzy_addplayer <steamid64> <team1\|team2\|spec> "<navn>"` | Tilføjer en spiller til den loadede kamp. Ikke i halvlegen. Alias `get5_addplayer`. |
 | `matchzy_removeplayer <steamid64>` | Fjerner en spiller fra den loadede kamp. Ikke i halvlegen. Alias `get5_removeplayer`. |
 | `matchzy_add_ready_time <sekunder>` | Det samme som `.addreadytime`. Alias `get5_add_ready_time`. |

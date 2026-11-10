@@ -633,7 +633,7 @@ public class PlayerHurtLiveEvent : MatchZyMapEvent
 public class MatchPausedLiveEvent : MatchZyMapEvent
 {
     [JsonPropertyName("pause_type")]
-    public required string PauseType { get; init; } // "tech" | "admin"
+    public required string PauseType { get; init; } // "tech" | "pause" | "auto" | "admin" | "backup" | "tactical"
 
     [JsonPropertyName("team_name")]
     public string? TeamName { get; init; }
@@ -836,4 +836,254 @@ public class ServerShutdownEvent : ServerLifecycleEvent
 
     public ServerShutdownEvent()
         : base("server_shutdown") { }
+}
+
+// ══════════════════════════════════════════════════════════════════════
+// Ready-up, unpause request, demo start and admin call events. Field names follow the
+// MatchZy Enhanced shapes that tournament panels (e.g. auto-tournament) already read.
+// ══════════════════════════════════════════════════════════════════════
+
+public class ReadyEventPlayer
+{
+    [JsonPropertyName("steamid")]
+    public required string SteamId { get; init; }
+
+    [JsonPropertyName("name")]
+    public required string Name { get; init; }
+
+    // "team1" / "team2" / "spectator"
+    [JsonPropertyName("team")]
+    public required string Team { get; init; }
+}
+
+public class PlayerReadyChangedEvent : MatchZyMapEvent
+{
+    [JsonPropertyName("player")]
+    public required ReadyEventPlayer Player { get; init; }
+
+    [JsonPropertyName("team")]
+    public required string Team { get; init; }
+
+    [JsonPropertyName("ready_count_team1")]
+    public int ReadyCountTeam1 { get; init; }
+
+    [JsonPropertyName("ready_count_team2")]
+    public int ReadyCountTeam2 { get; init; }
+
+    [JsonPropertyName("total_ready")]
+    public int TotalReady { get; init; }
+
+    [JsonPropertyName("expected_total")]
+    public int ExpectedTotal { get; init; }
+
+    // "player_ready" or "player_unready"
+    public PlayerReadyChangedEvent(string eventName)
+        : base(eventName) { }
+}
+
+public class TeamReadyEvent : MatchZyMapEvent
+{
+    [JsonPropertyName("team")]
+    public required string Team { get; init; }
+
+    [JsonPropertyName("ready_count")]
+    public int ReadyCount { get; init; }
+
+    [JsonPropertyName("total_ready")]
+    public int TotalReady { get; init; }
+
+    [JsonPropertyName("expected_total")]
+    public int ExpectedTotal { get; init; }
+
+    // true when the team used .forceready
+    [JsonPropertyName("forced")]
+    public bool Forced { get; init; }
+
+    public TeamReadyEvent()
+        : base("team_ready") { }
+}
+
+public class AllPlayersReadyEvent : MatchZyMapEvent
+{
+    [JsonPropertyName("ready_count_team1")]
+    public int ReadyCountTeam1 { get; init; }
+
+    [JsonPropertyName("ready_count_team2")]
+    public int ReadyCountTeam2 { get; init; }
+
+    [JsonPropertyName("total_ready")]
+    public int TotalReady { get; init; }
+
+    // true in join ready mode, where the match starts after matchzy_join_start_delay
+    [JsonPropertyName("countdown_started")]
+    public bool CountdownStarted { get; init; }
+
+    public AllPlayersReadyEvent()
+        : base("all_players_ready") { }
+}
+
+public class UnpauseRequestedEvent : MatchZyMapEvent
+{
+    [JsonPropertyName("team")]
+    public required string Team { get; init; }
+
+    [JsonPropertyName("teams_ready")]
+    public int TeamsReady { get; init; }
+
+    [JsonPropertyName("teams_needed")]
+    public int TeamsNeeded { get; init; }
+
+    [JsonPropertyName("round_number")]
+    public int RoundNumber { get; init; }
+
+    public UnpauseRequestedEvent()
+        : base("unpause_requested") { }
+}
+
+public class DemoRecordingStartEvent : MatchZyMapEvent
+{
+    [JsonPropertyName("filename")]
+    public required string FileName { get; init; }
+
+    public DemoRecordingStartEvent()
+        : base("demo_recording_start") { }
+}
+
+public class AdminCallPlayer
+{
+    [JsonPropertyName("steamid64")]
+    public required string SteamId64 { get; init; }
+
+    [JsonPropertyName("name")]
+    public required string Name { get; init; }
+
+    // "team1" / "team2" / "spectator", null without a loaded match
+    [JsonPropertyName("team")]
+    public string? Team { get; init; }
+
+    // "ct" / "t", null for spectators
+    [JsonPropertyName("side")]
+    public string? Side { get; init; }
+}
+
+public class AdminTicketServer
+{
+    [JsonPropertyName("hostname")]
+    public required string Hostname { get; init; }
+
+    // ip:port as the server binds it (0.0.0.0 unless started with -ip; the port tells servers apart).
+    [JsonPropertyName("address")]
+    public required string Address { get; init; }
+}
+
+// The .admin / .report ticket events. Sent with or without a loaded match, like the lifecycle
+// events (to the server's and the match's remote log URL).
+public abstract class AdminTicketEvent : ServerLifecycleEvent
+{
+    [JsonPropertyName("map_number")]
+    public int? MapNumber { get; init; }
+
+    // One conversation: the match's ticket (.admin) or one player's report (.report).
+    [JsonPropertyName("thread_id")]
+    public required string ThreadId { get; init; }
+
+    // "admin" (seen by every player in the match) or "report" (only the reporter and the admins).
+    [JsonPropertyName("kind")]
+    public required string Kind { get; init; }
+
+    [JsonPropertyName("server")]
+    public required AdminTicketServer Server { get; init; }
+
+    protected AdminTicketEvent(string eventName)
+        : base(eventName) { }
+}
+
+public class AdminCalledEvent : AdminTicketEvent
+{
+    // Unique per message, so a panel can store a retried delivery once.
+    [JsonPropertyName("call_id")]
+    public required string CallId { get; init; }
+
+    // true for the first message of a thread (create the ticket), false for the ones after it.
+    [JsonPropertyName("new_thread")]
+    public bool NewThread { get; init; }
+
+    [JsonPropertyName("player")]
+    public required AdminCallPlayer Player { get; init; }
+
+    // At most 200 characters, may be empty.
+    [JsonPropertyName("message")]
+    public required string Message { get; init; }
+
+    // ISO 8601, UTC.
+    [JsonPropertyName("called_at")]
+    public required string CalledAt { get; init; }
+
+    public AdminCalledEvent()
+        : base("admin_called") { }
+}
+
+// An admin answered (matchzy_admin_reply), so the reply is in the panel's history too.
+public class AdminReplyEvent : AdminTicketEvent
+{
+    [JsonPropertyName("from")]
+    public required string From { get; init; }
+
+    [JsonPropertyName("message")]
+    public required string Message { get; init; }
+
+    [JsonPropertyName("sent_at")]
+    public required string SentAt { get; init; }
+
+    public AdminReplyEvent()
+        : base("admin_reply") { }
+}
+
+public class AdminThreadClosedEvent : AdminTicketEvent
+{
+    // "admin" (matchzy_admin_close), "match_end" or "timeout" (no message for matchzy_admin_ticket_timeout minutes)
+    [JsonPropertyName("reason")]
+    public required string Reason { get; init; }
+
+    [JsonPropertyName("closed_at")]
+    public required string ClosedAt { get; init; }
+
+    public AdminThreadClosedEvent()
+        : base("admin_thread_closed") { }
+}
+
+// knife_round_started, knife_round_ended, halftime_started, overtime_started, side_swap.
+public class MatchPhaseEvent : MatchZyMapEvent
+{
+    // Rounds played on this map when the phase changed.
+    [JsonPropertyName("round_number")]
+    public int RoundNumber { get; init; }
+
+    // overtime_started: 1 for the first overtime, 2 for the next, ...
+    [JsonPropertyName("overtime_number")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public int? OvertimeNumber { get; init; }
+
+    // knife_round_ended: "team1" / "team2" (the knife winner, who now picks a side)
+    [JsonPropertyName("winner")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? Winner { get; init; }
+
+    // side_swap: team1's side after the swap ("ct" / "t")
+    [JsonPropertyName("team1_side")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? Team1Side { get; init; }
+
+    public MatchPhaseEvent(string eventName)
+        : base(eventName) { }
+}
+
+// matchzy_test_event: a connectivity probe for a panel's endpoint.
+public class TestEvent : ServerLifecycleEvent
+{
+    [JsonPropertyName("timestamp")]
+    public long Timestamp { get; init; }
+
+    public TestEvent()
+        : base("test_event") { }
 }

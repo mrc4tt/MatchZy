@@ -5,8 +5,8 @@ Før en kamp, scrim eller hill går live, venter serveren i warmup. Spillerne fo
 ## Det grundlæggende
 
 - Skriv `.ready` (eller `.r`), når du er klar, og `.unready` for at fortryde. Et ping (midterste museknap) skifter også (`matchzy_ready_up_by_ping`).
-- `.readycheck` viser, hvem serveren stadig venter på.
-- Coaches tæller aldrig med og skal ikke skrive `.ready`.
+- `.readycheck` viser, hvem serveren stadig venter på. I en loadet kamp pr. hold, fx `Team A (CT): 4/5 spillere på siden, 1/1 klar` og `Mangler: alpha5`.
+- Kun spillere på T eller CT melder klar. Spectators og coaches tæller aldrig med, og `.ready` eller et ping fra dem ignoreres.
 - Admins kan springe det hele over med `.start`.
 - `matchzy_ready_enabled false` slår spillernes klarmelding fra: kun en admin starter kampen med `.start`, også før map veto, og klar-tidsgrænsen kører ikke.
 
@@ -62,21 +62,54 @@ Hvad "klar" betyder, afhænger af `matchzy_ready_per_team`:
 | `0` (standard) | alle dets registrerede spillere er på serveren, **og** hver af dem har skrevet `.ready` |
 | `1` (eller mere) | alle dets registrerede spillere er på serveren, **og** 1 (eller det antal) af dem har skrevet `.ready` |
 
-I begge tilstande starter kampen aldrig, mens en registreret spiller mangler. Spillere, der allerede er inde, kan skrive `.ready`, mens de venter; serveren husker det.
+I begge tilstande starter kampen aldrig, mens en registreret spiller mangler. Spillere, der allerede er inde, kan skrive `.ready`, mens de venter; serveren husker det, og kampen starter af sig selv et par sekunder efter, at den sidste registrerede spiller er helt connected og står på siden. Ingen skal skrive `.ready` igen.
 
 Godt at vide:
 
-- `min_players_to_ready` i match configen sænker antallet: er det lavere end det, holdet ellers skal have, gør så mange klar-spillere holdet klar, også mens registrerede spillere mangler. Med `"min_players_to_ready": 1` starter kampen, når én spiller på CT og én på T har skrevet `.ready`. Udelad det (eller sæt det til `players_per_team`) for fuld ready-up.
+- `min_players_to_ready` i match configen (kun med `matchzy_ready_per_team 0`; med `1` eller mere skal holdet stadig være fuldt) sænker antallet: er det lavere end det, holdet ellers skal have, gør så mange klar-spillere holdet klar, også mens registrerede spillere mangler. Med `"min_players_to_ready": 1` starter kampen, når én spiller på CT og én på T har skrevet `.ready`. Udelad det (eller sæt det til `players_per_team`) for fuld ready-up.
 - Tallet tages fra hver ny match config, så næste kamp kan være 5v5 igen.
 - Det følger holdet, ikke siden: det er ligegyldigt, om Hold A spiller CT eller T.
 - En spiller tæller, når han er helt connected og står på sit holds side. Mens han loader ind eller står på Spectator, tæller han ikke.
-- `players_per_team` er det maksimale antal, et hold kan have på serveren. En 6. registreret spiller (reserve) venter på Spectator, og et hold med 6 registreret skal have 5.
-- Coaches, der står under `players`, tælles ikke med. Et hold med `"players": "any"` eller et bot-hold bruger `players_per_team`.
+- `players_per_team` er det maksimale antal, et hold kan have på serveren. Står det ikke i match configen, bruges den største roster af de to hold (højst 5 i competitive), så en 4v4-config med to rosters på 4 virker uden. En 6. registreret spiller (reserve) venter på Spectator, og et hold med 6 registreret skal have 5.
+- Coaches, der står under `players`, og registrerede spillere, der coacher med `.coach`, tælles ikke med. Et hold med `"players": "any"` eller et bot-hold bruger `players_per_team`.
 - Spectators (kommentatorer, admins) er ikke en del af ready-up.
+
+## Turneringer (2v2 til 5v5) { #tournaments }
+
+Til en liga eller turnering, hvor spillerne selv melder klar, og ingen admin skal starte kampen:
+
+På serveren, én gang (`cfg/MatchZy/config.cfg`):
+
+```text
+matchzy_ready_per_team 1
+```
+
+I hver match config, turneringens holdstørrelse:
+
+| Turnering | Match config |
+|---|---|
+| 5v5 | `"players_per_team": 5` |
+| 4v4 | `"players_per_team": 4` |
+| 3v3 | `"players_per_team": 3` |
+| 2v2 | `"players_per_team": 2, "game_mode": "wingman"` |
+
+Så:
+
+1. Spillerne skriver `.ready`, når de vil, også mens en holdkammerat stadig mangler. Holdet ser, hvor mange det venter på.
+2. En spiller tæller, når han er helt connected og står på holdets side. Spectators (admins, kommentatorer) og coaches tæller aldrig.
+3. Når begge hold er fulde, og én spiller pr. hold har skrevet `.ready`, starter kampen af sig selv.
+
+Godt at vide:
+
+- Reserver kan stå under `players`: serveren venter aldrig på flere end `players_per_team`.
+- Udelad `min_players_to_ready`. Med `matchzy_ready_per_team 1` bruges det alligevel ikke.
+- Et hold, der ikke kan stille fuldt, kan starte med én mand mindre via `.forceready` (`matchzy_forceready_max_missing`), eller slå det fra med `matchzy_allow_force_ready false`, så kun en admin (`.start`) kan starte et hold, der mangler spillere.
+- Udelades `players_per_team`, tages det fra den største `players`-liste (højst 5), så skriv præcis spillerne på i det tilfælde.
+- Tjek serverkonsollen, når en kamp er loadet: `[LOADMATCH] WARNING`-linjer peger på en roster større end holdstørrelsen, en spiller, der også står som spectator, og lignende fejl, der gør, at kampen ikke starter af sig selv. `.readycheck` viser, hvem et hold venter på.
 
 ## Når en registreret spiller mangler
 
-Venter et hold på en registreret spiller, ser holdet, hvor mange der mangler, i chatten og på ready-panelet, fx `Hold 4/5: mangler 1`. Normalt venter man bare på spilleren.
+Venter et hold på en registreret spiller, ser holdet, hvem der mangler, i chatten og på ready-panelet, fx `4 joinet (min. 5): mangler alpha5` (panelet viser højst 2 navne; chatten viser alle, markeret `(Spectator)`, hvis de står der). En åben roster (`"any"`) viser kun antallet. Normalt venter man bare på spilleren.
 
 Kommer spilleren ikke, kan én spiller på holdet skrive `.forceready`. Det gør hele holdet klar, og holdet spiller uden den manglende spiller.
 
@@ -101,7 +134,7 @@ Som standard kan et hold, der er registreret med færre spillere end `players_pe
 | `1` (standard) | HTML-panelet **READY-UP** for hver spiller med statuslinje, antal klar og din egen status. |
 | `2` | En påmindelse i chatten med de spillere, der ikke er klar. |
 
-I en loadet kamp viser panelet antal klar pr. side og det minimum, hver side skal bruge (`Klar (min. 4): CT 2  T 3`), og et hold, der mangler spillere, ser hvor mange der er joinet (`3 joinet (min. 4): 1 mangler`, vist 30 sekunder efter at den seneste spiller joinede). Style `0` viser samme linje pr. side. Style `1` viser også den aktuelle mode på dit sprog. Det almindelige WARMUP-banner skjules, og rundeuret viser et frosset `1:00`.
+I en loadet kamp viser panelet antal klar pr. side og det minimum, hver side skal bruge (`Klar (min. 4): CT 2  T 3`), og et hold, der mangler spillere, ser hvor mange der er joinet (`3 joinet (min. 4): mangler alpha4`, eller `1 mangler` uden roster, vist 30 sekunder efter at den seneste spiller joinede). Style `0` viser samme linje pr. side. Style `1` viser også den aktuelle mode på dit sprog. Det almindelige WARMUP-banner skjules, og rundeuret viser et frosset `1:00`.
 
 Relateret: `matchzy_ready_hint_blink` får IKKE KLAR-linjen til at blinke (style 1), `matchzy_ready_clantag_enabled` viser `[READY]` / `[UNREADY]` på scoreboardet (ikke i join ready mode, hvor ingen skriver `.ready`). Når kampen er live, viser `matchzy_team_clantag_enabled` i stedet hvert holds `tag` fra match configen.
 

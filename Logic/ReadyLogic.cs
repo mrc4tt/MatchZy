@@ -36,6 +36,18 @@ namespace MatchZy
             return minimum < required ? minimum : 0;
         }
 
+        // players_per_team when the match config leaves it out: the larger roster of the two teams
+        // (coaches not counted), at most the game mode's default, so a 4v4 config with two rosters
+        // of 4 plays as 4v4 and substitutes on a roster of 6 do not make it a 6v6. Rosters of 0
+        // (open "any", bot team, no list) do not count; with none left the mode default applies.
+        public static int PlayersPerTeamFromRosters(int roster1, int roster2, int modeDefault)
+        {
+            int largest = Math.Max(roster1, roster2);
+            if (largest <= 0 || modeDefault <= 0)
+                return modeDefault;
+            return Math.Min(largest, modeDefault);
+        }
+
         // Players a side needs for .forceready: min_players_to_ready, but never fewer than
         // players_per_team - matchzy_forceready_max_missing (-1 = no such limit) or the ready floor.
         public static int ForceReadyMinimum(int playersPerTeam, int configMin, int forceMaxMissing, int floor)

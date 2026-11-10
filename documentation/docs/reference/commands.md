@@ -42,6 +42,11 @@ Arguments in `<angle brackets>` are required, arguments in `[square brackets]` a
 | `.help` | Player | Lists the commands that make sense in the current phase (practice, warmup, live...). Also `!matchhelp` and `!matchzyhelp`. |
 | `.mhelp` | Any admin | Chat: the admin commands you can run, grouped by category. Console: the full list with a check mark per command and the permission you are missing. |
 | `.version` | Player | Shows the CS2 build and MatchZy version. Also `!matchzy_version` and `!mikzy_version`. |
+| `.admin [message]` | Player | Only with `matchzy_admin_call_enabled true`. Writes to the match's admin ticket. Every player in the match sees the message and the admins' answers, so both teams see what was agreed (for example a round restore). Write as often as needed (one message per `matchzy_admin_call_cooldown` seconds). Also `.calladmin`. |
+| `.report [message]` | Player | A private ticket: only you and the admins see it. The line is not shown in chat. For reporting the other team. |
+| `matchzy_admin_reply <thread_id\|call_id\|steamid64> <message>` | Admin, RCON | Answers a ticket: everyone in the match sees the answer to the match ticket, only the reporter sees the answer to a report. |
+| `matchzy_admin_close <thread_id\|call_id\|steamid64> [message]` | Admin, RCON | Closes a ticket, with an optional last message. The next `.admin` opens a new one. |
+| `matchzy_test_event` | Config, RCON | Sends a `test_event` to the remote log URL(s), to check that a panel can be reached. |
 | `!color <0-4>` | Player | Picks your teammate color on the radar and scoreboard (0 blue, 1 green, 2 yellow, 3 orange, 4 purple). |
 | `.asay <message>` | Chat | Sends an announcement to all chat with the admin prefix. `.asay` always works. |
 | `.map <map>` | Map | Changes map before a match has started. Accepts `mirage`, `de_mirage`, a workshop id, `ws/<id>` or `ws:<name>`. |
@@ -100,7 +105,7 @@ Before a match goes live, players ready up. How many must be ready is explained 
 |---|---|---|
 | `.ready` `.r` `.rdy` `.gaben` | Player | Marks you ready. Pinging (middle mouse) also toggles ready. While a live match is paused, `.r` votes to unpause instead. |
 | `.unready` `.ur` `.notready` `.nr` `.urdy` | Player | Takes back your ready. |
-| `.readycheck` `.rc` `.rcheck` | Player | Shows how many players are ready and how many are still missing. |
+| `.readycheck` `.rc` `.rcheck` | Player | Shows how many players are ready and how many are still missing. In a loaded match, per team: players on the side and ready players against what the team needs, the registered players who are missing (still connecting, on Spectator or not on the server) by name, and who on the side has not typed `.ready`. Also works from the server console / RCON. |
 | `.forceready` | Player | Readies your whole team at once. Loaded match configs only. |
 | `.addreadytime <seconds>` | Config | Gives the teams more time before the ready-up time limit (`matchzy_forfeit_ready_timeout`) runs out. Never above the full limit. |
 | `.start` `.force` `.forcestart` | Config | Starts the match now, skipping the ready check. Not in practice or dryrun. |
@@ -420,6 +425,7 @@ Run from the server console, RCON or a panel. Players cannot use these.
 |---|---|
 | `matchzy_loadmatch <file>` | Loads a [match config](match-config.md) file (path relative to `csgo/`). Refused while another match is loaded. |
 | `matchzy_loadmatch_url <url> [header] [value]` | Loads a match config from a URL, optionally with one HTTP header (sent only when both header name and value are given). Alias `get5_loadmatch_url`. |
+| `matchzy_validate_match <file\|url> [header] [value]` | Checks a match config without loading it (also while a match runs): whether it would load, the teams, team size, maps and ready-up it gives, and the [load warnings](match-config.md). A file answers at once (also over RCON); a URL answers after the download, in the console and the log. |
 | `matchzy_addplayer <steamid64> <team1\|team2\|spec> "<name>"` | Adds a player to the loaded match. Not during halftime. Alias `get5_addplayer`. |
 | `matchzy_removeplayer <steamid64>` | Removes a player from the loaded match. Not during halftime. Alias `get5_removeplayer`. |
 | `matchzy_add_ready_time <seconds>` | Same as `.addreadytime`. Alias `get5_add_ready_time`. |

@@ -10,9 +10,12 @@ matchzy_loadmatch_url "https://example.com/match.json" "Authorization" "Bearer <
 
 `get5_loadmatch_url` is an alias of `matchzy_loadmatch_url`. A match loaded by URL is treated as a panel match (no automatic map change at series end). If the first map is not the current map, MatchZy changes map and loads the match again on the new map.
 
+!!! tip "Load warnings"
+    A config can be valid and still not start by itself. When a match loads, MatchZy writes `[LOADMATCH] WARNING` lines to the server console (and tells admins on the server in chat) when: a player is listed for both teams, a team player is also listed under `spectators`, a roster has more players than `players_per_team`, the two teams need a different number of players, or `min_players_to_ready` is ignored (`matchzy_ready_per_team`) or lets a short team start. The match still loads. Check a config before sending it with `matchzy_validate_match <file|url>`, which prints the same warnings without loading anything.
+
 Ready-made BO1 to BO5 configs, a bot test and G5API notes: [Match config examples](match-examples.md).
 
-Prefer an in-game flow? Admins can build the same config with the [`.matchsetup` wizard](../guides/menus.md).
+Prefer a form? The [match config builder](match-builder.md) writes a config for you. Prefer an in-game flow? Admins can build the same config with the [`.matchsetup` wizard](../guides/menus.md).
 
 ## Full example
 
@@ -73,7 +76,7 @@ Prefer an in-game flow? Admins can build the same config with the [`.matchsetup`
 | `veto_first` | string | - | `team1`, `team2` or `random`: who starts a generated veto. |
 | `veto_mode` | string[] | generated | Veto order using `team1_ban`, `team2_ban`, `team1_pick`, `team2_pick`. Generated if omitted. |
 | `map_sides` | string[] | `knife` | Per map: `team1_ct`, `team1_t`, `team2_ct`, `team2_t` or `knife`. A fixed side means no knife round on that map. |
-| `players_per_team` | integer | by mode | Players per side at a time. Defaults to 5 for competitive, 2 for wingman, 3 for rush and 1 for 1v1. Extra roster players (substitutes) wait on Spectator while their side is full. Also the number of bots on a bot team. A team whose `players` roster has fewer players readies up with that many: 4 players listed in a 5v5 means the team is ready once those 4 have typed `.ready`, no `.forceready` needed. |
+| `players_per_team` | integer | from rosters | Players per side at a time. Left out: the larger `players` roster of the two teams (coaches not counted), at most the mode's default (5 competitive, 2 wingman, 3 rush, 1 1v1), so two rosters of 4 play as 4v4. Without rosters it is the mode's default. Extra roster players (substitutes) wait on Spectator while their side is full. Also the number of bots on a bot team. A team whose `players` roster has fewer players readies up with that many: 4 players listed in a 5v5 means the team is ready once those 4 have typed `.ready`, no `.forceready` needed. |
 | `min_players_to_ready` | integer | not set | Ready players that make a team ready, when lower than `players_per_team` (or the team's roster size): `1` means one ready player on each team starts the match. Not set = every player must ready up. Also the players a team needs before `.forceready` can ready the whole team. Never fewer than `players_per_team` minus `matchzy_forceready_max_missing` (default: at most one player short, so 4 in a 5v5); a higher value here makes it stricter. In join ready mode, the players a team needs on its side (default: the team's roster size, at most `players_per_team`). |
 | `min_spectators_to_ready` | integer | `0` | Ready spectators needed. |
 | `spectators` | object | `{}` | `{ "players": { "<steamid64>": "<name>" } }`. |

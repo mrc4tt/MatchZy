@@ -2,10 +2,14 @@
 
 Når GOTV er slået til (`tv_enable 1`, fra startparametrene eller en cfg), optager MatchZy en demo af hver live-bane.
 
+MatchZy optager kun live-baner (match, scrim, hill), aldrig practice mode eller en tom server. CS2's egen `tv_autorecord 1` er noget andet: den optager hver bane fra den loader, også en tom server i timevis, og nogle hosts slår den til som standard. Vil du kun have match-demoer, så sæt `matchzy_demo_live_only true`: MatchZy sætter så `tv_autorecord 0` og stopper enhver optagelse uden for en live-bane (tjekkes, når den slås til, og et par sekunder efter hver bane-load, da `server.cfg` kan slå `tv_autorecord` til igen). Med `false` (standard) lader MatchZy `tv_autorecord` stå, som du har sat den. At fjerne `tv_autorecord 1` fra `server.cfg` og startparametrene virker også og undgår de få sekunders optagelse ved hver bane-load.
+
 | Indstilling | Standard | Formål |
 |---|---|---|
 | `matchzy_demo_path` | `demos/` | Mappe i forhold til `csgo/`. |
 | `matchzy_demo_name_format` | `{TIME}_{MATCH_ID}_{MAP}_{TEAM1}_vs_{TEAM2}` | Filnavn. Også `{MAPNUMBER}`. Bogstaver uden for ASCII omskrives (`æ` til `ae`, `é` til `e`) eller fjernes, så upload-headerne er gyldige. |
+
+Gamle demoer kan slettes automatisk: `matchzy_demo_keep_days 7` (eller et andet antal dage) fjerner `.dem`-filer i `matchzy_demo_path`, der er ældre end det, når pluginet loader og ved series end. Slået fra (`0`) som standard. Demoen, der optages, og demoer, der stadig uploades, slettes aldrig.
 
 ## Pålidelig optagelse { #reliable-recording }
 

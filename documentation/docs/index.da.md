@@ -1,12 +1,16 @@
 ---
+title: MatchZy
 hide:
   - navigation
   - toc
 ---
 
 <div class="mz-hero" markdown>
+<div class="mz-hero__text" markdown>
 
-# MatchZy <span class="mz-pill">fork · @@MATCHZY_VERSION@@</span>
+[<span class="mz-dot"></span> Seneste version **@@MATCHZY_VERSION@@**](https://github.com/mrc4tt/MatchZy/releases/tag/@@MATCHZY_VERSION@@){ .mz-badge }
+
+<h1 class="mz-title">Kør CS2-kampe <span class="mz-grad">uden besvær.</span></h1>
 
 <p class="mz-lead">Kampstyring, practice mode, coaching, live events og statistik til CS2-servere med CounterStrikeSharp. Bygget på MatchZy og udvidet til hostede konkurrenceservere.</p>
 
@@ -14,8 +18,30 @@ hide:
 [Kom i gang](getting-started/installation.md){ .md-button }
 [Kommandoer](reference/commands.md){ .md-button }
 
-<small>[Download](https://github.com/mrc4tt/MatchZy/releases/latest) · [Changelog](https://github.com/mrc4tt/MatchZy/blob/@@MATCHZY_VERSION@@/CHANGELOG.md) · [Alle releases](https://github.com/mrc4tt/MatchZy/releases) · [Rapportér en fejl](https://github.com/mrc4tt/MatchZy/issues/new)</small>
+<small>[Changelog](https://github.com/mrc4tt/MatchZy/blob/@@MATCHZY_VERSION@@/CHANGELOG.md) · [Alle releases](https://github.com/mrc4tt/MatchZy/releases) · [Rapportér en fejl](https://github.com/mrc4tt/MatchZy/issues/new)</small>
 
+</div>
+<div class="mz-panel" aria-hidden="true">
+<div class="mz-panel__glow"></div>
+<div class="mz-panel__hud">
+<div class="mz-p-warm">● WARMUP</div>
+<div class="mz-p-title">READY UP TO START</div>
+<div class="mz-p-mode">Mode: Competitive</div>
+<div class="mz-p-bar"><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i></i><i></i><i></i><i></i></div>
+<div class="mz-p-sides"><span class="mz-p-lbl">Klar (min. 4):</span> <span class="mz-p-ct">CT 2</span> <span class="mz-p-t">T 3</span></div>
+<div class="mz-p-you">✔ Du er KLAR</div>
+<div class="mz-p-short">3 joinet (min. 4): 1 mangler</div>
+<div class="mz-p-wait">Venter på: playerA, playerB</div>
+</div>
+<div class="mz-panel__caption">matchzy_ready_hint_style 1</div>
+</div>
+</div>
+
+<div class="mz-stats">
+<div><b>@@STAT_COMMANDS@@</b><span>chat-kommandoer</span></div>
+<div><b>@@STAT_SETTINGS@@</b><span>indstillinger</span></div>
+<div><b>@@STAT_EVENTS@@</b><span>event-typer</span></div>
+<div><b>@@STAT_LANGUAGES@@</b><span>sprog</span></div>
 </div>
 
 <div class="grid cards" markdown>
@@ -80,12 +106,14 @@ hide:
 
 ## Hurtig start
 
-```text
-1. Installer CounterStrikeSharp på din CS2-server.
-2. Pak MatchZy-<version>.zip ud i game/csgo/.
-3. Genstart serveren.
-4. I spillet (som admin): .match  → spillerne skriver .ready
-```
+<div class="mz-steps" markdown>
+
+1. Installér [CounterStrikeSharp](https://docs.cssharp.dev/) på din CS2-server.
+2. Pak `MatchZy-@@MATCHZY_VERSION@@.zip` ud i `game/csgo/`.
+3. Genstart serveren. `cfg/MatchZy/config.cfg` oprettes med alle indstillinger og deres standard.
+4. I spillet (som admin): `.match`, og derefter skriver spillerne `.ready`.
+
+</div>
 
 Hele vejledningen står under [Installation](getting-started/installation.md).
 

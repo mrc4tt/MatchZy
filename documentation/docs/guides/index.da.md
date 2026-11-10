@@ -44,4 +44,8 @@ Opgavefokuserede gennemgange. Alle kommandoer og indstillinger står under [Refe
 
     Webhooks til scoreboards, bots og paneler (på engelsk).
 
+-   :material-ticket-account: **[Admin-tickets](admin-tickets.md)**
+
+    `.admin` / `.report` fra spillet, besvaret fra jeres hjemmeside eller Discord-bot.
+
 </div>

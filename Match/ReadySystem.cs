@@ -145,17 +145,161 @@ public partial class MatchZy
         return configMin > 0 ? configMin : RequiredPlayersOnSide(side);
     }
 
-    private static int RosterPlayerCount(Team team)
+    // Rostered players who coach (.coach / css_coach without a "coaches" list in the match config)
+    // do not play, so they are not counted either: a roster of 5 with one coaching readies up as 4.
+    private int RosterPlayerCount(Team team)
+    {
+        HashSet<ulong> coaching = new();
+        foreach (var coach in matchzyTeam1.coach.Concat(matchzyTeam2.coach))
+            if (coach != null && coach.IsValid)
+                coaching.Add(coach.SteamID);
+        return RosterPlayerIds(team).Count(id => !ulong.TryParse(id, out ulong steamId) || !coaching.Contains(steamId));
+    }
+
+    // Players listed in the team's match config roster, without the ones also listed as coaches.
+    // 0 for an open ("any") or bot team or no roster.
+    private static int ListedRosterSize(Team team) => RosterPlayerIds(team).Count();
+
+    private static IEnumerable<string> RosterPlayerIds(Team team)
     {
         if (team.openRoster || team.botTeam || team.teamPlayers == null)
-            return 0;
+            return Enumerable.Empty<string>();
         IEnumerable<string> steamIds = team.teamPlayers switch
         {
             JObject rosterObject => rosterObject.Properties().Select(p => p.Name),
             JArray rosterArray => rosterArray.Select(e => e.ToString()),
             _ => Enumerable.Empty<string>(),
         };
-        return steamIds.Count(id => !ulong.TryParse(id, out ulong steamId) || !LookupRosterEntry(team.teamCoaches, steamId));
+        return steamIds.Where(id => !ulong.TryParse(id, out ulong steamId) || !LookupRosterEntry(team.teamCoaches, steamId));
+    }
+
+    // .readycheck in a loaded match: one block per team. The team's players on its side against what
+    // it needs, how many are ready against what it needs, and by name the registered players who are
+    // not on the side (still connecting, on Spectator or not on the server) and the players on the
+    // side who have not typed .ready. A side that is ready gets a single line.
+    private List<string> ReadyCheckTeamLines(CCSPlayerController? viewer)
+    {
+        var lines = new List<string>();
+        int perTeam = EffectiveReadyPerTeam();
+        foreach (string sideKey in new[] { "CT", "TERRORIST" })
+        {
+            if (!reverseTeamSides.TryGetValue(sideKey, out Team? team) || team == null)
+                continue;
+            int side = sideKey == "CT" ? (int)CsTeam.CounterTerrorist : (int)CsTeam.Terrorist;
+            string sideName = sideKey == "CT" ? "CT" : "T";
+            if (IsTeamReady(side))
+            {
+                lines.Add(Localizer.ForPlayer(viewer, "matchzy.cmd.readycheck.teamready", team.teamName, sideName));
+                continue;
+            }
+            if (IsBotSide(side))
+                continue;
+
+            (int present, int ready) = GetTeamPlayerCount(side, false);
+            int required = RequiredPlayersOnSide(side);
+            int readyNeeded = perTeam > 0 ? perTeam : ReadyNeededOnSide(side);
+            lines.Add(Localizer.ForPlayer(viewer, "matchzy.cmd.readycheck.team", team.teamName, sideName,
+                present, required, Math.Min(ready, readyNeeded), readyNeeded));
+
+            var missing = MissingRosterNames(side, viewer, markSpectators: true);
+            if (missing.Count > 0 && present < required)
+                lines.Add(Localizer.ForPlayer(viewer, "matchzy.cmd.readycheck.missing", ShortNameList(missing)));
+
+            // Players on the side who have not typed .ready, while the side still needs ready players.
+            if (ready < readyNeeded)
+            {
+                var notReady = playerData
+                    .Where(kv => IsReadyGatePlayer(kv.Value) && kv.Value.TeamNum == side
+                        && !(playerReadyStatus.TryGetValue(kv.Key, out bool r) && r))
+                    .Select(kv => kv.Value.PlayerName)
+                    .ToList();
+                if (notReady.Count > 0)
+                    lines.Add(Localizer.ForPlayer(viewer, "matchzy.cmd.readycheck.notready", ShortNameList(notReady)));
+            }
+        }
+        return lines;
+    }
+
+    // Registered players of the team on `side` who are not on that side (still connecting, on
+    // Spectator, on the other side or not on the server), by name: the in-game name when connected,
+    // else the roster's name, else the SteamID64. Coaches are skipped. Empty for an open ("any") or
+    // bot team, which has no roster. markSpectators adds "(Spectator)" for the viewer's language.
+    private List<string> MissingRosterNames(int side, CCSPlayerController? viewer, bool markSpectators)
+    {
+        var missing = new List<string>();
+        string sideKey = side == (int)CsTeam.CounterTerrorist ? "CT" : "TERRORIST";
+        if (!isMatchSetup || !reverseTeamSides.TryGetValue(sideKey, out Team? team) || team == null)
+            return missing;
+        JObject? rosterNames = team.teamPlayers as JObject;
+        foreach (string id in RosterPlayerIds(team))
+        {
+            if (!ulong.TryParse(id, out ulong steamId))
+                continue;
+            CCSPlayerController? connected = playerData.Values.FirstOrDefault(p => p != null && p.IsValid && p.SteamID == steamId);
+            if (connected != null && (IsMatchCoach(connected) || connected.TeamNum == side))
+                continue;
+            string name = connected?.PlayerName ?? rosterNames?[id]?.ToString() ?? id;
+            if (string.IsNullOrWhiteSpace(name))
+                name = id;
+            missing.Add(markSpectators && connected != null && connected.TeamNum == (int)CsTeam.Spectator
+                ? Localizer.ForPlayer(viewer, "matchzy.cmd.readycheck.onspectator", name)
+                : name);
+        }
+        return missing;
+    }
+
+    // Names for a chat line: at most `max`, then "+N".
+    private static string ShortNameList(List<string> names, int max = 6)
+    {
+        string list = string.Join(", ", names.Take(max));
+        return names.Count > max ? $"{list} +{names.Count - max}" : list;
+    }
+
+    // The short-handed line for the ready panel / classic center text: with the names of the
+    // missing registered players (at most 2, kept short for the panel's size cap) when the roster
+    // knows them, else the bare count.
+    private string ShortHandedLine(CCSPlayerController viewer, int side, int present, int required)
+    {
+        var names = MissingRosterNames(side, viewer, markSpectators: false);
+        if (names.Count == 0)
+            return Localizer.ForPlayer(viewer, "matchzy.ready.shorthanded", present, required, required - present);
+        string list = ShortNameList(names, 2);
+        if (list.Length > 48)
+            list = list.Substring(0, 48) + "...";
+        return Localizer.ForPlayer(viewer, "matchzy.ready.shorthandednames", present, required, list);
+    }
+
+    // Players that take part in the ready-up: on T or CT and not coaching. Spectators and coaches
+    // cannot ready up and never count towards it.
+    private bool IsReadyGatePlayer(CCSPlayerController? player)
+    {
+        return player != null && player.IsValid
+            && (player.TeamNum == (int)CsTeam.CounterTerrorist || player.TeamNum == (int)CsTeam.Terrorist)
+            && !IsMatchCoach(player);
+    }
+
+    // Ready-up players (see IsReadyGatePlayer) and how many of them are ready.
+    private (int Players, int Ready) CountReadyGatePlayers()
+    {
+        int players = 0, ready = 0;
+        foreach (var (userId, p) in playerData)
+        {
+            if (!IsReadyGatePlayer(p))
+                continue;
+            players++;
+            if (playerReadyStatus.TryGetValue(userId, out bool r) && r)
+                ready++;
+        }
+        return (players, ready);
+    }
+
+    // .ready / .unready / ping from a spectator or a coach: tell them and ignore it.
+    private bool RejectNonPlayerReady(CCSPlayerController player)
+    {
+        if (IsReadyGatePlayer(player))
+            return false;
+        PrintToPlayerChat(player, Localizer.ForPlayer(player, "matchzy.ready.playersonly"));
+        return true;
     }
 
     // A side that is still waiting for registered players who have not joined. Null otherwise

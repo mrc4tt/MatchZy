@@ -130,17 +130,9 @@ namespace MatchZy
                 // connected players. (It used to send "terrorist", the server-wide ready state for
                 // both teams and -1 for connected clients.)
                 CsTeam SideOf(Team t) => teamSides[t] == "CT" ? CsTeam.CounterTerrorist : CsTeam.Terrorist;
-                bool TeamReady(CsTeam side)
-                {
-                    foreach (var kv in playerData)
-                    {
-                        if (kv.Value == null || !kv.Value.IsValid || kv.Value.Team != side || IsMatchCoach(kv.Value))
-                            continue;
-                        if (!playerReadyStatus.TryGetValue(kv.Key, out bool r) || !r)
-                            return false;
-                    }
-                    return true;
-                }
+                // The same rule as the ready gate (roster size, min_players_to_ready,
+                // matchzy_ready_per_team, .forceready), so a panel shows what actually starts the match.
+                bool TeamReady(CsTeam side) => IsTeamReady((int)side);
                 CsTeam side1 = SideOf(matchzyTeam1);
                 CsTeam side2 = SideOf(matchzyTeam2);
 

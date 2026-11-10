@@ -45,4 +45,15 @@ public class ReadyLogicTests
     [InlineData(5, 5, 1, 0, 5)]   // match config stricter
     public void ForceReadyMinimum(int perTeam, int configMin, int forceMaxMissing, int floor, int expected)
         => Assert.Equal(expected, ReadyLogic.ForceReadyMinimum(perTeam, configMin, forceMaxMissing, floor));
+
+    [Theory]
+    [InlineData(4, 4, 5, 4)]  // 4v4 config without players_per_team
+    [InlineData(4, 0, 5, 4)]  // other team open ("any") or bots
+    [InlineData(3, 4, 5, 4)]  // one team short: the larger roster sets the size
+    [InlineData(7, 6, 5, 5)]  // substitutes: never above the mode default
+    [InlineData(0, 0, 5, 5)]  // no rosters
+    [InlineData(2, 2, 2, 2)]  // wingman
+    [InlineData(3, 3, 2, 2)]
+    public void PlayersPerTeamFromRosters(int roster1, int roster2, int modeDefault, int expected)
+        => Assert.Equal(expected, ReadyLogic.PlayersPerTeamFromRosters(roster1, roster2, modeDefault));
 }

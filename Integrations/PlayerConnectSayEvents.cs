@@ -111,6 +111,21 @@ namespace MatchZy
         {
             try
             {
+                // .report is private: handle it here, before the engine broadcasts the chat line, and
+                // swallow the line so neither the server chat nor player_say carries the report.
+                if (adminCallEnabled.Value && player != null && player.IsValid && !player.IsBot)
+                {
+                    string line = ChatMessage(info.ArgString);
+                    if (line.Equals(".report", StringComparison.OrdinalIgnoreCase)
+                        || line.StartsWith(".report ", StringComparison.OrdinalIgnoreCase))
+                    {
+                        string text = line.Length > ".report".Length ? line.Substring(".report".Length).Trim() : "";
+                        var reporter = player;
+                        // Engine re-entry (chat prints, events) off the command dispatch: next frame (rule 4).
+                        Server.NextFrame(() => { if (reporter.IsValid) HandleAdminCall(reporter, text, report: true); });
+                        return HookResult.Handled;
+                    }
+                }
                 if (!ShouldSendPlayerEvent(player))
                     return HookResult.Continue;
                 string message = ChatMessage(info.ArgString);

@@ -330,6 +330,9 @@ namespace MatchZy
             {
                 if (playerReadyStatus[key] == false && playerData.TryGetValue(key, out var p) && p != null && p.IsValid)
                 {
+                    // Spectators are not part of the ready gate (as the ready panel), so they hold nothing up.
+                    if (p.TeamNum != (int)CsTeam.CounterTerrorist && p.TeamNum != (int)CsTeam.Terrorist)
+                        continue;
                     // A side that is already ready (N ready players, min_players_to_ready, .forceready)
                     // is done, so its remaining players are not holding anything up.
                     if ((p.TeamNum == (int)CsTeam.CounterTerrorist && ctDone) || (p.TeamNum == (int)CsTeam.Terrorist && tDone))
@@ -358,7 +361,7 @@ namespace MatchZy
             }
             else
             {
-                int countOfReadyPlayers = playerReadyStatus.Count(kv => kv.Value == true);
+                (_, int countOfReadyPlayers) = CountReadyGatePlayers();
                 if (isMatchSetup)
                 {
                     PrintLocalizedToAll("matchzy.utility.readyplayers", countOfReadyPlayers);
@@ -391,7 +394,10 @@ namespace MatchZy
                 {
                     if (p == null || !p.IsValid || p.IsBot || p.IsHLTV || p.TeamNum != side || IsMatchCoach(p))
                         continue;
-                    PrintToPlayerChat(p, Localizer.ForPlayer(p, "matchzy.ready.shorthandedchat", present, required, required - present));
+                    var names = MissingRosterNames(side, p, markSpectators: true);
+                    PrintToPlayerChat(p, names.Count > 0
+                        ? Localizer.ForPlayer(p, "matchzy.ready.shorthandedchatnames", present, required, required - present, ShortNameList(names))
+                        : Localizer.ForPlayer(p, "matchzy.ready.shorthandedchat", present, required, required - present));
                 }
             }
         }
@@ -417,6 +423,7 @@ namespace MatchZy
                 return;
             List<string> unreadyPlayers = new();
             List<int> keysToRemove = new(); // Track stale keys
+            (bool ctDone, bool tDone) = ReadySidesDone();
 
             foreach (var key in playerReadyStatus.Keys.ToList()) // ToList() to avoid collection modification issues
             {
@@ -424,6 +431,12 @@ namespace MatchZy
                 {
                     if (playerData.TryGetValue(key, out var player) && player != null)
                     {
+                        // Same list as the ready panel: only T/CT players, no coaches, and nobody on
+                        // a side that is already ready. Spectators are not part of the ready gate.
+                        if (!player.IsValid || (player.TeamNum != (int)CsTeam.CounterTerrorist && player.TeamNum != (int)CsTeam.Terrorist))
+                            continue;
+                        if (IsMatchCoach(player) || (player.TeamNum == (int)CsTeam.CounterTerrorist ? ctDone : tDone))
+                            continue;
                         unreadyPlayers.Add(player.PlayerName);
                     }
                     else
@@ -527,8 +540,8 @@ namespace MatchZy
             {
                 if (playerData.TryGetValue(key, out var p) && p != null && p.IsValid)
                 {
-                    // Only T/CT - spectators aren't part of the ready gate.
-                    if (p.TeamNum != 2 && p.TeamNum != 3)
+                    // Only T/CT players - spectators and coaches aren't part of the ready gate.
+                    if (!IsReadyGatePlayer(p))
                         continue;
                     totalPlayers++;
                     if (playerReadyStatus[key])
@@ -640,6 +653,8 @@ namespace MatchZy
         // - in classic style (matchzy_ready_hint_style 0) - broadcast the plain center text.
         private void SendReadyStatusHintMessage()
         {
+            try { TrackReadyEvents(); }
+            catch (Exception e) { Log($"[TrackReadyEvents] {e.Message}"); }
             // Dryrun (.dryrun) is a practice-style mode with no ready gate - don't show the ready hint.
             if (!readyAvailable || matchStarted || isDryRun)
                 return;
@@ -663,7 +678,7 @@ namespace MatchZy
                     // the cached numbers: a few localizer lookups per player once a second.
                     foreach (var p in Utilities.GetPlayers())
                     {
-                        if (p == null || !p.IsValid || p.IsBot || p.IsHLTV)
+                        if (p == null || !p.IsValid || p.IsBot || p.IsHLTV || IsCenterMenuOpen(p))
                             continue;
                         p.PrintToCenter(BuildClassicReadyHint(p));
                     }
@@ -699,7 +714,7 @@ namespace MatchZy
                 : Localizer.ForPlayer(player, "matchzy.hint.waitingforplayers", _rpReady, _rpRequired);
             string line2 = Localizer.ForPlayer(player, "matchzy.hint.usereadycommand");
             if (ShortHandedHintSide(player.TeamNum) is (int shortPresent, int shortRequired))
-                line2 += "\n" + Localizer.ForPlayer(player, "matchzy.ready.shorthanded", shortPresent, shortRequired, shortRequired - shortPresent);
+                line2 += "\n" + ShortHandedLine(player, player.TeamNum, shortPresent, shortRequired);
             return _rpWaiting.Length > 0
                 ? $"{line1}\n{line2}\n{Localizer.ForPlayer(player, "matchzy.hint.notready", _rpWaiting)}"
                 : $"{line1}\n{line2}";
@@ -969,6 +984,13 @@ namespace MatchZy
                         continue;
 
                     int uid = target.UserId.Value;
+                    // A menu is open on this player's center panel: leave it alone, and rebuild the
+                    // ready panel once the menu closes.
+                    if (IsCenterMenuOpen(target))
+                    {
+                        _lastPanelHtml.Remove(uid);
+                        continue;
+                    }
                     bool isPlayingNow = target.TeamNum == 2 || target.TeamNum == 3;
                     bool isReadyNow = isPlayingNow
                         && playerReadyStatus.TryGetValue(uid, out bool readyFlag)
@@ -1031,7 +1053,7 @@ namespace MatchZy
                         }
                         else
                             readyLabel += $" ({Localizer.ForPlayer(target, "matchzy.ready.minshort", ctOf)})";
-                        sb.Append($"<font class='fontSize-sm' color='#c8c8c8'>{PanelSafe(readyLabel)}: </font><font class='fontSize-sm' color='#9ecbff'>{PanelSafe(ctSeg)}</font><font class='fontSize-sm' color='#ffffff'> &nbsp; </font><font class='fontSize-sm' color='#ffb36b'>{PanelSafe(tSeg)}</font>");
+                        sb.Append($"<font class='fontSize-sm' color='#c8c8c8'>{PanelSafe(readyLabel)}: </font><font class='fontSize-sm' color='#9ecbff'>{PanelSafe(ctSeg)}</font><font class='fontSize-sm' color='#ffffff'> &#160; </font><font class='fontSize-sm' color='#ffb36b'>{PanelSafe(tSeg)}</font>");
 
                         // Self-status (YOU ARE (NOT) READY) is the most important line, so render it
                         // BEFORE the "waiting on" list. CS2's center-HTML panel has a size cap and drops
@@ -1045,13 +1067,13 @@ namespace MatchZy
                             else if (notReadyVisible)
                                 sb.Append($"<br><font class='fontSize-m' color='#ff3b3b'>&#10008; {PanelSafe(Localizer.ForPlayer(target, "matchzy.ready.notready"))}</font>");
                             else
-                                sb.Append("<br><font class='fontSize-m' color='#ff3b3b'>&nbsp;</font>"); // blink off-frame: keep height
+                                sb.Append("<br><font class='fontSize-m' color='#ff3b3b'>&#160;</font>"); // blink off-frame: keep height
                         }
 
                         // A registered player is missing: how many. After
                         // the self-status so the panel's size cap can only drop this and the list below.
                         if (ShortHandedHintSide(target.TeamNum) is (int shortPresent, int shortRequired))
-                            sb.Append($"<br><font class='fontSize-sm' color='#ffcf3f'>{PanelSafe(Localizer.ForPlayer(target, "matchzy.ready.shorthanded", shortPresent, shortRequired, shortRequired - shortPresent))}</font>");
+                            sb.Append($"<br><font class='fontSize-sm' color='#ffcf3f'>{PanelSafe(ShortHandedLine(target, target.TeamNum, shortPresent, shortRequired))}</font>");
 
                         if (_rpWaiting.Length > 0)
                             sb.Append($"<br><font class='fontSize-sm' color='#9a9a9a'>{PanelSafe(Localizer.ForPlayer(target, "matchzy.ready.waitingon", _rpWaiting))}</font>");
@@ -1377,6 +1399,7 @@ namespace MatchZy
             isDryRun = false;
             isWarmup = false;
             ClearClanTags();
+            PublishKnifeRoundStarted();
 
             var absolutePath = Path.Join(Server.GameDirectory + "/csgo/cfg", knifeCfgPath);
             if (File.Exists(Path.Join(Server.GameDirectory + "/csgo/cfg", knifeCfgPath)))
@@ -1648,6 +1671,7 @@ namespace MatchZy
             var goingLiveEvent = new GoingLiveEvent { MatchId = liveMatchId, MapNumber = matchConfig.CurrentMapNumber };
 
             PublishEvent(goingLiveEvent);
+            ScheduleStalePauseCheck();
         }
 
         private void StartScrim()
@@ -1799,6 +1823,9 @@ namespace MatchZy
                 // Send match_cancelled whenever a loaded or started match is stopped with a reason:
                 // also in warmup, veto, knife and between the maps of a series, where the panel
                 // otherwise never learnt that the match it created was gone.
+                // The match's admin tickets end with it (admin_thread_closed to the match's URL).
+                try { CloseMatchAdminThreads(); }
+                catch (Exception e) { Log($"[CloseMatchAdminThreads] {e.Message}"); }
                 bool cancellingMatch = cancelReason != null && (matchStarted || isMatchSetup);
                 if (cancellingMatch && liveMatchId > 0)
                 {
@@ -2311,8 +2338,9 @@ namespace MatchZy
             if (mapChangePending)
                 return;
 
-            // Todo: Implement a same ready system for both pug and match
-            int countOfReadyPlayers = playerReadyStatus.Count(kv => kv.Value == true);
+            // Only players on T/CT who are not coaching count; a spectator or coach who readied
+            // earlier (then moved) does not.
+            (int gatePlayers, int countOfReadyPlayers) = CountReadyGatePlayers();
             bool liveRequired = false;
             if (isMatchSetup)
             {
@@ -2328,7 +2356,7 @@ namespace MatchZy
             }
             else if (EffectiveMinimumReadyRequired() == 0)
             {
-                if (countOfReadyPlayers >= connectedPlayers && connectedPlayers > 0)
+                if (countOfReadyPlayers >= gatePlayers && gatePlayers > 0)
                 {
                     liveRequired = true;
                 }
@@ -2340,6 +2368,10 @@ namespace MatchZy
 
             if (liveRequired)
             {
+                // team_ready / all_players_ready before going_live, also when the last .ready
+                // starts the match before the next 1 s ready tick.
+                try { TrackReadyEvents(); }
+                catch (Exception e) { Log($"[TrackReadyEvents] {e.Message}"); }
                 HandleMatchStart();
             }
         }
@@ -3262,6 +3294,11 @@ namespace MatchZy
                     {
                         SwapSidesInTeamData(false);
                     }
+                    if (!isRoundRestoring)
+                    {
+                        try { PublishPostRoundPhaseEvents(swapRequired, t1score, t2score); }
+                        catch (Exception e) { Log($"[PhaseEvents] {e.Message}"); }
+                    }
 
                     isRoundRestoring = false;
                 }
@@ -3407,6 +3444,8 @@ namespace MatchZy
 
                 PrintLocalizedToAll("matchzy.pause.pausedthematch", pauseTeamName);
                 SetMatchPausedFlags("pause");
+                // After SetMatchPausedFlags: it stops any tech pause box (CancelTechPauseTimer).
+                StartTechPauseHud(pausingTeam, player.PlayerName, isTech: false);
             }
         }
 

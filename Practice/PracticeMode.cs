@@ -1341,7 +1341,8 @@ namespace MatchZy
                     if (index >= 0 && index < spawnMarkerVisuals.Count)
                     {
                         var v = spawnMarkerVisuals[index];
-                        player.PrintToCenter(Localizer.ForPlayer(player, "matchzy.pm.spawnmarkeraim", v.Side, v.Number));
+                        if (!IsCenterMenuOpen(player))
+                            player.PrintToCenter(Localizer.ForPlayer(player, "matchzy.pm.spawnmarkeraim", v.Side, v.Number));
                     }
                 }
                 for (int i = 0; i < spawnMarkerVisuals.Count; i++)
@@ -3381,7 +3382,18 @@ namespace MatchZy
                 return;
             }
 
-            postCleanUp(gameRules);
+            // A stale signature resolves to a zero handle: the key is there, but the call throws
+            // ("Invalid function pointer"). Same answer as a missing key instead of an unhandled throw.
+            try
+            {
+                postCleanUp(gameRules);
+            }
+            catch (Exception e)
+            {
+                ReplyToUserCommand(player, Localizer.ForPlayer(player, "matchzy.prac.breakrestorenosig"));
+                Log($"[OnBreakRestoreCommand] CCSGameRules_PostCleanUp failed (stale signature?): {e.Message}");
+                return;
+            }
             ReplyToUserCommand(player, Localizer.ForPlayer(player, "matchzy.prac.breakrestored"));
         }
 
@@ -4211,6 +4223,10 @@ namespace MatchZy
             if (!IsPlayerValid(playerData[userId]))
                 return;
             var timerPlayer = playerData[userId];
+            // An open menu (.nades, .strats) owns the center panel; the timer keeps running.
+            // The .startround countdown does too while it runs.
+            if (IsCenterMenuOpen(timerPlayer) || startRoundPending)
+                return;
             timerPlayer.PrintToCenter(Localizer.ForPlayer(timerPlayer, "matchzy.prac.timercenter", playerTimers[userId].GetTimerResult().ToString("0.00", System.Globalization.CultureInfo.InvariantCulture)));
         }
 

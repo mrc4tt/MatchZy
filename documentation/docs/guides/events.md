@@ -2,6 +2,8 @@
 
 MatchZy POSTs a JSON event to your server whenever something happens in a match: the match flow events a Get5 panel needs, plus a **live scorebot** feed (kills, damage, bomb, grenades, flashes, pauses) so you can build live scoreboards, Discord bots or overlays.
 
+For `.admin` / `.report` tickets answered from a website or Discord bot, see [Admin tickets](admin-tickets.md).
+
 ## Setup
 
 Set the URL from a private cfg (exec'd after `config.cfg`) or the match config's `cvars` block. The setting stays active when a match is loaded.

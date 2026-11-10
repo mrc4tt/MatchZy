@@ -1,12 +1,16 @@
 ---
+title: MatchZy
 hide:
   - navigation
   - toc
 ---
 
 <div class="mz-hero" markdown>
+<div class="mz-hero__text" markdown>
 
-# MatchZy <span class="mz-pill">fork · @@MATCHZY_VERSION@@</span>
+[<span class="mz-dot"></span> Latest release **@@MATCHZY_VERSION@@**](https://github.com/mrc4tt/MatchZy/releases/tag/@@MATCHZY_VERSION@@){ .mz-badge }
+
+<h1 class="mz-title">Run CS2 matches <span class="mz-grad">without the hassle.</span></h1>
 
 <p class="mz-lead">Match management, practice mode, coaching, live events and stats for CS2 servers running CounterStrikeSharp. Built on MatchZy, extended for hosted competitive servers.</p>
 
@@ -14,8 +18,30 @@ hide:
 [Get started](getting-started/installation.md){ .md-button }
 [Commands](reference/commands.md){ .md-button }
 
-<small>[Download](https://github.com/mrc4tt/MatchZy/releases/latest) · [Changelog](https://github.com/mrc4tt/MatchZy/blob/@@MATCHZY_VERSION@@/CHANGELOG.md) · [All releases](https://github.com/mrc4tt/MatchZy/releases) · [Report an issue](https://github.com/mrc4tt/MatchZy/issues/new)</small>
+<small>[Changelog](https://github.com/mrc4tt/MatchZy/blob/@@MATCHZY_VERSION@@/CHANGELOG.md) · [All releases](https://github.com/mrc4tt/MatchZy/releases) · [Report an issue](https://github.com/mrc4tt/MatchZy/issues/new)</small>
 
+</div>
+<div class="mz-panel" aria-hidden="true">
+<div class="mz-panel__glow"></div>
+<div class="mz-panel__hud">
+<div class="mz-p-warm">● WARMUP</div>
+<div class="mz-p-title">READY UP TO START</div>
+<div class="mz-p-mode">Mode: Competitive</div>
+<div class="mz-p-bar"><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i></i><i></i><i></i><i></i></div>
+<div class="mz-p-sides"><span class="mz-p-lbl">Ready (min. 4):</span> <span class="mz-p-ct">CT 2</span> <span class="mz-p-t">T 3</span></div>
+<div class="mz-p-you">✔ You are READY</div>
+<div class="mz-p-short">3 joined (min. 4): 1 missing</div>
+<div class="mz-p-wait">Waiting on: playerA, playerB</div>
+</div>
+<div class="mz-panel__caption">matchzy_ready_hint_style 1</div>
+</div>
+</div>
+
+<div class="mz-stats">
+<div><b>@@STAT_COMMANDS@@</b><span>chat commands</span></div>
+<div><b>@@STAT_SETTINGS@@</b><span>settings</span></div>
+<div><b>@@STAT_EVENTS@@</b><span>event types</span></div>
+<div><b>@@STAT_LANGUAGES@@</b><span>languages</span></div>
 </div>
 
 <div class="grid cards" markdown>
@@ -80,12 +106,14 @@ hide:
 
 ## Quick start
 
-```text
-1. Install CounterStrikeSharp on your CS2 server.
-2. Extract MatchZy-<version>.zip into game/csgo/.
-3. Restart the server.
-4. In game (as admin): .match  → players type .ready
-```
+<div class="mz-steps" markdown>
+
+1. Install [CounterStrikeSharp](https://docs.cssharp.dev/) on your CS2 server.
+2. Extract `MatchZy-@@MATCHZY_VERSION@@.zip` into `game/csgo/`.
+3. Restart the server. `cfg/MatchZy/config.cfg` is created with every setting and its default.
+4. In game (as admin): `.match`, then the players type `.ready`.
+
+</div>
 
 Full steps in [Installation](getting-started/installation.md).
 

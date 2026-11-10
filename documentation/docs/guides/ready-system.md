@@ -5,8 +5,8 @@ Before a match, scrim or hill goes live, the server waits in warmup. Players tel
 ## The basics
 
 - Type `.ready` (or `.r`) when you are ready, `.unready` to take it back. Pinging (middle mouse) also toggles it (`matchzy_ready_up_by_ping`).
-- `.readycheck` shows who the server is still waiting for.
-- Coaches never count and do not need to ready.
+- `.readycheck` shows who the server is still waiting for. In a loaded match it lists per team, for example `Team A (CT): 4/5 players on the side, 1/1 ready` and `Missing: alpha5`.
+- Only players on T or CT ready up. Spectators and coaches never count, and `.ready` or a ping from them is ignored.
 - Admins can skip the whole thing with `.start`.
 - `matchzy_ready_enabled false` turns the player ready-up off: only an admin starts the match with `.start`, also before the map veto, and the ready time limit does not run.
 
@@ -62,20 +62,53 @@ What "ready" means depends on `matchzy_ready_per_team`:
 | `0` (default) | all its registered players are on the server **and** every one of them typed `.ready` |
 | `1` (or more) | all its registered players are on the server **and** 1 (or that many) of them typed `.ready` |
 
-In both modes the match never starts while a registered player is missing. Players who are already in can type `.ready` while they wait; the server remembers it.
+In both modes the match never starts while a registered player is missing. Players who are already in can type `.ready` while they wait; the server remembers it, and the match starts by itself a few seconds after the last registered player has fully connected and is on the side. Nobody has to type `.ready` again.
 
 Good to know:
 
-- `min_players_to_ready` in the match config lowers the count: when it is below what a team would otherwise need, that many ready players make the team ready, even while registered players are missing. With `"min_players_to_ready": 1`, one ready player on CT and one on T start the match. Leave it out (or set it to `players_per_team`) for the full ready-up.
+- `min_players_to_ready` in the match config (only with `matchzy_ready_per_team 0`; with `1` or more the team must still be complete) lowers the count: when it is below what a team would otherwise need, that many ready players make the team ready, even while registered players are missing. With `"min_players_to_ready": 1`, one ready player on CT and one on T start the match. Leave it out (or set it to `players_per_team`) for the full ready-up.
 - The count is taken from each new match config, so the next match can be 5v5 again.
 - It follows the team, not the side: it does not matter whether Team A plays CT or T.
-- `players_per_team` is the most a team can have on the server. A sixth registered player (a substitute) waits on Spectator, and a team with 6 registered needs 5.
-- Coaches listed under `players` are not counted. A team with `"players": "any"` or a bot team uses `players_per_team`.
+- `players_per_team` is the most a team can have on the server. Left out of the match config, it is the larger roster of the two teams (at most 5 in competitive), so a 4v4 config with two rosters of 4 works without it. A sixth registered player (a substitute) waits on Spectator, and a team with 6 registered needs 5.
+- Coaches listed under `players`, and registered players who coach with `.coach`, are not counted. A team with `"players": "any"` or a bot team uses `players_per_team`.
 - Spectators (casters, admins) are not part of the ready-up.
+
+## Hosting tournaments (2v2 to 5v5) { #tournaments }
+
+For a league or tournament where players ready up themselves and no admin has to start the match:
+
+On the server, once (`cfg/MatchZy/config.cfg`):
+
+```text
+matchzy_ready_per_team 1
+```
+
+In every match config, the tournament's team size:
+
+| Tournament | Match config |
+|---|---|
+| 5v5 | `"players_per_team": 5` |
+| 4v4 | `"players_per_team": 4` |
+| 3v3 | `"players_per_team": 3` |
+| 2v2 | `"players_per_team": 2, "game_mode": "wingman"` |
+
+Then:
+
+1. Players type `.ready` whenever they like, also while a teammate is still missing. The team sees how many it is waiting for.
+2. A player counts once fully connected and on the team's side. Spectators (admins, casters) and coaches never count.
+3. When both teams are complete and one player per team has typed `.ready`, the match starts by itself.
+
+Good to know:
+
+- Substitutes can be listed under `players`: the server never waits for more than `players_per_team`.
+- Leave `min_players_to_ready` out. With `matchzy_ready_per_team 1` it is ignored anyway.
+- A team that cannot complete its line-up can start one player short with `.forceready` (`matchzy_forceready_max_missing`), or turn that off with `matchzy_allow_force_ready false` so only an admin (`.start`) can start a short team.
+- If `players_per_team` is left out, it is taken from the larger `players` list (at most 5), so list exactly the players then.
+- Check the server console after loading a match: `[LOADMATCH] WARNING` lines point out a roster larger than the team size, a player also listed as a spectator and similar mistakes that keep a match from starting by itself. `.readycheck` shows who a team is waiting for.
 
 ## When a registered player is missing
 
-If a team is waiting for a registered player, the team sees how many are missing, in chat and on the ready panel, for example `Team 4/5: 1 missing`. Usually you just wait for that player.
+If a team is waiting for a registered player, the team sees who is missing, in chat and on the ready panel, for example `4 joined (min. 5): missing alpha5` (the panel names at most 2; the chat names all, marked `(Spectator)` when they sit there). An open roster (`"any"`) only shows the count. Usually you just wait for that player.
 
 If the player will not come, one player on the team can type `.forceready`. That readies the whole team and the team plays without the missing player.
 
@@ -100,7 +133,7 @@ By default a team registered with fewer players than `players_per_team`, or a ma
 | `1` (default) | HTML **READY-UP** panel per player with a progress bar, ready count and your own status. |
 | `2` | A chat reminder listing the players who are not ready. |
 
-In a loaded match the panel shows the ready players per side and the minimum each side needs (`Ready (min. 4): CT 2  T 3`), and a short-handed side sees how many of its players have joined (`3 joined (min. 4): 1 missing`, shown 30 seconds after the last player joined). Style `0` shows the same per-side line. Style `1` also shows the current mode, in your language. The native WARMUP banner is hidden and the round timer shows a frozen `1:00`.
+In a loaded match the panel shows the ready players per side and the minimum each side needs (`Ready (min. 4): CT 2  T 3`), and a short-handed side sees how many of its players have joined (`3 joined (min. 4): missing alpha4`, or `1 missing` without a roster, shown 30 seconds after the last player joined). Style `0` shows the same per-side line. Style `1` also shows the current mode, in your language. The native WARMUP banner is hidden and the round timer shows a frozen `1:00`.
 
 Related: `matchzy_ready_hint_blink` blinks the NOT READY line (style 1), `matchzy_ready_clantag_enabled` shows `[READY]` / `[UNREADY]` on the scoreboard (not in join ready mode, where nobody types `.ready`). Once live, `matchzy_team_clantag_enabled` shows each team's `tag` from the match config instead.
 

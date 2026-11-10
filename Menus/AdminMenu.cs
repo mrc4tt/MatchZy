@@ -28,12 +28,46 @@ namespace MatchZy
             try
             {
                 open(player);
+                if (player.IsValid)
+                    _centerMenuHolders.Add(player.Slot);
             }
             catch (Exception e) when (e is FileNotFoundException || e is TypeLoadException || e is FileLoadException)
             {
                 ReplyToUserCommand(player, Localizer.ForPlayer(player, "matchzy.menu.menumanagermissing"));
                 Log($"[Menu] CS2MenuManager not available: {e.Message}");
             }
+        }
+
+        // Center-panel menu gate. A WasdMenu repaints the center HTML panel every tick, and the ready
+        // panel, classic ready hint, tech pause box, .timer and spawn-marker hover wrote over it, so
+        // the menu flickered (.matchadmin / .matchsetup during the ready-up, .nades with .timer on).
+        // Those writers skip a player whose menu is open. Slots are added in OpenMenuGuarded, so the
+        // menu library is only asked (MenuStillOpen) after it has loaded.
+        private readonly HashSet<int> _centerMenuHolders = new();
+
+        private bool IsCenterMenuOpen(CCSPlayerController player)
+        {
+            if (_centerMenuHolders.Count == 0 || !_centerMenuHolders.Contains(player.Slot))
+                return false;
+            bool open;
+            try
+            {
+                open = MenuStillOpen(player);
+            }
+            catch (Exception)
+            {
+                open = false;
+            }
+            if (!open)
+                _centerMenuHolders.Remove(player.Slot);
+            return open;
+        }
+
+        // Own method so the menu type is only JIT-resolved here, never in the always-run callers.
+        [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.NoInlining)]
+        private static bool MenuStillOpen(CCSPlayerController player)
+        {
+            return MenuManager.GetActiveMenu(player) != null;
         }
 
         // Pre-JIT the CS2MenuManager assembly on a BACKGROUND thread at Load. Without this the whole
