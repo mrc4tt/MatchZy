@@ -3,7 +3,7 @@ using Newtonsoft.Json.Linq;
 
 namespace MatchZy.Tests;
 
-// Configs in the shape the docs' match config builder (documentation/docs/assets/match-builder.js)
+// Configs in the shape the docs' match config builder (documentation/docs/assets/mz-tools.js)
 // writes. If the loader's validation changes, the builder has to follow.
 public class MatchBuilderOutputTests
 {
@@ -33,6 +33,15 @@ public class MatchBuilderOutputTests
           "team2": { "name": "Bravo", "players": { "76561198000000011": "bravo1" } },
           "spectators": { "players": { "76561198000000099": "caster" } },
           "cvars": { "mp_overtime_enable": "1" }
+        }
+        """)]
+    [InlineData("""
+        {
+          "matchid": 39509, "num_maps": 1, "maplist": ["de_inferno"], "skip_veto": true, "map_sides": ["team1_ct"],
+          "players_per_team": 4, "min_spectators_to_ready": 1,
+          "team1": { "name": "Alpha", "players": { "76561198000000001": "alpha1" } },
+          "team2": { "name": "Bravo", "players": { "76561198000000011": "bravo1" } },
+          "spectators": { "players": { "76561198000000099": "caster" } }
         }
         """)]
     public void BuilderOutputLoads(string json) => Assert.Equal("", MatchConfigLogic.ValidateMatchJson(JObject.Parse(json)));

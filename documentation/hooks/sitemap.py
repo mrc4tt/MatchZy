@@ -124,11 +124,15 @@ def on_post_build(config, **kwargs):
         f.write(xml)
     with gzip.open(os.path.join(site_dir, "sitemap.xml.gz"), "wb", compresslevel=9) as f:
         f.write(xml.encode("utf-8"))
-    # The Danish build writes its own sitemap under /da/; the root one covers both languages.
-    for stale in ("da/sitemap.xml", "da/sitemap.xml.gz"):
-        try:
-            os.remove(os.path.join(site_dir, stale))
-        except OSError:
-            pass
+    # The same sitemap under /da/, replacing the Danish build's own (which lists the English
+    # fallback pages as Danish). Material's language switcher fetches the target language's
+    # sitemap.xml to open the same page in the other language; without it every page logged a
+    # 404 and the switch fell back to the Danish home page. robots.txt still names only the root one.
+    da_dir = os.path.join(site_dir, "da")
+    if os.path.isdir(da_dir):
+        with open(os.path.join(da_dir, "sitemap.xml"), "w", encoding="utf-8") as f:
+            f.write(xml)
+        with gzip.open(os.path.join(da_dir, "sitemap.xml.gz"), "wb", compresslevel=9) as f:
+            f.write(xml.encode("utf-8"))
     with open(os.path.join(site_dir, "robots.txt"), "w", encoding="utf-8") as f:
         f.write(f"User-agent: *\nAllow: /\n\nSitemap: {_site_url}sitemap.xml\n")

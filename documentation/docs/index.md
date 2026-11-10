@@ -44,7 +44,7 @@ hide:
 <div><b>@@STAT_LANGUAGES@@</b><span>languages</span></div>
 </div>
 
-<div class="grid cards" markdown>
+<div class="grid cards mz-features" markdown>
 
 -   :material-trophy:{ .lg .middle } **Matches your way**
 
@@ -101,6 +101,14 @@ hide:
     Reliable demo recording and S3 upload, round restores after a crash, auto-pause, safe config updates, and coexistence with CS2-SimpleAdmin.
 
     [:octicons-arrow-right-24: Installation](getting-started/installation.md) · [Troubleshooting](getting-started/troubleshooting.md)
+
+-   :material-tournament:{ .lg .middle } **Tournament ready**
+
+    ---
+
+    2v2 to 5v5 leagues without an admin: the team size comes from the match config, one `.ready` per team starts it, and the server names who a team is still waiting for.
+
+    [:octicons-arrow-right-24: Hosting tournaments](guides/ready-system.md#tournaments)
 
 </div>
 

@@ -52,11 +52,14 @@ def parse_config_cfg(text):
     """Settings of cfg/config.cfg: comment block, "Default: x" line, then the setting (or a
     commented-out example such as // matchzy_demo_upload_url "https://...")."""
     settings, section, comment = [], "", []
+    # Several commented-out examples under one comment (matchzy_demo_upload_url / _header_key /
+    # _header_value): the comment belongs to the first; the others point to it.
+    shared_from = None
     lines = text.splitlines()
     for i, raw in enumerate(lines):
         line = raw.strip()
         if not line:
-            comment = []
+            comment, shared_from = [], None
             continue
         if line.startswith("// ===="):
             continue
@@ -79,10 +82,15 @@ def parse_config_cfg(text):
                     desc.append(c)
             default = value if active and default is None else (default if default is not None else "")
             kind = "bool" if default in ("true", "false") else "number" if re.fullmatch(r"-?\d+(\.\d+)?", default) else "text"
+            description = re.sub(r"\s*Syntax:$", "", " ".join(desc))
+            if optional and shared_from:
+                description = f"Goes with {shared_from} (see there)."
+            elif optional:
+                shared_from = name
             settings.append({
                 "section": section, "name": name, "default": default, "type": kind,
                 "optional": bool(optional), "example": value if optional else "",
-                "description": re.sub(r"\s*Syntax:$", "", " ".join(desc)),
+                "description": description,
             })
             if active:
                 comment = []
@@ -148,12 +156,12 @@ def on_page_content(html, page=None, config=None, **kwargs):
     if "<!--MATCHZY_EVENTS-->" in html:
         html = html.replace(
             "<!--MATCHZY_EVENTS-->",
-            f'<script type="application/json" id="mz-events-data">{_events_json}</script>',
+            f'<script type="application/json" id="mz-pl-data">{_events_json}</script>',
         )
     if "<!--MATCHZY_SETTINGS-->" in html:
         html = html.replace(
             "<!--MATCHZY_SETTINGS-->",
-            f'<script type="application/json" id="mz-settings-data">{_settings_json}</script>',
+            f'<script type="application/json" id="mz-cfg-data">{_settings_json}</script>',
         )
     return html
 

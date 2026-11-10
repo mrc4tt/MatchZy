@@ -1,6 +1,8 @@
 ---
 title: Event explorer
 new_in: 1.0.24
+hide:
+  - toc
 ---
 
 # Event explorer
@@ -11,11 +13,6 @@ Every event MatchZy can send to `matchzy_remote_log_url`, with its fields and an
 
 <!--MATCHZY_EVENTS-->
 
-<div id="mz-events" class="mz-events" data-msg-all="All" data-msg-both="Match flow" data-msg-server="Server and tickets" data-msg-get5="Live (Get5 format)" data-msg-legacy="Live (legacy format)" data-msg-badge-both="match" data-msg-badge-server="server" data-msg-badge-get5="Get5" data-msg-badge-legacy="legacy" data-msg-fields="{0} fields" data-msg-field="Field" data-msg-type="Type" data-msg-note="Note" data-msg-nullable="may be null" data-msg-example="Example" data-msg-copy="Copy" data-msg-copied="Copied!" data-msg-shown="{0} events">
-<div class="ev-tools">
-<input id="ev-search" type="search" placeholder="Search events or fields (e.g. steamid, pause, bomb)..." autocomplete="off">
-<span id="ev-shown" class="ev-shown"></span>
-</div>
-<div id="ev-tabs" class="ev-tabs"></div>
-<div id="ev-list"></div>
+<div id="mz-pl" class="mzt-tool mzt-tool--event-explorer">
+<p class="mzt-noscript">The search needs JavaScript. If nothing appears here, an ad or tracker blocker is probably blocking <code>assets/mz-tools.js</code>: allow this site in it, or use <a href="../events/">Events</a>.</p>
 </div>

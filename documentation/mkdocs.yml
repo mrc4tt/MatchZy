@@ -60,9 +60,7 @@ extra_css:
   - assets/extra.css
 
 extra_javascript:
-  - assets/match-builder.js
-  - assets/config-generator.js
-  - assets/event-explorer.js
+  - assets/mz-tools.js
 
 # Version and the landing page numbers, read from the plugin source at build time.
 hooks:
@@ -163,7 +161,7 @@ extra:
     - icon: fontawesome/brands/github
       link: https://github.com/mrc4tt/MatchZy
       name: Source, releases and issues on GitHub
-    - icon: fontawesome/brands/github
+    - icon: fontawesome/solid/code-fork
       link: https://github.com/shobhit-pathak/MatchZy
       name: MatchZy by Shobhit Pathak
 

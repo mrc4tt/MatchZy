@@ -44,7 +44,7 @@ hide:
 <div><b>@@STAT_LANGUAGES@@</b><span>sprog</span></div>
 </div>
 
-<div class="grid cards" markdown>
+<div class="grid cards mz-features" markdown>
 
 -   :material-trophy:{ .lg .middle } **Kampe på din måde**
 
@@ -101,6 +101,14 @@ hide:
     Pålidelig demo-optagelse og S3-upload, gendannelse af runder efter et crash, auto-pause, sikre config-opdateringer og sameksistens med CS2-SimpleAdmin.
 
     [:octicons-arrow-right-24: Installation](getting-started/installation.md) · [Fejlfinding](getting-started/troubleshooting.md)
+
+-   :material-tournament:{ .lg .middle } **Klar til turneringer**
+
+    ---
+
+    2v2 til 5v5-ligaer uden en admin: holdstørrelsen kommer fra match configen, én `.ready` pr. hold starter kampen, og serveren viser, hvem et hold stadig venter på.
+
+    [:octicons-arrow-right-24: Turneringer](guides/ready-system.md#tournaments)
 
 </div>
 
