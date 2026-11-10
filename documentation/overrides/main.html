@@ -1,0 +1,41 @@
+{#- MatchZy overrides of Material's main.html:
+    - link previews (Open Graph / Twitter) with the social card, so a link shared on Discord shows
+      the page title, its description and the MatchZy card;
+    - the release banner at the top (dismissable; it comes back for the next version). -#}
+{% extends "base.html" %}
+
+{% block extrahead %}
+  {%- set mz_title = (page.meta.title or page.title or config.site_name) if page else config.site_name -%}
+  {%- set mz_desc = (page.meta.description if page and page.meta and page.meta.description else config.site_description) -%}
+  {%- set mz_url = (page.canonical_url if page and page.canonical_url else config.site_url) -%}
+  {%- set mz_image = config.site_url ~ "assets/social-card.png" -%}
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="{{ config.site_name }}">
+  <meta property="og:title" content="{{ mz_title | striptags }}{% if mz_title != config.site_name %} - {{ config.site_name }}{% endif %}">
+  <meta property="og:description" content="{{ mz_desc }}">
+  <meta property="og:url" content="{{ mz_url }}">
+  <meta property="og:image" content="{{ mz_image }}">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:image:alt" content="MatchZy: run CS2 matches without the hassle">
+  <meta property="og:locale" content="{{ 'da_DK' if config.theme.language == 'da' else 'en_US' }}">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="{{ mz_title | striptags }}">
+  <meta name="twitter:description" content="{{ mz_desc }}">
+  <meta name="twitter:image" content="{{ mz_image }}">
+  <meta name="theme-color" content="#ff8a1f">
+{% endblock %}
+
+{% block announce %}
+  {%- set mz_version = config.extra.matchzy_version -%}
+  {%- if mz_version -%}
+    <a class="mz-announce" href="{{ 'whats-new/' | url }}">
+      <span class="mz-announce__dot"></span>
+      {%- if config.theme.language == 'da' -%}
+        MatchZy <strong>{{ mz_version }}</strong> er ude. Se hvad der er nyt
+      {%- else -%}
+        MatchZy <strong>{{ mz_version }}</strong> is out. See what's new
+      {%- endif %} &rarr;
+    </a>
+  {%- endif -%}
+{% endblock %}

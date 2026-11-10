@@ -7,6 +7,7 @@ obj/
 
 # MkDocs build output
 documentation/site/
+documentation/.venv/
 
 # Local backup copies
 *.bak
@@ -15,3 +16,4 @@ tools/ship.sh
 
 # Release output (tools/package.sh)
 dist/
+__pycache__/

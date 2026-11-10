@@ -9,6 +9,7 @@ copyright: Based on MatchZy by Shobhit Pathak. Maintained by Miksen.
 
 theme:
   name: material
+  custom_dir: overrides
   language: en
   icon:
     logo: material/sword-cross
@@ -24,19 +25,20 @@ theme:
         name: Switch to light mode
     - media: "(prefers-color-scheme: light)"
       scheme: default
-      primary: deep orange
-      accent: amber
+      primary: custom
+      accent: custom
       toggle:
         icon: material/weather-sunny
         name: Switch to dark mode
     - media: "(prefers-color-scheme: dark)"
       scheme: slate
-      primary: deep orange
-      accent: amber
+      primary: custom
+      accent: custom
       toggle:
         icon: material/weather-night
         name: Switch to system preference
   features:
+    - announce.dismiss
     - navigation.instant
     - navigation.instant.progress
     - navigation.tracking
@@ -56,6 +58,17 @@ theme:
 
 extra_css:
   - assets/extra.css
+
+extra_javascript:
+  - assets/match-builder.js
+  - assets/config-generator.js
+  - assets/event-explorer.js
+
+# Version and the landing page numbers, read from the plugin source at build time.
+hooks:
+  - hooks/values.py
+  # Real last-change dates, Danish pages only where translated, robots.txt.
+  - hooks/sitemap.py
 
 plugins:
   - search
@@ -93,10 +106,14 @@ plugins:
             Admin menus: Admin-menuer
             Demos (GOTV): Demoer (GOTV)
             Stats and database: Statistik og database
+            Admin tickets: Admin-tickets
             Reference: Reference
             Commands: Kommandoer
             Configuration (convars): Konfiguration (convars)
             Files and folders: Filer og mapper
+            Event explorer: Event-explorer
+            Settings generator: Indstillings-generator
+            Match config builder: Match config-builder
 
 markdown_extensions:
   - abbr
@@ -132,6 +149,9 @@ markdown_extensions:
 
 extra:
   generator: false
+  # Nav marker for pages with "new_in: <version>" in their front matter (see hooks/values.py).
+  status:
+    new: Recently added
   alternate:
     - name: English
       link: /
@@ -167,13 +187,17 @@ nav:
       - Demos (GOTV): guides/demos.md
       - Stats and database: guides/stats.md
       - Live events API: guides/events.md
+      - Admin tickets: guides/admin-tickets.md
   - Reference:
       - reference/index.md
       - Commands: reference/commands.md
       - Configuration (convars): reference/convars.md
+      - Settings generator: reference/config-generator.md
       - Match config JSON: reference/match-config.md
+      - Match config builder: reference/match-builder.md
       - Match config examples: reference/match-examples.md
       - Events: reference/events.md
+      - Event explorer: reference/event-explorer.md
       - Files and folders: reference/files.md
   - Changelog:
       - "What's new": whats-new.md

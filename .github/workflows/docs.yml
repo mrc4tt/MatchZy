@@ -56,6 +56,10 @@ jobs:
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v7
+        with:
+          # Full history: the sitemap's <lastmod> is each page's last change in git
+          # (documentation/hooks/sitemap.py); a shallow clone would date every page today.
+          fetch-depth: 0
 
       # Own Python instead of the runner's system one: newer runner images mark the system Python
       # as externally managed, and a plain pip install fails there.
@@ -82,6 +86,11 @@ jobs:
       - name: Build site
         working-directory: documentation
         run: mkdocs build --strict
+
+      # --strict catches links to missing pages; this also catches links to missing #anchors.
+      - name: Check links and anchors
+        working-directory: documentation
+        run: python3 -I scripts/check_links.py site
 
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v5
