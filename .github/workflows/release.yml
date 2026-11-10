@@ -73,35 +73,62 @@ jobs:
 
       - name: Write release notes
         run: |
-          # Short body on purpose: the full changelog block made every release long in the release
-          # list, pushing the zip far down. The body carries this version's short whats-new.md
-          # section (already written as a summary) and links to the full CHANGELOG.md at this tag.
+          # Short body on purpose: a release lists only the highlights, so the zip stays near the top of
+          # the release list. Everything is on the What's new page and in CHANGELOG.md at this tag.
+          # From this version's whats-new.md section: the "Action needed" box in full (as a GitHub
+          # alert), then at most 5 highlights (the New items, else the Changed ones) and a count of
+          # the rest. Docs links in the bullets point to the docs site (relative .md links break on
+          # GitHub). Empty when the section is missing; the release then only gets the links.
           VER="${{ env.MATCHZY_VERSION }}"
           CHANGELOG_URL="${{ github.server_url }}/${{ github.repository }}/blob/$VER/CHANGELOG.md"
-          # This version's section of whats-new.md, converted from MkDocs markup to GitHub markdown:
-          # the "Action needed" admonition becomes a GitHub alert and ++key++ becomes plain text.
-          # Empty when the section is missing; the release then only gets the links.
           python3 - "$VER" > whats-new-section.md <<'PY'
           import re, sys
           ver = sys.argv[1]
+          site = "https://matchzy.miksen.me/"
           text = open("documentation/docs/whats-new.md", encoding="utf-8").read()
           m = re.search(r"^## " + re.escape(ver) + r" <small>.*?</small>\n(.*?)(?=^## |\Z)", text, re.S | re.M)
           if not m:
               sys.exit(0)
-          out = []
-          alert = False
+
+          def gh(line):
+              line = re.sub(r"\+\+([^+\s][^\s]*?)\+\+", lambda k: k.group(1).replace("+", " + ").title(), line)
+              def link(k):
+                  path, anchor = k.group(1), k.group(2) or ""
+                  path = re.sub(r"(^|/)index\.md$", r"\1", path)
+                  path = re.sub(r"\.md$", "/", path)
+                  return "](" + site + path + anchor + ")"
+              return re.sub(r"\]\((?!https?:)([^)#]*?\.md)(#[^)]*)?\)", link, line)
+
+          alert, items = [], []
+          in_alert = False
           for line in m.group(1).strip().splitlines():
               if line.startswith('!!! warning "Action needed"'):
-                  out += ["> [!WARNING]", "> **Action needed**"]
-                  alert = True
-              elif alert and line.startswith("    "):
-                  out.append("> " + line[4:])
+                  alert += ["> [!WARNING]", "> **Action needed**"]
+                  in_alert = True
+              elif in_alert and line.startswith("    "):
+                  alert.append("> " + gh(line[4:]))
+              elif line.startswith("- **"):
+                  in_alert = False
+                  label = re.match(r"- \*\*(\w+):\*\*", line)
+                  items.append((label.group(1) if label else "", gh(line)))
               else:
-                  alert = False
-                  out.append(line)
-          body = "\n".join(out)
-          body = re.sub(r"\+\+([^+\s][^\s]*?)\+\+", lambda k: k.group(1).replace("+", " + ").title(), body)
-          print(body)
+                  in_alert = False
+
+          picks = [i for i in items if i[0] == "New"] or [i for i in items if i[0] == "Changed"] or items
+          picks = picks[:5]
+          rest = [i for i in items if i not in picks]
+          out = alert + ([""] if alert else [])
+          if picks:
+              out.append("**Highlights**")
+              out.append("")
+              out += [p[1] for p in picks]
+          if rest:
+              counts = {}
+              for label, _ in rest:
+                  counts[label.lower() or "other"] = counts.get(label.lower() or "other", 0) + 1
+              out.append("")
+              out.append("Plus " + str(len(rest)) + " more (" + ", ".join(f"{n} {k}" for k, n in counts.items()) + ").")
+          print("\n".join(out))
           PY
           {
             echo "Download \`MatchZy-$VER.zip\` below and extract it into \`game/csgo/\`. Updating never touches your \`cfg/\` files."
@@ -110,7 +137,7 @@ jobs:
               cat whats-new-section.md
               echo
             fi
-            echo "What's new: https://matchzy.miksen.me/whats-new/ · Full changelog: [CHANGELOG.md]($CHANGELOG_URL)"
+            echo "**What's new:** https://matchzy.miksen.me/whats-new/ · **Full changelog:** [CHANGELOG.md]($CHANGELOG_URL)"
           } > notes.md
 
       # Creates the release, or refreshes the zip when the release already exists.
