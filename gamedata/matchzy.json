@@ -46,5 +46,23 @@
       "windows": 30,
       "linux": 31
     }
+  },
+  "CCSGameRules_CanPlayerHear_CoachCommGate": {
+    "signatures": {
+      "library": "server",
+      "windows": "75 ? 80 B8 ? ? ? ? ? 75 ? 80 B8 ? ? ? ? ?",
+      "linux": "0F 85 ? ? ? ? 80 B8 ? ? ? ? ? 0F 85 ? ? ? ? 80 B8 ? ? ? ? ? 0F 85 ? ? ? ? 83 B8 ? ? ? ? ?"
+    }
+  },
+  "CPlayer_ObserverServices::IsValidObserverTarget": {
+    "signatures": {
+      "library": "server",
+      "windows": "40 53 56 57 48 83 EC ? 48 8B FA 48 8B F1",
+      "linux": "55 48 89 E5 41 56 41 55 41 54 53 48 85 F6 0F 84 ? ? ? ? 48 8B 06"
+    },
+    "offsets": {
+      "windows": 34,
+      "linux": 35
+    }
   }
 }
