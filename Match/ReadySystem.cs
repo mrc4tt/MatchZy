@@ -298,6 +298,11 @@ public partial class MatchZy
     {
         if (IsReadyGatePlayer(player))
             return false;
+        // A loaded match with min_spectators_to_ready waits for that many ready spectators
+        // (IsSpectatorsReady): rejecting their .ready made the match impossible to start.
+        if (isMatchSetup && matchConfig.MinSpectatorsToReady > 0 && player.IsValid
+            && player.TeamNum == (int)CsTeam.Spectator && !IsMatchCoach(player))
+            return false;
         PrintToPlayerChat(player, Localizer.ForPlayer(player, "matchzy.ready.playersonly"));
         return true;
     }

@@ -106,6 +106,20 @@ public partial class MatchZy
     // Round lifecycle handlers
     // ═══════════════════════════════════════════════════════════════════
 
+    // Bots get advanced stats only when they are stat players (matchzy_stats_include_bots, or a bot
+    // team), the same rule StatsPlayers() applies. Either way a bot still takes part in the round:
+    // its death can be the opening duel or a trade, and it counts as a living player for clutches.
+    private bool TracksAdvancedStats(CCSPlayerController player)
+    {
+        return !player.IsBot || statsIncludeBots.Value || HasBotTeam();
+    }
+
+    // Bots have SteamID 0; key them like the rest of the stats code so each bot keeps its own row.
+    private static ulong AdvancedStatsKey(CCSPlayerController player)
+    {
+        return player.IsBot ? BotStatsId(player.PlayerName) : player.SteamID;
+    }
+
     private void OnAdvancedStatsRoundStart()
     {
         if (!isMatchLive)
@@ -123,9 +137,11 @@ public partial class MatchZy
         foreach (var player in Utilities.GetPlayers())
         {
             // Only players on a side; spectators and coaches are not part of the round.
-            if (player == null || !player.IsValid || player.IsBot || player.TeamNum is not (2 or 3) || IsMatchCoach(player))
+            if (player == null || !player.IsValid || player.IsHLTV || player.TeamNum is not (2 or 3) || IsMatchCoach(player))
                 continue;
-            var steamId = player.SteamID;
+            if (!TracksAdvancedStats(player))
+                continue;
+            var steamId = AdvancedStatsKey(player);
 
             playerRoundStats[steamId] = new PlayerRoundStats();
 
@@ -206,28 +222,28 @@ public partial class MatchZy
         return stats;
     }
 
-    // Bomb plant/defuse and team-flash counters for the stats events. Humans only, live match only,
-    // like the rest of the advanced stats.
+    // Bomb plant/defuse and team-flash counters for the stats events. Stat players only, live match
+    // only, like the rest of the advanced stats.
     private void OnAdvancedStatsBombPlanted(CCSPlayerController? player)
     {
-        if (isMatchLive && player != null && player.IsValid && !player.IsBot)
-            AdvancedStatsFor(player.SteamID).BombPlants++;
+        if (isMatchLive && player != null && player.IsValid && TracksAdvancedStats(player))
+            AdvancedStatsFor(AdvancedStatsKey(player)).BombPlants++;
     }
 
     private void OnAdvancedStatsBombDefused(CCSPlayerController? player)
     {
-        if (isMatchLive && player != null && player.IsValid && !player.IsBot)
-            AdvancedStatsFor(player.SteamID).BombDefuses++;
+        if (isMatchLive && player != null && player.IsValid && TracksAdvancedStats(player))
+            AdvancedStatsFor(AdvancedStatsKey(player)).BombDefuses++;
     }
 
     private void OnAdvancedStatsPlayerBlind(CCSPlayerController? victim, CCSPlayerController? attacker, float duration)
     {
         if (!isMatchLive || duration <= 0f)
             return;
-        if (victim == null || !victim.IsValid || attacker == null || !attacker.IsValid || attacker.IsBot)
+        if (victim == null || !victim.IsValid || attacker == null || !attacker.IsValid || !TracksAdvancedStats(attacker))
             return;
         if (attacker != victim && attacker.TeamNum == victim.TeamNum)
-            AdvancedStatsFor(attacker.SteamID).FriendliesFlashed++;
+            AdvancedStatsFor(AdvancedStatsKey(attacker)).FriendliesFlashed++;
     }
 
     // Set by OnAdvancedStatsPlayerDeath for the death it just processed; read by the player_kill
@@ -237,38 +253,43 @@ public partial class MatchZy
     public void OnAdvancedStatsPlayerDeath(CCSPlayerController? victim, CCSPlayerController? attacker, CCSPlayerController? assister, string weapon = "", bool assistedFlash = false)
     {
         lastDeathWasTradeKill = false;
-        if (!isMatchLive || victim == null || !victim.IsValid || victim.IsBot)
+        // A bot victim is NOT skipped even when bots are not stat players: its death still decides
+        // the opening duel and can be a trade, and the human who killed it is owed the K in KAST.
+        // Only the bot's own counters are gated on victimTracked below.
+        if (!isMatchLive || victim == null || !victim.IsValid)
             return;
         // The coach's end-of-freezetime suicide would otherwise be the first death of every round
         // and take the opening duel away from the real players.
         if (IsMatchCoach(victim))
             return;
 
-        var victimSteamId = victim.SteamID;
+        var victimSteamId = AdvancedStatsKey(victim);
+        bool victimTracked = TracksAdvancedStats(victim);
         var victimTeam = (CsTeam)victim.TeamNum;
 
         bool attackerValid = attacker != null && attacker.IsValid;
         bool isSuicide = !attackerValid || attacker == victim;
         bool isTeamKill = !isSuicide && attacker!.TeamNum == victim.TeamNum;
+        bool attackerTracked = attackerValid && TracksAdvancedStats(attacker!);
 
         if (isSuicide)
         {
             // World damage / fall / bomb has no attacker; only an explicit self-kill is a suicide.
-            if (attackerValid)
+            if (attackerValid && victimTracked)
                 AdvancedStatsFor(victimSteamId).Suicides++;
         }
         else if (isTeamKill)
         {
-            if (!attacker!.IsBot)
-                AdvancedStatsFor(attacker.SteamID).TeamKills++;
+            if (attackerTracked)
+                AdvancedStatsFor(AdvancedStatsKey(attacker!)).TeamKills++;
         }
-        else if (!attacker!.IsBot && (weapon.Contains("knife", StringComparison.OrdinalIgnoreCase) || weapon.Contains("bayonet", StringComparison.OrdinalIgnoreCase)))
+        else if (attackerTracked && (weapon.Contains("knife", StringComparison.OrdinalIgnoreCase) || weapon.Contains("bayonet", StringComparison.OrdinalIgnoreCase)))
         {
-            AdvancedStatsFor(attacker.SteamID).KnifeKills++;
+            AdvancedStatsFor(AdvancedStatsKey(attacker!)).KnifeKills++;
         }
 
-        if (assistedFlash && !isTeamKill && assister != null && assister.IsValid && !assister.IsBot && assister.TeamNum != victim.TeamNum)
-            AdvancedStatsFor(assister.SteamID).FlashAssists++;
+        if (assistedFlash && !isTeamKill && assister != null && assister.IsValid && TracksAdvancedStats(assister) && assister.TeamNum != victim.TeamNum)
+            AdvancedStatsFor(AdvancedStatsKey(assister)).FlashAssists++;
 
         // Mark player as dead this round
         if (playerRoundStats.TryGetValue(victimSteamId, out var victimRoundStats))
@@ -282,7 +303,9 @@ public partial class MatchZy
             VictimSteamId = victimSteamId,
             // Only a kill on an enemy counts as the killer's: a suicide used to credit the victim
             // with a kill (KAST "K" for dying), and a team kill counted as an opening/trade kill.
-            KillerSteamId = !isSuicide && !isTeamKill && !attacker!.IsBot ? attacker.SteamID : null,
+            // A bot killer is recorded too (by its stats key) so killing it back is a trade; it is
+            // only credited below when bots are stat players.
+            KillerSteamId = !isSuicide && !isTeamKill ? AdvancedStatsKey(attacker!) : null,
             VictimTeam = victimTeam,
             Time = DateTime.UtcNow,
         };
@@ -299,9 +322,9 @@ public partial class MatchZy
             {
                 vrs.WasOpeningDeath = true;
             }
-            if (victimTeam == CsTeam.Terrorist)
+            if (victimTracked && victimTeam == CsTeam.Terrorist)
                 AdvancedStatsFor(victimSteamId).FirstDeathsT++;
-            else if (victimTeam == CsTeam.CounterTerrorist)
+            else if (victimTracked && victimTeam == CsTeam.CounterTerrorist)
                 AdvancedStatsFor(victimSteamId).FirstDeathsCT++;
 
             // Mark opening kill
@@ -309,7 +332,7 @@ public partial class MatchZy
             {
                 krs.WasOpeningKill = true;
             }
-            if (death.KillerSteamId.HasValue)
+            if (death.KillerSteamId.HasValue && attackerTracked)
             {
                 // The killer is on the other side of the victim.
                 if (victimTeam == CsTeam.CounterTerrorist)
@@ -354,11 +377,8 @@ public partial class MatchZy
                 lastDeathWasTradeKill = true;
 
                 // Mark the killer's trade kill stat
-                if (!advancedStats.ContainsKey(killerSteamId))
-                {
-                    advancedStats[killerSteamId] = new AdvancedPlayerStats();
-                }
-                advancedStats[killerSteamId].TradeKills++;
+                if (attackerTracked)
+                    AdvancedStatsFor(killerSteamId).TradeKills++;
 
                 // Mark the traded player's round stats
                 if (playerRoundStats.TryGetValue(tradedDeath.VictimSteamId, out var tradedPlayerStats))
@@ -384,9 +404,9 @@ public partial class MatchZy
         // ─────────────────────────────────────────────────────────────────
         // Assist tracking
         // ─────────────────────────────────────────────────────────────────
-        if (assister != null && assister.IsValid && !assister.IsBot)
+        if (assister != null && assister.IsValid)
         {
-            if (playerRoundStats.TryGetValue(assister.SteamID, out var assisterRoundStats))
+            if (playerRoundStats.TryGetValue(AdvancedStatsKey(assister), out var assisterRoundStats))
             {
                 assisterRoundStats.GotAssist = true;
             }
@@ -426,6 +446,22 @@ public partial class MatchZy
             else if (team == (int)CsTeam.CounterTerrorist)
                 aliveCT++;
         }
+
+        // Bots are not in playerData, but a living bot is still an opponent (or a teammate): leaving
+        // them out reported a 1v1 against a full bot side, or a "clutch" with a bot still alive.
+        foreach (var bot in Utilities.GetPlayers())
+        {
+            if (bot == null || !bot.IsValid || !bot.IsBot || bot.IsHLTV)
+                continue;
+            var pawn = bot.PlayerPawn?.Value;
+            if (pawn == null || pawn.Health <= 0)
+                continue;
+
+            if (bot.TeamNum == (int)CsTeam.Terrorist)
+                aliveT++;
+            else if (bot.TeamNum == (int)CsTeam.CounterTerrorist)
+                aliveCT++;
+        }
     }
 
     private void CheckClutchSituation(CsTeam victimTeam)
@@ -440,29 +476,24 @@ public partial class MatchZy
         if (aliveT == 1 && aliveCT > 0)
         {
             // T is clutching
-            clutcher = Utilities.GetPlayers().FirstOrDefault(p => p != null && p.IsValid && !p.IsBot && p.TeamNum == (int)CsTeam.Terrorist && p.PlayerPawn?.Value != null && p.PlayerPawn.Value.Health > 0);
+            clutcher = Utilities.GetPlayers().FirstOrDefault(p => p != null && p.IsValid && !p.IsHLTV && TracksAdvancedStats(p) && !IsMatchCoach(p) && p.TeamNum == (int)CsTeam.Terrorist && p.PlayerPawn?.Value != null && p.PlayerPawn.Value.Health > 0);
             opponents = aliveCT;
         }
         else if (aliveCT == 1 && aliveT > 0)
         {
             // CT is clutching
-            clutcher = Utilities.GetPlayers().FirstOrDefault(p => p != null && p.IsValid && !p.IsBot && p.TeamNum == (int)CsTeam.CounterTerrorist && p.PlayerPawn?.Value != null && p.PlayerPawn.Value.Health > 0);
+            clutcher = Utilities.GetPlayers().FirstOrDefault(p => p != null && p.IsValid && !p.IsHLTV && TracksAdvancedStats(p) && !IsMatchCoach(p) && p.TeamNum == (int)CsTeam.CounterTerrorist && p.PlayerPawn?.Value != null && p.PlayerPawn.Value.Health > 0);
             opponents = aliveT;
         }
 
         if (clutcher != null && opponents >= 1 && opponents <= 5)
         {
             clutchInProgress = true;
-            clutchPlayer = clutcher.SteamID;
+            clutchPlayer = AdvancedStatsKey(clutcher);
             clutchOpponents = opponents;
 
             // Record clutch attempt
-            if (!advancedStats.ContainsKey(clutcher.SteamID))
-            {
-                advancedStats[clutcher.SteamID] = new AdvancedPlayerStats();
-            }
-
-            var stats = advancedStats[clutcher.SteamID];
+            var stats = AdvancedStatsFor(clutchPlayer.Value);
             switch (opponents)
             {
                 case 1:
@@ -491,7 +522,7 @@ public partial class MatchZy
         if (!clutchPlayer.HasValue || !advancedStats.ContainsKey(clutchPlayer.Value))
             return;
 
-        var clutcherPlayer = Utilities.GetPlayers().FirstOrDefault(p => p != null && p.IsValid && !p.IsBot && p.SteamID == clutchPlayer.Value);
+        var clutcherPlayer = Utilities.GetPlayers().FirstOrDefault(p => p != null && p.IsValid && !p.IsHLTV && AdvancedStatsKey(p) == clutchPlayer.Value);
 
         if (clutcherPlayer == null)
             return;

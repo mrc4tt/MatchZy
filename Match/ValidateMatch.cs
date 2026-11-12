@@ -77,6 +77,20 @@ namespace MatchZy
 
         private void ReportMatchValidation(string source, string text)
         {
+            // Console/RCON handler and URL NextFrame callback: an odd value (num_maps "three") threw
+            // out of the validation helpers and out of the command.
+            try
+            {
+                ReportMatchValidationCore(source, text);
+            }
+            catch (Exception e)
+            {
+                ValidateReply($"{source}: ERROR, the config could not be checked: {e.Message}");
+            }
+        }
+
+        private void ReportMatchValidationCore(string source, string text)
+        {
             JObject json;
             try
             {

@@ -14,8 +14,8 @@ namespace MatchZy
 {
     // In-world grenade library (SCL-style). `.shownades` draws every saved lineup for the current
     // map - the caller's PRIVATE savednades PLUS the shared GLOBAL pack (grenadelibrary.json) - as a
-    // vertical beam + a floating world-text label, colored by nade type. Aim at a beam + press E to
-    // teleport to that lineup. Reuses the interactive spawn-marker aim-cone + teleport pattern.
+    // glowing ghost on the throw spot (the lineup trainer, NadeTutorial.cs). Aim at a ghost + press E
+    // to teleport to that lineup. Reuses the interactive spawn-marker aim-cone + teleport pattern.
     // Markers are server-wide entities (all players see them); the set is a single server-wide toggle
     // (last .shownades caller wins), which suits a practice server.
     // Each marker also has a small glowing grenade model of its type that shows through walls, so
@@ -34,17 +34,15 @@ namespace MatchZy
             public bool Global;
         }
 
-        // Lineups saved at (near) the SAME throw position are grouped onto ONE beam + label instead of
-        // overlapping (unreadable). The label shows current/total + "Use F to toggle"; F cycles which
-        // lineup is shown, and E teleports to the one currently shown.
+        // Lineups saved at (near) the SAME throw position are grouped onto ONE marker (the trainer
+        // ghost); F cycles which lineup is selected, and E teleports to it.
         private sealed class NadeMarkerGroup
         {
             public Vector Pos = null!;             // representative throw position (first lineup added)
             public readonly List<NadeLineup> Lineups = new();
             public int Current;
-            public CPointWorldText? Label;         // updated on F-toggle
-            public CBeam? Beam;
-            public CBaseModelEntity? Glow;         // grenade model glowing through walls
+            public CBaseModelEntity? Glow;         // grenade model (or the trainer ghost) glowing through walls
+            public bool Ghost;                     // Glow is the trainer ghost: fixed green, not the type color
         }
 
         // Lineups within this radius of each other share one marker.
@@ -53,8 +51,6 @@ namespace MatchZy
         // so the beam does not block your view while you stand on the lineup; it reappears when you
         // walk away - no need to .shownades again.
         private const float NadeHideRadiusSq = 70.0f * 70.0f;
-        // Labels are only sent to viewers within this radius.
-        private const float NadeLabelRadiusSq = 1500.0f * 1500.0f;
 
         // SteamIDs of the players who turned .shownades on; only they receive the markers.
         private readonly HashSet<ulong> _nadeViewers = new();
@@ -105,6 +101,8 @@ namespace MatchZy
             {
                 _nadeViewerFilters.Remove(player.SteamID);
                 ReplyToUserCommand(player, Localizer.ForPlayer(player, "matchzy.gl.showing", activeNadeGroups.Sum(g => g.Lineups.Count)));
+                if (!_jtModelsPrecached)
+                    ReplyToUserCommand(player, Localizer.ForPlayer(player, "matchzy.gl.trainernotready"));
                 return;
             }
             _nadeViewerFilters[player.SteamID] = filter;
@@ -138,20 +136,6 @@ namespace MatchZy
                 g.Lineups.Add(lu);
             }
             return groups;
-        }
-
-        // The label text for a group's currently-shown lineup (with the counter + toggle hint when the
-        // group holds more than one lineup).
-        private static string LabelTextFor(NadeMarkerGroup g)
-        {
-            var lu = g.Lineups[g.Current];
-            var lines = new List<string>(5);
-            if (g.Lineups.Count > 1) lines.Add($"{g.Current + 1}/{g.Lineups.Count}");
-            lines.Add(string.IsNullOrEmpty(lu.Type) ? "[]" : $"[{lu.Type}]");
-            lines.Add(string.IsNullOrWhiteSpace(lu.Desc) ? lu.Name : lu.Desc);
-            if (!string.IsNullOrWhiteSpace(lu.Throw)) lines.Add(lu.Throw);
-            if (g.Lineups.Count > 1) lines.Add("Use F to toggle");
-            return string.Join("\n", lines);
         }
 
         // Console commands so a client can bind a key: bind g "css_shownades".
@@ -275,6 +259,8 @@ namespace MatchZy
                 {
                     _nadeViewers.Add(player.SteamID);
                     ReplyToUserCommand(player, Localizer.ForPlayer(player, "matchzy.gl.showing", activeNadeGroups.Sum(g => g.Lineups.Count)));
+                    if (!_jtModelsPrecached)
+                        ReplyToUserCommand(player, Localizer.ForPlayer(player, "matchzy.gl.trainernotready"));
                 }
                 return;
             }
@@ -307,6 +293,8 @@ namespace MatchZy
                 _nadeViewers.Add(player!.SteamID);
                 SetNadeTransmitListener(true);
                 ReplyToUserCommand(player, Localizer.ForPlayer(player, "matchzy.gl.showing", lineups.Count));
+                if (!_jtModelsPrecached)
+                    ReplyToUserCommand(player, Localizer.ForPlayer(player, "matchzy.gl.trainernotready"));
             }
             catch (Exception e)
             {
@@ -390,23 +378,12 @@ namespace MatchZy
                     {
                         if (filteredOut != null && filteredOut.Contains(g))
                         {
-                            if (g.Beam != null && g.Beam.IsValid) transmitEntities.Remove(g.Beam);
-                            if (g.Label != null && g.Label.IsValid) transmitEntities.Remove(g.Label);
                             if (g.Glow != null && g.Glow.IsValid) transmitEntities.Remove(g.Glow);
                             continue;
                         }
                         float dx = g.Pos.X - x, dy = g.Pos.Y - y, dz = g.Pos.Z - z;
                         float distSq = dx * dx + dy * dy + dz * dz;
-                        // Far away: keep the beam (it shows where the lineup is) but drop the world-text
-                        // label, which is the expensive part for the client and unreadable at range anyway.
-                        if (distSq > NadeLabelRadiusSq)
-                        {
-                            if (g.Label != null && g.Label.IsValid) transmitEntities.Remove(g.Label);
-                            continue;
-                        }
                         if (distSq > NadeHideRadiusSq) continue;
-                        if (g.Beam != null && g.Beam.IsValid) transmitEntities.Remove(g.Beam);
-                        if (g.Label != null && g.Label.IsValid) transmitEntities.Remove(g.Label);
                         if (g.Glow != null && g.Glow.IsValid) transmitEntities.Remove(g.Glow);
                     }
                 }
@@ -441,6 +418,8 @@ namespace MatchZy
             // .arc beams of the previous map are gone too; their removal timers stopped with the map.
             _liveArcs.Clear();
             _liveArcBeamCount = 0;
+            ForgetJtOnMapStart();
+            ResetNadeFollow(mapStart: true);
             nadeMarkerEntities.Clear();
             activeNadeGroups.Clear();
             _nadeViewers.Clear();
@@ -470,6 +449,11 @@ namespace MatchZy
             _botJiggleRoll.Clear();
             humanRegenOverride.Clear();
             respawnAtSavedLocation.Clear();
+            // AddBot/SpawnBot timers are STOP_ON_MAPCHANGE: a spawn in flight at the map change
+            // never reaches the code that clears the flag, and it would block .bot for the session.
+            isSpawningBot = false;
+            ForgetXrayOnMapStart();
+            ForgetRunBoostsOnMapStart();
         }
 
         // CheckTransmit fires every tick and crosses into managed code for every recipient, so the
@@ -497,62 +481,20 @@ namespace MatchZy
             Color color = NadeTypeColor(lu.Type);
             Vector pos = group.Pos;
 
-            // Vertical beam at the throw spot.
-            var beam = Utilities.CreateEntityByName<CBeam>("beam");
-            if (beam != null)
+            // Lineup trainer (NadeTutorial.cs): a spot is only the glowing ghost; the targets near it
+            // and the hud hint on it say the rest (no beam, no label).
+            var ghost = SpawnJtGhost(pos, lu.Pos.PlayerAngle.Y);
+            if (ghost != null)
             {
-                beam.LifeState = 1;
-                beam.Width = 4;
-                beam.Render = color;
-                Vector basePos = new(pos.X, pos.Y, pos.Z + 2.0f);
-                beam.EndPos.X = basePos.X;
-                beam.EndPos.Y = basePos.Y;
-                beam.EndPos.Z = pos.Z + 16.0f;
-                beam.Teleport(basePos, new QAngle(0, 0, 0), new Vector(0, 0, 0));
-                beam.DispatchSpawn();
-                group.Beam = beam;
-                nadeMarkerEntities.Add(beam);
+                group.Glow = ghost;
+                group.Ghost = true;
+                nadeMarkerEntities.Add(ghost);
+                EnsureJtWatch();
+                return;
             }
 
-            // Floating label above the beam (optional - matchzy_grenadelibrary_labels).
-            var text = grenadeLibraryLabels.Value ? Utilities.CreateEntityByName<CPointWorldText>("point_worldtext") : null;
-            if (text != null)
-            {
-                // SCL-style label: (N/total when grouped) / "[Type]" / comment / throw-style / toggle
-                // hint. Built by LabelTextFor so F-toggle can re-render the same entity.
-                text.MessageText = LabelTextFor(group);
-                text.Color = color;
-                text.FontName = "Arial Bold";
-                // Enabled / FontSize / Fullbright / justify / reorient are get-only in the wrapper, so
-                // they default to off/0 and the label renders INVISIBLE. Set them via schema. Reorient
-                // AROUND_UP (1) billboards the text so it faces every viewer (no manual angle needed).
-                Schema.SetSchemaValue(text.Handle, "CPointWorldText", "m_bEnabled", true);
-                Schema.SetSchemaValue(text.Handle, "CPointWorldText", "m_flFontSize", 60.0f);
-                Schema.SetSchemaValue(text.Handle, "CPointWorldText", "m_flWorldUnitsPerPx", grenadeLibraryLabelScale.Value);
-                Schema.SetSchemaValue(text.Handle, "CPointWorldText", "m_bFullbright", true);
-                // Dark background panel behind the text so it stays legible on light walls.
-                Schema.SetSchemaValue(text.Handle, "CPointWorldText", "m_bDrawBackground", true);
-                Schema.SetSchemaValue(text.Handle, "CPointWorldText", "m_flBackgroundBorderWidth", 6.0f);
-                Schema.SetSchemaValue(text.Handle, "CPointWorldText", "m_flBackgroundBorderHeight", 4.0f);
-                Schema.SetSchemaValue(text.Handle, "CPointWorldText", "m_nJustifyHorizontal", 1); // center
-                Schema.SetSchemaValue(text.Handle, "CPointWorldText", "m_nJustifyVertical", 1);   // center
-                // AROUND_UP (1): billboard - the label yaws to face every viewer, so it can never be
-                // seen from behind (fixed-yaw mode read mirrored from the back side). The original
-                // billboard attempt looked mirrored because it ran WITHOUT the roll-90 upright fix;
-                // with roll 90 (below) the panel is upright and viewer-facing from every angle.
-                Schema.SetSchemaValue(text.Handle, "CPointWorldText", "m_nReorientMode", 1);
-                // Billboard mode owns the yaw; only the roll-90 upright matters here.
-                float faceYaw = lu.Pos.PlayerAngle.Y;
-                // De-clip: a lineup saved right up against a wall put the label plane INSIDE the wall,
-                // cutting off part of the text (e.g. "Use F to toggle" -> "se F to toggle"). Push the
-                // label center away from any nearby solid so the whole panel floats clear and reads 100%.
-                Vector labelPos = DeclipLabelPosition(new Vector(pos.X, pos.Y, pos.Z + 48.0f));
-                text.Teleport(labelPos, new QAngle(0, faceYaw, 90), new Vector(0, 0, 0));
-                text.DispatchSpawn();
-                group.Label = text;
-                nadeMarkerEntities.Add(text);
-            }
-
+            // Models not precached yet (plugin loaded in the middle of a map): the grenade glow
+            // stands in for the ghost until the next map.
             // Glowing grenade model just above the spot, visible through walls (GlowType 3).
             var glow = Utilities.CreateEntityByName<CBaseModelEntity>("prop_dynamic");
             if (glow != null)
@@ -565,6 +507,7 @@ namespace MatchZy
                 group.Glow = glow;
                 nadeMarkerEntities.Add(glow);
             }
+            EnsureJtWatch();
         }
 
         private static void SetNadeGlowColor(CBaseModelEntity glow, Color color)
@@ -576,64 +519,6 @@ namespace MatchZy
             glow.Glow.GlowType = 3;
             Utilities.SetStateChanged(glow, "CBaseModelEntity", "m_Glow");
         }
-
-        // Push a label center horizontally away from nearby walls so the text panel never intersects
-        // geometry. Traces 8 compass directions; any solid within `clear` units contributes an
-        // opposing push. Total push capped so the label stays recognizably at its marker.
-        private static Vector DeclipLabelPosition(Vector c)
-        {
-#if HAS_CSS_TRACE
-            // Runtime-probed: the Trace API only exists in the forked CounterStrikeSharp build.
-            // The trace body lives in its own NoInlining method so stock servers never JIT a
-            // reference to the missing types (that would throw TypeLoadException here).
-            if (HasCssTraceApi)
-            {
-                try
-                {
-                    return DeclipLabelPositionViaTrace(c);
-                }
-                catch
-                {
-                    // Trace failed - keep the original spot.
-                }
-            }
-#endif
-            return c;
-        }
-
-#if HAS_CSS_TRACE
-        [MethodImpl(MethodImplOptions.NoInlining)]
-        private static Vector DeclipLabelPositionViaTrace(Vector c)
-        {
-            const float clear = 56.0f;   // desired free space around the label center
-            const float maxPush = 80.0f;
-            float pushX = 0, pushY = 0;
-            var opts = new TraceOptions { InteractsWith = Masks.Solid };
-            for (int i = 0; i < 8; i++)
-            {
-                double a = Math.PI * i / 4.0;
-                float dx = (float)Math.Cos(a), dy = (float)Math.Sin(a);
-                var tr = Trace.TraceEndShape(c, new Vector(c.X + dx * clear, c.Y + dy * clear, c.Z), null, opts);
-                if (!tr.DidHit())
-                    continue;
-                float hx = tr.HitPoint.X - c.X, hy = tr.HitPoint.Y - c.Y;
-                float dist = (float)Math.Sqrt(hx * hx + hy * hy);
-                float deficit = clear - dist;
-                if (deficit > 0)
-                {
-                    pushX -= dx * deficit;
-                    pushY -= dy * deficit;
-                }
-            }
-            float mag = (float)Math.Sqrt(pushX * pushX + pushY * pushY);
-            if (mag > maxPush)
-            {
-                pushX *= maxPush / mag;
-                pushY *= maxPush / mag;
-            }
-            return new Vector(c.X + pushX, c.Y + pushY, c.Z);
-        }
-#endif
 
         // ── data loading (private savednades + global pack), current map only ────────────
         private List<NadeLineup> LoadLineupsForCurrentMap(CCSPlayerController player)
@@ -756,7 +641,9 @@ namespace MatchZy
                 if (lastNadeToggleTime.TryGetValue(uid, out float lt) && now - lt < spawnMarkerUseCooldown)
                     return;
                 lastNadeToggleTime[uid] = now;
-                ToggleAimedGroup(player);
+                // On a spot, F cycles that spot's lineups; otherwise the marker aimed at.
+                if (!ToggleJtZoneLineup(player))
+                    ToggleAimedGroup(player);
                 return;
             }
 
@@ -782,13 +669,17 @@ namespace MatchZy
         // the .nades menu (shared-pack entries).
         private void LoadNadeLineup(CCSPlayerController player, NadeLineup target)
         {
-            if (!isPractice || player.TeamNum != (byte)CsTeam.CounterTerrorist && player.TeamNum != (byte)CsTeam.Terrorist)
+            // CanPracticeTeleport: a valid, living pawn on T/CT (the .loadnade path checks the same).
+            // Without it a dead player picking a shared lineup in the .nades menu was teleported and
+            // handed a grenade.
+            if (!isPractice || !CanPracticeTeleport(player))
                 return;
             bool isCT = player.TeamNum == (byte)CsTeam.CounterTerrorist;
             TeleportAndClearPose(player, target.Pos.PlayerPosition, target.Pos.PlayerAngle, wantDucked: false, deployWeapon: NadeTypeToWeapon(target.Type, isCT), giveDeploy: true);
             string tag = target.Global ? " (G)" : "";
             string note = string.IsNullOrEmpty(target.Desc) ? "" : $" - {target.Desc}";
             ReplyToUserCommand(player, Localizer.ForPlayer(player, "matchzy.gl.loaded", $"[{target.Type}] {target.Name}{tag}{note}"));
+            ShowNadeTutorial(player, target.Name, target.Type, target.Throw, target.Pos.PlayerPosition, target.Pos.PlayerAngle);
         }
 
         // Shared-pack (grenadelibrary.json) lineups for the current map, for the .nades menu.
@@ -824,13 +715,13 @@ namespace MatchZy
             if (g.Lineups.Count <= 1) return;
 
             g.Current = (g.Current + 1) % g.Lineups.Count;
-            if (g.Label != null && g.Label.IsValid)
-            {
-                g.Label.MessageText = LabelTextFor(g);
-                g.Label.Color = NadeTypeColor(g.Lineups[g.Current].Type);
-                Utilities.SetStateChanged(g.Label, "CPointWorldText", "m_messageText");
-            }
-            if (g.Glow != null && g.Glow.IsValid)
+            RefreshNadeGroupLabel(g);
+        }
+
+        // Glow after the selected lineup of a group changed.
+        private void RefreshNadeGroupLabel(NadeMarkerGroup g)
+        {
+            if (!g.Ghost && g.Glow != null && g.Glow.IsValid)
                 SetNadeGlowColor(g.Glow, NadeTypeColor(g.Lineups[g.Current].Type));
         }
 

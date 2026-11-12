@@ -312,6 +312,13 @@ namespace MatchZy
                 HandleDryRunRestartRound(player, command?.ArgString ?? "");
                 return;
             }
+            // Practice: .rr restarts the round (the chat dispatch does the same). With "." as a CSS
+            // chat trigger the dispatch skips .rr because css_rr exists, so this handler runs alone.
+            if (isPractice)
+            {
+                OnRestartRoundCommand(player, command);
+                return;
+            }
             if (!IsPlayerAdmin(player, "css_restorecurrent", "@css/config"))
             {
                 SendPlayerNotAdminMessage(player);

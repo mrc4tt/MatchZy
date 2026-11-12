@@ -703,6 +703,11 @@ namespace MatchZy
                         PrintToPlayerChat(player, Localizer.ForPlayer(player, "matchzy.cc.skipvetomatchstarted"));
                     }
                 }
+                else if (!isVeto && !isPreVeto)
+                {
+                    // Outside a veto SkipVeto forced warmup flags on top of practice/sleep/idle.
+                    ReplyToUserCommand(player, Localizer.ForPlayer(player, "matchzy.cc.novetotoskip"));
+                }
                 else
                 {
                     SkipVeto();
@@ -1011,6 +1016,12 @@ namespace MatchZy
                 {
                     ReplyToUserCommand(player, Localizer.ForPlayer(player, "matchzy.cc.startmatchstarted"));
                 }
+                else if (isVeto)
+                {
+                    // matchStarted is false during the veto: a second start ran HandleMatchStartCore
+                    // again (new database row, CreateVeto again with new captains) mid-veto.
+                    ReplyToUserCommand(player, Localizer.ForPlayer(player, "matchzy.cc.vetoinprogress"));
+                }
                 else
                 {
                     PrintLocalizedToAll("matchzy.cmd.adminstartedgame");
@@ -1033,6 +1044,17 @@ namespace MatchZy
                 if (matchStarted)
                 {
                     ReplyToUserCommand(player, Localizer.ForPlayer(player, "matchzy.cmd.warmupmatchstarted"));
+                }
+                else if (isVeto)
+                {
+                    // warmup.cfg restarts the game under the veto's pause.
+                    ReplyToUserCommand(player, Localizer.ForPlayer(player, "matchzy.cc.vetoinprogress"));
+                }
+                else if (isPractice)
+                {
+                    // Only the cfg would change: isPractice and the practice handlers stayed on top
+                    // of a warmup cfg. .match / .exitprac leave practice properly.
+                    ReplyToUserCommand(player, Localizer.ForPlayer(player, "matchzy.cmd.startinpracticehint"));
                 }
                 else if (!warmupEnabled.Value)
                 {
@@ -1210,10 +1232,18 @@ namespace MatchZy
 
             SetExplicitMode(1);
             StartScrimMode();
+            // Start*Mode runs ResetMatch() when leaving practice, sleep or a dry run, which sets the
+            // mode flags back to their defaults: set them again so this mode is the one that starts.
+            isKnifeRound = false;
+            isKnifeRequired = false;
+            isPlayOutEnabled = true;
+            isPlayOutEnabled2 = false;
+            isMatchModeEnabled = false;
             // Apply clinch=0/overtime=0 NOW during warmup so client trophy UI slot
             // is allocated correctly at the upcoming warmup→live phase transition.
             // Mid-live convar flips can't move trophy after the slot is allocated.
             HandlePlayoutConfig();
+            RefreshScoreboardAfterModeSwitch();
             // Same compact status readout as .match, reflecting scrim's flags (knife off, playout on).
             string on = Localizer.ForPlayer(player, "matchzy.cc.statuson");
             string off = Localizer.ForPlayer(player, "matchzy.cc.statusoff");
@@ -1254,13 +1284,22 @@ namespace MatchZy
             isKnifeRequired = false;
             isMatchModeEnabled = false;
             StartHillMode();
+            // Start*Mode runs ResetMatch() when leaving practice, sleep or a dry run, which sets the
+            // mode flags back to their defaults: set them again so this mode is the one that starts.
+            isPlayOutEnabled = false;
+            isPlayOutEnabled2 = true;
+            isKnifeRequired = false;
+            isMatchModeEnabled = false;
             // Apply clinch=0/overtime=0 in warmup → see OnScrimCommand for rationale.
             HandlePlayoutConfig();
+            RefreshScoreboardAfterModeSwitch();
         }
 
         [ConsoleCommand("css_match", "Starts match mode")]
         public void OnMatchCommand(CCSPlayerController? player, CommandInfo? command)
         {
+            if (DeferExternalModeCall(player, command, () => OnMatchCommand(null, null)))
+                return;
             if (!IsPlayerAdmin(player, "css_match", "@css/map", "@custom/prac"))
             {
                 SendPlayerNotAdminMessage(player);
@@ -1299,10 +1338,17 @@ namespace MatchZy
             isPlayOutEnabled2 = false; // clear hill flag too, else .hill -> .match leaks hill mode
             SetExplicitMode(1);
             StartMatchMode();
+            // Start*Mode runs ResetMatch() when leaving practice, sleep or a dry run, which sets the
+            // mode flags back to their defaults: set them again so this mode is the one that starts.
+            isKnifeRequired = true;
+            isMatchModeEnabled = true;
+            isPlayOutEnabled = false;
+            isPlayOutEnabled2 = false;
             // Apply clinch=1/overtime=1 from live.cfg NOW during warmup so client
             // trophy UI slot is allocated at warmup→knife/live phase transition.
             // Required when transitioning back from scrim/hill where clinch=0 leaked.
             HandlePlayoutConfig();
+            RefreshScoreboardAfterModeSwitch();
         }
 
         [ConsoleCommand("css_exitprac", "Starts match mode")]

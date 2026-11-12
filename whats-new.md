@@ -2,6 +2,35 @@
 
 A short summary of each release. The [full changelog](changelog.md) has the details and background for every change.
 
+## 1.0.27-beta.1 <small>November 14, 2026</small>
+
+- **New:** (Beta) Spectator coach with `matchzy_coaching_mode 3`: no body, first person on the own team, radar with only the own team and spotted enemies, teammates outlined through walls, no enemy ghosting. See [Coaching](guides/coaching.md#spectator-coach-beta-matchzy_coaching_mode-3).
+- **Fixed:** The bot quota no longer kicks CSTV when it removes bots (a lowered `bot_quota`, or `bot_quota_mode fill` and a player joining a team), so the demo is no longer split in two (`matchzy_cstv_kick_guard`).
+- **Fixed:** Practice `.bot` adds one bot instead of adding two and kicking one.
+- **Changed:** SQLite no longer leaves `matchzy.db-wal` / `matchzy.db-shm` files; `matchzy.db` alone is a complete copy again.
+- **New:** Grenade follow camera in practice: a throw from a lineup spot is followed by the camera and shows where it lands; jump to come back. `.follownade` sets lineup spots / every throw / off.
+- **New:** Lineup trainer: `.shownades` spots get a glowing figure; near a spot you see the aim targets on the wall, and on the spot a hint box with the keys ("Left Click + Jump").
+- **New:** Players can vote all chat off with `.mute` (`matchzy_allchat_mute_votes`; `.nochat` with CS2-SimpleAdmin), so the teams can no longer write to each other; admins use `.allchat`.
+- **Fixed:** A server crash when a coach got the bomb (two hand-offs removed the same C4 at once).
+- **Changed:** Coaches can no longer take control of bots on their team.
+- **Fixed:** `.uncoach` during freeze time no longer leaves an unkillable coach body in the round.
+- **Fixed:** `.matchsetup` with a veto and "Skip knife" gives team1 CT on every map, also the decider.
+- **Fixed:** A technical pause counts its time only while it is in effect, so a `.tech` early in a round is no longer used up without pausing.
+- **Fixed:** A BO2 veto from 3 maps plays both maps instead of stopping after map 1.
+- **Fixed:** A match loaded right after a series end is no longer reset by the old series' restart, and a second load no longer replaces a match that is still loading.
+- **Fixed:** A match whose first map cannot be loaded fails the load instead of reporting success.
+- **Fixed:** `min_spectators_to_ready` works again (spectators can `.ready`).
+- **Fixed:** `.match`, `.scrim` and `.hill` from practice start the chosen mode with its settings.
+- **Fixed:** `.skipveto`, `.start` and `.warmup` behave during a veto; `.rr` works in practice with "." as chat trigger; readying up by ping sends `player_ready`.
+- **Fixed:** The server no longer crashes at start when `matchzymaps.cfg` cannot be created.
+- **Fixed:** Coach bomb carrier: the C4 is no longer deleted.
+- **Fixed:** Forfeits, `.gg` and `get5_endmatch` write the final stats, CSV and stats JSON; match events are retried; `series_start` is no longer lost when the database was down at load.
+- **Fixed:** S3 demo uploads no longer overwrite one part with the next.
+- **Fixed:** MySQL stats with long team names or emoji player names; advanced stats with bots.
+- **Fixed:** Practice: leftover bots, bot settings and player settings after leaving practice or the server, stuck strat playback, broken save files.
+- **Changed:** `matchzy_demo_upload_url ""` and `matchzy_remote_backup_url ""` turn uploads off.
+- **Security:** A failed demo upload no longer logs the S3 signature details.
+
 ## 1.0.26 <small>November 14, 2026</small>
 
 - **Fixed:** `.help` in practice shows every command again: long lists continue on a new line instead of being cut off, and the list shown when practice starts is no longer pushed out of chat by server messages.
@@ -63,14 +92,14 @@ A short summary of each release. The [full changelog](changelog.md) has the deta
 
 - **Fixed:** Reconnecting during a live round no longer refunds the money spent that round. Players keep the money they left with.
 
-## 1.0.22 <small>November 5, 2026</small>
-
-- **Changed:** The startup line and `css_matchzy_version` say that this is the fork by mrc4tt, not the original MatchZy by WD- (0.9.x), and where to get support.
-- **Fixed:** Round backups work on servers where `mp_backup_round_file_pattern` was changed (for example by a hosting egg to a `backups/` folder). MatchZy sets it back to the default during a match, so `.restore` finds the round files.
-- **Changed:** On Metamod servers the round backup files are moved from `csgo/addons/metamod/` to `csgo/` after each round start, so they no longer end up in the Metamod folder.
-- **Fixed:** Round backups are found in `csgo/backups/` on servers whose `gameinfo.gi` adds that folder (some Pelican/Pterodactyl eggs).
-
 ## Older releases
+
+??? note "1.0.22 - November 5, 2026"
+
+    - **Changed:** The startup line and `css_matchzy_version` say that this is the fork by mrc4tt, not the original MatchZy by WD- (0.9.x), and where to get support.
+    - **Fixed:** Round backups work on servers where `mp_backup_round_file_pattern` was changed (for example by a hosting egg to a `backups/` folder). MatchZy sets it back to the default during a match, so `.restore` finds the round files.
+    - **Changed:** On Metamod servers the round backup files are moved from `csgo/addons/metamod/` to `csgo/` after each round start, so they no longer end up in the Metamod folder.
+    - **Fixed:** Round backups are found in `csgo/backups/` on servers whose `gameinfo.gi` adds that folder (some Pelican/Pterodactyl eggs).
 
 ??? note "1.0.21 - November 2, 2026"
 

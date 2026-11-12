@@ -67,6 +67,16 @@ namespace MatchZy
             "series_start", "going_live", "map_result", "series_end", "demo_upload_ended", "server_shutdown",
         };
 
+        // A delivery-logged match event that hit a transient failure (timeout, network error, 5xx) is
+        // sent again before the sender moves on, so one receiver hiccup no longer loses a map result
+        // and the queue order is kept. 4xx means the receiver rejected the event itself, and a retry
+        // would get the same answer. Lifecycle events are left out: server_shutdown is sent while the
+        // process is exiting and cannot wait.
+        private static readonly TimeSpan[] MatchEventRetryDelays = { TimeSpan.FromSeconds(2), TimeSpan.FromSeconds(5) };
+
+        private static bool RetriesOnFailure(MatchZyEvent e) =>
+            DeliveryLoggedEvents.Contains(e.EventName) && e is not ServerLifecycleEvent;
+
         private static bool IsHighVolumeLiveEvent(MatchZyEvent e)
         {
             string name = e.GetType().Name;
@@ -93,7 +103,16 @@ namespace MatchZy
                         }
                         TimeSpan? timeout = live ? LiveEventTimeout
                             : item.Event is ServerLifecycleEvent ? LifecycleEventTimeout : null;
-                        bool ok = await SendEventCoreAsync(item.Event, item.Target, item.MatchId, timeout, token).ConfigureAwait(false);
+                        var (ok, retryable) = await SendEventCoreAsync(item.Event, item.Target, item.MatchId, timeout, token).ConfigureAwait(false);
+                        if (!ok && retryable && RetriesOnFailure(item.Event))
+                        {
+                            for (int attempt = 0; attempt < MatchEventRetryDelays.Length && !ok && retryable; attempt++)
+                            {
+                                Log($"[SendEventAsync] Retrying {item.Event.EventName} in {MatchEventRetryDelays[attempt].TotalSeconds:0} s (attempt {attempt + 2}/{MatchEventRetryDelays.Length + 1}).");
+                                await Task.Delay(MatchEventRetryDelays[attempt], token).ConfigureAwait(false);
+                                (ok, retryable) = await SendEventCoreAsync(item.Event, item.Target, item.MatchId, timeout, token).ConfigureAwait(false);
+                            }
+                        }
                         if (ok)
                         {
                             if (_droppedLiveEvents > 0)
@@ -153,9 +172,10 @@ namespace MatchZy
             return EnqueueEvent(@event, target ?? CurrentRemoteLogTarget(), liveMatchId);
         }
 
-        // True when the event was delivered or there was nothing to send; false when the receiver
-        // failed or timed out (feeds the live-event backoff in RunEventSenderAsync).
-        private async Task<bool> SendEventCoreAsync(MatchZyEvent @event, RemoteLogTarget target, long currentMatchId, TimeSpan? timeout, CancellationToken shutdown)
+        // Ok: the event was delivered or there was nothing to send; false when the receiver failed or
+        // timed out (feeds the live-event backoff in RunEventSenderAsync). Retryable: the failure was
+        // a timeout, a network error or a 5xx, so the same request may succeed later.
+        private async Task<(bool Ok, bool Retryable)> SendEventCoreAsync(MatchZyEvent @event, RemoteLogTarget target, long currentMatchId, TimeSpan? timeout, CancellationToken shutdown)
         {
             try
             {
@@ -167,13 +187,19 @@ namespace MatchZy
                     // A panel that never got series_end or map_result can be told why.
                     if (logDelivery && eventMatchId != -1)
                         Log($"[SendEventAsync] {@event.EventName} (match {eventMatchId}) not sent: no remote log URL is set.");
-                    return true;
+                    return (true, false);
                 }
 
                 // Never send match events with an invalid matchId. Server lifecycle events
                 // (server_ready, map_change, server_shutdown) are not about a match.
                 if (eventMatchId == -1 && @event is not ServerLifecycleEvent)
-                    return true;
+                {
+                    // A result event dropped here (the matchid allocation failed, e.g. the database
+                    // was unreachable) is otherwise invisible: say so, once per event.
+                    if (logDelivery)
+                        Log($"[SendEventAsync] {@event.EventName} not sent: the match has no valid matchid (-1).");
+                    return (true, false);
+                }
 
                 string json = JsonSerializer.Serialize(@event, @event.GetType());
                 using var request = new HttpRequestMessage(HttpMethod.Post, target.Url);
@@ -197,11 +223,11 @@ namespace MatchZy
                 if (!response.IsSuccessStatusCode)
                 {
                     Log($"[SendEventAsync] {@event.EventName} (match {eventMatchId}) to {RedactUrl(target.Url)} failed: {(int)response.StatusCode} {response.StatusCode}");
-                    return false;
+                    return (false, (int)response.StatusCode >= 500);
                 }
                 if (logDelivery)
                     Log($"[SendEventAsync] {@event.EventName} (match {eventMatchId}) delivered to {RedactUrl(target.Url)}: {(int)response.StatusCode}");
-                return true;
+                return (true, false);
             }
             catch (OperationCanceledException) when (shutdown.IsCancellationRequested)
             {
@@ -210,12 +236,18 @@ namespace MatchZy
             catch (TaskCanceledException)
             {
                 Log($"[SendEventAsync] Request timed out for {@event.EventName}");
-                return false;
+                return (false, true);
+            }
+            catch (HttpRequestException e)
+            {
+                // DNS failure, connection refused or reset: the receiver may be back in a moment.
+                Log($"[SendEventAsync] {@event.EventName} network error: {e.Message}");
+                return (false, true);
             }
             catch (Exception e)
             {
                 Log($"[SendEventAsync FATAL] An error occurred: {e.Message}");
-                return false;
+                return (false, false);
             }
         }
     }

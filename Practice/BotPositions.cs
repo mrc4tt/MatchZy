@@ -49,6 +49,13 @@ namespace MatchZy
                     return new();
                 }
                 var loaded = JsonSerializer.Deserialize<Dictionary<string, Dictionary<string, BotPos>>>(File.ReadAllText(BotPositionsPath), BotPosJsonOpts) ?? new();
+                // Valid JSON can still hold nulls ("de_dust2": null, "a": null); the commands
+                // dereference every entry, so drop them here.
+                foreach (var map in loaded.Where(kv => kv.Value == null).Select(kv => kv.Key).ToList())
+                    loaded.Remove(map);
+                foreach (var spots in loaded.Values)
+                    foreach (var name in spots.Where(kv => kv.Value == null).Select(kv => kv.Key).ToList())
+                        spots.Remove(name);
                 _botPositionsLoadFailed = false;
                 return loaded;
             }
@@ -372,9 +379,13 @@ namespace MatchZy
             _botPosVizOn = false;
             AddTimer(2.0f, () =>
             {
+                // The new map may not be in practice (a match load); markers would then be drawn
+                // into a match.
+                if (!isPractice)
+                    return;
                 try { _botPosVizOn = DrawBotPosMarkers() > 0; }
                 catch (Exception e) { Log($"[BotPosViz] map-start redraw: {e.Message}"); }
-            });
+            }, TimerFlags.STOP_ON_MAPCHANGE);
         }
 
         // ── botjiggle : silent side-to-side strafing ─────────────────────────────────────────────

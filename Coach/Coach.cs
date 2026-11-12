@@ -28,6 +28,19 @@ public partial class MatchZy
 
     public HookResult OnCoachPlayerSpawn(EventPlayerSpawn @event, GameEventInfo info)
     {
+        try
+        {
+            return OnCoachPlayerSpawnCore(@event);
+        }
+        catch (Exception e)
+        {
+            Log($"[EventPlayerSpawn FATAL] coach: {e}");
+            return HookResult.Continue;
+        }
+    }
+
+    private HookResult OnCoachPlayerSpawnCore(EventPlayerSpawn @event)
+    {
         if (!matchStarted)
             return HookResult.Continue;
 
@@ -35,7 +48,7 @@ public partial class MatchZy
         if (!IsPlayerValid(player))
             return HookResult.Continue;
 
-        HashSet<CCSPlayerController> coaches = GetAllCoaches();
+        HashSet<CCSPlayerController> coaches = GetBodyCoaches();
         if (player == null)
             return HookResult.Continue;
         if (!coaches.Contains(player))
@@ -242,6 +255,13 @@ public partial class MatchZy
             return;
         }
 
+        // matchzy_coaching_mode 3 (experimental): bodyless coach on the Spectator team.
+        if (coachingMode.Value == 3)
+        {
+            StartSpectatorCoach(player!, matchZyCoachTeam, (CsTeam)wantedTeam);
+            return;
+        }
+
         matchZyCoachTeam.coach.Add(player!);
         // A player who played earlier in the match keeps no stats line as coach.
         ResetCoachScoreboard(player!);
@@ -249,6 +269,22 @@ public partial class MatchZy
         if (player.InGameMoneyServices != null)
             player.InGameMoneyServices.Account = 0;
         Server.NextFrame(EnforceCompetitiveTeammateColors);
+        // Becoming a coach in freeze time of a live or knife round: the body only gets the coach
+        // treatment at its next spawn, and KillCoaches kills it where it stands when freeze time
+        // ends, so its weapons dropped for the team and a carried C4 fell at that spot. Hand the
+        // bomb off and strip the body now.
+        if ((isMatchLive || isKnifeRound) && player.PawnIsAlive)
+        {
+            CCSPlayerController newCoach = player;
+            Server.NextFrame(() =>
+            {
+                if (!IsPlayerValid(newCoach) || !newCoach.PawnIsAlive || !GetAllCoaches().Contains(newCoach))
+                    return;
+                if (HoldsBomb(newCoach))
+                    TransferCoachBomb(newCoach);
+                HandleCoachWeapons(newCoach);
+            });
+        }
         ReplyToUserCommand(player, Localizer.ForPlayer(player, "matchzy.coach.nowcoaching", matchZyCoachTeam.teamName));
         PrintLocalizedToAll("matchzy.coach.announce", player.PlayerName, matchZyCoachTeam.teamName);
     }
@@ -257,7 +293,7 @@ public partial class MatchZy
     {
         coachKillTimer?.Kill();
         coachKillTimer = null;
-        HashSet<CCSPlayerController> coaches = GetAllCoaches();
+        HashSet<CCSPlayerController> coaches = GetBodyCoaches();
         if (coaches.Count == 0)
             return;
         if (spawnsData.Values.Any(list => list.Count == 0))
@@ -539,7 +575,7 @@ public partial class MatchZy
         // Runs on an AddTimer callback: an escaped exception would become a CSS runtime error box.
         try
         {
-            HashSet<CCSPlayerController> coaches = GetAllCoaches();
+            HashSet<CCSPlayerController> coaches = GetBodyCoaches();
             if (coaches.Count == 0)
                 return;
             if (!IsPlayerValid(player) || coaches.Contains(player) || !player.PawnIsAlive)
@@ -1015,10 +1051,27 @@ public partial class MatchZy
         }
     }
 
-    private void HandleCoachWeapons(CCSPlayerController coach)
+    private void HandleCoachWeapons(CCSPlayerController coach, int attempt = 0)
     {
         if (!IsPlayerValid(coach))
             return;
+        // Going live: wait until the engine's round restart has settled before killing weapons.
+        float wait = coachStripSettleUntil - Server.CurrentTime;
+        if (wait > 0)
+        {
+            AddTimer(wait + 0.1f, () => HandleCoachWeapons(coach, attempt), TimerFlags.STOP_ON_MAPCHANGE);
+            return;
+        }
+        // The bomb goes first (dropped and moved to a teammate, never deleted), then the rest by the
+        // engine's RemoveWeapons() as in 1.0.24. Killing the coach's held weapons one by one with
+        // entity IO (to keep the C4 in the inventory) was followed by "FATAL ERROR: WriteEnterPVS:
+        // GetEntServerClass failed" in testing. With nobody to take the bomb it goes with the rest.
+        if (HoldsBomb(coach) && RandomBombTarget() != null && attempt < 10)
+        {
+            HandOffCoachBomb(coach, "HandleCoachWeapons");
+            AddTimer(0.3f, () => HandleCoachWeapons(coach, attempt + 1), TimerFlags.STOP_ON_MAPCHANGE);
+            return;
+        }
         coach.RemoveWeapons();
     }
 
@@ -1194,7 +1247,7 @@ public partial class MatchZy
             }
             foreach (var c4 in Utilities.FindAllEntitiesByDesignerName<CBasePlayerWeapon>("weapon_c4"))
             {
-                if (c4 == null || !c4.IsValid || c4.AbsOrigin == null)
+                if (c4 == null || !c4.IsValid || c4.AbsOrigin == null || IsBombKillQueued(c4))
                     continue;
                 if (IsBombCarried(c4))
                 {
@@ -1235,7 +1288,8 @@ public partial class MatchZy
                 stuckBombSince.Remove(c4.Index);
                 var target = onIt;
                 Log($"[CheckStuckBomb] {target.PlayerName} stood on the dropped bomb for {StuckBombSeconds:0.0}s without picking it up at {b.X:0}/{b.Y:0}/{b.Z:0}; giving a new one.");
-                c4.AcceptInput("Kill");
+                if (!QueueBombKill(c4))
+                    continue;
                 coachBombRecoveryPending = true;
                 Server.NextFrame(() =>
                 {
@@ -1261,7 +1315,7 @@ public partial class MatchZy
         if (coachBombRecoveryPending)
             return;
         var bomb = Utilities.GetEntityFromIndex<CBasePlayerWeapon>(bombIndex);
-        if (bomb == null || !bomb.IsValid || bomb.DesignerName != "weapon_c4")
+        if (bomb == null || !bomb.IsValid || bomb.DesignerName != "weapon_c4" || IsBombKillQueued(bomb))
             return;
         // Someone already picked it up again.
         if (IsBombCarried(bomb))
@@ -1272,19 +1326,15 @@ public partial class MatchZy
             Log($"[RecoverCoachDroppedBomb] Coach {coachName} dropped the bomb and there is no live terrorist to give it to.");
             return;
         }
-        // A dropped weapon has no holder, so the entity IO kill is safe; the new one is given a frame
-        // later, once the old one is gone.
-        bomb.AcceptInput("Kill");
+        // Move the dropped C4 to the player instead of deleting it and giving a new one (deleting
+        // C4s around round starts is the WriteEnterPVS crash class).
+        var o = target.PlayerPawn.Value?.AbsOrigin;
+        if (o == null)
+            return;
+        bomb.Teleport(new Vector(o.X, o.Y, o.Z + 8.0f), null, new Vector(0, 0, 0));
         coachBombRecoveryPending = true;
-        Server.NextFrame(() =>
-        {
-            coachBombRecoveryPending = false;
-            if (IsPlayerValid(target) && target.PawnIsAlive && target.TeamNum == (int)CsTeam.Terrorist && !HoldsBomb(target))
-            {
-                target.GiveNamedItem("weapon_c4");
-                Log($"[RecoverCoachDroppedBomb] Bomb dropped by coach {coachName} given to {target.PlayerName}.");
-            }
-        });
+        AddTimer(1.0f, () => coachBombRecoveryPending = false, TimerFlags.STOP_ON_MAPCHANGE);
+        Log($"[RecoverCoachDroppedBomb] Bomb dropped by coach {coachName} moved to {target.PlayerName}.");
     }
 
     // The live terrorist (not a coach, not already carrying a bomb) closest to a point: the coach
@@ -1348,6 +1398,28 @@ public partial class MatchZy
 
     private static bool HoldsBomb(CCSPlayerController player) => FindHeldBomb(player) != null;
 
+    // C4 entities already sent "Kill", by entity handle (index + serial, so a new entity that reuses
+    // the slot is not mistaken for it). Several paths hand a coach's bomb on (the given_c4 retries,
+    // the pickup event, CheckStuckBomb twice a second, the drop recovery) and two of them could run
+    // in the same frame: both found the same C4 before the engine deleted it, both sent "Kill" and
+    // both gave out a new bomb. Killing an entity that is already queued for deletion is the
+    // WriteEnterPVS / GetEntServerClass crash class (seen right after two hand-offs logged together).
+    private static readonly HashSet<uint> c4KillQueued = new();
+
+    private static bool IsBombKillQueued(CBasePlayerWeapon c4) => c4KillQueued.Contains(c4.EntityHandle.Raw);
+
+    // Sends "Kill" once per C4; false when another path already did (then do not hand out a new one).
+    private bool QueueBombKill(CBasePlayerWeapon c4)
+    {
+        uint handle = c4.EntityHandle.Raw;
+        if (!c4KillQueued.Add(handle))
+            return false;
+        c4.AcceptInput("Kill");
+        // The engine deletes it at the end of the frame; forget the handle a little later.
+        AddTimer(1.0f, () => c4KillQueued.Remove(handle), TimerFlags.STOP_ON_MAPCHANGE);
+        return true;
+    }
+
     // The C4 a player carries. The inventory list is checked first; a coach was seen carrying the
     // bomb (it dropped on the freezetime kill) while it was not found there, so every C4 whose
     // owner is this player's pawn counts as well.
@@ -1362,24 +1434,24 @@ public partial class MatchZy
             foreach (var h in weapons)
             {
                 var w = h.Value;
-                if (w != null && w.IsValid && w.DesignerName == "weapon_c4")
+                if (w != null && w.IsValid && w.DesignerName == "weapon_c4" && !IsBombKillQueued(w))
                     return w;
             }
         }
         foreach (var c4 in Utilities.FindAllEntitiesByDesignerName<CBasePlayerWeapon>("weapon_c4"))
         {
-            if (c4 != null && c4.IsValid && c4.OwnerEntity.IsValid && c4.OwnerEntity.Index == pawn.Index)
+            if (c4 != null && c4.IsValid && !IsBombKillQueued(c4) && c4.OwnerEntity.IsValid && c4.OwnerEntity.Index == pawn.Index)
                 return c4;
         }
         return null;
     }
 
     /// <summary>
-    /// Moves a coach's C4 to a random live non-coach terrorist: kills the coach's C4 via entity
-    /// IO (never Remove() a held networked weapon) and gives the new carrier one a frame later.
+    /// Moves a coach's C4 to a random live non-coach terrorist: the coach drops it and the dropped
+    /// C4 is moved to the carrier, who picks it up (the bomb is never deleted).
     /// A coach must never die holding the bomb: the death drops it at the coach viewing spot,
     /// which is often outside the playable area, and the team loses the bomb for the round.
-    /// Returns true when the coach's C4 was killed.
+    /// Returns true when the hand-off was started.
     /// </summary>
     private string lastNoBombTargetLogKey = "";
 
@@ -1403,21 +1475,67 @@ public partial class MatchZy
         }
 
         var bomb = FindHeldBomb(coach);
-        if (bomb == null)
+        if (bomb == null || coachBombRecoveryPending)
             return false;
-        // Entity IO kill, never Remove() on a held networked weapon.
-        bomb.AcceptInput("Kill");
 
+        // The bomb is never deleted: killing the coach's C4 and giving the carrier a new one ended
+        // the server with "FATAL ERROR: WriteEnterPVS: GetEntServerClass failed" around round
+        // (re)starts, even with one kill per C4. Instead the coach drops it through the engine (C4
+        // made active first, a frame later the drop) and the dropped C4 is moved to the carrier's
+        // feet, where the normal pickup takes it. coachBombRecoveryPending keeps the drop event and
+        // the stuck-bomb check off this bomb meanwhile.
+        coachBombRecoveryPending = true;
+        uint bombHandle = bomb.EntityHandle.Raw;
+        SwitchWeaponNative(coach, "weapon_c4");
         Server.NextFrame(() =>
         {
-            if (IsPlayerValid(target) && target.PawnIsAlive && target.TeamNum == (int)CsTeam.Terrorist)
+            try
             {
-                target.GiveNamedItem("weapon_c4");
-                Log($"[HandOffCoachBomb] {context}: bomb moved from coach {coach.PlayerName} to {target.PlayerName}");
+                var c4 = new CHandle<CBasePlayerWeapon>(bombHandle).Value;
+                var active = IsPlayerValid(coach) ? coach.PlayerPawn.Value?.WeaponServices?.ActiveWeapon.Value : null;
+                if (c4 == null || !c4.IsValid || active == null || !active.IsValid || active.EntityHandle.Raw != bombHandle)
+                {
+                    // Not in hand (switch refused, coach gone): the retries / the twice-a-second check try again.
+                    coachBombRecoveryPending = false;
+                    string why = c4 == null || !c4.IsValid ? "bomb gone" : active == null || !active.IsValid ? "no active weapon" : $"active is {active.DesignerName}";
+                    string key = $"switch_{coach.Slot}_{GetRoundNumer()}";
+                    if (key != lastNoBombTargetLogKey)
+                    {
+                        lastNoBombTargetLogKey = key;
+                        Log($"[HandOffCoachBomb] {context}: could not put the bomb in coach {coach.PlayerName}'s hand ({why}); retrying.");
+                    }
+                    return;
+                }
+                coach.DropActiveWeapon();
+                Server.NextFrame(() =>
+                {
+                    try
+                    {
+                        var dropped = new CHandle<CBasePlayerWeapon>(bombHandle).Value;
+                        var o = IsPlayerValid(target) && target.PawnIsAlive && target.TeamNum == (int)CsTeam.Terrorist
+                            ? target.PlayerPawn.Value?.AbsOrigin : null;
+                        if (dropped != null && dropped.IsValid && !IsBombCarried(dropped) && o != null)
+                        {
+                            dropped.Teleport(new Vector(o.X, o.Y, o.Z + 8.0f), null, new Vector(0, 0, 0));
+                            Log($"[HandOffCoachBomb] {context}: bomb moved from coach {coach.PlayerName} to {target.PlayerName}");
+                        }
+                        else
+                        {
+                            Log($"[HandOffCoachBomb] {context}: bomb from coach {coach.PlayerName} not moved (dropped: {dropped?.IsValid == true}, carried: {dropped != null && dropped.IsValid && IsBombCarried(dropped)}, carrier alive: {o != null})");
+                        }
+                    }
+                    catch (Exception e)
+                    {
+                        Log($"[HandOffCoachBomb] move: {e.Message}");
+                    }
+                    // Let the pickup land before the drop and stuck-bomb paths look at it again.
+                    AddTimer(1.0f, () => coachBombRecoveryPending = false, TimerFlags.STOP_ON_MAPCHANGE);
+                });
             }
-            else
+            catch (Exception e)
             {
-                Log($"[HandOffCoachBomb] {context}: {target.PlayerName} left before receiving the bomb from coach {coach.PlayerName}");
+                coachBombRecoveryPending = false;
+                Log($"[HandOffCoachBomb] drop: {e.Message}");
             }
         });
         return true;
@@ -1616,7 +1734,7 @@ public partial class MatchZy
         coachKillTimer = null;
         if (isPaused || IsTacticalTimeoutActive())
             return;
-        HashSet<CCSPlayerController> coaches = GetAllCoaches();
+        HashSet<CCSPlayerController> coaches = GetBodyCoaches();
         if (coaches.Count == 0)
             return;
 
@@ -1640,7 +1758,7 @@ public partial class MatchZy
     {
         if (isPaused || IsTacticalTimeoutActive())
             return;
-        HashSet<CCSPlayerController> coaches = GetAllCoaches();
+        HashSet<CCSPlayerController> coaches = GetBodyCoaches();
         if (coaches.Count == 0)
             return;
         WithCoachSuicideCashSuppressed(() =>

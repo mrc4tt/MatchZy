@@ -766,20 +766,19 @@ namespace MatchZy
                     break;
 
                 case 2:
-                    if (matchConfig.MapsPool.Count < 7)
+                    // ban, ban, pick, pick needs a pool of at least 4. With 3 maps the two bans left one
+                    // map, the "1 left" branch made it the only map and the BO2 stalled after map 1.
+                    if (matchConfig.MapsPool.Count >= 4)
                     {
                         matchConfig.MapBanOrder.Add(startingVetoTeam == matchzyTeam1 ? "team1_ban" : "team2_ban");
                         matchConfig.MapBanOrder.Add(startingVetoTeam == matchzyTeam1 ? "team2_ban" : "team1_ban");
-                        matchConfig.MapBanOrder.Add(startingVetoTeam == matchzyTeam1 ? "team1_pick" : "team2_pick");
-                        matchConfig.MapBanOrder.Add(startingVetoTeam == matchzyTeam1 ? "team2_pick" : "team1_pick");
                     }
-                    else
+                    else if (matchConfig.MapsPool.Count == 3)
                     {
                         matchConfig.MapBanOrder.Add(startingVetoTeam == matchzyTeam1 ? "team1_ban" : "team2_ban");
-                        matchConfig.MapBanOrder.Add(startingVetoTeam == matchzyTeam1 ? "team2_ban" : "team1_ban");
-                        matchConfig.MapBanOrder.Add(startingVetoTeam == matchzyTeam1 ? "team1_pick" : "team2_pick");
-                        matchConfig.MapBanOrder.Add(startingVetoTeam == matchzyTeam1 ? "team2_pick" : "team1_pick");
                     }
+                    matchConfig.MapBanOrder.Add(startingVetoTeam == matchzyTeam1 ? "team1_pick" : "team2_pick");
+                    matchConfig.MapBanOrder.Add(startingVetoTeam == matchzyTeam1 ? "team2_pick" : "team1_pick");
 
                     break;
 
@@ -834,6 +833,18 @@ namespace MatchZy
 
         public void SkipVeto()
         {
+            // CreateVeto paused the match for the veto (mp_pause_match, pauseTeam "Admin") and runs
+            // the countdown timer: skipping left both behind, so warmup started engine-paused.
+            if (isVeto)
+            {
+                vetoStateTimer?.Kill();
+                vetoStateTimer = null;
+                Server.ExecuteCommand("mp_unpause_match");
+                isPaused = false;
+                unpauseData["ct"] = false;
+                unpauseData["t"] = false;
+                unpauseData["pauseTeam"] = "";
+            }
             isWarmup = true;
             readyAvailable = true;
             isPreVeto = false;

@@ -32,22 +32,22 @@ public static class GrenadeFunctions
     }
 
     private static readonly Lazy<MemoryFunctionWithReturn<IntPtr, IntPtr, IntPtr, IntPtr, IntPtr, int, int, CSmokeGrenadeProjectile>?> CSmokeGrenadeProjectile_CreateFuncLazy = new(() =>
-        Guard(() => new MemoryFunctionWithReturn<IntPtr, IntPtr, IntPtr, IntPtr, IntPtr, int, int, CSmokeGrenadeProjectile>(GameData.GetSignature("CSmokeGrenadeProjectile_Create"))));
+        Guard(() => new MemoryFunctionWithReturn<IntPtr, IntPtr, IntPtr, IntPtr, IntPtr, int, int, CSmokeGrenadeProjectile>(MzGameData.GetSignature("CSmokeGrenadeProjectile_Create"))));
 
     public static MemoryFunctionWithReturn<IntPtr, IntPtr, IntPtr, IntPtr, IntPtr, int, int, CSmokeGrenadeProjectile>? CSmokeGrenadeProjectile_CreateFunc => CSmokeGrenadeProjectile_CreateFuncLazy.Value;
 
     private static readonly Lazy<MemoryFunctionWithReturn<IntPtr, IntPtr, IntPtr, IntPtr, IntPtr, int, CHEGrenadeProjectile>?> CHEGrenadeProjectile_CreateFuncLazy = new(() =>
-        Guard(() => new MemoryFunctionWithReturn<IntPtr, IntPtr, IntPtr, IntPtr, IntPtr, int, CHEGrenadeProjectile>(GameData.GetSignature("CHEGrenadeProjectile_Create"))));
+        Guard(() => new MemoryFunctionWithReturn<IntPtr, IntPtr, IntPtr, IntPtr, IntPtr, int, CHEGrenadeProjectile>(MzGameData.GetSignature("CHEGrenadeProjectile_Create"))));
 
     public static MemoryFunctionWithReturn<IntPtr, IntPtr, IntPtr, IntPtr, IntPtr, int, CHEGrenadeProjectile>? CHEGrenadeProjectile_CreateFunc => CHEGrenadeProjectile_CreateFuncLazy.Value;
 
     private static readonly Lazy<MemoryFunctionWithReturn<IntPtr, IntPtr, IntPtr, IntPtr, IntPtr, int, CMolotovProjectile>?> CMolotovProjectile_CreateFuncLazy = new(() =>
-        Guard(() => new MemoryFunctionWithReturn<IntPtr, IntPtr, IntPtr, IntPtr, IntPtr, int, CMolotovProjectile>(GameData.GetSignature("CMolotovProjectile_Create"))));
+        Guard(() => new MemoryFunctionWithReturn<IntPtr, IntPtr, IntPtr, IntPtr, IntPtr, int, CMolotovProjectile>(MzGameData.GetSignature("CMolotovProjectile_Create"))));
 
     public static MemoryFunctionWithReturn<IntPtr, IntPtr, IntPtr, IntPtr, IntPtr, int, CMolotovProjectile>? CMolotovProjectile_CreateFunc => CMolotovProjectile_CreateFuncLazy.Value;
 
     private static readonly Lazy<MemoryFunctionWithReturn<IntPtr, IntPtr, IntPtr, IntPtr, IntPtr, int, CDecoyProjectile>?> CDecoyProjectile_CreateFuncLazy = new(() =>
-        Guard(() => new MemoryFunctionWithReturn<IntPtr, IntPtr, IntPtr, IntPtr, IntPtr, int, CDecoyProjectile>(GameData.GetSignature("CDecoyProjectile_Create"))));
+        Guard(() => new MemoryFunctionWithReturn<IntPtr, IntPtr, IntPtr, IntPtr, IntPtr, int, CDecoyProjectile>(MzGameData.GetSignature("CDecoyProjectile_Create"))));
 
     public static MemoryFunctionWithReturn<IntPtr, IntPtr, IntPtr, IntPtr, IntPtr, int, CDecoyProjectile>? CDecoyProjectile_CreateFunc => CDecoyProjectile_CreateFuncLazy.Value;
 

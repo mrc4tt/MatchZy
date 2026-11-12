@@ -165,6 +165,13 @@ namespace MatchZy
                 botPawn.Teleport(null, null, new Vector(0, 0, 0));
         }
 
+        // New map: the stored controller wrappers belong to the previous map (freed or reused
+        // memory), so only forget them; no Teleport.
+        private void ForgetRunBoostsOnMapStart()
+        {
+            runBoosts.Clear();
+        }
+
         // Practice start and end (ResetPracticeExtras).
         private void ResetRunBoosts()
         {
