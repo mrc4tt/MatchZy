@@ -18,6 +18,8 @@ public partial class MatchZy
     // that started it, so a later pause is never lifted by an old timer.
     private CounterStrikeSharp.API.Modules.Timers.Timer? techPauseTimer = null;
     private int techPauseToken = 0;
+    // Mode 0: seconds the technical pause has been in effect (freeze time only).
+    private int techPauseElapsed = 0;
 
     // Any unpause, and any new pause that is not a tech pause, ends the tech pause window. Without
     // this the timer of an earlier, already-lifted tech pause could end a later regular pause of
@@ -193,17 +195,30 @@ public partial class MatchZy
         {
             int token = ++techPauseToken;
             string pauseTeamName = playerTeam.teamName;
-            techPauseTimer = AddTimer(duration, () =>
+            // Count only the seconds the pause is in effect (freeze time). mp_pause_match called
+            // mid-round waits for the next freeze time; a timer running from the call could expire
+            // first, and its mp_unpause_match cancelled the pending pause the team had used up.
+            techPauseElapsed = 0;
+            techPauseTimer = AddTimer(1.0f, () =>
             {
-                techPauseTimer = null;
                 if (token != techPauseToken || !isPaused)
+                {
+                    techPauseTimer?.Kill();
+                    techPauseTimer = null;
                     return;
+                }
+                if (GetGameRules()?.FreezePeriod != true)
+                    return;
+                if (++techPauseElapsed < duration)
+                    return;
+                techPauseTimer?.Kill();
+                techPauseTimer = null;
                 if (!unpauseData.TryGetValue("pauseTeam", out var current) || current is not string currentTeam || currentTeam != pauseTeamName)
                     return;
                 PrintLocalizedToAll("matchzy.pausemsg.techpauseexpired", pauseTeamName, duration);
                 UnpauseMatch();
                 unpauseData["pauseTeam"] = "";
-            }, TimerFlags.STOP_ON_MAPCHANGE);
+            }, TimerFlags.REPEAT | TimerFlags.STOP_ON_MAPCHANGE);
         }
 
         // Send webhook for live scorebot
@@ -627,7 +642,9 @@ public partial class MatchZy
                 ConVarType.UInt16 => cvar.GetPrimitiveValue<ushort>(),
                 ConVarType.Int64 => (int)cvar.GetPrimitiveValue<long>(),
                 ConVarType.UInt64 => (int)cvar.GetPrimitiveValue<ulong>(),
-                ConVarType.Float32 or ConVarType.Float64 => (int)Math.Round(cvar.GetPrimitiveValue<float>()),
+                ConVarType.Float32 => (int)Math.Round(cvar.GetPrimitiveValue<float>()),
+                // A Float64 read as float throws (size mismatch) and the hint fell back to plain text.
+                ConVarType.Float64 => (int)Math.Round(cvar.GetPrimitiveValue<double>()),
                 _ => null,
             };
         }

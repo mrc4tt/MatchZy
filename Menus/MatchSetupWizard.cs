@@ -375,6 +375,12 @@ namespace MatchZy
                     sides.Add("team1_ct");
                 json["map_sides"] = sides;
             }
+            else if (!s.SkipVeto && !s.KnifeRound)
+            {
+                // With a veto, map_sides is not used: the veto's side picks and a knife on the decider
+                // decide. never_knife makes every map team1 CT, which is what "Team1 CT" promises.
+                json["side_type"] = "never_knife";
+            }
 
             string jsonText = json.ToString();
             Log($"[MatchSetup] Loading match: {jsonText}");

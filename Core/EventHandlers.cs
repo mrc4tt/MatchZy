@@ -1,6 +1,7 @@
 using CounterStrikeSharp.API;
 using CounterStrikeSharp.API.Core;
 using CounterStrikeSharp.API.Core.Translations;
+using CounterStrikeSharp.API.Modules.Commands;
 using CounterStrikeSharp.API.Modules.Utils;
 
 namespace MatchZy;
@@ -43,7 +44,10 @@ public partial class MatchZy
                 CsTeam team = GetPlayerTeam(player);
                 if (team == CsTeam.None)
                 {
-                    if (matchModeOnly && !IsPlayerAdmin(player, "", "@css/config"))
+                    // Not while a loaded match waits for its changelevel: the rosters are only filled
+                    // when OnMapStart re-loads the config, so a rostered player connecting in that
+                    // window looked like "not in the match" and was kicked.
+                    if (matchModeOnly && pendingMatchLoadJson == null && !IsPlayerAdmin(player, "", "@css/config"))
                     {
                         Log($"[EventPlayerConnectFull] KICKING PLAYER STEAMID: {steamId}, Name: {player.PlayerName} (NOT ALLOWED!)");
                         PrintLocalizedToAll("matchzy.cmd.kicknotinmatch", player.PlayerName);
@@ -218,7 +222,11 @@ public partial class MatchZy
             int userId = player.UserId.Value;
 
             if (player.IsHLTV)
+            {
+                // The reason tells a quota/console kick from a crash or a map change in the log.
+                Log($"[Demo] CSTV client disconnected (userid {userId}, reason {@event.Reason}, bots {Utilities.GetPlayers().Count(p => p != null && p.IsValid && p.IsBot && !p.IsHLTV)}, players {Utilities.GetPlayers().Count(p => p != null && p.IsValid && !p.IsBot && !p.IsHLTV)}).");
                 OnCstvDisconnected();
+            }
 
             // No player_disconnect for a player the connect gate kicked (they got no player_connect),
             // nor for one that never finished authenticating (SteamID still 0, e.g. a timeout while
@@ -370,8 +378,38 @@ public partial class MatchZy
         }
     }
 
+    // Set from OnMapEnd until the next OnMapStart: the level is being torn down.
+    private bool mapEnding;
+
+    // .match / .prac / .sleep invoked by another plugin (both arguments null: no player and no
+    // console command info; MatchZy's own callers always pass one of them). A practice add-on
+    // calls OnMatchCommand from its own OnMapEnd listener to leave practice; running the mode
+    // switch then (cfg exec, ResetMatch, practice entity cleanup) works on a level that is being
+    // torn down and crashed the server in a changelevel. Such calls run next frame instead, and
+    // are dropped while the map is ending.
+    private bool runningExternalModeCall;
+
+    private bool DeferExternalModeCall(CCSPlayerController? player, CommandInfo? command, Action call)
+    {
+        if (player != null || command != null || runningExternalModeCall)
+            return false;
+        Server.NextFrame(() =>
+        {
+            if (mapEnding || !AreServerGlobalsReady())
+            {
+                Log("[ExternalModeCall] A plugin asked for a mode switch while the map was changing; ignored.");
+                return;
+            }
+            runningExternalModeCall = true;
+            try { call(); }
+            finally { runningExternalModeCall = false; }
+        });
+        return true;
+    }
+
     private void OnMapEndHandler()
     {
+        mapEnding = true;
         // OnMapEnd also fires while the server is still starting up (the boot map is shut down before
         // the first real map), when the engine's global variables do not exist yet. ResetMatch reads
         // players and Server.* and failed there with "Global Variables not initialized yet". Nothing
@@ -446,6 +484,19 @@ public partial class MatchZy
         {
             // A new round has no planted bomb: the cached site must not leak into this round.
             plantedBombSite = null;
+            // "Game commencing": a match that went live with an empty team (players joined later,
+            // e.g. bots added after .start, or everyone coaching from Spectator) is put back into
+            // warmup by the engine when the first player joins that team. A live match is never in
+            // warmup: end it again, next frame (engine re-entry).
+            if (isMatchLive && !isPaused && GetGameRules()?.WarmupPeriod == true)
+            {
+                Log("[EventRoundStart] Live match fell back into warmup (a team was empty); ending the warmup again.");
+                Server.NextFrame(() =>
+                {
+                    if (isMatchLive && GetGameRules()?.WarmupPeriod == true)
+                        Server.ExecuteCommand("mp_warmup_end");
+                });
+            }
             // Re-assert the bot team every round: follows halftime/overtime side swaps and
             // round restores, and refills bots the engine dropped.
             if (isMatchSetup)
@@ -475,7 +526,7 @@ public partial class MatchZy
         {
             if (!matchStarted)
                 return HookResult.Continue;
-            HashSet<CCSPlayerController> coaches = GetAllCoaches();
+            HashSet<CCSPlayerController> coaches = GetBodyCoaches();
 
             // Fallback: a coach still alive when freezetime ends means the scheduled freezetime
             // kill did not run (it is suppressed during a pause/tactical-timeout window). Kill
@@ -588,6 +639,8 @@ public partial class MatchZy
                     QAngle eyeAngles = player.PlayerPawn.Value.EyeAngles;
                     ushort itemIndex = projectile.ItemIndex;
                     uint projIndex = projectile.Index;
+                    // .follownade: the camera follows this grenade (opt-in, practice only).
+                    TryStartNadeFollow(player, projectile);
 
                     lastGrenadeThrownTime[(int)projIndex] = DateTime.Now;
                     if (nadeType == "smoke")
@@ -875,10 +928,18 @@ public partial class MatchZy
                 int slot = player.Slot;
                 Server.NextFrame(() => HandleClanTags(forceUpdateSlot: slot));
 
-                // Show feedback to the player
-                if (playerReadyStatus[userId])
+                // Show feedback to the player. Same follow-up as .ready / .unready: the
+                // player_ready / player_unready event (panels saw no event for ping readies) and
+                // the team-ready announcement.
+                bool nowReady = playerReadyStatus[userId];
+                PublishPlayerReadyChanged(player, nowReady);
+                if (nowReady)
                 {
                     PrintToPlayerChat(player, Localizer.ForPlayer(player, "matchzy.ready.markedready"));
+                    int team = player.TeamNum;
+                    if (IsTeamReady(team))
+                        PrintLocalizedToAll("matchzy.cmd.teamready", team == 3 ? "CT" : "Terrorists");
+                    UnreadyHintMessageStart();
                 }
                 else
                 {

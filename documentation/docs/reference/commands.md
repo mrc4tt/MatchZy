@@ -145,7 +145,7 @@ Runs after a match config with `"skip_veto": false` is loaded. MatchZy picks one
 | `.ban <map>` | Captain on turn | Removes a map from the pool. |
 | `.pick <map>` | Captain on turn | Picks a map to play. |
 | `.ct` / `.t` | Captain on turn | Chooses the starting side on a map the other team picked. |
-| `.skipveto` `.sv` | Config | Skips the veto and plays the maps in the listed order. Not once the match has started. |
+| `.skipveto` `.sv` | Config | Skips the veto and plays the maps in the listed order. Only while a veto is running. |
 
 ### Examples
 
@@ -177,6 +177,7 @@ Runs after a match config with `"skip_veto": false` is loaded. MatchZy picks one
 | `.tac` | Player | Tactical timeout from your team's timeout budget. The chat shows how many your team has left. |
 | `.stop` | Player | Vote to replay the current round from its start. A player from each team must type it within 30 seconds. |
 | `!gg` | Player | Surrender vote. Your team must be 6 or more rounds behind and all but one of its players must vote (all of them in a team of 2 or fewer). Single-map matches only. |
+| `.mute` `!mute` `.nochat` | Player | Vote to turn off all chat, so the teams can no longer write to each other. Needs `matchzy_allchat_mute_votes` players on a team (capped at the number of players). Lasts until the map changes. Team chat, admins and chat commands still work. Off by default. While CS2-SimpleAdmin is loaded, `!mute` is its admin mute: vote with `.nochat` instead. |
 
 - **`.pause`**: refused while `matchzy_allow_pause` is off. If `matchzy_use_pause_command_for_tactical_pause` is on, it calls a tactical timeout instead.
 - **`.tech`**: `matchzy_max_tech_pauses_allowed 0` means no tech pauses, or unlimited with `matchzy_tech_pause_mode 1`. By default each tech pause ends on its own after `matchzy_tech_pause_duration` seconds. With `matchzy_tech_pause_mode 1` it never ends by itself, but after that time either team can unpause alone.
@@ -187,7 +188,7 @@ Runs after a match config with `"skip_veto": false` is loaded. MatchZy picks one
 | Command | Who | What it does |
 |---|---|---|
 | `.coach [t\|ct]` | Player | Become your own team's coach. Works in warmup and freeze time, not in a live round or in practice mode. |
-| `.uncoach` `.play` | Coach | Go back to playing. A player listed only as a coach in the match config cannot. |
+| `.uncoach` `.play` | Coach | Go back to playing. A player listed only as a coach in the match config cannot. In a live match not during freeze time: the coach body cannot join a round, so wait until the round has started. |
 
 - **`.coach`**: without a side it uses the team you are on; with a side it must be your own. The coach watches from a spot behind the team during freeze time and is killed right before the round starts, so they spectate the round. With a `coaches` list in the match config, only listed SteamIDs can coach that team.
 
@@ -198,6 +199,7 @@ More in [Coaching](../guides/coaching.md).
 | Command | Who | What it does |
 |---|---|---|
 | `.forcepause` `.fp` | Config | Admin pause. Only an admin can lift it. |
+| `.allchat [on\|off]` | Config, Chat | Turns all chat for players on or off (no argument toggles). Lasts until the map changes. |
 | `.forceunpause` `.fup` | Config | Lifts any pause at once. |
 | `.restore <round>` | Config | Restores the match to the start of that round (score, money, equipment). Use the `R` number `.backups` shows. |
 | `.restorelast` `.rl` | Config | Restores the previous round. |
@@ -347,6 +349,7 @@ The per-type rethrow commands also work as `.rethrowsmoke`, `.rethrowflash`, `.r
 | `.landmarker` `.lm` | Marks the spot where each grenade detonated. |
 | `.arc` `.traceline` | Draws the flight path of thrown grenades in the world. |
 | `.traj` `.pip` `.cam` `.nadecam` `.previewnade` `.nadepreview` | Picture-in-picture camera that follows your grenade. |
+| `.follownade` | Grenade follow camera: after a throw the camera follows the grenade full screen, then backs off to show where it landed (you fly invisible behind it). Jump to come back to where you threw. Cycles: lineup spots only (default, where the lineup hint shows), every throw, off. Only for you. |
 | `.impacts` | Turns bullet impact markers off / on for you. On by default. |
 | `.noflash` `.noblind` | Flashbangs do not blind you. |
 | `.flashtest` `.ft` | Prints how long you were blinded each time you get flashed. |

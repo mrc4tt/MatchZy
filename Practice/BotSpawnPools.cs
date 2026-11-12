@@ -38,6 +38,17 @@ namespace MatchZy
                     return new();
                 }
                 var loaded = JsonSerializer.Deserialize<Dictionary<string, Dictionary<string, List<BotPos>>>>(File.ReadAllText(BotSpawnsPath), BotPosJsonOpts) ?? new();
+                // Valid JSON can still hold nulls (a null map, pool or spot); the commands dereference
+                // every entry, so drop null maps/spots and treat a null pool as empty.
+                foreach (var map in loaded.Where(kv => kv.Value == null).Select(kv => kv.Key).ToList())
+                    loaded.Remove(map);
+                foreach (var pools in loaded.Values)
+                    foreach (var pool in pools.Keys.ToList())
+                    {
+                        var spots = pools[pool] ?? new List<BotPos>();
+                        spots.RemoveAll(b => b == null);
+                        pools[pool] = spots;
+                    }
                 _botSpawnsLoadFailed = false;
                 return loaded;
             }
@@ -259,8 +270,12 @@ namespace MatchZy
                 }
                 else
                 {
-                    // Userids only grow, so the highest one is the newest bot.
-                    lastUserId = pracUsedBots.Keys.Max();
+                    // Newest = highest claim sequence. Not the highest userid: userids follow the
+                    // slot, which a new bot reuses after a kick. Entries without a sequence sort first.
+                    lastUserId = pracUsedBots
+                        .OrderByDescending(kv => kv.Value.TryGetValue(PracBotSpawnSeqKey, out var seq) && seq is long n ? n : long.MinValue)
+                        .ThenByDescending(kv => kv.Key)
+                        .First().Key;
                     pracUsedBots.Remove(lastUserId);
                     remaining = pracUsedBots.Count;
                 }
@@ -274,6 +289,7 @@ namespace MatchZy
             Server.ExecuteCommand($"bot_quota {remaining}");
             Server.ExecuteCommand($"kickid {lastUserId}");
             ForgetBotCombatState(lastUserId);
+            ForgetBotLoadout(lastUserId);
             ReplyToUserCommand(player, Localizer.ForPlayer(player, "matchzy.px.kickedlastbot"));
         }
 

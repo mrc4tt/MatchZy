@@ -20,11 +20,12 @@ Helpers while learning:
 
 ## Grenade library
 
-`.shownades` draws a colored marker at every saved lineup on the map (smoke blue, flash yellow, HE red, molotov orange, decoy grey) with a label showing type, comment and throw style. A small glowing grenade marks each spot through walls, so you can find lineups from across the map. `.shownades smoke` (or `flash`, `he`, `molly`, `mine`, or part of a name) shows only those.
+`.shownades` puts a glowing green figure on every saved lineup spot of the map, visible through walls, so you can find lineups from across the map. `.shownades smoke` (or `flash`, `he`, `molly`, `mine`, or part of a name) shows only those.
 
 - Aim at a marker and press ++e++ to teleport there with the right grenade.
 - Several lineups on one spot share a marker; press ++f++ to cycle them.
 - The marker you stand on hides for you, so it never blocks your throw.
+- Each spot has a glowing green figure. Near a spot, a red target appears where each of its lineups aims, the selected one glowing green (press ++f++ to cycle). Stand on the spot (no key needed) and a hint box at the bottom of the screen says how to throw, for example "Left Click + Jump". Only you see your targets and hint. Save the throw style with the lineup, for example `.savenade window jumpthrow`. A lineup loaded with `.nades` or `.loadnade` gets the same targets and hint.
 - `.nades` opens a menu to browse lineups by type.
 - Admins add lineups to a shared server-wide pack with `.libadd <name>` (`.libremove`, `.liblist`).
 

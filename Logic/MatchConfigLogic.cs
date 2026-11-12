@@ -102,7 +102,7 @@ namespace MatchZy
 
                         if (field == "num_maps" && numMaps > jsonData["maplist"]!.ToObject<List<string>>()!.Count)
                         {
-                            return $"{field} should be equal to or greater than maplist!";
+                            return $"{field} should not be larger than the number of maps in maplist!";
                         }
 
                         break;
@@ -175,10 +175,10 @@ namespace MatchZy
 
                         if (!allElementsValid)
                         {
-                            return $"{field} should be \"team1_ct\", \"team1_t\", or \"knife\"!";
+                            return $"{field} should be \"team1_ct\", \"team1_t\", \"team2_ct\", \"team2_t\" or \"knife\"!";
                         }
 
-                        if (jsonData[field]!.ToObject<List<string>>()!.Count < jsonData["num_maps"]!.Value<int>())
+                        if (int.TryParse(jsonData["num_maps"]?.ToString(), out int sideMaps) && jsonData[field]!.ToObject<List<string>>()!.Count < sideMaps)
                         {
                             return $"{field} should be equal to or greater than num_maps!";
                         }
@@ -217,6 +217,14 @@ namespace MatchZy
         /// </summary>
         public static string ValidateMapBanOrder(IReadOnlyList<string> banOrder, int poolCount, int numMaps)
         {
+            // Anything else (a typo such as "team1_veto") stalled the veto: no captain is asked and
+            // both .ban and .pick refuse the step.
+            foreach (string option in banOrder)
+            {
+                if (option is not ("team1_ban" or "team2_ban" or "team1_pick" or "team2_pick"))
+                    return $"Unknown veto option \"{option}\": use team1_ban, team2_ban, team1_pick or team2_pick.";
+            }
+
             int numberOfPicks = 0;
             for (int i = 0; i < banOrder.Count; i++)
             {

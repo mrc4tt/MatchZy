@@ -145,7 +145,7 @@ Kører, når en match config med `"skip_veto": false` er loadet. MatchZy vælger
 | `.ban <bane>` | Kaptajnen, der har tur | Fjerner en bane fra puljen. |
 | `.pick <bane>` | Kaptajnen, der har tur | Vælger en bane, der skal spilles. |
 | `.ct` / `.t` | Kaptajnen, der har tur | Vælger startsiden på en bane, det andet hold har pickét. |
-| `.skipveto` `.sv` | Config | Springer vetoet over og spiller banerne i listens rækkefølge. Ikke når kampen er startet. |
+| `.skipveto` `.sv` | Config | Springer vetoet over og spiller banerne i listens rækkefølge. Kun mens et veto kører. |
 
 ### Eksempler { #examples_2 }
 
@@ -177,6 +177,7 @@ Kører, når en match config med `"skip_veto": false` er loadet. MatchZy vælger
 | `.tac` | Player | Taktisk timeout fra dit holds timeout-budget. Chatten viser, hvor mange dit hold har tilbage. |
 | `.stop` | Player | Stem for at spille den nuværende runde om fra start. En spiller fra hvert hold skal skrive den inden for 30 sekunder. |
 | `!gg` | Player | Stem for at give op. Dit hold skal være mindst 6 runder bagud, og alle på holdet undtagen én skal stemme (alle på et hold med 2 eller færre). Kun kampe med én bane. |
+| `.mute` `!mute` `.nochat` | Player | Stem for at slå allchat fra, så holdene ikke længere kan skrive til hinanden. Kræver `matchzy_allchat_mute_votes` spillere på et hold (højst antallet af spillere). Gælder til banen skifter. Teamchat, admins og chatkommandoer virker stadig. Slået fra som standard. Når CS2-SimpleAdmin er indlæst, er `!mute` dens admin-mute: stem i stedet med `.nochat`. |
 
 - **`.pause`**: afvises, mens `matchzy_allow_pause` er slået fra. Er `matchzy_use_pause_command_for_tactical_pause` slået til, kalder den i stedet en taktisk timeout.
 - **`.tech`**: `matchzy_max_tech_pauses_allowed 0` betyder ingen tekniske pauser, eller ubegrænset med `matchzy_tech_pause_mode 1`. Som standard slutter en teknisk pause af sig selv efter `matchzy_tech_pause_duration` sekunder. Med `matchzy_tech_pause_mode 1` slutter den aldrig af sig selv, men efter den tid kan hvert hold genoptage alene.
@@ -187,7 +188,7 @@ Kører, når en match config med `"skip_veto": false` er loadet. MatchZy vælger
 | Kommando | Hvem | Hvad den gør |
 |---|---|---|
 | `.coach [t\|ct]` | Player | Bliv coach for dit eget hold. Virker i warmup og freeze time, ikke i en live-runde eller i practice mode. |
-| `.uncoach` `.play` | Coach | Gå tilbage til at spille. En spiller, der kun står som coach i match configen, kan ikke. |
+| `.uncoach` `.play` | Coach | Gå tilbage til at spille. En spiller, der kun står som coach i match configen, kan ikke. I en live-kamp ikke i freeze time: coach-kroppen kan ikke være med i runden, så vent til runden er startet. |
 
 - **`.coach`**: uden en side bruges det hold, du står på; med en side skal det være dit eget. Coachen ser med fra en plads bag holdet i freeze time og dræbes lige før runden starter, så han ser runden som spectator. Med en `coaches`-liste i match configen kan kun de SteamID'er, der står på listen, coache det hold.
 
@@ -198,6 +199,7 @@ Mere under [Coaching](../guides/coaching.md).
 | Kommando | Hvem | Hvad den gør |
 |---|---|---|
 | `.forcepause` `.fp` | Config | Admin-pause. Kun en admin kan hæve den. |
+| `.allchat [on\|off]` | Config, Chat | Slår allchat for spillere til eller fra (uden argument skifter den). Gælder til banen skifter. |
 | `.forceunpause` `.fup` | Config | Hæver enhver pause med det samme. |
 | `.restore <runde>` | Config | Sætter kampen tilbage til starten af den runde (score, penge, udstyr). Brug `R`-nummeret, som `.backups` viser. |
 | `.restorelast` `.rl` | Config | Gendanner den forrige runde. |
@@ -347,6 +349,7 @@ Kommandoerne til rethrow pr. type virker også som `.rethrowsmoke`, `.rethrowfla
 | `.landmarker` `.lm` | Markerer stedet, hvor hver granat detonerede. |
 | `.arc` `.traceline` | Tegner flyvebanen for kastede granater i verden. |
 | `.traj` `.pip` `.cam` `.nadecam` `.previewnade` `.nadepreview` | Billede-i-billede-kamera, der følger din granat. |
+| `.follownade` | Granatkamera: efter et kast følger kameraet granaten i fuld skærm og trækker sig tilbage for at vise, hvor den landede (du flyver usynligt bag den). Hop for at komme tilbage, hvor du kastede. Skifter mellem: kun lineup-steder (standard, hvor lineup-hintet vises), alle kast, fra. Kun for dig. |
 | `.impacts` | Slår markører for kugleskud fra / til for dig. Slået til som standard. |
 | `.noflash` `.noblind` | Flashbangs blænder dig ikke. |
 | `.flashtest` `.ft` | Skriver, hvor længe du var blændet, hver gang du bliver flashet. |

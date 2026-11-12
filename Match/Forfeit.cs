@@ -331,7 +331,7 @@ namespace MatchZy
 
             if (isMatchLive && !currentMapFinished)
             {
-                var (_, statsTeam1, statsTeam2) = GetPlayerStatsDict();
+                var (playerStatsDictionary, statsTeam1, statsTeam2) = GetPlayerStatsDict();
                 string? demoFilename = demoWasRecording && !string.IsNullOrEmpty(lastStoppedDemoFile) ? Path.GetFileName(lastStoppedDemoFile) : null;
                 var mapResultEvent = new MapResultEvent
                 {
@@ -345,6 +345,23 @@ namespace MatchZy
                 // Queued on the game thread before EndSeries queues series_end, so the event queue
                 // sends map_result first.
                 lastMapResultTask = SendEventAsync(mapResultEvent);
+
+                // A forfeit, .gg or get5_endmatch ends the map here, not in HandleMatchEnd, so the
+                // final stats write, the CSV export and the stats JSON for this map were skipped:
+                // the database kept the last round_end snapshot. Same block as HandleMatchEnd
+                // (series end data is written by EndSeries). Natives captured on the game thread.
+                long matchId = liveMatchId;
+                int mapNumber = matchConfig.CurrentMapNumber;
+                string statsPath = Server.GameDirectory + "/csgo/MatchZy_Stats/" + liveMatchId;
+                MatchStatsJson? export = CollectMatchStatsForExport(demoFilename ?? string.Empty, t1score, t2score, statsTeam1, statsTeam2);
+                Task.Run(async () =>
+                {
+                    if (playerStatsDictionary.Count > 0)
+                        await database.UpdatePlayerStatsAsync(matchId, mapNumber, playerStatsDictionary.ToDictionary(kvp => (long)kvp.Key, kvp => kvp.Value));
+                    await database.WritePlayerStatsToCsvAsync(statsPath, matchId, mapNumber);
+                    if (export != null && demoFilename != null)
+                        await WriteMatchStatsJsonAsync(export, demoFilename, statsPath);
+                });
             }
 
             // The series is over: nobody may ready up into a knife round or veto before the reset.

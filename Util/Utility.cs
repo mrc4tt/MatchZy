@@ -150,6 +150,20 @@ namespace MatchZy
                 ExecuteChangedConvars();
         }
 
+        // A going-live mode cfg followed by its restart ("mp_restartgame 1;mp_warmup_end;"), in the
+        // same frame as before 1.0.25 (kicking leftover bots one frame earlier put the match back
+        // into warmup in testing). Opens a short settle window in which coach weapons are not
+        // stripped while the engine restarts the round.
+        private void ExecModeCfgAndRestart(string cfgPath, string restartCommands)
+        {
+            coachStripSettleUntil = Server.CurrentTime + 2.0f;
+            ExecModeCfg(cfgPath);
+            Server.ExecuteCommand(restartCommands);
+        }
+
+        // Coach weapons are not stripped before this server time (see ExecModeCfgAndRestart).
+        private float coachStripSettleUntil;
+
         // Commands (mp_warmup_start/end, ...) are left out: only "name value" settings are applied,
         // so nothing in the default runs twice. Server-level settings that some default cfgs carry
         // (hibernation, CSTV voice, sv_lan, sv_pure, Steam group, ...) are left out too: they belong
@@ -722,6 +736,14 @@ namespace MatchZy
 
         public override void Unload(bool hotReload)
         {
+            UnregisterCstvKickGuard();
+            // Engine asserts back on the console (quieted while glows were in use).
+            if (_glowAssertQuiet == true && !Tier0Logging.SetChannelFlag("Assert", Tier0Logging.LCF_DO_NOT_ECHO, false))
+                Server.ExecuteCommand("log_flags Assert -DoNotEcho");
+            // Engine code patched for matchzy_coach_comm_unrestricted must not outlive the plugin.
+            try { DisableCoachCommPatch("unload"); } catch { }
+            RestoreSpectatorCoachPawnTeams();
+            try { RemoveAllSpectatorCoachGlows(); } catch { }
             // The ready-phase "fake warmup" (matchzy_ready_hint_style 1) forces m_bWarmupPeriod off +
             // RoundTime 0 + mp_ignore_round_win_conditions each tick from RenderReadyPanel. If the
             // plugin unloads/reloads while it is active, that per-tick upkeep stops but the gamerules
@@ -1404,8 +1426,7 @@ namespace MatchZy
             var absolutePath = Path.Join(Server.GameDirectory + "/csgo/cfg", knifeCfgPath);
             if (File.Exists(Path.Join(Server.GameDirectory + "/csgo/cfg", knifeCfgPath)))
             {
-                ExecModeCfg(knifeCfgPath);
-                Server.ExecuteCommand("mp_restartgame 1;mp_warmup_end;");
+                ExecModeCfgAndRestart(knifeCfgPath, "mp_restartgame 1;mp_warmup_end;");
             }
             else
             {
@@ -1748,6 +1769,54 @@ namespace MatchZy
         // Bumps m_nRoundEndCount netvar so client re-evaluates scoreboard UI
         // (trophy/clinch icons, per-round dots). Used after HandlePlayoutConfig at
         // match-start so cosmetic UI matches the actual playout convars before round 1.
+        // .match / .scrim / .hill in warmup: the clinch trophy on the scoreboard's round timeline kept
+        // showing the previous mode until a restart. Deferred so the mode cfg and HandlePlayoutConfig
+        // (mp_match_can_clinch) have landed.
+        private void RefreshScoreboardAfterModeSwitch()
+        {
+            AddTimer(0.5f, () =>
+            {
+                if (matchStarted || isMatchLive || isPractice)
+                    return;
+                try
+                {
+                    ForceScoreboardRefresh();
+                    NudgeScoreboardTimeline();
+                }
+                catch (Exception e)
+                {
+                    Log($"[RefreshScoreboardAfterModeSwitch] {e.Message}");
+                }
+            }, TimerFlags.STOP_ON_MAPCHANGE);
+        }
+
+        // The clinch trophy (round 13 of MR24) is drawn by the client's scoreboard script
+        // (panorama/scripts/scoreboard.js, _UpdateScore_Classic): it redraws every round's clinch mark
+        // only when the timeline resets (maxrounds_this_period, side swap or overtime changed) or a new
+        // round starts. A .scrim -> .match switch only flips mp_match_can_clinch, so the trophy stayed
+        // hidden until the next restart. Changing mp_maxrounds for a moment makes every client reset
+        // its timeline (once on the change, once on the way back), and the redraw picks up the new
+        // clinch setting. Warmup only; a match that goes live in between is left alone.
+        private void NudgeScoreboardTimeline()
+        {
+            if (matchStarted || isMatchLive)
+                return;
+            var cvar = ConVar.Find("mp_maxrounds");
+            if (cvar == null)
+                return;
+            int rounds = cvar.GetPrimitiveValue<int>();
+            if (rounds <= 0 || rounds > 28)
+                return; // the client draws no timeline above 30 rounds
+            int nudged = rounds + 2;
+            Server.ExecuteCommand($"mp_maxrounds {nudged}");
+            AddTimer(1.5f, () =>
+            {
+                var c = ConVar.Find("mp_maxrounds");
+                if (c != null && c.GetPrimitiveValue<int>() == nudged)
+                    Server.ExecuteCommand($"mp_maxrounds {rounds}");
+            }, TimerFlags.STOP_ON_MAPCHANGE);
+        }
+
         private void ForceScoreboardRefresh()
         {
             try
@@ -1817,6 +1886,12 @@ namespace MatchZy
             try
             {
                 seriesEnded = false;
+                owedSeriesStart = null;
+                owedSeriesStartTarget = null;
+                // Set when the veto's first map needs a changelevel and cleared on map start. If that
+                // changelevel never happened (a map name that cannot be loaded), CheckLiveRequired
+                // stayed blocked for every later ready-up, also after .stopmatch.
+                mapChangePending = false;
                 currentMapFinished = false;
                 matchLoadGeneration++;
                 pauseCarriedToLive = null;
@@ -1930,6 +2005,7 @@ namespace MatchZy
                 isKnifeRequired = knifeEnabledDefault;
                 friendlyFireOverride = null;
                 friendlyFireGrenadesOnly = false;
+                ResetAllChatVote();
                 CancelVetoStepTimer();
                 readyPhaseStartedAt = null;
 
@@ -1961,6 +2037,8 @@ namespace MatchZy
                 matchzyTeam2.teamPlayers = null;
                 matchzyTeam1.openRoster = matchzyTeam2.openRoster = false;
                 matchzyTeam1.botTeam = matchzyTeam2.botTeam = false;
+                // Spectator coaches (mode 3) go back to their team's side before the sets are cleared.
+                ReturnSpectatorCoachesToTeams(cancelReason ?? "match reset");
                 HashSet<CCSPlayerController> coaches = GetAllCoaches();
 
                 foreach (var coach in coaches)
@@ -2578,6 +2656,7 @@ namespace MatchZy
                         {
                             Log($"[HandleMatchStart] Match initialized successfully with matchId: {liveMatchId}");
                         }
+                        SendOwedSeriesStart();
 
                         SetupRoundBackupFile();
                         GetSpawns();
@@ -3680,7 +3759,10 @@ namespace MatchZy
             ExecUnpracCommands();
             ResetMatch();
             RemoveSpawnBeams();
-            isPlayOutEnabled = true;
+            // Hill is isPlayOutEnabled2; isPlayOutEnabled is scrim, and HandleMatchStartCore took the
+            // scrim branch (StartScrim) for a hill started from practice or sleep.
+            isPlayOutEnabled = false;
+            isPlayOutEnabled2 = true;
             isKnifeRound = false;
             isKnifeRequired = false;
             ScheduleRoundHistoryWipe();
@@ -3734,8 +3816,7 @@ namespace MatchZy
             {
                 // ExecModeCfg applies the match config cvars after the mode cfg and before the
                 // restart, so round 1 already uses them (start money, freeze time, ...).
-                ExecModeCfg(cfgPath);
-                Server.ExecuteCommand("mp_restartgame 1;mp_warmup_end;");
+                ExecModeCfgAndRestart(cfgPath, "mp_restartgame 1;mp_warmup_end;");
             }
             else
             {
@@ -3773,8 +3854,7 @@ namespace MatchZy
             {
                 // ExecModeCfg applies the match config cvars after the mode cfg and before the
                 // restart, so round 1 already uses them (start money, freeze time, ...).
-                ExecModeCfg(cfgPath);
-                Server.ExecuteCommand("mp_restartgame 1;mp_warmup_end;");
+                ExecModeCfgAndRestart(cfgPath, "mp_restartgame 1;mp_warmup_end;");
             }
             else
             {
@@ -3808,8 +3888,7 @@ namespace MatchZy
             {
                 // ExecModeCfg applies the match config cvars after the mode cfg and before the
                 // restart, so round 1 already uses them (start money, freeze time, ...).
-                ExecModeCfg(cfgPath);
-                Server.ExecuteCommand("mp_restartgame 1;mp_warmup_end;");
+                ExecModeCfgAndRestart(cfgPath, "mp_restartgame 1;mp_warmup_end;");
             }
             else
             {
@@ -4732,7 +4811,8 @@ namespace MatchZy
 
                     // Fields the engine's MatchStats does not track come from the advanced stats
                     // (humans only; bots report 0 for these).
-                    advancedStats.TryGetValue(player.SteamID, out var adv);
+                    // Advanced stats are keyed by steamid64 (BotStatsId for a bot, whose SteamID is 0).
+                    advancedStats.TryGetValue(steamid64, out var adv);
                     PlayerStats playerStatsInstance = new()
                     {
                         Kills = playerStats.Kills,
@@ -5333,7 +5413,7 @@ namespace MatchZy
                 return _selectItemOffset;
             try
             {
-                _selectItemOffset = GameData.GetOffset("CCSPlayer_WeaponServices_SelectItem");
+                _selectItemOffset = MzGameData.GetOffset("CCSPlayer_WeaponServices_SelectItem");
             }
             catch (Exception e)
             {
@@ -5514,7 +5594,7 @@ namespace MatchZy
                         return true;
                     }
 
-                    Log($"[UploadFileAsync ERROR] Failed to upload file. Status code: {s3Response.StatusCode} Response: {await s3Response.Content.ReadAsStringAsync()}");
+                    Log($"[UploadFileAsync ERROR] Failed to upload file. Status code: {s3Response.StatusCode} Response: {RedactUploadResponseBody(await s3Response.Content.ReadAsStringAsync())}");
                     return false;
                 }
 
@@ -5549,7 +5629,7 @@ namespace MatchZy
                     return true;
                 }
 
-                Log($"[UploadFileAsync ERROR] Failed to upload file. Status code: {response.StatusCode} Response: {await response.Content.ReadAsStringAsync()}");
+                Log($"[UploadFileAsync ERROR] Failed to upload file. Status code: {response.StatusCode} Response: {RedactUploadResponseBody(await response.Content.ReadAsStringAsync())}");
                 return false;
             }
             catch (Exception e)
@@ -5735,6 +5815,10 @@ namespace MatchZy
 
         public void SwitchPlayerTeam(CCSPlayerController player, CsTeam team)
         {
+            // A spectator coach (matchzy_coaching_mode 3) is on Spectator on purpose; the roster
+            // correction would otherwise drag them straight back to their roster side.
+            if (IsSpectatorCoach(player))
+                return;
             // None is what GetPlayerTeam returns for a player who is not part of the match.
             // SwitchTeam(None) followed by the warmup Respawn below on an unassigned player is
             // the respawn-a-non-T/CT crash class - never move anyone to None.

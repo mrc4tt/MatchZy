@@ -20,6 +20,7 @@ The rules depend on whether the match config gives the team a `coaches` list.
 
 - `.coach` only works for the team you are on.
 - `.coach` works in warmup and during freeze time, not in the middle of a live round.
+- Coaches cannot take control of a bot on their team while they spectate.
 - `.uncoach` goes back to playing (not for a coach who is only in the `coaches` list).
 - Someone who is in no roster of a loaded match is moved to Spectator and cannot coach, admins included. To let an admin coach, put their SteamID in the team's `players` or `coaches`.
 
@@ -89,3 +90,35 @@ Hand-tuned spots ship for ancient, ancient_night, anubis, cache, dust2, inferno,
 1. `.coachtest` places you like a coach right now (run again to release).
 2. `.showcoachspawns` shows both sides' spots.
 3. Stand where the coach should be, look the right way, and type `.savecoachspawn t` or `.savecoachspawn ct`.
+
+## Spectator coach (BETA, matchzy_coaching_mode 3)
+
+!!! warning "Beta"
+    Mode 3 is new and still being tested on live servers. Modes 1 and 2 are unchanged and stay the default. Report problems on [GitHub](https://github.com/mrc4tt/MatchZy/issues) with the server log lines that start with `[SpectatorCoach]`.
+
+A coach without a body, close to how coaching worked in CS:GO. With `matchzy_coaching_mode 3`, `.coach t` / `.coach ct` (warmup or freeze time, same permission and roster rules as above) moves the coach to the Spectator team and marks them as the engine's coach of that team (`sv_coaching_enabled` is set to 1 while a spectator coach exists and restored afterwards). `.uncoach` sends them back to their team's side, and so does the end of the match (`.stopmatch`, `.end`, series end).
+
+What the coach sees:
+
+- **Camera:** always first person on a living player of the coached team. Free roam, third person and enemy players are switched back.
+- **Radar:** the own team everywhere, enemies only while the team spots them.
+- **Enemies:** not sent to the coach until the team spots them or the watched player can see them (kept 2 seconds after a sighting so they do not blink). No ghosting through models, outlines or the radar.
+- **Dropped bomb:** a CT coach only gets it once the CTs spot it or the watched CT looks at it.
+- **Outlines:** teammates are outlined through walls (orange T, blue CT), like a dead player of the team sees them. Enemies never get an outline.
+- **Halftime:** the coach follows the team to the other side.
+
+Settings (all default to the recommended value):
+
+| Setting | Default | What it does |
+|---|---|---|
+| `matchzy_spectator_coach_hide_enemies` | `true` | Unspotted enemies, their weapons and a dropped bomb (CT coach) are not sent to the coach. |
+| `matchzy_spectator_coach_no_xray` | `true` | Turns off the game's own spectator x-ray for the coach (it would outline enemies). |
+| `matchzy_spectator_coach_team_xray` | `true` | Outlines the coached team through walls on the coach's screen. |
+| `matchzy_spectator_coach_pawn_team` | `true` | Gives the coach's camera the coached team, so the engine keeps it on that team. |
+| `matchzy_coach_comm_unrestricted` | `false` | Coach voice and team chat reach the team at any time, not only in warmup, timeouts and halftime (CS:GO's `sv_coach_comm_unrestricted`). The enemy never hears the coach. |
+
+Known limits of the beta:
+
+- The coach's own HUD treats the match as casual (that is how the game's spectator x-ray is turned off for the coach only). Players and the server keep the real mode.
+- `mp_forcecamera` is kept at `1` while a spectator coach exists; the coach radar needs it.
+- `matchzy_coach_comm_unrestricted` patches the server in memory and has only been tried on Linux.

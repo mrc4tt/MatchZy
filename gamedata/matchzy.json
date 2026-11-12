@@ -64,5 +64,12 @@
       "windows": 34,
       "linux": 35
     }
+  },
+  "KickBotFromTeam": {
+    "signatures": {
+      "library": "server",
+      "windows": "48 89 5C 24 ? 55 56 57 41 56 41 57 48 8B EC 48 83 EC ? 8B F9",
+      "linux": "55 48 89 E5 41 57 41 56 41 55 41 89 FD 41 54 53 48 83 EC ?"
+    }
   }
 }

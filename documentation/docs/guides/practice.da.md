@@ -20,11 +20,12 @@ Hjælp, mens du lærer:
 
 ## Granatbiblioteket { #grenade-library }
 
-`.shownades` tegner en farvet markør ved hvert gemt lineup på banen (smoke blå, flash gul, HE rød, molotov orange, decoy grå) med en tekst, der viser type, kommentar og kastemåde. En lille lysende granat markerer hvert sted gennem vægge, så du kan finde lineups på tværs af banen. `.shownades smoke` (eller `flash`, `he`, `molly`, `mine` eller en del af et navn) viser kun dem.
+`.shownades` sætter en lysende grøn figur på hvert gemt lineup-sted på banen, synlig gennem vægge, så du kan finde lineups på tværs af banen. `.shownades smoke` (eller `flash`, `he`, `molly`, `mine` eller en del af et navn) viser kun dem.
 
 - Sigt på en markør, og tryk ++e++ for at teleportere dertil med den rigtige granat.
 - Flere lineups på samme sted deler en markør; tryk ++f++ for at skifte mellem dem.
 - Markøren, du står på, skjules for dig, så den aldrig er i vejen for dit kast.
+- Hvert sted har en lysende grøn figur. Tæt på et sted viser et rødt mål, hvor hver af dets lineups sigter, det valgte lyser grønt (tryk ++f++ for at skifte). Stil dig på stedet (ingen tast), så siger en hint-boks nederst på skærmen, hvordan du kaster, fx "Venstreklik + hop". Kun du ser dine mål og dit hint. Gem kastetypen med lineuppen, fx `.savenade window jumpthrow`. En lineup indlæst med `.nades` eller `.loadnade` får de samme mål og hint.
 - `.nades` åbner en menu, hvor du kan gennemse lineups efter type.
 - Admins tilføjer lineups til en fælles pakke for hele serveren med `.libadd <navn>` (`.libremove`, `.liblist`).
 

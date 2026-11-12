@@ -405,7 +405,12 @@ de_ancient
                 {
                     Console.WriteLine($"[MatchZy] matchzymaps.cfg not found, creating default...");
                     CreateMapRotationFile();
-                    return LoadMapRotation();
+                    // Read it back once. CreateMapRotationFile swallows its errors, so recursing
+                    // on a folder that cannot be written (read-only mount, wrong owner, full disk)
+                    // never ended: a StackOverflowException kills the server at every start.
+                    if (File.Exists(filePath))
+                        return LoadMapRotation();
+                    Console.WriteLine("[MatchZy] Could not create matchzymaps.cfg; map rotation is empty.");
                 }
             }
             catch (Exception ex)

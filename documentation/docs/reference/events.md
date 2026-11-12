@@ -87,7 +87,7 @@ Events that Get5 also has (`player_death`, `bomb_planted`, `bomb_defused`, `bomb
 
 Building blocks:
 
-- **Player object**: `{"steamid", "name", "user_id", "side", "is_bot"}`. `side` is `ct`, `t`, `spec` or `null`; a bot's `steamid` is `BOT-<user_id>`.
+- **Player object**: `{"steamid", "name", "user_id", "side", "is_bot"}`. `side` is `ct`, `t`, `spec` or `null`; a bot's `steamid` is `BOT-<user_id>`. That id changes when the bot reconnects; the stats rows, CSV and stats JSON instead key a bot by a stable id derived from its name (90000000000000000 plus a hash of the name), so the two ids do not match.
 - **Weapon object**: `{"name", "id"}`. `name` without the `weapon_` prefix (`ak47`, `hegrenade`, `planted_c4`). `id` is SourceMod's weapon ID as Get5 sends it (`ak47` = 27), `0` for weapons without one (MP5-SD), the bomb, fire and the world.
 - **`round_time`**: milliseconds since freeze time ended, `0` during freeze time.
 - **`round_number`**: 0-based, the number of rounds already played.
@@ -132,7 +132,7 @@ Get5's per-grenade detonation events with victim lists (`hegrenade_detonated`, `
   "round_number": 7,
   "round_time": 51434,
   "player": { "steamid": "76561198000000013", "name": "bravo3", "user_id": 9, "side": "t", "is_bot": false },
-  "weapon": { "name": "ak47", "id": 7 },
+  "weapon": { "name": "ak47", "id": 27 },
   "bomb": false,
   "headshot": true,
   "thru_smoke": false,

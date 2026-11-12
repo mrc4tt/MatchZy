@@ -82,6 +82,21 @@ namespace MatchZy
                 HandleReplayCommand(player, command?.ArgString ?? "");
                 return;
             }
+            // matchzy_coaching_mode 3: a spectator coach may have no player pawn, so it is handled
+            // before the pawn check below.
+            if (player != null && player.IsValid && IsSpectatorCoach(player))
+            {
+                // Same rule as below: a coach-only roster entry would become an extra player.
+                if (GetRosteredCoachTeam(player.SteamID) != null
+                    && !LookupRosterEntry(matchzyTeam1.teamPlayers, player.SteamID)
+                    && !LookupRosterEntry(matchzyTeam2.teamPlayers, player.SteamID))
+                {
+                    ReplyToUserCommand(player, Localizer.ForPlayer(player, "matchzy.matchmsg.uncoachlisted"));
+                    return;
+                }
+                EndSpectatorCoach(player);
+                return;
+            }
             if (player == null || !player.PlayerPawn.IsValid)
                 return;
             if (isPractice)
@@ -95,6 +110,18 @@ namespace MatchZy
                 && !LookupRosterEntry(matchzyTeam2.teamPlayers, player.SteamID))
             {
                 ReplyToUserCommand(player, Localizer.ForPlayer(player, "matchzy.matchmsg.uncoachlisted"));
+                return;
+            }
+
+            // A coach is alive only in freeze time (KillCoaches runs when it ends), frozen
+            // (MOVETYPE_NONE), untouchable (TakesDamage off) and stripped at the viewing spot.
+            // Uncoaching then would leave that body in the round: alive, unkillable, unable to move,
+            // so the team could never be eliminated. Killing it here would count as the player's
+            // death, so wait until the round has started and the coach body is gone.
+            if ((isMatchLive || isKnifeRound) && player.PawnIsAlive
+                && (matchzyTeam1.coach.Contains(player) || matchzyTeam2.coach.Contains(player)))
+            {
+                ReplyToUserCommand(player, Localizer.ForPlayer(player, "matchzy.matchmsg.uncoachfreeze"));
                 return;
             }
 

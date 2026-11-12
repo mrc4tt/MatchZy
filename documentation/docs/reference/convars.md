@@ -34,6 +34,7 @@ Legend: **cfg** = present in the generated `config.cfg`.
 |---|---|---|---|
 | `matchzy_admin_call_enabled` | `false` | Y | Turns on admin tickets: `.admin` (the match's ticket, seen by every player in the match) and `.report` (private). |
 | `matchzy_admin_call_cooldown` | `5` | Y | Seconds between two `.admin` / `.report` messages from the same player. |
+| `matchzy_allchat_mute_votes` | `0` | Y | Players on a team who must write `.mute` / `!mute` (alias `.nochat`) to turn off all chat until the map changes. Team chat, admins and chat commands are not affected; admins use `.allchat`. Capped at the number of players on the teams. While CS2-SimpleAdmin is loaded, `!mute` is its admin command and players vote with `.nochat`. `0` = off. |
 | `matchzy_admin_ticket_timeout` | `30` | Y | Minutes without a message after which a ticket counts as closed. Tickets of a loaded match also close when the match ends. `0` = no timeout. |
 | `matchzy_warmup_enabled` | `true` | Y | Use warmup (execute `warmup.cfg`) before a match. |
 | `matchzy_warmup_instant_respawn` | `false` | Y | Instant-respawn warmup: the dead respawn at once at their team spawn with 2 seconds of spawn protection, no bomb, no friendly fire, buying all warmup and full money on every respawn. Set after `warmup.cfg`, so older cfg copies work too. `false` = `warmup.cfg` decides. |
@@ -70,7 +71,7 @@ Legend: **cfg** = present in the generated `config.cfg`.
 | `matchzy_allow_unpause` | `true` | Y | Enable `.unpause`. Admin force unpause is not affected. |
 | `matchzy_use_pause_command_for_tactical_pause` | `false` | Y | `.pause` starts a tactical timeout instead of a normal pause. |
 | `matchzy_enable_tech_pause` | `true` | Y | Enable `.tech`. |
-| `matchzy_tech_pause_duration` | `300` | Y | Tech pause length in seconds; the match unpauses on its own when it runs out. `-1` = unlimited. |
+| `matchzy_tech_pause_duration` | `300` | Y | Tech pause length in seconds, counted while the pause is in effect (freeze time); the match unpauses on its own when it runs out. `-1` = unlimited. |
 | `matchzy_max_tech_pauses_allowed` | `2` | Y | Tech pauses per team per map. |
 | `matchzy_tech_pause_mode` | `0` | Y | `0` = a tech pause ends on its own when its time runs out. `1` = Get5 rules (see below). |
 | `matchzy_pause_hud` | `2` | Y | On-screen info during a pause (`.tech`, `.pause`, `.tac`): who called it, time left, who can unpause, tech pauses or tactical timeouts left, which teams typed `.unpause`. `0` = off, `1` = small center text, `2` = center box. |
@@ -175,7 +176,12 @@ Database connection settings are in [`database.json`](files.md#databasejson), no
 |---|---|---|---|
 | `matchzy_coach_enabled` | `true` | Y | Allow `.coach`. |
 | `matchzy_coach_listed_only` | `false` | Y | In a loaded match only the SteamIDs in a team's `coaches` list may coach it; a team without a list has no coach. |
-| `matchzy_coaching_mode` | `1` | Y | Coach viewing spot: `1` use `spawns/coach/<map>.json` when present, otherwise compute one; `2` always compute. |
+| `matchzy_coaching_mode` | `1` | Y | Coach viewing spot: `1` use `spawns/coach/<map>.json` when present, otherwise compute one; `2` always compute; `3` BETA spectator coach without a body (see the [coaching guide](../guides/coaching.md#spectator-coach-beta-matchzy_coaching_mode-3)). |
+| `matchzy_spectator_coach_hide_enemies` | `true` | Y | Mode 3: unspotted enemies, their weapons and a dropped bomb (CT coach) are not sent to the coach. |
+| `matchzy_spectator_coach_no_xray` | `true` | Y | Mode 3: turn off the game's own spectator x-ray for the coach (it would outline enemies). |
+| `matchzy_spectator_coach_team_xray` | `true` | Y | Mode 3: outline the coached team through walls on the coach's screen. |
+| `matchzy_spectator_coach_pawn_team` | `true` | Y | Mode 3: give the coach's camera the coached team, so the engine keeps it there. |
+| `matchzy_coach_comm_unrestricted` | `false` | Y | Mode 3: coach voice and team chat reach the team at any time, not only in warmup, timeouts and halftime. |
 
 ## Practice
 
@@ -186,9 +192,7 @@ Database connection settings are in [`database.json`](files.md#databasejson), no
 | `matchzy_smoke_color_enabled` | `false` | Y | Player-colored smokes. |
 | `matchzy_botjiggle_range` | `30` | N | Strafe width for `.botjiggle`. |
 | `matchzy_spawn_markers_enabled_default` | `true` | Y | Show the `.showspawns` markers automatically when practice starts. |
-| `matchzy_grenadelibrary_labels` | `true` | N | Text labels above `.shownades` markers. |
-| `matchzy_grenadelibrary_label_scale` | `0.2` | N | Size of those labels. |
-| `matchzy_prac_disable_magazine_drop` | `true` | N | Keep leftover ammo on reload in practice. |
+| `matchzy_lineup_target_angles` | `"0 0 0"` | Y | Extra rotation (pitch yaw roll) for the lineup trainer's aim target model, to tune how it faces the wall. |
 
 ## Chat
 

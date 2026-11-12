@@ -16,7 +16,7 @@ namespace MatchZy
     public partial class MatchZy : BasePlugin
     {
         public override string ModuleName => "MatchZy";
-        public override string ModuleVersion => "1.0.24";
+        public override string ModuleVersion => "1.0.25-beta.1";
 
         // Shown next to the version in the load line and the version command, so a log or a
         // support question tells this fork (1.0.x) apart from the original MatchZy (0.x).
@@ -303,13 +303,16 @@ namespace MatchZy
 
         public override void Load(bool hotReload)
         {
+            // Before anything resolves a signature: lets a new gamedata key work after a plugin
+            // reload, without a server restart (see MzGameData).
+            MzGameData.Init(ModuleDirectory);
             // Run DB init on a background thread instead of blocking Load with
             // .GetAwaiter().GetResult(). Blocking here races with other plugins'
             // SQLite native init on worker threads (observed crash: concurrent
             // open from CS2_SimpleAdmin + MatchZy main-thread open during Load
-            // segfaulted in EnsureConnectionOpen). The Database type now serializes
-            // its own connection access, so DB-dependent calls elsewhere are safe
-            // to fire before this completes - they will block on the lock.
+            // segfaulted in EnsureConnectionOpen). Every Database method opens its own
+            // connection and first awaits this init (capped at 60 s), so DB calls made
+            // before it completes wait for it instead of failing.
             string moduleDir = ModuleDirectory;
             string gameDir = Server.GameDirectory;
             _ = Task.Run(async () =>
@@ -514,6 +517,8 @@ namespace MatchZy
                 { ".forcestart", OnStartCommand },
                 { ".friendlyfire", OnFriendlyFireCommand },
                 { ".ffire", OnFriendlyFireCommand },
+                { ".allchat", OnAllChatCommand },
+                { ".nochat", OnNoChatCommand },
                 { ".breakrestore", OnBreakRestoreCommand },
                 { ".nobreak", OnBreakRestoreCommand },
                 { ".repair", OnBreakRestoreCommand },
@@ -563,6 +568,7 @@ namespace MatchZy
                 { ".previewnade", OnTrajCommand },
                 { ".nadepreview", OnTrajCommand },
                 { ".nadecam", OnTrajCommand },
+                { ".follownade", OnFollowNadeCommand },
                 { ".cam", OnTrajCommand },
                 { ".warmup", OnWarmupCommand },
                 { ".crouchbot", OnCrouchBotCommand },
@@ -708,6 +714,7 @@ namespace MatchZy
                 return HookResult.Continue;
             }, HookMode.Post);
             RegisterEventHandler<EventPlayerGivenC4>(EventPlayerGivenC4);
+            RegisterEventHandler<EventBotTakeover>(OnCoachBotTakeover);
             RegisterEventHandler<EventBombPickup>(OnCoachBombPickup);
             RegisterEventHandler<EventBombDropped>(OnCoachBombDropped);
             RegisterEventHandler<EventPlayerDeath>(OnCoachDeathBombCheck, HookMode.Post);
@@ -720,6 +727,7 @@ namespace MatchZy
             // Before the lifecycle hooks: a redirected workshop changelevel is announced once,
             // by the workshop command it turns into.
             RegisterWorkshopHooks(hotReload);
+            RegisterCstvKickGuard();
             RegisterServerLifecycleHooks();
             RegisterListener<Listeners.OnClientDisconnectPost>(playerSlot =>
             {
@@ -740,6 +748,13 @@ namespace MatchZy
             // the DynoHook "could not allocate trampoline" error for zero benefit.
             RegisterListener<Listeners.OnTick>(RenderReadyPanel);
             RegisterListener<Listeners.OnTick>(TechPauseHudAntiFlashTick);
+            RegisterSpectatorCoachListeners();
+            RegisterCoachCommPatch();
+            RegisterListener<Listeners.OnTick>(ForbidCoachBotControlTick);
+            // Again after the entities thought: the engine sets the flag during the observer's think,
+            // after OnTick, so a write there alone was overwritten before the snapshot and the
+            // coach could still take over a bot.
+            RegisterListener<Listeners.OnServerPostEntityThink>(ForbidCoachBotControlTick);
             RegisterPauseNoticeFilter();
 
             // Hot load/reload while a ready phase is already up: run the panel render immediately on
@@ -1120,6 +1135,13 @@ namespace MatchZy
                 ForgetPracticeEntitiesOnMapStart();
                 // Set by FinishVeto when it queued a changelevel; the new map is here.
                 mapChangePending = false;
+                mapEnding = false;
+                // .mute (all chat off) lasts one map.
+                ResetAllChatVote();
+                // Server.CurrentTime restarts near 0 on a new map: a settle window from the old map
+                // would hold back the coach weapon strip for minutes.
+                coachStripSettleUntil = 0;
+                RestoreBotControllable();
 
                 // Re-arm AutoStart latch: allow exactly one AutoStart for this new map.
                 autoStartLatched = false;
@@ -1803,6 +1825,12 @@ namespace MatchZy
                     if ((cmdWord == ".ffire" || cmdWord == ".friendlyfire") && messageCommandArg != "")
                     {
                         HandleFriendlyFireCommand(player, messageCommandArg);
+                        return HookResult.Continue;
+                    }
+
+                    if (cmdWord == ".allchat" && messageCommandArg != "")
+                    {
+                        HandleAllChatCommand(player, messageCommandArg);
                         return HookResult.Continue;
                     }
 

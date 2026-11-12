@@ -49,7 +49,9 @@ namespace MatchZy
             {
                 if (player != null)
                     return;
-                if (isMatchSetup)
+                // Also while a load waits for its changelevel (pendingMatchLoadJson): a second load
+                // then replaced the pending config.
+                if (IsMatchLoadedOrPending())
                 {
                     ReplyToUserCommand(player, Localizer.ForPlayer(player, "matchzy.mm.matchisalreadysetup", liveMatchId));
                     Log($"[LoadMatch] A match is already setup with id: {liveMatchId}, cannot load a new match!");
@@ -94,9 +96,8 @@ namespace MatchZy
         {
             if (player != null)
                 return;
-            if (isMatchSetup)
+            if (IsMatchLoadedOrPending())
             {
-                // command.ReplyToCommand($"[LoadMatchDataCommand] A match is already setup with id: {liveMatchId}, cannot load a new match!");
                 ReplyToUserCommand(player, Localizer.ForPlayer(player, "matchzy.mm.get5matchisalreadysetup", liveMatchId));
                 Log($"[LoadMatchDataCommand] A match is already setup with id: {liveMatchId}, cannot load a new match!");
                 return;
@@ -156,6 +157,14 @@ namespace MatchZy
                                     // The issuer may have left during the fetch; reply to the console then.
                                     if (player != null && !player.IsValid)
                                         player = null;
+                                    // The fetch can take a while (retries): another load may have set up
+                                    // a match meanwhile. Loading over it reset that match.
+                                    if (IsMatchLoadedOrPending())
+                                    {
+                                        ReplyToUserCommand(player, Localizer.ForPlayer(player, "matchzy.mm.get5matchisalreadysetup", liveMatchId));
+                                        Log($"[LoadMatchFromURL] A match was set up while the config was downloading; not loading this one.");
+                                        return;
+                                    }
                                     bool success = LoadMatchFromJSON(jsonData);
                                     if (!success)
                                     {
@@ -449,6 +458,14 @@ namespace MatchZy
                     // on the target map (skipMapChange, currentMap == mapName -> no second changelevel),
                     // carrying the match across like get5. Return success so the caller still records
                     // loadedConfigFile / isG5ApiMatch (captured in OnMapEndHandler, restored on resume).
+                    // A name that is not a stock map, workshop id/name or collection map cannot be
+                    // changed to (ChangeMap only logs that). Reporting success then left the panel
+                    // believing the match was loaded while the server stayed on the old map.
+                    if (!IsSafeMapName(mapName) || BuildMapChangeCommand(mapName) == null)
+                    {
+                        Log($"[LoadMatchFromJSON] Cannot change to the first map '{mapName}' (not a stock map, workshop id/name or collection map).");
+                        return false;
+                    }
                     pendingMatchLoadJson = jsonData;
                     ChangeMap(mapName, 0);
                     return true;
@@ -535,23 +552,39 @@ namespace MatchZy
                     if (loadGeneration != matchLoadGeneration)
                     {
                         Log($"[LoadMatchFromJSON] Discarding matchid {allocatedId}: the match was reset or replaced while it was being allocated.");
+                        // The allocation created matches/maps rows; close them so they do not stay
+                        // "running" forever (end_time NULL).
+                        CancelOrphanMatchRow(allocatedId, currentMapNumForInit);
                         return;
                     }
                     // series_start only for a load that is still current (queued here, on the game
                     // thread, in order with the match's other events).
-                    SendEventAsync(new MatchZySeriesStartedEvent
+                    var t1 = new MatchZyTeamWrapper(matchzyTeam1Id, matchzyTeam1Name);
+                    var t2 = new MatchZyTeamWrapper(matchzyTeam2Id, matchzyTeam2Name);
+                    Func<long, MatchZySeriesStartedEvent> seriesStart = id => new MatchZySeriesStartedEvent
                     {
-                        // The id the match actually runs under: a ready-up can have allocated one
-                        // before this arrived (that one wins, see below).
-                        MatchId = liveMatchId > 0 && liveMatchId != allocatedId ? liveMatchId : allocatedId,
+                        MatchId = id,
                         NumberOfMaps = seriesNumMaps,
-                        Team1 = new(matchzyTeam1Id, matchzyTeam1Name),
-                        Team2 = new(matchzyTeam2Id, matchzyTeam2Name),
-                    }, seriesStartTarget);
+                        Team1 = t1,
+                        Team2 = t2,
+                    };
+                    // The id the match actually runs under: a ready-up can have allocated one before
+                    // this arrived (that one wins, see below).
+                    long seriesId = liveMatchId > 0 && liveMatchId != allocatedId ? liveMatchId : allocatedId;
+                    if (seriesId > 0)
+                        SendEventAsync(seriesStart(seriesId), seriesStartTarget);
+                    else
+                    {
+                        // No id yet (database unreachable): an event with matchid -1 is dropped, and
+                        // nothing sent series_start later. HandleMatchStart sends it once it has an id.
+                        owedSeriesStart = seriesStart;
+                        owedSeriesStartTarget = seriesStartTarget;
+                    }
                     // HandleMatchStart may already have allocated one (ready-up before this finished).
                     if (liveMatchId > 0 && liveMatchId != allocatedId)
                     {
                         Log($"[LoadMatchFromJSON] Keeping matchid {liveMatchId}; the early allocation {allocatedId} arrived after the match had started.");
+                        CancelOrphanMatchRow(allocatedId, currentMapNumForInit);
                         return;
                     }
                     if (allocatedId > 0)
@@ -569,6 +602,27 @@ namespace MatchZy
 
             WarnIfRoundBackupFlagMissing();
             return true;
+        }
+
+        // series_start held back while the match had no id (see LoadMatchFromJSON).
+        private Func<long, MatchZySeriesStartedEvent>? owedSeriesStart = null;
+        private RemoteLogTarget? owedSeriesStartTarget = null;
+
+        private void SendOwedSeriesStart()
+        {
+            if (owedSeriesStart == null || liveMatchId <= 0)
+                return;
+            SendEventAsync(owedSeriesStart(liveMatchId), owedSeriesStartTarget);
+            owedSeriesStart = null;
+            owedSeriesStartTarget = null;
+        }
+
+        // A matches/maps row created for an id the match does not use: mark it cancelled.
+        private void CancelOrphanMatchRow(long matchId, int mapNumber)
+        {
+            if (matchId <= 0)
+                return;
+            Task.Run(async () => await database.SetMatchCancelledAsync(matchId, mapNumber, 0, 0, 0, 0));
         }
 
         public bool LockTeamsManually()
@@ -1045,7 +1099,13 @@ namespace MatchZy
             // the menu render (same race ChatMenu has with EventPlayerChat).
             if (player != null && activeSetup != null && activeSetup.AdminSteamId == player.SteamID)
             {
-                Server.NextFrame(() => OpenConfirmMenu(player));
+                Server.NextFrame(() =>
+                {
+                    // Re-validate after the frame, and open through the guard: CS2MenuManager is
+                    // optional and a missing library must not throw out of this callback.
+                    if (IsPlayerValid(player))
+                        OpenMenuGuarded(player!, OpenConfirmMenu);
+                });
             }
         }
 
@@ -1334,14 +1394,20 @@ namespace MatchZy
                     Log("[EndSeries] Workshop server: mp_match_end_restart 1 so the engine does not changelevel by map name.");
                     Server.ExecuteCommand("mp_match_end_restart 1");
                 }
-                AddTimer(
+                // Kept in matchEndMapChangeTimer (killed by ResetMatch and every match load) and
+                // stopped by a map change: an untracked timer fired on the next match a panel
+                // loaded within the restart delay, reset it and kicked everyone.
+                matchEndMapChangeTimer?.Kill();
+                matchEndMapChangeTimer = AddTimer(
                     restartDelay,
                     () =>
                     {
+                        matchEndMapChangeTimer = null;
                         ResetMatch(false);
                         if (kickPlayers)
                             KickPlayersWithNoMatch();
-                    }
+                    },
+                    CounterStrikeSharp.API.Modules.Timers.TimerFlags.STOP_ON_MAPCHANGE
                 );
                 return;
             }
@@ -1354,14 +1420,18 @@ namespace MatchZy
             {
                 Log("[EndSeries] WARNING: Map rotation list is empty! Cannot auto-changelevel. Resetting match on current map.");
                 PrintLocalizedToAll("matchzy.matchmsg.norotationmaps");
-                AddTimer(
+                // Tracked and stopped by a map change, as above.
+                matchEndMapChangeTimer?.Kill();
+                matchEndMapChangeTimer = AddTimer(
                     restartDelay,
                     () =>
                     {
+                        matchEndMapChangeTimer = null;
                         ResetMatch(false);
                         if (kickPlayers)
                             KickPlayersWithNoMatch();
-                    }
+                    },
+                    CounterStrikeSharp.API.Modules.Timers.TimerFlags.STOP_ON_MAPCHANGE
                 );
                 return;
             }

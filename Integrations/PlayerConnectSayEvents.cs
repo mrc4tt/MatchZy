@@ -126,6 +126,9 @@ namespace MatchZy
                         return HookResult.Handled;
                     }
                 }
+                if (player != null && player.IsValid && !player.IsBot && !player.IsHLTV
+                    && HandleAllChatSay(player, command, ChatMessage(info.ArgString)) == HookResult.Handled)
+                    return HookResult.Handled;
                 if (!ShouldSendPlayerEvent(player))
                     return HookResult.Continue;
                 string message = ChatMessage(info.ArgString);

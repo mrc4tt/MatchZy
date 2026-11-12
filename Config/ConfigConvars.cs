@@ -10,6 +10,7 @@ namespace MatchZy
 {
     public partial class MatchZy
     {
+        public FakeConVar<bool> cstvKickGuard = new("matchzy_cstv_kick_guard", "Keep the bot quota from kicking the CSTV client: when CS2 trims bots (a lowered bot_quota, bot_quota_mode fill and a player joining a team) it kicks SourceTV first, which stops GOTV and splits the demo. Needs the KickBotFromTeam gamedata signature. Default: true", true);
         public FakeConVar<bool> demoLiveOnly = new("matchzy_demo_live_only", "Only live maps (match, scrim, hill) are recorded: MatchZy sets tv_autorecord 0 and stops any GOTV recording that runs outside a live map (CS2's tv_autorecord records every map from load, also practice and an idle server for hours). MatchZy's own match demos are not affected. false = tv_autorecord is left as the server sets it. Default: false", false);
         public FakeConVar<bool> statsIncludeBots = new("matchzy_stats_include_bots", "Whether bots on CT/T get player stats (database, CSV and stats events). Bots have no SteamID, so each is recorded under a stable id of 90000000000000000 plus a hash of its name. Default: false", false);
 
@@ -23,6 +24,7 @@ namespace MatchZy
 
         public FakeConVar<float> botJiggleRange = new("matchzy_botjiggle_range", "Practice .botjiggle: how far (units) bots strafe side-to-side. Default: 30", 30.0f);
 
+        public FakeConVar<string> lineupTargetAngles = new("matchzy_lineup_target_angles", "Extra rotation (pitch yaw roll) added to the lineup trainer's aim target model, for tuning how it faces the wall. Default: \"0 0 0\"", "0 0 0");
         public FakeConVar<bool> spawnMarkersEnabledDefault = new("matchzy_spawn_markers_enabled_default", "Show the .showspawns markers automatically when practice mode starts. Default: true", true);
 
 
@@ -31,7 +33,12 @@ namespace MatchZy
         // team (ignore the JSON files). Default: 1.
         public FakeConVar<bool> coachEnabled = new("matchzy_coach_enabled", "Whether players can become a coach with .coach / css_coach. Players already coaching stay coaches until .uncoach or the match resets. Default: true", true);
 
-        public FakeConVar<int> coachingMode = new("matchzy_coaching_mode", "Coach spot source: 1 = spawns/coach JSON override then computed, 2 = always computed (ignore JSON). Default: 1", 1);
+        public FakeConVar<bool> specCoachNoXray = new("matchzy_spectator_coach_no_xray", "Spectator coach (matchzy_coaching_mode 3): turn off the game's own spectator x-ray on the coach's screen (it would outline the enemy too; teammates get outlines from matchzy_spectator_coach_team_xray). Sends game_mode 0 to the coach's client only (its HUD then treats the match as casual); the server and the players keep the real game mode. Default: true", true);
+        public FakeConVar<bool> specCoachTeamXray = new("matchzy_spectator_coach_team_xray", "Spectator coach (matchzy_coaching_mode 3): outline the coached team's living players through walls on the coach's screen, like a dead teammate sees them. Built from glowing model copies that only the coaches of that side receive; enemies never get one. Default: true", true);
+        public FakeConVar<bool> specCoachHideEnemies = new("matchzy_spectator_coach_hide_enemies", "Spectator coach (matchzy_coaching_mode 3): enemies the coached team has not spotted, and that the watched teammate cannot see, are not sent to the coach's client (no model, outline or radar dot). Needed because the CS2 client still gives a spectator coach enemy x-ray and a full radar. Default: true", true);
+        public FakeConVar<bool> coachCommUnrestricted = new("matchzy_coach_comm_unrestricted", "Spectator coach (matchzy_coaching_mode 3): the coach's voice and team chat reach the coached team at any time, not only in warmup, timeouts and halftime (CS:GO's sv_coach_comm_unrestricted; patches the engine gate, enemies still never hear the coach). Default: false", false);
+        public FakeConVar<bool> specCoachPawnTeam = new("matchzy_spectator_coach_pawn_team", "Spectator coach (matchzy_coaching_mode 3): give the coach's observer pawn the coached team, so mp_forcecamera 1 keeps the camera on that team in first person. Default: true", true);
+        public FakeConVar<int> coachingMode = new("matchzy_coaching_mode", "Coach spot source: 1 = spawns/coach JSON override then computed, 2 = always computed (ignore JSON), 3 = BETA spectator coach (no body: coach watches from the Spectator team, locked to their team in first person, unspotted enemies hidden, teammates outlined). Default: 1", 1);
 
         public FakeConVar<bool> warmupInstantRespawn = new("matchzy_warmup_instant_respawn", "Instant-respawn warmup: the dead respawn at once at their team spawn with 2 seconds of spawn protection, no bomb, no friendly fire, buying all warmup and full money on every respawn. Set after warmup.cfg, so it works with older warmup.cfg copies. false = warmup.cfg decides. Default: false", false);
         public FakeConVar<bool> warmupEnabled = new("matchzy_warmup_enabled", "Whether warmup mode is enabled. If false, warmup.cfg will not be loaded. Default: true", true);
@@ -61,6 +68,7 @@ namespace MatchZy
         public FakeConVar<int> forceReadyMaxMissing = new("matchzy_forceready_max_missing", "Loaded matches: how many players a team may be short of players_per_team and still use .forceready (1 = at most one short, 4 in a 5v5). min_players_to_ready in the match config can only make it stricter. -1 = only min_players_to_ready decides (Get5). Default: 1", 1);
         public FakeConVar<int> readyMaxMissing = new("matchzy_ready_max_missing", "Loaded matches: how many players a team may be short of players_per_team and still ready up, whichever way (.ready with a smaller roster, min_players_to_ready in the match config, join mode, matchzy_ready_per_team, .forceready). 1 = at least 4 in a 5v5, 0 = full teams only. Admins can still css_forcestart. -1 = off: the roster and the match config decide. Default: -1", -1);
         public FakeConVar<bool> adminCallEnabled = new("matchzy_admin_call_enabled", "Admin tickets: .admin [message] writes to the match's ticket (every player in the match sees it), .report [message] to a private one (only the admins). Each message is an admin_called event to the remote log URL; a panel answers with matchzy_admin_reply and closes with matchzy_admin_close. Off: the commands do nothing (they may belong to another plugin). Default: false", false);
+        public FakeConVar<int> allChatMuteVotesNeeded = new("matchzy_allchat_mute_votes", "Players on a team who must write .mute / !mute (alias .nochat) to turn off all chat: the teams can then no longer write to each other until the map changes. Team chat, admins and chat commands are not affected; admins turn it on or off with .allchat. While CS2-SimpleAdmin is loaded, !mute is its admin command and players vote with .nochat. Capped at the number of players on the teams. 0 = off. Default: 0", 0);
         public FakeConVar<int> adminCallCooldown = new("matchzy_admin_call_cooldown", "Seconds a player has to wait between two .admin / .report messages (spam filter). Default: 5", 5);
         public FakeConVar<int> adminTicketTimeout = new("matchzy_admin_ticket_timeout", "Minutes without a message after which an admin ticket counts as closed, so the next .admin / .report opens a new one. Tickets of a loaded match also close when the match ends. 0 = only matchzy_admin_close and the match end close them. Default: 30", 30);
         public FakeConVar<int> demoKeepDays = new("matchzy_demo_keep_days", "Deletes .dem files in matchzy_demo_path older than this many days, at plugin load and at series end. The demo being recorded and demos still uploading are never deleted. Only the demo folder is cleaned, not other folders (a tv_autorecord demo outside it stays). 0 = keep everything. Default: 0", 0);
@@ -114,7 +122,6 @@ namespace MatchZy
 
         public FakeConVar<bool> teamClanTagEnabled = new("matchzy_team_clantag_enabled", "Whether to show each team's tag from the match config (team1.tag / team2.tag) as the players' clan tag while the match is live. Off leaves live clan tags empty. Default: false", false);
 
-        public FakeConVar<bool> grenadeLibraryLabels = new("matchzy_grenadelibrary_labels", "Whether .shownades draws a floating text label (CPointWorldText) above each grenade beam. false = beams only. Default: true", true);
 
         // Label facing: yaw (degrees) ADDED to the lineup's throw direction. CPointWorldText has no
         // reliable billboard, so the label sits at a fixed angle - tune this until the text reads
@@ -122,7 +129,6 @@ namespace MatchZy
 
         // World scale of the label (world units per pixel). Bigger = larger/more readable from a
         // distance (but huge up close). Re-run .shownades after changing. Default: 0.2
-        public FakeConVar<float> grenadeLibraryLabelScale = new("matchzy_grenadelibrary_label_scale", "World scale (world units per pixel) of the .shownades text label. Bigger = more readable from distance. Default: 0.2", 0.2f);
 
         public FakeConVar<bool> readyEnabled = new("matchzy_ready_enabled", "Whether players can ready up (.ready, .r, .unready, .forceready, ping, join ready mode). false = only an admin starts the match with .start / .forcestart, and every phase that waits for a ready-up (veto, map start) waits for the admin. The ready time limit (matchzy_forfeit_ready_timeout) does not run. Default: true", true);
         public FakeConVar<bool> readyUpByPing = new("matchzy_ready_up_by_ping", "Whether pinging (middle-mouse / scroll button) toggles your ready status during warmup. Set false if players ready up by accident when pinging. Default: true", true);
@@ -137,7 +143,6 @@ namespace MatchZy
 
         public FakeConVar<bool> stopCommandNoDamage = new("matchzy_stop_command_no_damage", "Whether the stop command becomes unavailable if a player damages a player from the opposing team.", false);
 
-        public FakeConVar<bool> pracDisableMagazineDrop = new("matchzy_prac_disable_magazine_drop", "Whether to disable magazine-based ammo discard on reload in practice mode (CS2 March 2026+ reload system). Default: true", true);
 
         // Registered as a real FakeConVar (not a ConsoleCommand) so a value set from a cfg
         // (e.g. `matchzy_autostart_mode 2` in a mapchange/exec script) is stored on the ConVar
@@ -306,7 +311,13 @@ namespace MatchZy
                 return;
             string url = command.ArgByIndex(1);
             if (url.Trim() == "")
+            {
+                // An explicit empty value (matchzy_demo_upload_url "") turns uploads off; before, it
+                // was ignored and demos kept going to the old (maybe expired presigned) URL.
+                if (command.ArgCount >= 2)
+                    demoUploadURL = "";
                 return;
+            }
             if (!IsValidUrl(url))
             {
                 Log($"[MatchZyDemoUploadURL] Invalid URL: {RedactUrl(url)}. Please provide a valid URL for uploading the demo!");
@@ -532,7 +543,12 @@ namespace MatchZy
                 return;
             string url = command.ArgByIndex(1);
             if (url.Trim() == "")
+            {
+                // An explicit empty value turns remote backups off (see matchzy_demo_upload_url).
+                if (command.ArgCount >= 2)
+                    backupUploadURL = "";
                 return;
+            }
             if (!IsValidUrl(url))
             {
                 // Log($"[MatchZyBackupUploadURL] Invalid URL: {url}. Please provide a valid URL for uploading the backup!");

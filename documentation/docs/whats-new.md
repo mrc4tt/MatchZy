@@ -2,6 +2,35 @@
 
 A short summary of each release. The [full changelog](changelog.md) has the details and background for every change.
 
+## 1.0.25 <small>November 12, 2026</small>
+
+- **New:** (Beta) Spectator coach with `matchzy_coaching_mode 3`: no body, first person on the own team, radar with only the own team and spotted enemies, teammates outlined through walls, no enemy ghosting. See [Coaching](guides/coaching.md#spectator-coach-beta-matchzy_coaching_mode-3).
+- **Fixed:** The bot quota no longer kicks CSTV when it removes bots (a lowered `bot_quota`, or `bot_quota_mode fill` and a player joining a team), so the demo is no longer split in two (`matchzy_cstv_kick_guard`).
+- **Fixed:** Practice `.bot` adds one bot instead of adding two and kicking one.
+- **Changed:** SQLite no longer leaves `matchzy.db-wal` / `matchzy.db-shm` files; `matchzy.db` alone is a complete copy again.
+- **New:** Grenade follow camera in practice: a throw from a lineup spot is followed by the camera and shows where it lands; jump to come back. `.follownade` sets lineup spots / every throw / off.
+- **New:** Lineup trainer: `.shownades` spots get a glowing figure; near a spot you see the aim targets on the wall, and on the spot a hint box with the keys ("Left Click + Jump").
+- **New:** Players can vote all chat off with `.mute` (`matchzy_allchat_mute_votes`; `.nochat` with CS2-SimpleAdmin), so the teams can no longer write to each other; admins use `.allchat`.
+- **Fixed:** A server crash when a coach got the bomb (two hand-offs removed the same C4 at once).
+- **Changed:** Coaches can no longer take control of bots on their team.
+- **Fixed:** `.uncoach` during freeze time no longer leaves an unkillable coach body in the round.
+- **Fixed:** `.matchsetup` with a veto and "Skip knife" gives team1 CT on every map, also the decider.
+- **Fixed:** A technical pause counts its time only while it is in effect, so a `.tech` early in a round is no longer used up without pausing.
+- **Fixed:** A BO2 veto from 3 maps plays both maps instead of stopping after map 1.
+- **Fixed:** A match loaded right after a series end is no longer reset by the old series' restart, and a second load no longer replaces a match that is still loading.
+- **Fixed:** A match whose first map cannot be loaded fails the load instead of reporting success.
+- **Fixed:** `min_spectators_to_ready` works again (spectators can `.ready`).
+- **Fixed:** `.match`, `.scrim` and `.hill` from practice start the chosen mode with its settings.
+- **Fixed:** `.skipveto`, `.start` and `.warmup` behave during a veto; `.rr` works in practice with "." as chat trigger; readying up by ping sends `player_ready`.
+- **Fixed:** The server no longer crashes at start when `matchzymaps.cfg` cannot be created.
+- **Fixed:** Coach bomb carrier: the C4 is no longer deleted.
+- **Fixed:** Forfeits, `.gg` and `get5_endmatch` write the final stats, CSV and stats JSON; match events are retried; `series_start` is no longer lost when the database was down at load.
+- **Fixed:** S3 demo uploads no longer overwrite one part with the next.
+- **Fixed:** MySQL stats with long team names or emoji player names; advanced stats with bots.
+- **Fixed:** Practice: leftover bots, bot settings and player settings after leaving practice or the server, stuck strat playback, broken save files.
+- **Changed:** `matchzy_demo_upload_url ""` and `matchzy_remote_backup_url ""` turn uploads off.
+- **Security:** A failed demo upload no longer logs the S3 signature details.
+
 ## 1.0.24 <small>November 10, 2026</small>
 
 - **New:** Admin tickets (turn on with `matchzy_admin_call_enabled`): `.admin` writes to the match's ticket (seen by every player in the match), `.report` to a private one. A panel or ticket system gets every message as an event and answers with `matchzy_admin_reply` over RCON.
@@ -59,12 +88,12 @@ A short summary of each release. The [full changelog](changelog.md) has the deta
 - **Security:** `noclip` in the console only works in practice mode. Before, MatchZy's own `noclip` handler skipped the `sv_cheats` check and let any alive player noclip in warmup, the knife round, scrims and live matches.
 - **Security:** MySqlConnector updated to 2.6.2 (GHSA-473q-m89c-ghf8). With MySQL stats, the older version could send the database password before checking the server's TLS certificate, so someone on the network between the game server and a remote MySQL server could read it.
 
-## 1.0.20 <small>October 24, 2026</small>
-
-- **Fixed:** A match config loaded during a `.start` pug no longer reuses the pug's match id (stats, events, demo name and backups went to the pug).
-- **Changed:** `.showspawns`: E on a spawn marker picks the marker you aim at more precisely, also at a distance and while crouched.
-
 ## Older releases
+
+??? note "1.0.20 - October 24, 2026"
+
+    - **Fixed:** A match config loaded during a `.start` pug no longer reuses the pug's match id (stats, events, demo name and backups went to the pug).
+    - **Changed:** `.showspawns`: E on a spawn marker picks the marker you aim at more precisely, also at a distance and while crouched.
 
 ??? note "1.0.19 - October 24, 2026"
 

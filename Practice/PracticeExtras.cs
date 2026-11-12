@@ -13,6 +13,8 @@ namespace MatchZy
         {
             RegisterListener<Listeners.OnTick>(OnBotCombatTick);
             RegisterListener<Listeners.OnTick>(OnPathReplayTick);
+            RegisterNadeTutorial();
+            RegisterNadeFollowCam();
             RegisterListener<Listeners.OnTick>(OnRunBoostTick);
             RegisterListener<Listeners.OnPlayerButtonsChanged>(OnBotSpawnMarkerButtonHandler);
             RegisterEventHandler<EventPlayerDeath>(OnPracticeDeathPre, HookMode.Pre);
@@ -27,6 +29,7 @@ namespace MatchZy
         // inherits shooting bots, a frozen .startround or regeneration settings.
         private void ResetPracticeExtras()
         {
+            ResetNadeFollow(mapStart: false);
             ResetBotCombatState();
             botShootEnabled = false;
             botReactionTimeMs = 500;

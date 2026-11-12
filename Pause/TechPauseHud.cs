@@ -16,7 +16,6 @@ public partial class MatchZy
 {
     private Team? techPauseHudTeam;
     private string techPauseHudCaller = "";
-    private DateTime techPauseHudCalledAt;
     private CounterStrikeSharp.API.Modules.Timers.Timer? techPauseHudTimer;
     private bool techPauseHudShown;
     // false: a regular .pause (both teams unpause, no time limit, no tech pause count).
@@ -29,7 +28,6 @@ public partial class MatchZy
         techPauseHudIsTech = isTech;
         techPauseHudTeam = team;
         techPauseHudCaller = callerName;
-        techPauseHudCalledAt = DateTime.UtcNow;
         techPauseHudTimer = AddTimer(1.0f, TechPauseHudTick, TimerFlags.REPEAT | TimerFlags.STOP_ON_MAPCHANGE);
         // First frame right away instead of after a second.
         Server.NextFrame(TechPauseHudTick);
@@ -170,14 +168,14 @@ public partial class MatchZy
         return GetGameRules()?.FreezePeriod != true;
     }
 
-    // Mode 0: seconds until the pause ends on its own (the timer runs from the call), or null when
-    // it has no time limit.
+    // Mode 0: seconds until the pause ends on its own (counted while it is in effect, see
+    // techPauseElapsed), or null when it has no time limit.
     private int? TechPauseSecondsLeft()
     {
         int duration = techPauseDuration.Value;
         if (duration <= 0)
             return null;
-        return Math.Max(0, duration - (int)(DateTime.UtcNow - techPauseHudCalledAt).TotalSeconds);
+        return Math.Max(0, duration - techPauseElapsed);
     }
 
     private string TechPauseHint(CCSPlayerController player, Team team)

@@ -7,9 +7,13 @@ hide:
 
 # Indstillings-generator
 
-Alle indstillinger i `cfg/MatchZy/config.cfg` med forklaring og standardværdi. Søg, ændr de værdier, du har brug for, og kopiér resultatet: hele din `config.cfg` med standarderne og dine ændringer (markeret), eller kun de ændrede linjer til at sætte ind i `config.cfg` eller i en privat cfg, der køres efter den. **Importér** indlæser værdierne fra den `config.cfg`, du har nu. Dine ændringer gemmes i denne browser. Listen bygges fra plugin'ets egen `config.cfg`, så den altid passer til denne version. Forklaringerne er på engelsk, som i filen. Intet forlader din browser.
+Ændr de indstillinger, du har brug for, og kopiér din `config.cfg`. Intet forlader din browser.
 
-Alle indstillinger, også dem der ikke står i `config.cfg`, findes i [Konfiguration (convars)](convars.md).
+??? note "Sådan virker det"
+    - Listen læses fra plugin'ets egen `cfg/MatchZy/config.cfg` med forklaring og standardværdi for hver indstilling, så den altid passer til denne version. Søg på navn eller tekst, eller hop til en sektion. Forklaringerne er på engelsk, som i filen.
+    - Til højre er **Hele config.cfg** hele filen med dine ændringer markeret, og **Kun ændrede** er kun de linjer, du har ændret, til at sætte ind i `config.cfg` eller i en privat cfg, der køres efter den.
+    - **Importér** indlæser den `config.cfg`, du har nu. Dine ændringer gemmes i denne browser, indtil du trykker **Nulstil alt**.
+    - Indstillinger, der ikke står i `config.cfg`, findes i [Konfiguration (convars)](convars.md).
 
 <!--MATCHZY_SETTINGS-->
 

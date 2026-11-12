@@ -52,7 +52,7 @@ public class MatchConfigLogicTests
 
     [Fact]
     public void NumMapsLargerThanTheMapListFails() =>
-        Assert.Equal("num_maps should be equal to or greater than maplist!", ValidateWith("num_maps", 5));
+        Assert.Equal("num_maps should not be larger than the number of maps in maplist!", ValidateWith("num_maps", 5));
 
     [Fact]
     public void NonIntegerPlayersPerTeamFails() =>
@@ -94,7 +94,7 @@ public class MatchConfigLogicTests
 
     [Fact]
     public void MapSidesWithUnknownValueFails() =>
-        Assert.Equal("map_sides should be \"team1_ct\", \"team1_t\", or \"knife\"!", ValidateWith("map_sides", new JArray("team1_ct", "ct")));
+        Assert.Equal("map_sides should be \"team1_ct\", \"team1_t\", \"team2_ct\", \"team2_t\" or \"knife\"!", ValidateWith("map_sides", new JArray("team1_ct", "ct")));
 
     [Fact]
     public void MapSidesShorterThanNumMapsFails()
@@ -174,6 +174,13 @@ public class MatchConfigLogicTests
     {
         var order = new[] { "team1_ban", "team2_ban", "team1_ban", "team2_ban", "team1_ban", "team2_ban" };
         Assert.Equal("", MatchConfigLogic.ValidateMapBanOrder(order, poolCount: 7, numMaps: 1));
+    }
+
+    [Fact]
+    public void ValidateMapBanOrder_RejectsUnknownOption()
+    {
+        var order = new List<string> { "team1_ban", "team2_veto", "team1_ban", "team2_ban", "team1_ban", "team2_ban" };
+        Assert.StartsWith("Unknown veto option \"team2_veto\"", MatchConfigLogic.ValidateMapBanOrder(order, 7, 1));
     }
 
     [Fact]

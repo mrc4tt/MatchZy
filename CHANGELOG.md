@@ -2,6 +2,64 @@
 
 Based on [MatchZy](https://github.com/shobhit-pathak/MatchZy) by Shobhit Pathak, adapted for CS2 game-server hosting: remote log HTTP API, G5API compatibility, auto changelevel, advanced stats (HLTV 2.0 rating / KAST / clutch / opening duels), a coach system, a pause overhaul, and in-game admin and match-setup menus.
 
+# 1.0.25
+
+#### November 12, 2026
+
+- Practice `.bot` adds one bot again: it used to add two and kick one right away (`[SpawnBot] kicking extra pair bot` in the log).
+- Practice `.xray` no longer fills the server console with `Assertion Failed ... EF_IN_STAGING_LIST` lines while it is on.
+- New (beta) spectator coach, `matchzy_coaching_mode 3`: the coach has no body and watches from the Spectator team, locked in first person on their own team, like coaching in CS:GO. The radar shows the own team and spotted enemies only, unspotted enemies and a dropped bomb (CT coach) are not sent to the coach, teammates are outlined through walls and enemies never are. The coach goes back to the team at `.uncoach` and at the end of the match.
+- New convars for the spectator coach: `matchzy_spectator_coach_hide_enemies`, `matchzy_spectator_coach_no_xray`, `matchzy_spectator_coach_team_xray`, `matchzy_spectator_coach_pawn_team` (all default on) and `matchzy_coach_comm_unrestricted` (default off: coach voice and team chat to the team at any time, CS:GO's `sv_coach_comm_unrestricted`). New gamedata signatures `CCSGameRules_CanPlayerHear_CoachCommGate` and `CPlayer_ObserverServices::IsValidObserverTarget`.
+- Removed `matchzy_prac_disable_magazine_drop` (removed from config.cfg on update): CS2 no longer has `sv_magazine_drop_enabled`, so `.prac` and leaving practice only printed an unknown-command line.
+- New `matchzy_cstv_kick_guard` (default on): when CS2's bot quota trims bots (a lowered `bot_quota`, or `bot_quota_mode fill` and a player joining a team) it kicked SourceTV first, which stopped GOTV and split the running demo in two. The quota now skips SourceTV and kicks a real bot instead (new gamedata signature `KickBotFromTeam`).
+- The SQLite database no longer leaves `matchzy.db-wal` and `matchzy.db-shm` next to `matchzy.db`: it uses the normal rollback journal again. An existing database is switched on the next start and the two files are removed. `matchzy.db` alone is now always a complete copy.
+- A live match that the engine put back into warmup ("Game Commencing" when the first player joins a team that was empty at `.start`, for example bots added later or a team coached from Spectator) now ends that warmup again on its own.
+- `.match`, `.prac` and `.sleep` called by another plugin (a practice add-on leaving practice from its own map-end listener) now run a frame later and are ignored while the map is changing. Running the mode switch during a changelevel worked on a level that was being torn down and could crash the server.
+- A coach's bomb is no longer deleted and replaced: the coach drops it and the dropped C4 is moved to a teammate, who picks it up. Deleting and re-giving C4s around round (re)starts could still end the server with "WriteEnterPVS: GetEntServerClass failed". A coach's other weapons are removed by the engine again (as in 1.0.24) once the bomb is handed on, instead of being deleted one by one.
+- Grenade follow camera in practice: after a throw from a lineup trainer spot the camera follows the grenade full screen and then backs off to show where it landed, with a cyan trail of the flight. Jump to come back to where you threw. `.follownade` switches between lineup spots only (default), every throw, and off, per player. It moves your own (invisible, noclip) player behind the grenade, not a separate view, so only you are affected.
+- The clinch trophy on the scoreboard's round timeline (round 13 of 24) now follows `.match`, `.scrim` and `.hill` in warmup: it appears again after `.scrim` -> `.match` and disappears after `.match` -> `.scrim`, without a restart. Before, it kept the previous mode until the match went live.
+- Lineup trainer for the grenade library: `.shownades` marks each lineup spot with a glowing green figure. Near a spot, a red target shows on the wall or sky where each of its lineups aims, the selected one glowing green (F cycles). Standing on the spot (no key needed) adds a hint box at the bottom of the screen that says how to throw (for example "Left Click + Jump"), in the player's language. Targets and hint are only shown to that player. E on a marker, `.nades` and `.loadnade` still teleport onto the spot; a lineup loaded without a shown marker gets the same targets and hint for that player. The throw style comes from `.savenade <name> <style>` (normal, jump, run, walk, crouch). New `matchzy_lineup_target_angles` tunes how the target model faces the wall. The beams and text labels of `.shownades` are gone, and with them `matchzy_grenadelibrary_labels` and `matchzy_grenadelibrary_label_scale` (removed from config.cfg on update).
+- New `matchzy_allchat_mute_votes` (default `0` = off): when that many players on a team write `.mute` or `!mute` (alias `.nochat`), all chat is turned off until the map changes, so the teams can no longer write to each other. Team chat, admins and chat commands (lines starting with `.`, `!` or `/`) still work. Admins turn all chat on or off with `.allchat [on|off]`. To keep chat quiet, the vote lines are not shown, only the first vote is announced, and a blocked player is told once per map. While CS2-SimpleAdmin is loaded, `!mute` stays its admin mute: a bare `.mute` / `!mute` tells the player to vote with `.nochat`.
+- Fixed a server crash ("WriteEnterPVS: GetEntServerClass failed") when a coach got the bomb: two of the hand-off paths (the round-start bomb and a pickup) could run in the same frame, both removed the same C4 and both gave out a new one. Each C4 is now removed once, and only one replacement is given.
+- Coaches can no longer take control of a bot on their team while they spectate (CS2 offers it to any dead player watching a bot). The "take control" option is turned off for coaches, and a takeover that still happens is ended at once: the coach is put back to spectating and the bot's body dies. The permission is now also cleared after the engine's own update each tick, and if a coach still takes over a bot, `bot_controllable` is set to 0 until the map changes.
+- `.uncoach` during freeze time of a live or knife round now answers that it works once the round has started. Before, the coach body stayed in the round frozen at the viewing spot, unarmed and unable to take damage, so the team could never be eliminated.
+- `.matchsetup` with a veto and "Skip knife" now gives team1 CT on every map. Before, the veto's side picks and a knife round on the decider were used anyway.
+- A technical pause (`matchzy_tech_pause_mode 0`) now counts `matchzy_tech_pause_duration` only while it is in effect in freeze time. A `.tech` called early in a long round could run out before the pause began; the unpause then cancelled it, and the team still lost the pause.
+- The `.nades` menu no longer teleports a dead player to a shared lineup or gives them a grenade.
+- A coach who is picked as the bomb carrier no longer loses the C4: the spawn strip deleted it before the hand-off to a player. A player who becomes coach during freeze time now hands over the bomb and is stripped at once, instead of dropping their weapons for the team when freeze time ends.
+- A BO2 veto from a pool of 3 maps now bans one map and picks two. Before, two bans left one map and the series stopped after map 1.
+- The restart after a series end (G5API servers, servers without auto changelevel, an empty map rotation) no longer fires on the next match: a match loaded within the restart delay was reset and its players kicked.
+- `matchzy_loadmatch` and `matchzy_loadmatch_url` are refused while another loaded match waits for its map change, and a URL load checks again when the download finishes. A second load used to replace the first.
+- Loading a match whose first map cannot be loaded (not a stock map, workshop id or collection map) now fails with a log line. Before, the load reported success and the server stayed on the old map. After such a veto, `.stopmatch` now lets the next ready-up start again.
+- `min_spectators_to_ready` works again: spectators can `.ready` when the match config asks for ready spectators. Since 1.0.24 their `.ready` was refused, so such a match never started.
+- A `veto_mode` with an unknown entry (for example `team1_veto`) is refused at load with an error naming it. Before, the veto stopped at that step.
+- `matchzy_validate_match` no longer fails with an exception on odd values such as `"num_maps": "three"`, and its error messages for `num_maps` and `map_sides` say what is allowed.
+- The plugin no longer crashes the server at start when `cfg/MatchZy/matchzymaps.cfg` is missing and cannot be created (read-only folder, full disk). The map rotation is empty then.
+- `.match`, `.scrim` and `.hill` from practice, sleep or a dry run now start the chosen mode with its settings. `.hill` from practice started a scrim, and `.match` used the knife default instead of the knife it announced.
+- `.rr` in practice restarts the round also when "." is a CounterStrikeSharp chat trigger.
+- Readying up by ping now sends the `player_ready` / `player_unready` events and the team-ready message, like `.ready`.
+- `.skipveto` only works while a veto runs, and it now lifts the veto's pause. Outside a veto it switched the server to warmup on top of practice or an idle server.
+- `.start` / `.forcestart` and `.warmup` are refused during the map veto (they restarted it), and `.warmup` is refused in practice (it changed the cfg but left practice on).
+- With `matchzy_kick_when_no_match_loaded`, a registered player who connects while a loaded match changes map is no longer kicked as "not in the match".
+- `matchzy_demo_upload_url ""` and `matchzy_remote_backup_url ""` now turn uploads off. Before, an empty value was ignored and the old URL stayed in use.
+- `series_start` is sent once the match has a matchid when the database was not reachable at load. Before, it was dropped.
+- With `matchzy_demo_upload_s3 1` and a demo split into several parts (recording restarted, CSTV reconnected), only the largest part is uploaded and the others are reported as failed in `demo_upload_ended`. Each part used to overwrite the previous one at the same presigned URL.
+- MySQL: team names longer than 64 characters no longer stop the stats of a match, new tables are created as utf8mb4, and a player whose name the database cannot store is saved with the name reduced to plain characters instead of being left out.
+- Advanced stats with bots in the stats (`matchzy_stats_include_bots`, bot teams): a kill on a bot counts for KAST, opening duels and trades, and living bots count for clutches.
+- Match events (`map_result`, `series_end`, `demo_upload_ended`, ...) are sent again up to two times after a timeout or a server error from the receiver, in order. A single failure lost them before.
+- A forfeit, `.gg` or `get5_endmatch` now writes the final player stats, the CSV and the stats JSON for the map in progress.
+- Database calls made right after the server starts wait for the database setup instead of failing.
+- Database rows created by the early matchid allocation are closed when the match does not use that id.
+- Practice: `.xray` glows and `.runboost` are forgotten at a map change instead of being removed later through stale handles.
+- Practice: per-player settings (`.liferegon`, `.smoketimer`, saved respawn, bot loadouts) are cleared when the player leaves, so the next player in that slot does not inherit them and one player's `.liferegon false` no longer keeps the whole server in timer health mode.
+- Practice: `.nobots`, `.kicklastbot` and replay bots forget the bot's `.botgun` / `.armor`, so a new bot does not inherit them. `.kicklastbot` kicks the bot added last.
+- Practice: a bot added just before leaving practice no longer stays in the match warmup or dry run, and leaving practice turns off `bot_stop`, `bot_freeze`, `bot_zombie` and `bot_dont_shoot`.
+- Practice: strat playback no longer stays "busy" when its owner leaves while the bots spawn, and players frozen by a `.rec` or `.strat` countdown are unfrozen when practice ends.
+- Practice: a damaged saved paths, strats or bot spawns file no longer breaks `.listrec`, `.strat` and the other commands of that map, and saves made in quick succession no longer overwrite each other.
+- Practice: `.showbotpos` markers are no longer drawn after a map change out of practice.
+- An error in an event handler is logged with its event name and no longer skips the rest of the handler's work.
+- A failed demo upload no longer writes the S3 signature details from the receiver's reply to the log.
+
 # 1.0.24
 
 #### November 10, 2026

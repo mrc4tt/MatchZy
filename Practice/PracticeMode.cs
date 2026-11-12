@@ -212,6 +212,9 @@ namespace MatchZy
         // (Backup)
         private readonly object _botsDictLock = new();
         public Dictionary<int, Dictionary<string, object>> pracUsedBots = new Dictionary<int, Dictionary<string, object>>();
+        // pracUsedBots entry key holding the claim sequence number (long) used by .kicklastbot.
+        private const string PracBotSpawnSeqKey = "spawnseq";
+        private long _pracBotSpawnSeq;
         private readonly HashSet<int> _botsBeingProcessed = new();
 
         public string practiceCfgPath => MatchZyCfgRel("prac.cfg");
@@ -244,7 +247,7 @@ namespace MatchZy
             try
             {
                 return new MemoryFunctionWithReturn<CCSGameRules, nint>(
-                    GameData.GetSignature("CCSGameRules_PostCleanUp")).Invoke;
+                    MzGameData.GetSignature("CCSGameRules_PostCleanUp")).Invoke;
             }
             catch
             {
@@ -334,11 +337,6 @@ namespace MatchZy
                 Server.ExecuteCommand("""sv_cheats "true"; mp_force_pick_time "0"; bot_quota "0"; sv_showimpacts "1"; mp_limitteams "0"; sv_deadtalk "true"; sv_full_alltalk "true"; sv_ignoregrenaderadio "false"; mp_forcecamera "0"; sv_grenade_trajectory_prac_pipreview "true"; sv_grenade_trajectory_prac_trailtime "3"; sv_infinite_ammo "1"; weapon_auto_cleanup_time "15"; weapon_max_before_cleanup "30"; mp_buy_anywhere "1"; mp_maxmoney "9999999"; mp_startmoney "9999999";""");
                 Server.ExecuteCommand("""mp_weapons_allow_typecount "-1"; mp_death_drop_defuser "false"; mp_death_drop_taser "false"; mp_drop_knife_enable "true"; mp_death_drop_grenade "0"; ammo_grenade_limit_total "5"; mp_defuser_allocation "2"; mp_free_armor "2"; mp_ct_default_grenades "weapon_incgrenade weapon_hegrenade weapon_smokegrenade weapon_flashbang weapon_decoy"; mp_ct_default_primary "weapon_m4a1";""");
                 Server.ExecuteCommand("""mp_t_default_grenades "weapon_molotov weapon_hegrenade weapon_smokegrenade weapon_flashbang weapon_decoy"; mp_t_default_primary "weapon_ak47"; mp_warmuptime 9999; mp_warmuptime_all_players_connected 0; mp_warmup_online_enabled "true"; mp_warmup_pausetimer "1"; mp_warmup_start; bot_quota_mode normal; mp_solid_teammates 2; mp_autoteambalance false; mp_teammates_are_enemies false; buddha 1; buddha_ignore_bots 1; buddha_reset_hp 100;""");
-                // CS2 March 2026+: Disable magazine-based reload (ammo discard on reload) for practice mode
-                if (pracDisableMagazineDrop.Value)
-                {
-                    Server.ExecuteCommand("""sv_magazine_drop_enabled "false";""");
-                }
             }
 
             // Practice team-damage: grenade / molotov / friendly-fire testing would otherwise trip the
@@ -1039,6 +1037,7 @@ namespace MatchZy
                                         _ => "weapon_smokegrenade",
                                     };
                                     TeleportAndClearPose(player, loadedPlayerPos, loadedPlayerAngle, wantDucked: false, deployWeapon: nadeWeapon, giveDeploy: true);
+                                    ShowNadeTutorial(player, nearestName, nadeType, lineupInfo.GetValueOrDefault("Throw") ?? "", loadedPlayerPos, loadedPlayerAngle);
 
                                     // Extract description, if available
                                     string? lineupDesc = lineupInfo.ContainsKey("Desc") ? lineupInfo["Desc"] : null;
@@ -1479,6 +1478,8 @@ namespace MatchZy
         [ConsoleCommand("css_tactics", "Starts practice mode")]
         public void OnPracCommand(CCSPlayerController? player, CommandInfo? command)
         {
+            if (DeferExternalModeCall(player, command, () => OnPracCommand(null, null)))
+                return;
             if (!IsPlayerAdmin(player, "css_prac", "@css/map", "@custom/prac"))
             {
                 SendPlayerNotAdminMessage(player);
@@ -1998,15 +1999,18 @@ namespace MatchZy
                         _ => CsTeam.Terrorist,
                     };
 
-                // Pre-pin the quota to the count INCLUDING the bot about to be added, so the
-                // engine's quota think has no headroom to add a balance partner alongside
-                // bot_add_t/_ct (the pair-spawn: one .bot -> a bot on each team). SpawnBot
-                // re-pins to the tracked count after the claim, and its claim pass still
-                // kicks a pair extra if the engine adds one anyway.
+                // Pre-pin the quota to the bots we track now. bot_add_t/_ct raises bot_quota by one
+                // itself, so after the add the quota equals the bots in the game and the engine's
+                // quota think has no headroom to add a second bot. Pinning to count + 1 here left
+                // the quota at count + 2 after the add, and every .bot spawned a pair (one kept,
+                // the other kicked a moment later by the claim pass below; in a match log:
+                // "[SpawnBot] kicking extra pair bot"). SpawnBot re-pins to the tracked count after
+                // the claim, and its claim pass still kicks an extra if the engine adds one anyway.
+                // The bot quota itself kicks nobody in practice (CstvKickGuard).
                 int quotaBotCount;
                 lock (_botsDictLock)
                     quotaBotCount = pracUsedBots.Count;
-                Server.ExecuteCommand($"bot_quota {quotaBotCount + 1}");
+                Server.ExecuteCommand($"bot_quota {quotaBotCount}");
 
                 // Add bot to opposite team or forced team. Use ONLY bot_add_t / bot_add_ct - it already
                 // routes the bot to that team. A preceding bot_join_team ALSO spawned a bot, so the two
@@ -2015,6 +2019,15 @@ namespace MatchZy
                     Server.ExecuteCommand("bot_add_t");
                 else
                     Server.ExecuteCommand("bot_add_ct");
+                // bot_add raised the quota by one, but the quota counts bots by pawn and the new
+                // bot has none until it spawns: the next quota think saw one bot missing and added a
+                // second one (one .bot -> two bots, one kicked by the claim pass). Put the quota back
+                // to the tracked count until SpawnBot claims the bot and re-pins it. Only while the
+                // KickBotFromTeam hook is active: it keeps the quota from kicking anything in
+                // practice, so a quota one below the real bot count is harmless. Without it the
+                // quota would kick the new bot.
+                if (_kickBotFromTeam != null)
+                    Server.ExecuteCommand($"bot_quota {quotaBotCount}");
 
                 // Once bot is added, we teleport it to the requested position
                 var targetPlayer = player; // Capture for timer safety
@@ -2022,6 +2035,13 @@ namespace MatchZy
                     0.1f,
                     () =>
                     {
+                        // Practice can end within the 0.1 s (.exitprac, match load): claiming and
+                        // teleporting a bot then would touch a non-practice session.
+                        if (!isPractice)
+                        {
+                            isSpawningBot = false;
+                            return;
+                        }
                         if (targetPlayer != null && targetPlayer.IsValid && targetPlayer.Connected == PlayerConnectedState.Connected)
                         {
                             SpawnBot(targetPlayer, crouch, boost, targetTeam, posOverride);
@@ -2030,7 +2050,8 @@ namespace MatchZy
                         {
                             isSpawningBot = false;
                         }
-                    }
+                    },
+                    TimerFlags.STOP_ON_MAPCHANGE
                 );
 
                 Server.ExecuteCommand("bot_stop 1");
@@ -2514,6 +2535,8 @@ namespace MatchZy
         {
             try
             {
+                // Reached from timers (AddBot, retries): practice may have ended meanwhile.
+                if (!isPractice) { isSpawningBot = false; return; }
                 if (!IsPlayerValid(botOwner))
                 {
                     isSpawningBot = false;
@@ -2583,7 +2606,7 @@ namespace MatchZy
                     var retryPos = posOverride;
                     AddTimer(0.15f, () =>
                     {
-                        if (IsPlayerValid(retryOwner) && retryOwner.Connected == PlayerConnectedState.Connected)
+                        if (isPractice && IsPlayerValid(retryOwner) && retryOwner.Connected == PlayerConnectedState.Connected)
                         {
                             SpawnBot(retryOwner, crouch, boost, targetTeam, retryPos, attempt + 1);
                         }
@@ -2591,7 +2614,7 @@ namespace MatchZy
                         {
                             isSpawningBot = false;
                         }
-                    });
+                    }, TimerFlags.STOP_ON_MAPCHANGE);
                     return;
                 }
 
@@ -2617,6 +2640,9 @@ namespace MatchZy
                         pracUsedBots[claimedBot.UserId.Value]["position"] = botOwnerPosition;
                         pracUsedBots[claimedBot.UserId.Value]["owner"] = botOwner;
                         pracUsedBots[claimedBot.UserId.Value]["crouchstate"] = crouch;
+                        // Claim order for .kicklastbot: userids (slots) are reused, so the highest
+                        // userid is not necessarily the newest bot.
+                        pracUsedBots[claimedBot.UserId.Value][PracBotSpawnSeqKey] = ++_pracBotSpawnSeq;
                     }
 
                     if (crouch)
@@ -3006,6 +3032,8 @@ namespace MatchZy
             KickAllBotsProtectCSTV();
             lock (_botsDictLock)
                 pracUsedBots = new Dictionary<int, Dictionary<string, object>>();
+            // The kicked bots' userids are reused by the next bots: drop their armor/gun overrides.
+            ResetBotLoadouts();
             CleanupAllCollisionTimers();
         }
 
@@ -3692,7 +3720,7 @@ namespace MatchZy
             {
                 try
                 {
-                    return GameData.GetSignature(key);
+                    return MzGameData.GetSignature(key);
                 }
                 catch (Exception e)
                 {
@@ -3748,7 +3776,7 @@ namespace MatchZy
                         if (player.PlayerPawn.Value == null)
                         {
                             Log($"[RespawnWhenTeamApplied] {player.PlayerName}: pawn handle empty, calling Respawn vfunc directly ({attemptsLeft} attempts left)");
-                            VirtualFunction.CreateVoid<IntPtr>(player.Handle, GameData.GetOffset("CCSPlayerController_Respawn"))(player.Handle);
+                            VirtualFunction.CreateVoid<IntPtr>(player.Handle, MzGameData.GetOffset("CCSPlayerController_Respawn"))(player.Handle);
                         }
                         else
                         {
@@ -3959,8 +3987,7 @@ namespace MatchZy
             if (File.Exists(absolutePath))
             {
                 //Log($"[ExecDryRunCFG] Starting Dryrun! Executing Dryrun CFG from {dryrunCfgPath}");
-                ExecModeCfg(dryrunCfgPath);
-                Server.ExecuteCommand("mp_restartgame 1;mp_warmup_end;");
+                ExecModeCfgAndRestart(dryrunCfgPath, "mp_restartgame 1;mp_warmup_end;");
             }
             else
             {
@@ -3993,10 +4020,13 @@ namespace MatchZy
             // prac.cfg settings no mode cfg resets: undo them here, before sv_cheats goes off (buddha is
             // a cheat command). Otherwise all-talk and buddha stayed on into a dry run or warmup.
             Server.ExecuteCommand("buddha 0; buddha_ignore_bots 0; sv_full_alltalk 0; sv_showimpacts 0;");
+            // .bot / .botshoot set bot_stop/bot_freeze/bot_zombie 1 and bot_dont_shoot 1. They are cheat
+            // cvars, so they can only be reset while sv_cheats is still on (same as LeaveModeOnUnload);
+            // left at 1 the warmup and match bots stood still and never fired. bot_difficulty is left
+            // alone: the warmup bot code sets its own.
+            Server.ExecuteCommand("bot_stop 0; bot_freeze 0; bot_zombie 0; bot_dont_shoot 0");
             Server.ExecuteCommand("sv_cheats false;sv_grenade_trajectory_prac_pipreview false;sv_grenade_trajectory_prac_trailtime 0; mp_ct_default_grenades \"\"; mp_ct_default_primary \"\"; mp_t_default_grenades\"\"; mp_t_default_primary\"\"; mp_teammates_are_enemies false;");
             Server.ExecuteCommand("mp_death_drop_defuser true; mp_death_drop_taser true; mp_drop_knife_enable false; mp_death_drop_grenade 2; ammo_grenade_limit_total 4; mp_defuser_allocation 0; sv_infinite_ammo 0; mp_force_pick_time 15");
-            // CS2 March 2026+: Re-enable magazine-based reload when exiting practice mode
-            Server.ExecuteCommand("""sv_magazine_drop_enabled "true";""");
         }
 
         // Leaves practice mode (and a dry run) without resetting the match: .exitprac / .match reset
@@ -4721,7 +4751,41 @@ namespace MatchZy
             // Reset grenade preview for this slot
             _pipPreviewEnabled[player.Slot] = false;
 
+            try
+            {
+                ForgetPracticePlayerOnDisconnect(player);
+            }
+            catch (Exception e)
+            {
+                Log($"[EventPlayerDisconnect FATAL] practice cleanup: {e.Message}");
+            }
+
             return HookResult.Continue;
+        }
+
+        // Per-player practice state is keyed by userid or slot, and both are reused by the next
+        // player (or bot) that connects: without this a newcomer inherited the leaver's .regen,
+        // .smoketimer, saved-respawn, impacts/.pip and bot armor/gun overrides.
+        internal void ForgetPracticePlayerOnDisconnect(CCSPlayerController player)
+        {
+            _nadeFollows.Remove(player.SteamID);
+            _nadeFollowEnabled.Remove(player.SteamID);
+            int slot = player.Slot;
+            playerImpacts.Remove(slot);
+            if (slot >= 0 && slot < _pipPreviewEnabled.Length)
+                _pipPreviewEnabled[slot] = false;
+            smokeTimerDisabled.Remove(slot);
+            smokeTimerArmed.Remove(slot);
+            smokeTimerStart.Remove(slot);
+            if (!player.UserId.HasValue)
+                return;
+            int uid = player.UserId.Value;
+            respawnAtSavedLocation.Remove(uid);
+            ForgetBotLoadout(uid);
+            // The leaver's override can be what kept buddha off (or the regen timer on); re-derive
+            // the health mode from the players that remain.
+            if (humanRegenOverride.Remove(uid))
+                ApplyPracticeHealthMode();
         }
 
         [GameEventHandler]

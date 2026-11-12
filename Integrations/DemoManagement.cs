@@ -806,7 +806,43 @@ namespace MatchZy
                     {
                       try
                       {
-                        foreach (string segmentPath in segmentPaths)
+                        // A presigned S3 URL names one object: PUTting every segment to it overwrote
+                        // the earlier parts, so only the last one survived while each reported
+                        // success. In S3 mode send only the main segment (the largest, normally the
+                        // one holding most of the map) and report the others as not uploaded.
+                        // HTTP POST mode names each file in its headers and keeps uploading all parts.
+                        List<string> toUpload = segmentPaths;
+                        List<string> skipped = new();
+                        if (useS3 && uploadURL != "" && segmentPaths.Count > 1)
+                        {
+                            string main = segmentPaths[0];
+                            long mainSize = -1;
+                            foreach (string path in segmentPaths)
+                            {
+                                long size = File.Exists(path) ? new FileInfo(path).Length : -1;
+                                if (size > mainSize)
+                                {
+                                    main = path;
+                                    mainSize = size;
+                                }
+                            }
+                            toUpload = new List<string> { main };
+                            skipped = segmentPaths.Where(p => p != main).ToList();
+                            Log($"[UploadDemo] WARNING: matchzy_demo_upload_s3 has one presigned URL per map, so only {Path.GetFileName(main)} is uploaded. Not uploaded (kept on disk): {string.Join(", ", skipped.Select(Path.GetFileName))}");
+                        }
+
+                        foreach (string segmentPath in skipped)
+                        {
+                            await SendEventAsync(new MatchZyDemoUploadedEvent
+                            {
+                                MatchId = uploadMatchId,
+                                MapNumber = currentMapNumber,
+                                FileName = Path.GetFileName(segmentPath),
+                                Success = false,
+                            }, eventTarget);
+                        }
+
+                        foreach (string segmentPath in toUpload)
                         {
                             bool uploadSuccess = await UploadFileAsync(segmentPath, uploadURL, headerKey, headerValue, uploadMatchId, currentMapNumber, roundNumber, useS3);
 
@@ -851,6 +887,28 @@ namespace MatchZy
             string headerValue = command.ArgByIndex(1).Trim();
 
             if (headerValue != "") demoUploadHeaderValue = headerValue;
+        }
+
+        // Shortened, scrubbed form of an upload error body for the server log. An S3
+        // SignatureDoesNotMatch response echoes the request it could not verify (StringToSign,
+        // CanonicalRequest, AWSAccessKeyId, the signature), so logging the raw body leaked
+        // credential material into console logs that are often shared for support.
+        internal static string RedactUploadResponseBody(string? body)
+        {
+            if (string.IsNullOrEmpty(body))
+                return "";
+            string redacted = System.Text.RegularExpressions.Regex.Replace(
+                body,
+                @"<(StringToSign|StringToSignBytes|CanonicalRequest|CanonicalRequestBytes|AWSAccessKeyId|SignatureProvided|Signature|X-Amz-Credential|X-Amz-Signature)>.*?</\1>",
+                "<$1>[redacted]</$1>",
+                System.Text.RegularExpressions.RegexOptions.Singleline | System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+            redacted = System.Text.RegularExpressions.Regex.Replace(
+                redacted,
+                @"(X-Amz-Credential|X-Amz-Signature|X-Amz-Security-Token|AWSAccessKeyId|Signature)=[^&\s""<]+",
+                "$1=[redacted]",
+                System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+            redacted = redacted.Replace('\r', ' ').Replace('\n', ' ');
+            return redacted.Length > 200 ? redacted.Substring(0, 200) + "..." : redacted;
         }
 
         private string FormatDemoName()
