@@ -44,6 +44,7 @@ namespace MatchZy
         {
             base.OnAllPluginsLoaded(hotReload);
             ScheduleServerReady(hotReload);
+            ScheduleAutoRecover();
         }
 
         private void ScheduleServerReady(bool hotReload)

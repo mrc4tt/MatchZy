@@ -649,6 +649,42 @@ namespace MatchZy
             Utilities.SetStateChanged(p, "CCSGameRulesProxy", "m_pGameRules");
         }
 
+        // Removes every override that stops a live round from ending. The ready phase (styles 1/2)
+        // runs as a fake warmup: mp_ignore_round_win_conditions 1, respawn on death, and (style 1)
+        // m_bGameRestart forced true every tick for the anti-flash HUD fix. The tech pause / timeout
+        // HUD does the same with m_bGameRestart. Leaving the ready phase used to reset only the
+        // convars, so a match that went live straight from it (a round restore during warmup:
+        // crash recovery or a repeated .restore) kept m_bGameRestart set. The engine then treats a
+        // restart as already in progress and never ends the round: everyone dead, timer at 0:00.
+        // m_bGameRestart is only cleared when no real restart is scheduled (RestartRoundTime in the
+        // past), so a pending mp_restartgame is left alone.
+        private void ClearLiveRoundBlockers(string reason)
+        {
+            bool hadFakeWarmup = _fakeWarmupActive;
+            _fakeWarmupActive = false;
+            ResetTechPauseAntiFlash();
+            Server.ExecuteCommand("mp_ignore_round_win_conditions 0; mp_respawn_on_death_ct 0; mp_respawn_on_death_t 0");
+            try
+            {
+                var proxy = Utilities.FindAllEntitiesByDesignerName<CCSGameRulesProxy>("cs_gamerules").FirstOrDefault();
+                var gr = proxy?.GameRules;
+                if (gr == null)
+                    return;
+                bool leakedRestart = gr.GameRestart && gr.RestartRoundTime < Server.CurrentTime;
+                if (leakedRestart)
+                {
+                    gr.GameRestart = false;
+                    Utilities.SetStateChanged(proxy!, "CCSGameRulesProxy", "m_pGameRules");
+                }
+                if (hadFakeWarmup || leakedRestart)
+                    Log($"[ClearLiveRoundBlockers] {reason}: fakeWarmup={hadFakeWarmup}, leakedGameRestart={leakedRestart}.");
+            }
+            catch (Exception e)
+            {
+                Log($"[ClearLiveRoundBlockers] {e.Message}");
+            }
+        }
+
         // 1s timer: keep data fresh, re-assert clan tags ([READY]/[UNREADY] scoreboard), and
         // - in classic style (matchzy_ready_hint_style 0) - broadcast the plain center text.
         private void SendReadyStatusHintMessage()
@@ -801,8 +837,7 @@ namespace MatchZy
                 // before play.
                 if (_fakeWarmupActive)
                 {
-                    Server.ExecuteCommand("mp_ignore_round_win_conditions 0; mp_respawn_on_death_ct 0; mp_respawn_on_death_t 0");
-                    _fakeWarmupActive = false;
+                    ClearLiveRoundBlockers("ready phase ended");
 
                     // Mode 1 ended real warmup (m_bWarmupPeriod=false) + set mp_roundtime 60 to hide the
                     // native warmup HUD. If we are leaving mode 1 but are STILL in the ready phase (e.g.
@@ -1827,6 +1862,8 @@ namespace MatchZy
                 try { CloseMatchAdminThreads(); }
                 catch (Exception e) { Log($"[CloseMatchAdminThreads] {e.Message}"); }
                 bool cancellingMatch = cancelReason != null && (matchStarted || isMatchSetup);
+                if (cancellingMatch)
+                    ClearActiveMatch($"match cancelled: {cancelReason}");
                 if (cancellingMatch && liveMatchId > 0)
                 {
                     (int t1score, int t2score) = GetTeamsScore();
@@ -5643,7 +5680,9 @@ namespace MatchZy
                     continue;
                 Log($"[KickPlayersWithNoMatch] Kicking {player.PlayerName} ({player.SteamID}): the series is over and no match is loaded.");
                 PrintLocalizedToAll("matchzy.cmd.kicknotinmatch", player.PlayerName);
-                Server.NextFrame(() => Server.ExecuteCommand($"kickid {userId}"));
+                PublishPlayerKicked(player, "series_over");
+                string kickText = SanitizeKickMessage(Localizer.ForPlayer(player, "matchzy.kick.seriesover"));
+                Server.NextFrame(() => Server.ExecuteCommand($"kickid {userId} \"{kickText}\""));
             }
         }
 
@@ -5651,16 +5690,64 @@ namespace MatchZy
         // player_connect, so their disconnect is not sent either. Removed on disconnect.
         private readonly HashSet<int> gateKickedUserIds = new();
 
-        public void KickPlayerDeferred(CCSPlayerController player)
+        public void KickPlayerDeferred(CCSPlayerController player, string reasonCode = "", string message = "")
         {
             if (player.UserId.HasValue)
                 gateKickedUserIds.Add(player.UserId.Value);
+            if (reasonCode != "")
+                PublishPlayerKicked(player, reasonCode);
+            string kickText = SanitizeKickMessage(message);
             Server.NextFrame(() =>
             {
                 if (!IsPlayerValid(player) || !player.UserId.HasValue)
                     return;
-                Server.ExecuteCommand($"kickid {player.UserId.Value}");
+                // The text after the userid is what the player sees in the disconnect dialog.
+                Server.ExecuteCommand(kickText == ""
+                    ? $"kickid {player.UserId.Value}"
+                    : $"kickid {player.UserId.Value} \"{kickText}\"");
             });
+        }
+
+        // Kick text goes into a console command line: no quotes, no command separators.
+        private static string SanitizeKickMessage(string message)
+        {
+            var sb = new System.Text.StringBuilder(message.Length);
+            foreach (char c in message)
+            {
+                if (c == '"' || c == ';' || c == '\n' || c == '\r' || char.IsControl(c))
+                    continue;
+                sb.Append(c);
+            }
+            string text = sb.ToString().Trim();
+            return text.Length > 200 ? text[..200] : text;
+        }
+
+        // Log line + player_kicked event, so a kick at the connect gate can be explained afterwards
+        // (from the server log or the panel) instead of the player just being gone.
+        private void PublishPlayerKicked(CCSPlayerController player, string reasonCode)
+        {
+            try
+            {
+                int t1 = matchzyTeam1.teamPlayers is JToken r1 ? r1.Count() : 0;
+                int t2 = matchzyTeam2.teamPlayers is JToken r2 ? r2.Count() : 0;
+                Log($"[ConnectGate] Kicked {player.PlayerName} ({player.SteamID}): {reasonCode}. "
+                    + $"matchLoaded={isMatchSetup}, matchid={liveMatchId}, kick_when_no_match_loaded={matchModeOnly}, whitelist={isWhitelistRequired}, "
+                    + $"team1 '{matchzyTeam1.teamName}' roster={t1}, team2 '{matchzyTeam2.teamName}' roster={t2}, map={Server.MapName}.");
+                PublishLifecycleEvent(new PlayerKickedEvent
+                {
+                    MatchId = LifecycleMatchId(),
+                    MapName = Server.MapName,
+                    PluginVersion = ModuleVersion,
+                    PlayerSteamId = player.SteamID.ToString(),
+                    PlayerName = player.PlayerName,
+                    Reason = reasonCode,
+                    MatchLoaded = isMatchSetup,
+                });
+            }
+            catch (Exception e)
+            {
+                Log($"[ConnectGate] {e.Message}");
+            }
         }
 
         /// <summary>

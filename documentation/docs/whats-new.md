@@ -2,6 +2,18 @@
 
 A short summary of each release. The [full changelog](changelog.md) has the details and background for every change.
 
+## 1.0.25 <small>November 13, 2026</small>
+
+- **New:** A match interrupted by a crash, restart or plugin reload comes back on its own (`matchzy_auto_recover`): MatchZy restores the newest round backup of that match with its rosters, team names, match id and score. Players on its roster are let in meanwhile instead of being kicked.
+- **New:** `.recover` / `matchzy_recover` brings back the interrupted match without a file name: its newest backup, or a round number.
+- **New:** Valve's `mp_backup_restore_load_file` goes through MatchZy's restore (`matchzy_raw_backup_restore`), so rosters, team names and the pause come back as well. A `.txt` round file without MatchZy's `.json` is rebuilt from the match's other backups.
+- **New:** A live round that never ends (one side all dead, or the timer at 0:00) is ended after a few seconds (`matchzy_round_watchdog`).
+- **New:** Players kicked at connect see why in the disconnect dialog, the server log has a `[ConnectGate]` line with the cause, and panels get a `player_kicked` event. Every disconnect is logged with the engine's reason.
+- **New:** `match_recovered` event when a match was brought back on its own.
+- **Changed:** `matchzy_loadbackup` also takes the `.txt` name, a name without extension, `latest` or a round number.
+- **Changed:** `.restore`, `.restorelast` and `.restorecurrent` without a live match list the backups on disk and how to load one, instead of doing nothing.
+- **Fixed:** A round restored from warmup (crash recovery or `.restore` twice) or during a technical pause no longer gets stuck with everyone dead and the timer at 0:00.
+
 ## 1.0.24 <small>November 10, 2026</small>
 
 - **New:** Admin tickets (turn on with `matchzy_admin_call_enabled`): `.admin` writes to the match's ticket (seen by every player in the match), `.report` to a private one. A panel or ticket system gets every message as an event and answers with `matchzy_admin_reply` over RCON.
@@ -59,12 +71,12 @@ A short summary of each release. The [full changelog](changelog.md) has the deta
 - **Security:** `noclip` in the console only works in practice mode. Before, MatchZy's own `noclip` handler skipped the `sv_cheats` check and let any alive player noclip in warmup, the knife round, scrims and live matches.
 - **Security:** MySqlConnector updated to 2.6.2 (GHSA-473q-m89c-ghf8). With MySQL stats, the older version could send the database password before checking the server's TLS certificate, so someone on the network between the game server and a remote MySQL server could read it.
 
-## 1.0.20 <small>October 24, 2026</small>
-
-- **Fixed:** A match config loaded during a `.start` pug no longer reuses the pug's match id (stats, events, demo name and backups went to the pug).
-- **Changed:** `.showspawns`: E on a spawn marker picks the marker you aim at more precisely, also at a distance and while crouched.
-
 ## Older releases
+
+??? note "1.0.20 - October 24, 2026"
+
+    - **Fixed:** A match config loaded during a `.start` pug no longer reuses the pug's match id (stats, events, demo name and backups went to the pug).
+    - **Changed:** `.showspawns`: E on a spawn marker picks the marker you aim at more precisely, also at a distance and while crouched.
 
 ??? note "1.0.19 - October 24, 2026"
 

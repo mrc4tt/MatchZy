@@ -1078,6 +1078,43 @@ public class MatchPhaseEvent : MatchZyMapEvent
         : base(eventName) { }
 }
 
+// matchzy_auto_recover brought back a match that a crash, restart or plugin reload interrupted.
+public class MatchRecoveredEvent : ServerLifecycleEvent
+{
+    // round_backup (newest round backup restored or queued), match_config (no round backup yet:
+    // the match config was loaded again) or failed.
+    [JsonPropertyName("source")]
+    public required string Source { get; init; }
+
+    [JsonPropertyName("backup_file")]
+    public string? BackupFile { get; init; }
+
+    public MatchRecoveredEvent()
+        : base("match_recovered") { }
+}
+
+// A player the connect gate (or the series-end sweep) kicked: why, and what the server had
+// loaded at the time, so a panel can show why a player could not get in.
+public class PlayerKickedEvent : ServerLifecycleEvent
+{
+    [JsonPropertyName("player_steamid")]
+    public required string PlayerSteamId { get; init; }
+
+    [JsonPropertyName("player_name")]
+    public required string PlayerName { get; init; }
+
+    // not_whitelisted, no_match_loaded, not_in_match, series_over
+    [JsonPropertyName("reason")]
+    public required string Reason { get; init; }
+
+    // Whether a match config was loaded when the player was kicked.
+    [JsonPropertyName("match_loaded")]
+    public bool MatchLoaded { get; init; }
+
+    public PlayerKickedEvent()
+        : base("player_kicked") { }
+}
+
 // matchzy_test_event: a connectivity probe for a panel's endpoint.
 public class TestEvent : ServerLifecycleEvent
 {

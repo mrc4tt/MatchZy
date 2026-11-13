@@ -203,7 +203,8 @@ Mere under [Coaching](../guides/coaching.md).
 | `.restorelast` `.rl` | Config | Gendanner den forrige runde. |
 | `.restorecurrent` `.rrestore` `.rr` | Config | Genstarter den nuværende runde fra start. Også `!restartround`. (I practice genstarter `.rr` i stedet practice-runden; i en dryrun genstarter den dryrun-runden, `.rr 15` med 15 sekunders freeze time.) |
 | `.backups` `.backup` `.backupmenu` | Config | Viser op til 10 backups af denne kamp, nyeste runde først, med score og `!restore`-kommandoen til hver. |
-| `!loadbackup <fil>` | Config | Gendanner en backup-fil ved navn (fra `csgo/MatchZyDataBackup`). Genopbygger kampen ud fra filen, også med baneskift, hvis det er nødvendigt. |
+| `.recover [runde\|fil]` | Config | Henter en afbrudt kamp tilbage (crash, genstart, reload): uden argument den nyeste backup af kampen, ellers et rundenummer eller en fil. |
+| `!loadbackup <fil>` | Config | Gendanner en backup-fil ved navn (fra `csgo/MatchZyDataBackup`). Tager `.json`-navnet, `.txt`-navnet fra `mp_backup_restore_load_file`, et navn uden endelse, `latest` eller et rundenummer. Genopbygger kampen ud fra filen, også med baneskift, hvis det er nødvendigt. |
 | `.listbackups [matchid]` | Config | Viser alle backups af en kamp. Uden et match-id bruges den nuværende kamp. |
 | `.restart` `.abort` | Config | Sætter kampen tilbage til warmup. Ikke i practice eller dryrun. |
 | `.stopmatch` `.endmatch` `.end` `.matchstop` `.forcestop` `.endgame` `.stopgame` `.endscrim` `.exitscrim` | Config | Stopper kampen og nulstiller den. Virker i opsætning, veto, warmup, knife og live. Kampen får et sluttidspunkt og ingen vinder i databasen. |
@@ -429,7 +430,8 @@ Køres fra serverkonsollen, RCON eller et panel. Spillere kan ikke bruge dem.
 | `matchzy_addplayer <steamid64> <team1\|team2\|spec> "<navn>"` | Tilføjer en spiller til den loadede kamp. Ikke i halvlegen. Alias `get5_addplayer`. |
 | `matchzy_removeplayer <steamid64>` | Fjerner en spiller fra den loadede kamp. Ikke i halvlegen. Alias `get5_removeplayer`. |
 | `matchzy_add_ready_time <sekunder>` | Det samme som `.addreadytime`. Alias `get5_add_ready_time`. |
-| `matchzy_loadbackup <fil>` | Gendanner en backup af en runde. Aliaser `get5_loadbackup`, `css_loadbackup`. |
+| `matchzy_loadbackup <fil>` | Gendanner en backup af en runde (`.json`- eller `.txt`-navn, `latest` eller et rundenummer). Aliaser `get5_loadbackup`, `css_loadbackup`. |
+| `matchzy_recover [runde\|fil]` | Gendanner den afbrudte kamp: dens nyeste backup eller den angivne runde eller fil. Alias `css_recover`. |
 | `matchzy_listbackups [matchid]` | Viser backups. Aliaser `get5_listbackups`, `css_listbackups`. |
 | `get5_endmatch [team1\|team2]` | Annullerer kampen, eller afslutter serien med det angivne hold som vinder (som i Get5). Det samme som `css_forceend`. |
 | `get5_status` / `get5_web_available` | Statussvar til Get5-paneler. |

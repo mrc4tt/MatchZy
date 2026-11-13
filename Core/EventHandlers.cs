@@ -28,7 +28,7 @@ public partial class MatchZy
             // Whitelist gate (css_whitelist): non-whitelisted players are kicked.
             if (HandlePlayerWhitelist(player, steamId))
             {
-                KickPlayerDeferred(player);
+                KickPlayerDeferred(player, "not_whitelisted", Localizer.ForPlayer(player, "matchzy.kick.notwhitelisted", steamId));
                 return HookResult.Continue;
             }
 
@@ -43,11 +43,24 @@ public partial class MatchZy
                 CsTeam team = GetPlayerTeam(player);
                 if (team == CsTeam.None)
                 {
-                    if (matchModeOnly && !IsPlayerAdmin(player, "", "@css/config"))
+                    // No match loaded, but the player is on the roster of the interrupted match
+                    // that active_match.json still holds (crash, restart, reload): let them in
+                    // instead of locking the teams out of their own match.
+                    if (matchModeOnly && !isMatchSetup && IsOnInterruptedMatchRoster(player.SteamID, out long interruptedMatchId))
+                    {
+                        Log($"[EventPlayerConnectFull] {player.PlayerName} ({steamId}) is on the roster of interrupted match {interruptedMatchId}, which is not loaded. Letting them in.");
+                        PrintLocalizedToAdmins("matchzy.recover.letin", player.PlayerName, interruptedMatchId);
+                    }
+                    else if (matchModeOnly && !IsPlayerAdmin(player, "", "@css/config"))
                     {
                         Log($"[EventPlayerConnectFull] KICKING PLAYER STEAMID: {steamId}, Name: {player.PlayerName} (NOT ALLOWED!)");
                         PrintLocalizedToAll("matchzy.cmd.kicknotinmatch", player.PlayerName);
-                        KickPlayerDeferred(player);
+                        // Two very different causes: no match config loaded at all (a failed or
+                        // missing load: everyone is kicked), or a loaded match without this SteamID.
+                        if (isMatchSetup)
+                            KickPlayerDeferred(player, "not_in_match", Localizer.ForPlayer(player, "matchzy.kick.notinmatch", liveMatchId, steamId));
+                        else
+                            KickPlayerDeferred(player, "no_match_loaded", Localizer.ForPlayer(player, "matchzy.kick.nomatchloaded"));
                         return HookResult.Continue;
                     }
                     // Only a loaded match has a roster to leave a player out of. An admin who
@@ -193,6 +206,15 @@ public partial class MatchZy
         {
             if (hideFailedConnectMessages.Value && !@event.EverFullyConnected)
                 info.DontBroadcast = true;
+            // Every human disconnect with the engine's reason (Steam auth, timeout, server full, a
+            // kick by another plugin or an admin, ...), so "could not get in" can be explained from
+            // the log. MatchZy's own kicks also log a [ConnectGate] line with the cause.
+            var who = @event.Userid;
+            if (who != null && who.IsValid && !who.IsBot && !who.IsHLTV)
+            {
+                var reason = (CounterStrikeSharp.API.ValveConstants.Protobuf.NetworkDisconnectionReason)@event.Reason;
+                Log($"[Disconnect] {who.PlayerName} ({who.SteamID}) left: {reason} ({@event.Reason}), fullyConnected={@event.EverFullyConnected}.");
+            }
             return HookResult.Continue;
         }
         catch (Exception e)

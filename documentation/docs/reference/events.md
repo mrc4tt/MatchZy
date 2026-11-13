@@ -42,7 +42,7 @@ Player stats objects (`team1.players[].stats` on `round_end` and `map_result`) u
 | `overtime_started` | An overtime begins (the score is level) | `matchid`, `map_number`, `round_number`, `overtime_number` (1, 2, ...) |
 | `demo_recording_start` | The demo recording starts | `matchid`, `map_number`, `filename` |
 | `demo_upload_ended` | A demo upload finished | `map_number`, `filename`, `success` |
-| `player_connect` | A player joins while a match is loaded, and again after each map change. Players kicked for not being in the match are not sent | `player` (user id), `player_steamid`, `player_name`, `player_team`, `ip_address` (without the port) |
+| `player_connect` | A player joins while a match is loaded, and again after each map change. Players kicked for not being in the match are not sent (see `player_kicked`) | `player` (user id), `player_steamid`, `player_name`, `player_team`, `ip_address` (without the port) |
 | `player_disconnect` | A player leaves while a match is loaded. Not sent for players kicked for not being in the match, or who leave before Steam has authenticated them | `player` (user id), `player_steamid`, `player_name`, `player_team`, `reason` |
 
 `match_cancelled` `reason` values: `ended_early` (stopped), `surrendered`, `restarted`, `no_show` (cancelled for a no-show) and `map_changed` (ended by a map change from outside MatchZy).
@@ -63,17 +63,21 @@ To answer, send `matchzy_admin_reply <thread_id> <message>` over RCON; `matchzy_
 
 ## Server lifecycle
 
-Sent with or without a loaded match, to `matchzy_remote_log_url` from `config.cfg`. While a loaded match uses its own remote log URL, they go there as well. All three carry `matchid` (`null` without a match), `map_name` (the current map) and `plugin_version`.
+Sent with or without a loaded match, to `matchzy_remote_log_url` from `config.cfg`. While a loaded match uses its own remote log URL, they go there as well. All of them carry `matchid` (`null` without a match), `map_name` (the current map) and `plugin_version`.
 
 | Event | When | Fields |
 |---|---|---|
 | `server_ready` | All plugins are loaded and `config.cfg` is applied | `hot_reload` (`true` when only MatchZy was reloaded) |
 | `map_change` | Before the map changes | `next_map` (map name or workshop id, `null` when not known), `trigger` (the command, or `map_end`) |
 | `server_shutdown` | The server is about to stop | `reason`, `empty_seconds` (with `empty`: how long the server had no players) |
+| `match_recovered` | `matchzy_auto_recover` brought back a match interrupted by a crash, restart or reload | `source` (`round_backup`, `match_config` or `failed`), `backup_file` |
+| `player_kicked` | MatchZy kicked a player at connect (whitelist, `matchzy_kick_when_no_match_loaded`) or after the series ended | `player_steamid`, `player_name`, `reason`, `match_loaded` (whether a match config was loaded) |
 
 - **`server_ready`**: about 2 seconds after load; on a boot, once the first map runs.
 - **`map_change`**: sent when a map command runs (`changelevel`, `map`, `ds_workshop_changelevel`, `host_workshop_map`), otherwise when the map ends.
 - **`server_shutdown`** `reason`: `quit` (`quit` / `exit`), `restart` (`_restart`), `fatal` (a fatal error), `plugin_unload` (MatchZy being unloaded) `empty` (the server was empty for `matchzy_empty_shutdown_seconds`) or `series_end` (`matchzy_series_end_shutdown_seconds` after a series ended).
+
+- **`player_kicked`** `reason`: `not_whitelisted` (not in `whitelist.cfg`), `no_match_loaded` (no match config is loaded, so everyone without `@css/config` is kicked: usually a match load that failed), `not_in_match` (a match is loaded but this SteamID is on no roster) or `series_over`. The player sees the reason in the disconnect dialog, and the server log has a `[ConnectGate]` line with the loaded match id and roster sizes.
 
 `server_shutdown` is sent while the server waits up to 3 seconds for it. A server that is killed (crash, `SIGKILL`, a panel's force stop) sends nothing; use `server_ready` on the next start to notice it.
 

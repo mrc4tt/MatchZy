@@ -16,7 +16,7 @@ namespace MatchZy
     public partial class MatchZy : BasePlugin
     {
         public override string ModuleName => "MatchZy";
-        public override string ModuleVersion => "1.0.24";
+        public override string ModuleVersion => "1.0.25";
 
         // Shown next to the version in the load line and the version command, so a log or a
         // support question tells this fork (1.0.x) apart from the original MatchZy (0.x).
@@ -605,6 +605,7 @@ namespace MatchZy
                 // (CSS only auto-routes ! and /), so .backup/.backups looked broken in game.
                 { ".backup", OnBackupMenuCommand },
                 { ".backups", OnBackupMenuCommand },
+                { ".recover", OnRecoverCommand },
                 { ".backupmenu", OnBackupMenuCommand },
                 { ".restorelast", OnRestoreLastCommand },
                 { ".rl", OnRestoreLastCommand },
@@ -698,6 +699,7 @@ namespace MatchZy
             RegisterEventHandler<EventCsWinPanelMatch>(EventCsWinPanelMatchHandler);
             RegisterEventHandler<EventRoundStart>(EventRoundStartHandler);
             RegisterEventHandler<EventRoundFreezeEnd>(EventRoundFreezeEndHandler);
+            InitRoundWatchdog();
             RegisterEventHandler<EventPlayerSpawn>(OnCoachPlayerSpawn, HookMode.Post);
             RegisterEventHandler<EventPlayerDeath>(OnCoachDeathPost, HookMode.Post);
             RegisterEventHandler<EventRoundMvp>((@event, info) => OnCoachRoundStatsPost(), HookMode.Post);
@@ -1045,6 +1047,8 @@ namespace MatchZy
             );
 
             AddCommandListener("noclip", OnConsoleNoClip); // Override noclip
+            // Valve's raw round restore goes through MatchZy's restore (matchzy_raw_backup_restore).
+            AddCommandListener("mp_backup_restore_load_file", OnRawBackupRestoreCommand, HookMode.Pre);
 
             RegisterEventHandler<EventRoundEnd>(
                 (@event, info) =>

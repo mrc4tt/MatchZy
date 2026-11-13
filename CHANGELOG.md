@@ -2,6 +2,20 @@
 
 Based on [MatchZy](https://github.com/shobhit-pathak/MatchZy) by Shobhit Pathak, adapted for CS2 game-server hosting: remote log HTTP API, G5API compatibility, auto changelevel, advanced stats (HLTV 2.0 rating / KAST / clutch / opening duels), a coach system, a pause overhaul, and in-game admin and match-setup menus.
 
+# 1.0.25
+
+#### November 13, 2026
+
+- New `matchzy_auto_recover` (default on) with `matchzy_auto_recover_max_age` (default 180 minutes): a loaded match is kept in `MatchZyDataBackup/active_match.json` until the series ends or the match is cancelled. A match interrupted by a crash, a restart or a plugin reload used to be gone from memory, so the server had no rosters, team names or match id and `matchzy_kick_when_no_match_loaded` kicked every player. Ten seconds after the server is ready with no match loaded, MatchZy now restores the newest round backup of that match (or loads its match config again when no round was backed up yet) and sends `match_recovered`.
+- With `matchzy_kick_when_no_match_loaded`, a player on the roster of the interrupted match is let in while no match is loaded, and admins are told in chat.
+- New `.recover` / `matchzy_recover` / `css_recover`: restores the interrupted match without a file name (its newest backup), or a given round number or file.
+- New `matchzy_raw_backup_restore` (default `redirect`): Valve's `mp_backup_restore_load_file` only brought the score back, not the rosters, team names or pause state, and MatchZy did not know about it. It now runs MatchZy's restore of the `.json` with the same name (`.txt` and `.json` names both work). When only the `.txt` exists, the `.json` is rebuilt from another backup of the same match, or from the loaded or interrupted match, with each team's side worked out for that round from the halftime parity; admins are asked to check the sides. `block` refuses the command, `allow` runs it as before.
+- `matchzy_loadbackup` takes the `.txt` name of Valve's command, a name without extension, a path, `latest` or a round number. The `.txt` name used to be looked up as is and reported as "does not exist".
+- `.restore` returned without a word when no match was live; `.restore`, `.restorelast` and `.restorecurrent` now list the newest backups on disk and the command to load one.
+- A round restored from warmup (crash recovery, or `.restore` typed twice) could get stuck with every player dead and the timer at 0:00. The ready phase forces `m_bGameRestart` and `mp_ignore_round_win_conditions 1` for its fake warmup, and leaving it only reset the convars, so the engine kept treating a restart as in progress and never ended the round. Both are now cleared when the ready phase ends and before and after every restore, and a technical pause box is closed before the restore loads.
+- New `matchzy_round_watchdog` (default on): a live round with one side all dead, or the timer past 0:00 with no bomb planted, gets the round-win overrides cleared after 3 seconds and is ended after 8 seconds. The state is logged as `[RoundWatchdog]`.
+- Players kicked at connect see the reason in the disconnect dialog (not whitelisted, no match loaded, not in the match, series over). The server log has a `[ConnectGate]` line with the loaded match id and roster sizes, panels get a `player_kicked` event, and every disconnect is logged with the engine's reason (`[Disconnect]`).
+
 # 1.0.24
 
 #### November 10, 2026

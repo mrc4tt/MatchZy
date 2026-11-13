@@ -203,7 +203,8 @@ More in [Coaching](../guides/coaching.md).
 | `.restorelast` `.rl` | Config | Restores the previous round. |
 | `.restorecurrent` `.rrestore` `.rr` | Config | Restarts the current round from its start. Also `!restartround`. (In practice, `.rr` restarts the practice round instead; in a dryrun it restarts the dryrun round, `.rr 15` with a 15 second freeze time.) |
 | `.backups` `.backup` `.backupmenu` | Config | Lists up to 10 backups of this match, latest round first, with score and the `!restore` command for each. |
-| `!loadbackup <file>` | Config | Restores a backup file by name (from `csgo/MatchZyDataBackup`). Rebuilds the match from the file, including a map change if needed. |
+| `!loadbackup <file>` | Config | Restores a backup file by name (from `csgo/MatchZyDataBackup`). Rebuilds the match from the file, including a map change if needed. Takes the `.json` name, the `.txt` name of `mp_backup_restore_load_file`, a name without extension, `latest` or a round number. |
+| `.recover [round\|file]` | Config | Brings back an interrupted match (crash, restart, reload): without an argument the newest backup of that match, otherwise a round number or a file. |
 | `.listbackups [matchid]` | Config | Lists every backup of a match. Without a match id it uses the current match. |
 | `.restart` `.abort` | Config | Resets the match back to warmup. Not in practice or dryrun. |
 | `.stopmatch` `.endmatch` `.end` `.matchstop` `.forcestop` `.endgame` `.stopgame` `.endscrim` `.exitscrim` | Config | Stops the match and resets it. Works in setup, veto, warmup, knife and live. The match gets an end time and no winner in the database. |
@@ -429,7 +430,8 @@ Run from the server console, RCON or a panel. Players cannot use these.
 | `matchzy_addplayer <steamid64> <team1\|team2\|spec> "<name>"` | Adds a player to the loaded match. Not during halftime. Alias `get5_addplayer`. |
 | `matchzy_removeplayer <steamid64>` | Removes a player from the loaded match. Not during halftime. Alias `get5_removeplayer`. |
 | `matchzy_add_ready_time <seconds>` | Same as `.addreadytime`. Alias `get5_add_ready_time`. |
-| `matchzy_loadbackup <file>` | Restores a round backup. Aliases `get5_loadbackup`, `css_loadbackup`. |
+| `matchzy_loadbackup <file>` | Restores a round backup (`.json` or `.txt` name, `latest`, or a round number). Aliases `get5_loadbackup`, `css_loadbackup`. |
+| `matchzy_recover [round\|file]` | Restores the interrupted match: its newest backup, or the given round or file. Alias `css_recover`. |
 | `matchzy_listbackups [matchid]` | Lists backups. Aliases `get5_listbackups`, `css_listbackups`. |
 | `get5_endmatch [team1\|team2]` | Cancels the match, or ends the series with the given team as winner (Get5 behavior). Same as `css_forceend`. |
 | `get5_status` / `get5_web_available` | Status replies for Get5 panels. |

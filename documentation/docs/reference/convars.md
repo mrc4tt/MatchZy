@@ -155,6 +155,10 @@ An empty value (`matchzy_remote_log_url ""`) clears a setting; with no value at 
 | `matchzy_restore_auto_unpause` | `false` | Y | Unpause on its own after a restore instead of waiting for both teams. |
 | `matchzy_restore_unpause_delay` | `5` | Y | Countdown in seconds for the automatic unpause. |
 | `matchzy_restore_scoreboard_stats` | `true` | Y | A restore also rolls back the round history and player K/D/A, damage, score and MVPs. |
+| `matchzy_auto_recover` | `true` | Y | Recover a match interrupted by a crash, restart or reload: restore its newest round backup (or load its config again) 10 s after the server is ready. Players on its roster are not kicked meanwhile. |
+| `matchzy_auto_recover_max_age` | `180` | Y | Minutes since the interrupted match was last active after which it is not recovered on its own. |
+| `matchzy_raw_backup_restore` | `redirect` | Y | Valve's `mp_backup_restore_load_file`: `redirect` runs MatchZy's restore of the matching `.json`, `block` refuses it, `allow` runs it as is. |
+| `matchzy_round_watchdog` | `true` | Y | A live round that never ends (one side all dead, or the timer at 0:00 with no bomb planted) is fixed: after 3 s the round-win overrides are cleared, after 8 s the round is ended. |
 | `matchzy_remote_backup_url` :material-lock: | `""` | N | Round backups are POSTed here. Alias `get5_remote_backup_url`. |
 | `matchzy_remote_backup_header_key` | `""` | N | Custom header name. Alias `get5_remote_backup_header_key`. |
 | `matchzy_remote_backup_header_value` :material-lock: | `""` | N | Custom header value. Alias `get5_remote_backup_header_value`. |

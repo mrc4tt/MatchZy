@@ -42,10 +42,30 @@ MatchZy saves a backup at the start of every live round (Valve's backup system p
 | Go back to round N | `.restore <n>` |
 | See what is available | `.backups` |
 | Pick a round from a list | `.ma` → Match Control → Restore Round (asks for confirmation) |
-| Server crashed mid-match | Reconnect and use `.ma` → Restore Round, which then lists the newest backups on disk. Or `.backups` lists the newest files on disk with a ready-made restore command, then `!loadbackup <file>` |
+| Server crashed mid-match | Nothing: the match recovers on its own (see [Crash recovery](#crash-recovery)). By hand: `.ma` → Restore Round, or `.backups` and then `matchzy_loadbackup <file>.json` |
 
 ### After a restore
 
 - The match pauses (`matchzy_pause_after_restore`). Set `matchzy_restore_auto_unpause true` to resume on its own after `matchzy_restore_unpause_delay` seconds.
 - The scoreboard is rolled back too: round history, kills, deaths, assists, damage, score and MVPs (`matchzy_restore_scoreboard_stats`).
 - A restore is only announced once the server has actually loaded it; a failed load is reported in chat.
+
+## Crash recovery
+
+A loaded match is kept in `csgo/MatchZyDataBackup/active_match.json` until the series ends or the match is cancelled. When the server crashes, restarts or MatchZy is reloaded in the middle of a match:
+
+1. **Automatic recovery** (`matchzy_auto_recover`, default on): 10 seconds after the server is ready, with no match loaded, MatchZy restores the newest round backup of that match. The match config, teams, match id and score come back, and the round is played once both teams are ready. A match interrupted before its first round backup is loaded again from its match config. Matches last active more than `matchzy_auto_recover_max_age` minutes ago (default 180) are left alone. A panel that loads a match within those 10 seconds wins. The panel is told with a `match_recovered` event.
+2. **Players are not locked out**: with `matchzy_kick_when_no_match_loaded`, a player on the interrupted match's roster is let in while no match is loaded, and admins are told in chat.
+3. **Valve's raw restore goes through MatchZy**: `mp_backup_restore_load_file <file>.txt` only brings the score back, not the rosters, team names or pause state. With `matchzy_raw_backup_restore redirect` (default) it is run as MatchZy's restore of `<file>.json` (a `.json` name works the same). When only the `.txt` exists, MatchZy rebuilds the `.json` from another backup of the same match (or the loaded or interrupted match) and works out each team's side for that round; admins are asked to check the sides. `block` refuses it, `allow` runs it as is.
+4. `.restore`, `.restorelast` and `.restorecurrent` without a live match list the newest backups on disk and the command to load one.
+
+### Runbook for tournament admins
+
+| Problem | Do this |
+|---|---|
+| Players are kicked on connect | Read the kick reason in the server log (`[ConnectGate]`, `[Disconnect]`) or the panel's `player_kicked` event. `no_match_loaded`: the match is not loaded, load it again (or `matchzy_loadbackup`). `not_in_match`: the SteamID is missing from the roster. |
+| The server crashed or restarted | Wait 10 seconds for the automatic recovery, then both teams `.ready`. Without it: `.recover` (or `matchzy_recover` over RCON). |
+| Wrong score or a round must be replayed | `.restore <round>`. Never `mp_backup_restore_load_file`. |
+| A round does not end (everyone dead, timer at 0:00) | MatchZy ends it after a few seconds (`matchzy_round_watchdog`). |
+| Check the connection to the panel | `matchzy_test_event` |
+

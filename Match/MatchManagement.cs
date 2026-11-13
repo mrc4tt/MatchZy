@@ -223,7 +223,10 @@ namespace MatchZy
             // Report it as a failed load instead; every caller then resets the match.
             try
             {
-                return LoadMatchFromJSONCore(jsonData, skipMapChange);
+                bool loaded = LoadMatchFromJSONCore(jsonData, skipMapChange);
+                if (loaded)
+                    SaveActiveMatch(jsonData);
+                return loaded;
             }
             catch (Exception e)
             {
@@ -1246,6 +1249,7 @@ namespace MatchZy
                 return;
             }
             seriesEnded = true;
+            ClearActiveMatch("series ended");
             long matchId = liveMatchId;
             (int team1Score, int team2Score) = (matchzyTeam1.seriesScore, matchzyTeam2.seriesScore);
             if (winnerName == "Draw")

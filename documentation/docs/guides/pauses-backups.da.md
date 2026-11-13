@@ -42,10 +42,30 @@ MatchZy gemmer en backup ved starten af hver live-runde (Valves backup-system pl
 | Gå tilbage til runde N | `.restore <n>` |
 | Se, hvad der findes | `.backups` |
 | Vælg en runde fra en liste | `.ma` → Match Control → Restore Round (beder om bekræftelse) |
-| Serveren crashede midt i kampen | Connect igen, og brug `.ma` → Restore Round, som så viser de nyeste backups på disken. Eller `.backups` viser de nyeste filer på disken med en færdig gendannelseskommando, og så `!loadbackup <fil>` |
+| Serveren crashede midt i kampen | Ingenting: kampen gendannes af sig selv (se [Gendannelse efter crash](#crash-recovery)). Manuelt: `.ma` → Restore Round, eller `.backups` og derefter `matchzy_loadbackup <fil>.json` |
 
 ### Efter en gendannelse { #after-a-restore }
 
 - Kampen pauses (`matchzy_pause_after_restore`). Sæt `matchzy_restore_auto_unpause true` for at genoptage af sig selv efter `matchzy_restore_unpause_delay` sekunder.
 - Scoreboardet rulles også tilbage: rundehistorik, kills, deaths, assists, skade, score og MVP'er (`matchzy_restore_scoreboard_stats`).
 - En gendannelse meldes først ud, når serveren rent faktisk har loadet den; en fejlet load meldes i chatten.
+
+## Gendannelse efter crash { #crash-recovery }
+
+En loadet kamp gemmes i `csgo/MatchZyDataBackup/active_match.json`, indtil serien slutter eller kampen bliver annulleret. Når serveren crasher, genstarter eller MatchZy bliver genindlæst midt i en kamp:
+
+1. **Automatisk gendannelse** (`matchzy_auto_recover`, slået til som standard): 10 sekunder efter at serveren er klar, uden en loadet kamp, gendanner MatchZy kampens nyeste rundebackup. Kampens config, hold, match-id og score kommer tilbage, og runden spilles, når begge hold er klar. En kamp, der blev afbrudt før første rundebackup, loades igen fra sin match-config. Kampe, der sidst var aktive for mere end `matchzy_auto_recover_max_age` minutter siden (standard 180), bliver ikke rørt. Et panel, der loader en kamp inden for de 10 sekunder, vinder. Panelet får besked med eventet `match_recovered`.
+2. **Spillerne bliver ikke låst ude**: med `matchzy_kick_when_no_match_loaded` bliver en spiller på den afbrudte kamps holdliste lukket ind, mens ingen kamp er loadet, og admins får besked i chatten.
+3. **Valves rå restore går gennem MatchZy**: `mp_backup_restore_load_file <fil>.txt` henter kun scoren tilbage, ikke holdlister, holdnavne eller pausestatus. Med `matchzy_raw_backup_restore redirect` (standard) køres den som MatchZys restore af `<fil>.json` (et `.json`-navn virker på samme måde). Findes kun `.txt`-filen, genopbygger MatchZy `.json`-filen ud fra en anden backup af samme kamp (eller den loadede eller afbrudte kamp) og regner holdenes side ud for runden; admins bliver bedt om at tjekke siderne. `block` afviser den, `allow` kører den uændret.
+4. `.restore`, `.restorelast` og `.restorecurrent` uden en live kamp viser de nyeste backups på disken og kommandoen til at loade en.
+
+### Runbook for turneringsadmins { #runbook }
+
+| Problem | Gør dette |
+|---|---|
+| Spillere bliver kicket, når de connecter | Læs kick-grunden i serverloggen (`[ConnectGate]`, `[Disconnect]`) eller panelets `player_kicked`-event. `no_match_loaded`: kampen er ikke loadet, load den igen (eller `matchzy_loadbackup`). `not_in_match`: SteamID'et mangler på holdlisten. |
+| Serveren crashede eller genstartede | Vent 10 sekunder på den automatiske gendannelse, og derefter `.ready` fra begge hold. Uden den: `.recover` (eller `matchzy_recover` over RCON). |
+| Forkert score, eller en runde skal spilles om | `.restore <runde>`. Aldrig `mp_backup_restore_load_file`. |
+| En runde slutter ikke (alle døde, timer på 0:00) | MatchZy afslutter den efter et par sekunder (`matchzy_round_watchdog`). |
+| Tjek forbindelsen til panelet | `matchzy_test_event` |
+

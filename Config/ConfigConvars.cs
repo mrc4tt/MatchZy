@@ -79,6 +79,14 @@ namespace MatchZy
 
         public FakeConVar<int> autoResumeDelay = new("matchzy_autopause_resume_delay", "Delay in seconds before auto-resuming when teams are balanced. Default: 3", 3);
 
+        public FakeConVar<bool> autoRecover = new("matchzy_auto_recover", "Whether a match interrupted by a crash, restart or plugin reload is recovered on its own: 10 seconds after the server is ready with no match loaded, the newest round backup of that match is restored (or its match config loaded again). Default: true", true);
+
+        public FakeConVar<int> autoRecoverMaxAge = new("matchzy_auto_recover_max_age", "Minutes since an interrupted match was last active (loaded or a round backed up) after which it is no longer recovered on its own. Default: 180", 180);
+
+        public FakeConVar<string> rawBackupRestoreMode = new("matchzy_raw_backup_restore", "What Valve's mp_backup_restore_load_file does: redirect = go through MatchZy's restore when a MatchZy backup with the same name exists, block = refuse it, allow = run it as is (score only, no rosters or team names). Default: redirect", "redirect");
+
+        public FakeConVar<bool> roundWatchdog = new("matchzy_round_watchdog", "Whether a live round that never ends (one side all dead, or the timer at 0:00 with no bomb planted) is fixed by MatchZy: after 3 seconds it clears mp_ignore_round_win_conditions and a stuck m_bGameRestart, after 8 seconds it ends the round. Default: true", true);
+
         public FakeConVar<bool> restoreAutoUnpause = new("matchzy_restore_auto_unpause", "Whether the match unpauses by itself after a round restore (!restore). When disabled, both teams (or an admin) must unpause. Requires matchzy_pause_after_restore. Default: false", false);
 
         public FakeConVar<bool> restoreScoreboardStats = new("matchzy_restore_scoreboard_stats", "Whether a round restore also rolls back the scoreboard (round history and player kills/deaths/assists/damage) to the restored round. Default: true", true);
