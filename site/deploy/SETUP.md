@@ -15,6 +15,10 @@ Layout on the server:
 The upload user `matchzy-deploy` can only run rsync inside `/srv/matchzy-docs` (`rrsync`), so the
 deploy key cannot open a shell or touch anything else.
 
+`deploy.sh` connects to `re.miksen.me` (the public address), not the tailnet name `re`: Tailscale
+SSH answers port 22 on the tailnet address, authenticates by tailnet policy ("tailnet policy does
+not permit you to SSH as user matchzy-deploy") and would skip the `rrsync` restriction anyway.
+
 ## 1. Deploy key (on your machine)
 
 ```sh

@@ -10,19 +10,25 @@
 # symlink /srv/matchzy-docs/current, so a deploy or a rollback is one symlink swap. The upload
 # user only has rsync into /srv/matchzy-docs (rrsync), see deploy/SETUP.md.
 #
-# Settings (environment): DEPLOY_HOST (default re), DEPLOY_USER (default matchzy-deploy),
+# Settings (environment): DEPLOY_HOST (default re.miksen.me), DEPLOY_USER (default matchzy-deploy),
 # DEPLOY_KEY (default ~/.ssh/matchzy_deploy), DEPLOY_KEEP (default 5), SITE_URL.
 set -euo pipefail
 
 cd "$(dirname "$0")"
-HOST="${DEPLOY_HOST:-re}"
+# The public name, not the tailnet host "re": Tailscale SSH answers port 22 on the tailnet
+# address and authenticates by tailnet policy, so it neither lets matchzy-deploy in nor applies
+# the rrsync restriction in authorized_keys. OpenSSH on the public address does both.
+HOST="${DEPLOY_HOST:-re.miksen.me}"
 USER_="${DEPLOY_USER:-matchzy-deploy}"
 KEY="${DEPLOY_KEY:-$HOME/.ssh/matchzy_deploy}"
 KEEP="${DEPLOY_KEEP:-5}"
 URL="${SITE_URL:-https://matchzy.miksen.me/}"
 TARGET="$USER_@$HOST"
 # rrsync puts us in /srv/matchzy-docs; paths below are relative to it.
-RSYNC=(rsync -e "ssh -i $KEY -o IdentitiesOnly=yes -o BatchMode=yes")
+# One SSH connection for every rsync call of a deploy: ufw rate-limits port 22 (LIMIT, 6 new
+# connections in 30 s), and a deploy makes more than that.
+CM="${XDG_RUNTIME_DIR:-/tmp}/matchzy-deploy-%C"
+RSYNC=(rsync -e "ssh -i $KEY -o IdentitiesOnly=yes -o BatchMode=yes -o ControlMaster=auto -o ControlPath=$CM -o ControlPersist=60")
 
 tmp="$(mktemp -d)"
 trap 'rm -rf "$tmp"' EXIT
