@@ -85,7 +85,7 @@ jobs:
           import re, sys
           ver = sys.argv[1]
           site = "https://matchzy.miksen.me/"
-          text = open("site/whats-new.md", encoding="utf-8").read()
+          text = open("whats-new.md", encoding="utf-8").read()
           m = re.search(r"^## " + re.escape(ver) + r" <small>.*?</small>\n(.*?)(?=^## |\Z)", text, re.S | re.M)
           if not m:
               sys.exit(0)
