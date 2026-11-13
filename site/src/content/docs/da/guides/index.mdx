@@ -1,0 +1,24 @@
+---
+title: "Guides"
+sidebar:
+  label: "Oversigt"
+  order: 0
+---
+
+import { CardGrid, LinkCard } from '@astrojs/starlight/components';
+
+Opgavefokuserede gennemgange. Alle kommandoer og indstillinger står under [Reference](/da/reference/).
+
+<CardGrid>
+	<LinkCard title="Spiltyper" href="/da/guides/game-modes/" description="Match, scrim, hill, practice, dryrun og sleep; 5v5, wingman, rush og 1v1; og hvordan serveren vælger en ved opstart." />
+	<LinkCard title="Kør en kamp" href="/da/guides/match-setup/" description="Pugs, match configs, veto, BO1/BO3, spillere mod bots." />
+	<LinkCard title="Ready-systemet" href="/da/guides/ready-system/" description="Ready-check, HTML-ready-panelet, holdstørrelse fra match configen, force ready, warmup-bots." />
+	<LinkCard title="Pauser og backups" href="/da/guides/pauses-backups/" description="Taktiske, tekniske, admin- og auto-pauser. Gendannelse af runder." />
+	<LinkCard title="Coaching" href="/da/guides/coaching/" description="Coaches i match configen, udsigtspladser, hvad coachen ser." />
+	<LinkCard title="Practice mode" href="/da/guides/practice/" description="Spawns, bots, granathistorik, lineups, granatbiblioteket, optagelse af ruter og holdstrategier." />
+	<LinkCard title="Admin-menuer" href="/da/guides/menus/" description="Admin-menuen .ma og guiden .matchsetup." />
+	<LinkCard title="Demoer (GOTV)" href="/da/guides/demos/" description="Optagelse, kontrol og upload (også til S3)." />
+	<LinkCard title="Statistik og database" href="/da/guides/stats/" description="SQLite / MySQL, CSV-eksport, rating og KAST i HLTV-stil." />
+	<LinkCard title="Live events API" href="/da/guides/events/" description="Webhooks til scoreboards, bots og paneler (på engelsk)." />
+	<LinkCard title="Admin-tickets" href="/da/guides/admin-tickets/" description=".admin / .report fra spillet, besvaret fra jeres hjemmeside eller Discord-bot." />
+</CardGrid>

@@ -1,0 +1,200 @@
+---
+// The What's new page: whats-new.md as release cards with a filter by kind (New, Changed, Fixed...).
+// Sections written as "## x.y.z" are shown, the "??? note" ones are folded under Older releases.
+import { Aside } from '@astrojs/starlight/components';
+import { KINDS, inline, isUnreleased, latestRelease, versionId, whatsNew } from '../data/changelog';
+
+const locale = Astro.locals.starlightRoute?.locale;
+const base = locale ? `/${locale}/` : '/';
+const { releases } = whatsNew();
+const recent = releases.filter((r) => r.open);
+const older = releases.filter((r) => !r.open);
+const counts = Object.fromEntries(KINDS.map((k) => [k, releases.reduce((n, r) => n + r.items.filter((i) => i.kind === k).length, 0)]));
+const kinds = KINDS.filter((k) => counts[k] > 0);
+const total = releases.reduce((n, r) => n + r.items.length, 0);
+---
+
+<div class="mz-wn" data-filter="all" data-mz-built={latestRelease}>
+	<div class="mz-filter not-content" role="toolbar" aria-label="Filter changes" hidden>
+		<button type="button" data-kind="all" aria-pressed="true">All <span>{total}</span></button>
+		{kinds.map((k) => (
+			<button type="button" data-kind={k.toLowerCase()} aria-pressed="false">
+				<i class={`mz-kind mz-kind--${k.toLowerCase()}`}></i>{k} <span>{counts[k]}</span>
+			</button>
+		))}
+	</div>
+
+	{[recent, older].map((list, li) => {
+		const cards = list.map((r) => (
+			<section class="mz-rel" id={versionId(r.version)} data-rel>
+				<header class="mz-rel__head">
+					<h2><a href={`#${versionId(r.version)}`}>{r.version}</a></h2>
+					{r.date && <span class="mz-rel__date">{r.date}</span>}
+					{isUnreleased(r.version) && <span class="mz-unreleased" data-mz-unreleased={r.version}>Not released yet</span>}
+					<a class="mz-rel__more" href={`${base}changelog/#${versionId(r.version)}`}>Full details →</a>
+				</header>
+				{r.action.length > 0 && (
+					<Aside type="caution" title="Action needed">
+						<ul>{r.action.map((a) => <li set:html={inline(a, base)} />)}</ul>
+					</Aside>
+				)}
+				<ul class="mz-items">
+					{r.items.map((i) => (
+						<li data-kind={i.kind?.toLowerCase() ?? 'other'}>
+							{i.kind && <span class={`mz-tag mz-tag--${i.kind.toLowerCase()}`}>{i.kind}</span>}
+							<span set:html={inline(i.text, base)} />
+						</li>
+					))}
+				</ul>
+			</section>
+		));
+		return li === 0 ? cards : list.length > 0 && (
+			<details class="mz-older" data-older>
+				<summary>Older releases <span>{list[list.length - 1].version} to {list[0].version}</span></summary>
+				{cards}
+			</details>
+		);
+	})}
+
+	<p class="mz-empty" hidden>No changes of this kind.</p>
+	<p>Releases before these: see the <a href={`${base}changelog/`}>full changelog</a>.</p>
+</div>
+
+<script>
+	for (const root of document.querySelectorAll<HTMLElement>('.mz-wn')) {
+		const bar = root.querySelector<HTMLElement>('.mz-filter')!;
+		const older = root.querySelector<HTMLDetailsElement>('[data-older]');
+		const empty = root.querySelector<HTMLElement>('.mz-empty')!;
+		bar.hidden = false;
+		bar.addEventListener('click', (e) => {
+			const btn = (e.target as HTMLElement).closest('button');
+			if (!btn) return;
+			const kind = btn.dataset.kind!;
+			root.dataset.filter = kind;
+			for (const b of bar.querySelectorAll('button')) b.setAttribute('aria-pressed', String(b === btn));
+			let shown = 0;
+			for (const rel of root.querySelectorAll<HTMLElement>('[data-rel]')) {
+				const items = rel.querySelectorAll<HTMLElement>('.mz-items > li');
+				let any = false;
+				for (const li of items) {
+					const on = kind === 'all' || li.dataset.kind === kind;
+					li.hidden = !on;
+					any ||= on;
+				}
+				rel.hidden = !any;
+				if (any) shown++;
+			}
+			if (older) older.open = kind !== 'all';
+			empty.hidden = shown > 0;
+		});
+	}
+</script>
+
+<script>
+	import { checkRelease } from '../scripts/release-check.js';
+	checkRelease();
+</script>
+
+<style>
+	.mz-filter {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 0.5rem;
+		margin-block: 1.5rem 0.5rem;
+	}
+	.mz-filter[hidden] { display: none; }
+	.mz-filter button {
+		display: inline-flex;
+		align-items: center;
+		gap: 0.4rem;
+		padding: 0.35rem 0.8rem;
+		border: 1px solid var(--mz-line);
+		border-radius: 999px;
+		background: var(--mz-surface);
+		color: var(--sl-color-gray-2);
+		font: inherit;
+		font-size: var(--sl-text-sm);
+		cursor: pointer;
+	}
+	.mz-filter button span { color: var(--sl-color-gray-3); font-variant-numeric: tabular-nums; }
+	.mz-filter button:hover { border-color: var(--sl-color-gray-4); color: var(--sl-color-white); }
+	.mz-filter button[aria-pressed='true'] {
+		border-color: var(--sl-color-accent);
+		color: var(--sl-color-white);
+		background: var(--sl-color-accent-low);
+	}
+	.mz-kind { width: 0.55rem; height: 0.55rem; border-radius: 50%; background: var(--k); }
+
+	.mz-rel {
+		margin-top: 2rem;
+		padding: 1.25rem 1.25rem 0.5rem;
+		border: 1px solid var(--mz-line);
+		border-radius: 0.75rem;
+		background: var(--mz-surface);
+	}
+	.mz-rel[hidden], .mz-items > li[hidden] { display: none; }
+	.mz-rel__head {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: baseline;
+		gap: 0.25rem 0.9rem;
+	}
+	.mz-rel__head h2 { margin: 0; font-size: var(--sl-text-2xl); font-variant-numeric: tabular-nums; }
+	.mz-rel__head h2 a { color: inherit; text-decoration: none; }
+	.mz-rel__head h2 a:hover { color: var(--sl-color-accent-high); }
+	.mz-rel__date { color: var(--sl-color-gray-3); font-size: var(--sl-text-sm); }
+	.mz-rel__more { margin-left: auto; font-size: var(--sl-text-sm); text-decoration: none; }
+
+	.mz-items { list-style: none; padding: 0; }
+	.mz-items > li {
+		display: grid;
+		grid-template-columns: 5.5rem 1fr;
+		gap: 0.75rem;
+		align-items: baseline;
+		padding-block: 0.55rem;
+		margin: 0;
+		border-top: 1px solid var(--mz-line);
+	}
+	.mz-items > li:first-child { border-top: 0; }
+	.mz-items > li[data-kind='other'] { grid-template-columns: 1fr; }
+	.mz-tag {
+		justify-self: start;
+		padding: 0.05rem 0.5rem;
+		border-radius: 0.35rem;
+		font-size: var(--sl-text-xs);
+		font-weight: 600;
+		letter-spacing: 0.02em;
+		color: var(--k);
+		background: color-mix(in srgb, var(--k) 14%, transparent);
+	}
+	.mz-tag--new, .mz-kind--new { --k: var(--mz-k-new); }
+	.mz-tag--changed, .mz-kind--changed { --k: var(--mz-k-changed); }
+	.mz-tag--fixed, .mz-kind--fixed { --k: var(--mz-k-fixed); }
+	.mz-tag--security, .mz-kind--security { --k: var(--mz-k-security); }
+	.mz-tag--removed, .mz-kind--removed { --k: var(--sl-color-gray-3); }
+
+	.mz-older { margin-top: 2.5rem; }
+	.mz-older > summary {
+		cursor: pointer;
+		font-weight: 600;
+		font-size: var(--sl-text-lg);
+		color: var(--sl-color-white);
+	}
+	.mz-older > summary span { margin-left: 0.5rem; font-weight: 400; font-size: var(--sl-text-sm); color: var(--sl-color-gray-3); }
+	.mz-empty[hidden] { display: none; }
+
+	@media (max-width: 40rem) {
+		.mz-rel { padding-inline: 1rem; }
+		.mz-items > li { grid-template-columns: 1fr; gap: 0.3rem; }
+		.mz-rel__more { margin-left: 0; width: 100%; }
+	}
+	.mz-unreleased {
+		padding: 0.1rem 0.6rem;
+		border-radius: 999px;
+		font-size: var(--sl-text-xs);
+		font-weight: 600;
+		color: var(--sl-color-accent-high);
+		background: var(--sl-color-accent-low);
+		border: 1px dashed color-mix(in srgb, var(--sl-color-accent) 55%, transparent);
+	}
+</style>

@@ -1,0 +1,167 @@
+---
+// The full changelog page: CHANGELOG.md with a search over every change and a version jump.
+import { changelog, inline, isUnreleased, latestRelease, versionId, whatsNew } from '../data/changelog';
+
+const locale = Astro.locals.starlightRoute?.locale;
+const base = locale ? `/${locale}/` : '/';
+const { intro, releases } = changelog();
+const summarized = new Set(whatsNew().releases.map((r) => r.version));
+const total = releases.reduce((n, r) => n + r.items.length, 0);
+// Version jump grouped by minor series (1.0, 0.8...).
+const series = new Map<string, string[]>();
+for (const r of releases) {
+	const key = r.version.split('.').slice(0, 2).join('.');
+	series.set(key, [...(series.get(key) ?? []), r.version]);
+}
+---
+
+<div class="mz-cl" data-mz-built={latestRelease}>
+	{intro && <p set:html={inline(intro, base)} />}
+
+	<div class="mz-cl__bar not-content">
+		<label class="mz-cl__search">
+			<span class="sr-only">Search the changelog</span>
+			<svg aria-hidden="true" viewBox="0 0 24 24" width="16" height="16"><path fill="currentColor" d="M10 2a8 8 0 0 1 6.32 12.9l5.39 5.4-1.41 1.4-5.4-5.39A8 8 0 1 1 10 2m0 2a6 6 0 1 0 0 12 6 6 0 0 0 0-12" /></svg>
+			<input type="search" placeholder={`Search ${total} changes`} autocomplete="off" disabled />
+		</label>
+		<label class="mz-cl__jump">
+			<span class="sr-only">Jump to version</span>
+			<select disabled>
+				<option value="">Jump to version</option>
+				{[...series].map(([key, versions]) => (
+					<optgroup label={`${key}.x`}>{versions.map((v) => <option value={versionId(v)}>{v}</option>)}</optgroup>
+				))}
+			</select>
+		</label>
+		<p class="mz-cl__count" aria-live="polite"></p>
+	</div>
+
+	{releases.map((r) => (
+		<section class="mz-cl__rel" id={versionId(r.version)} data-rel>
+			<header>
+				<h2><a href={`#${versionId(r.version)}`}>{r.version}</a></h2>
+				{r.date && <span class="mz-cl__date">{r.date}</span>}
+					{isUnreleased(r.version) && <span class="mz-unreleased" data-mz-unreleased={r.version}>Not released yet</span>}
+				{summarized.has(r.version) && <a class="mz-cl__sum" href={`${base}whats-new/#${versionId(r.version)}`}>Summary</a>}
+			</header>
+			<ul>{r.items.map((i) => <li set:html={inline(i, base)} />)}</ul>
+		</section>
+	))}
+</div>
+
+<script>
+	for (const root of document.querySelectorAll<HTMLElement>('.mz-cl')) {
+		const input = root.querySelector<HTMLInputElement>('input[type=search]')!;
+		const select = root.querySelector<HTMLSelectElement>('select')!;
+		const count = root.querySelector<HTMLElement>('.mz-cl__count')!;
+		const rels = [...root.querySelectorAll<HTMLElement>('[data-rel]')];
+		const items = rels.map((rel) => [...rel.querySelectorAll<HTMLElement>('li')].map((li) => [li, li.textContent!.toLowerCase()] as const));
+		input.disabled = select.disabled = false;
+
+		const filter = () => {
+			const words = input.value.toLowerCase().split(/\s+/).filter(Boolean);
+			let hits = 0, shown = 0;
+			rels.forEach((rel, i) => {
+				const versionHit = words.length === 1 && rel.querySelector('h2')!.textContent!.startsWith(words[0]);
+				let any = false;
+				for (const [li, text] of items[i]) {
+					const on = !words.length || versionHit || words.every((w) => text.includes(w));
+					li.hidden = !on;
+					if (on) { any = true; hits++; }
+				}
+				rel.hidden = !any;
+				if (any) shown++;
+			});
+			count.textContent = words.length ? (hits ? `${hits} changes in ${shown} releases` : 'No changes match.') : '';
+		};
+		input.addEventListener('input', filter);
+		select.addEventListener('change', () => {
+			if (!select.value) return;
+			if (input.value) { input.value = ''; filter(); }
+			location.hash = select.value;
+			select.value = '';
+		});
+	}
+</script>
+
+<script>
+	import { checkRelease } from '../scripts/release-check.js';
+	checkRelease();
+</script>
+
+<style>
+	.mz-cl__bar {
+		position: sticky;
+		top: calc(var(--sl-nav-height) + 0.5rem);
+		z-index: 2;
+		display: flex;
+		flex-wrap: wrap;
+		align-items: center;
+		gap: 0.6rem;
+		margin-block: 1.5rem 0.5rem;
+		padding: 0.6rem;
+		border: 1px solid var(--mz-line);
+		border-radius: 0.75rem;
+		background: color-mix(in srgb, var(--sl-color-black) 88%, transparent);
+		backdrop-filter: blur(8px);
+	}
+	.mz-cl__search {
+		flex: 1 1 14rem;
+		display: flex;
+		align-items: center;
+		gap: 0.5rem;
+		padding-inline: 0.7rem;
+		border: 1px solid var(--mz-line);
+		border-radius: 0.5rem;
+		background: var(--mz-surface);
+		color: var(--sl-color-gray-3);
+	}
+	.mz-cl__search:focus-within { border-color: var(--sl-color-accent); }
+	.mz-cl__search input {
+		flex: 1;
+		min-width: 0;
+		padding-block: 0.5rem;
+		border: 0;
+		outline: 0;
+		background: transparent;
+		color: var(--sl-color-white);
+		font: inherit;
+	}
+	.mz-cl__jump select {
+		padding: 0.5rem 0.6rem;
+		border: 1px solid var(--mz-line);
+		border-radius: 0.5rem;
+		background: var(--mz-surface);
+		color: var(--sl-color-white);
+		font: inherit;
+	}
+	.mz-cl__count { margin: 0; width: 100%; font-size: var(--sl-text-sm); color: var(--sl-color-gray-3); }
+	.mz-cl__count:empty { display: none; }
+
+	.mz-cl__rel { scroll-margin-top: calc(var(--sl-nav-height) + 6rem); }
+	.mz-cl__rel[hidden], .mz-cl__rel li[hidden] { display: none; }
+	.mz-cl__rel header {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: baseline;
+		gap: 0.25rem 0.9rem;
+		margin-top: 2.5rem;
+		padding-bottom: 0.4rem;
+		border-bottom: 1px solid var(--mz-line);
+	}
+	.mz-cl__rel h2 { margin: 0; font-variant-numeric: tabular-nums; }
+	.mz-cl__rel h2 a { color: inherit; text-decoration: none; }
+	.mz-cl__rel h2 a:hover { color: var(--sl-color-accent-high); }
+	.mz-cl__date { color: var(--sl-color-gray-3); font-size: var(--sl-text-sm); }
+	.mz-cl__sum { margin-left: auto; font-size: var(--sl-text-sm); text-decoration: none; }
+	.mz-cl__rel li + li { margin-top: 0.6rem; }
+	.mz-unreleased {
+		padding: 0.1rem 0.6rem;
+		border-radius: 999px;
+		font-size: var(--sl-text-xs);
+		font-weight: 600;
+		color: var(--sl-color-accent-high);
+		background: var(--sl-color-accent-low);
+		border: 1px dashed color-mix(in srgb, var(--sl-color-accent) 55%, transparent);
+	}
+</style>

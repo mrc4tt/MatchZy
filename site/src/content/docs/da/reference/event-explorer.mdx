@@ -1,0 +1,15 @@
+---
+title: "Event-explorer"
+tableOfContents: false
+new_in: "1.0.24"
+sidebar:
+  order: 8
+---
+
+import Tool from '../../../../components/Tool.astro';
+
+Alle events, MatchZy kan sende til `matchzy_remote_log_url`, med felter og et eksempel. Listen læses fra plugin'ets kildekode, når siden bygges, så den altid passer til denne version. Opsætning af endpointet står i guiden [Live events API](/da/guides/events/), og hvad hvert event betyder, og hvornår det sendes, står i [Events](/da/reference/events/).
+
+`matchzy_events_format` vælger formatet for live scorebot-events: **Get5** (standard) eller **legacy**. Kamp- og server-events er ens i begge.
+
+<Tool name="event-explorer" />

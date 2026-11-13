@@ -1,0 +1,13 @@
+---
+title: "Match config builder"
+tableOfContents: false
+new_in: "1.0.24"
+sidebar:
+  order: 5
+---
+
+import Tool from '../../../components/Tool.astro';
+
+Fill in the form and copy the match config, or download it as `match.json`. Load it with `matchzy_loadmatch_url` from your panel, or put it in `csgo/cfg/MatchZy/` and use `matchzy_loadmatch`. Every field is explained in [Match config JSON](/reference/match-config/). **Import** loads an existing match config to edit it. The problems the plugin would warn about when loading (a player on both teams or also a spectator, a roster larger than the team size) show above the result. Your form is kept in this browser. Nothing leaves your browser.
+
+<Tool name="match-builder" />

@@ -1,0 +1,50 @@
+---
+// Mount point for one of the docs tools in src/scripts/tools.js. The script builds the UI; the page
+// holds the root element, a fallback note for when the script is blocked or JavaScript is off, and
+// for the generator and the explorer the data read from the plugin source at build time.
+// Neutral name on purpose: see the note at the top of tools.js.
+import '../styles/tools.css';
+import { settings } from '../data/settings.mjs';
+import { events } from '../data/events.mjs';
+
+interface Props {
+	name: 'match-builder' | 'config-generator' | 'event-explorer';
+}
+const { name } = Astro.props;
+const locale = Astro.locals.starlightRoute?.locale;
+const base = locale ? `/${locale}/` : '/';
+const da = locale === 'da';
+
+const ids = { 'match-builder': 'mz-mcb', 'config-generator': 'mz-cfg', 'event-explorer': 'mz-pl' } as const;
+const json = (v: unknown) => JSON.stringify(v).replace(/</g, '\\u003c');
+const data =
+	name === 'config-generator' ? { id: 'mz-cfg-data', body: json(settings()) }
+	: name === 'event-explorer' ? { id: 'mz-pl-data', body: json(events()) }
+	: null;
+
+const blocked = da
+	? 'Kommer der intet frem her, blokerer en ad- eller tracker-blocker sandsynligvis scriptet: tillad denne side i den, eller brug'
+	: 'If nothing appears here, an ad or tracker blocker is probably blocking the script: allow this site in it, or use';
+const what = {
+	'match-builder': da ? 'Builderen kræver JavaScript.' : 'The builder needs JavaScript.',
+	'config-generator': da ? 'Generatoren kræver JavaScript.' : 'The generator needs JavaScript.',
+	'event-explorer': da ? 'Søgningen kræver JavaScript.' : 'The search needs JavaScript.',
+}[name];
+---
+
+{data && <script is:inline type="application/json" id={data.id} set:html={data.body} />}
+<div id={ids[name]} class={`mzt-tool mzt-tool--${name} not-content`}>
+	<p class="mzt-noscript">
+		{what} {blocked}{' '}
+		{name === 'match-builder' && (
+			<><a href={`${base}reference/match-config/`}>Match config JSON</a> {da ? 'og' : 'and the'} <a href={`${base}reference/match-examples/`}>{da ? 'eksemplerne' : 'examples'}</a>.</>
+		)}
+		{name === 'config-generator' && <><a href={`${base}reference/convars/`}>{da ? 'Konfiguration (convars)' : 'Configuration (convars)'}</a>.</>}
+		{name === 'event-explorer' && <><a href={`${base}reference/events/`}>Events</a>.</>}
+	</p>
+</div>
+
+<script>
+	import { initTools } from '../scripts/tools.js';
+	initTools();
+</script>

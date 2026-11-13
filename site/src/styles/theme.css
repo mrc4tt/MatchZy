@@ -1,0 +1,101 @@
+/* MatchZy theme for Starlight: CS2 warmup orange on charcoal. Dark is the main look; light keeps
+   the same accent with warm greys. Fonts are self-hosted (fontsource), no third-party request. */
+@import '@fontsource-variable/inter';
+@import '@fontsource-variable/jetbrains-mono';
+
+:root {
+	--sl-font: 'Inter Variable', system-ui, sans-serif;
+	--sl-font-mono: 'JetBrains Mono Variable', ui-monospace, monospace;
+	--mz-orange: #ff8a1f;
+	--mz-orange-2: #ff5a3c;
+	--mz-green: #37ff8b;
+	--mz-ct: #5fa8ff;
+	--mz-t: #ffb547;
+	--mz-grad: linear-gradient(100deg, var(--mz-orange), var(--mz-orange-2));
+	--sl-content-width: 50rem;
+}
+
+/* Dark (default) */
+:root,
+::backdrop {
+	--sl-color-accent-low: #3a1d06;
+	--sl-color-accent: #ff8a1f;
+	--sl-color-accent-high: #ffd2a6;
+	--sl-color-white: #f5f6f8;
+	--sl-color-gray-1: #e3e5ea;
+	--sl-color-gray-2: #bcc0c9;
+	--sl-color-gray-3: #8b909a;
+	--sl-color-gray-4: #5a5f69;
+	--sl-color-gray-5: #33363d;
+	--sl-color-gray-6: #1d1f24;
+	--sl-color-black: #121316;
+	--mz-surface: #1a1c21;
+	--mz-surface-2: #22252b;
+	--mz-line: #2c2f36;
+	/* Change kinds (What's new / changelog tags) */
+	--mz-k-new: #37d982;
+	--mz-k-changed: #6fb1ff;
+	--mz-k-fixed: #ff9a3d;
+	--mz-k-security: #ff6b86;
+}
+
+/* Light */
+:root[data-theme='light'],
+[data-theme='light'] ::backdrop {
+	--sl-color-accent-low: #ffe6cf;
+	--sl-color-accent: #c2500a;
+	--sl-color-accent-high: #6b2a03;
+	--sl-color-white: #15171b;
+	--sl-color-gray-1: #23262c;
+	--sl-color-gray-2: #3a3e46;
+	--sl-color-gray-3: #5d626c;
+	--sl-color-gray-4: #8b909a;
+	--sl-color-gray-5: #c9ccd2;
+	--sl-color-gray-6: #eceef1;
+	--sl-color-gray-7: #f6f7f9;
+	--sl-color-black: #ffffff;
+	--mz-surface: #f6f7f9;
+	--mz-surface-2: #eef0f3;
+	--mz-line: #e2e4e9;
+	--mz-k-new: #0f7a43;
+	--mz-k-changed: #1f5fae;
+	--mz-k-fixed: #b04a00;
+	--mz-k-security: #b8213f;
+}
+
+/* Header: a thin orange line under it. */
+/* Only the outer <header>: Starlight's inner <div> has the class "header" too, and a border on it
+   drew a second line through the title and the search box. */
+header.header { border-bottom: 1px solid var(--mz-line); box-shadow: inset 0 -2px 0 -1px color-mix(in srgb, var(--mz-orange) 35%, transparent); }
+.site-title { font-weight: 800; letter-spacing: -0.02em; }
+
+/* Headings and body */
+.sl-markdown-content :is(h1, h2, h3) { letter-spacing: -0.015em; }
+.sl-markdown-content h2 { font-weight: 750; }
+h1#_top { font-weight: 850; letter-spacing: -0.03em; }
+
+/* Code */
+.sl-markdown-content :not(pre) > code { border-radius: 0.3rem; padding: 0.1em 0.35em; background: var(--mz-surface-2); border: 1px solid var(--mz-line); }
+
+/* Tables: full width, compact name columns */
+.sl-markdown-content table { display: table; width: 100%; font-size: var(--sl-text-sm); }
+.sl-markdown-content table td:first-child code { white-space: nowrap; }
+
+/* Sidebar active item in accent */
+.sidebar-content a[aria-current='page'] { font-weight: 650; }
+
+/* Buttons used on pages */
+.mz-btn {
+	display: inline-flex; align-items: center; gap: 0.5rem; padding: 0.7rem 1.2rem; border-radius: 0.6rem;
+	font-weight: 650; text-decoration: none; border: 1px solid var(--mz-line); color: var(--sl-color-white);
+	background: var(--mz-surface); transition: transform 0.15s, border-color 0.15s, box-shadow 0.15s;
+}
+.mz-btn:hover { transform: translateY(-1px); border-color: var(--mz-orange); color: var(--sl-color-white); }
+.mz-btn--primary { background: var(--mz-grad); color: #1a0f05; border-color: transparent; box-shadow: 0 8px 30px -10px var(--mz-orange); }
+.mz-btn--primary:hover { color: #1a0f05; box-shadow: 0 12px 34px -8px var(--mz-orange); }
+
+/* Landing page (splash template): wider than the docs column, and Starlight's own page title is
+   replaced by the hero. */
+body:has(.mz-landing) .sl-container { max-width: 76rem; }
+body:has(.mz-landing) .content-panel:has(> .sl-container > h1#_top) { display: none; }
+body:has(.mz-landing) .content-panel { border-top: 0; }

@@ -1,0 +1,24 @@
+---
+title: "Guides"
+sidebar:
+  label: "Overview"
+  order: 0
+---
+
+import { CardGrid, LinkCard } from '@astrojs/starlight/components';
+
+Task-focused walkthroughs. For every command and setting, see the [Reference](/reference/).
+
+<CardGrid>
+	<LinkCard title="Game modes" href="/guides/game-modes/" description="Match, scrim, hill, practice, dryrun and sleep; 5v5, wingman, rush and 1v1; and how the server picks one on startup." />
+	<LinkCard title="Running a match" href="/guides/match-setup/" description="Pugs, match configs, veto, BO1/BO3, players vs bots." />
+	<LinkCard title="Ready system" href="/guides/ready-system/" description="Ready check, HTML ready panel, force ready, warmup bots." />
+	<LinkCard title="Pauses and backups" href="/guides/pauses-backups/" description="Tactical, tech, admin and auto pauses. Round restores." />
+	<LinkCard title="Coaching" href="/guides/coaching/" description="Coaches in the match config, viewing spots, what the coach sees." />
+	<LinkCard title="Practice mode" href="/guides/practice/" description="Spawns, bots, grenade history, lineups, the grenade library, path recording and team strategies." />
+	<LinkCard title="Admin menus" href="/guides/menus/" description=".ma admin menu and the .matchsetup wizard." />
+	<LinkCard title="Demos (GOTV)" href="/guides/demos/" description="Recording, verification and uploads (including S3)." />
+	<LinkCard title="Stats and database" href="/guides/stats/" description="SQLite / MySQL, CSV export, HLTV-style rating and KAST." />
+	<LinkCard title="Live events API" href="/guides/events/" description="Webhooks for scoreboards, bots and panels." />
+	<LinkCard title="Admin tickets" href="/guides/admin-tickets/" description=".admin / .report from the game, answered from your website or Discord bot." />
+</CardGrid>

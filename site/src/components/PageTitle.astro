@@ -1,0 +1,25 @@
+---
+// Starlight's page title plus a "New in x.y.z" badge while the page's new_in is recent.
+import Default from '@astrojs/starlight/components/PageTitle.astro';
+import { isRecent } from '../data/plugin';
+
+const { entry, locale } = Astro.locals.starlightRoute;
+const newIn = entry.data.new_in;
+---
+
+<Default><slot /></Default>
+{isRecent(newIn) && <p class="mz-newin"><span>{locale === 'da' ? 'Ny i' : 'New in'} {newIn}</span></p>}
+
+<style>
+	.mz-newin { margin: 0.6rem 0 0; }
+	.mz-newin span {
+		display: inline-block;
+		padding: 0.15rem 0.65rem;
+		border-radius: 999px;
+		font-size: var(--sl-text-xs);
+		font-weight: 600;
+		color: var(--sl-color-accent-high);
+		background: var(--sl-color-accent-low);
+		border: 1px solid color-mix(in srgb, var(--sl-color-accent) 45%, transparent);
+	}
+</style>
