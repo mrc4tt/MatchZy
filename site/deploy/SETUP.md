@@ -95,13 +95,11 @@ A/AAAA records as `img.miksen.me`. SSL mode as for the other hosts (Full strict)
 curl -sI https://matchzy.miksen.me/ | grep -iE '^(HTTP|server|cache-control|cf-cache-status)'
 ```
 
-## 7. Retire the old site (after the new one is live)
+## 7. Retire the old site (done 2026-11-13)
 
-- GitHub: Settings, Pages: remove the custom domain and turn Pages off.
-- Repository: delete `.github/workflows/docs.yml` and `documentation/`, move
-  `documentation/docs/whats-new.md` (read by `.github/workflows/release.yml`,
-  `site/src/data/changelog.ts` and `.claude/docs/release.md`) and drop
-  `site/scripts/convert-mkdocs.mjs`.
+GitHub Pages is off, `.github/workflows/docs.yml`, `documentation/` and the MkDocs converter are
+gone, and `whats-new.md` lives in `site/` (read by `src/data/changelog.ts`,
+`.github/workflows/release.yml` and the release tooling).
 
 ## Everyday use
 

@@ -6,7 +6,6 @@
     "dev": "astro dev",
     "start": "astro dev",
     "build": "astro build",
-    "convert": "node scripts/convert-mkdocs.mjs",
     "preview": "astro preview",
     "astro": "astro"
   },

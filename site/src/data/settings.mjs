@@ -1,5 +1,5 @@
 // The settings of cfg/config.cfg for the settings generator (reference/config-generator):
-// section, name, default, type, description. Port of the old documentation/hooks/values.py.
+// section, name, default, type, description. Ported from the retired MkDocs values.py hook.
 // Plain JS so it can also be run alone: node src/data/settings.mjs [repo root]
 import { readFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';

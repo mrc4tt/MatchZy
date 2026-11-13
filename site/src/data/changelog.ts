@@ -6,8 +6,8 @@ import { join, resolve } from 'node:path';
 import { compareVersions, releasedVersion } from './version.mjs';
 
 const root = resolve(process.cwd(), '..');
-// Moves with the release workflow when documentation/ is retired.
-const WHATS_NEW = 'documentation/docs/whats-new.md';
+// Also read by .github/workflows/release.yml and tools/package.sh (release body).
+const WHATS_NEW = 'site/whats-new.md';
 
 /** The newest release (git tag); sections for later versions are not released yet. */
 export const latestRelease = releasedVersion(root);

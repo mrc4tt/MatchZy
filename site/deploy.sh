@@ -75,7 +75,7 @@ fi
 [ -f dist/index.html ] || { echo "dist/ is empty: build first" >&2; exit 1; }
 
 commit="$(git rev-parse --short HEAD)"
-paths=(. ../CHANGELOG.md ../documentation/docs/whats-new.md)
+paths=(. ../CHANGELOG.md)
 if ! git diff --quiet HEAD -- "${paths[@]}" || [ -n "$(git status --porcelain -- "${paths[@]}")" ]; then
 	commit="$commit-dirty"
 fi

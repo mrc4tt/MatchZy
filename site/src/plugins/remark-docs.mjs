@@ -1,4 +1,4 @@
-// Remark plugins for the docs pages (the syntax scripts/convert-mkdocs.mjs leaves in them).
+// Remark plugins for the docs pages: {#id} heading ids, @@MATCHZY_VERSION@@ and mermaid blocks.
 import { visit } from 'unist-util-visit';
 import { releasedVersion } from '../data/version.mjs';
 

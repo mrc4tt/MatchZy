@@ -3,7 +3,7 @@ using Newtonsoft.Json.Linq;
 
 namespace MatchZy.Tests;
 
-// Configs in the shape the docs' match config builder (documentation/docs/assets/mz-tools.js)
+// Configs in the shape the docs' match config builder (site/src/scripts/tools.js)
 // writes. If the loader's validation changes, the builder has to follow.
 public class MatchBuilderOutputTests
 {

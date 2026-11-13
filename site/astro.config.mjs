@@ -20,8 +20,7 @@ export default defineConfig({
 				da: { label: 'Dansk', lang: 'da' },
 			},
 			social: [{ icon: 'github', label: 'GitHub', href: 'https://github.com/mrc4tt/MatchZy' }],
-			// No editLink: src/content/docs is generated from documentation/docs by
-			// scripts/convert-mkdocs.mjs. Re-add it when documentation/ is retired.
+			editLink: { baseUrl: 'https://github.com/mrc4tt/MatchZy/edit/main/site/' },
 			lastUpdated: true,
 			// Source engine .cfg files have no grammar; show them as plain text.
 			expressiveCode: { shiki: { langAlias: { cfg: 'txt' } } },

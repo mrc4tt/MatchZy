@@ -6,8 +6,6 @@ obj/
 .git-credentials
 
 # MkDocs build output
-documentation/site/
-documentation/.venv/
 
 # Local backup copies
 *.bak

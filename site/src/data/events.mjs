@@ -1,6 +1,6 @@
 // MatchZy's event classes (Core/Events.cs, Core/Get5Events.cs) as a catalog for the event explorer
 // (reference/event-explorer): every event name, its format, its fields (inherited ones included)
-// with type and comment, and an example payload. Port of the old documentation/hooks/events_catalog.py.
+// with type and comment, and an example payload. Ported from the retired MkDocs events_catalog.py hook.
 // Plain JS so it can also be run alone: node src/data/events.mjs [repo root]
 import { readFileSync, readdirSync } from 'node:fs';
 import { join, resolve } from 'node:path';
