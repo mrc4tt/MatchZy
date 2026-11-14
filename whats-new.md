@@ -2,6 +2,11 @@
 
 A short summary of each release. The [full changelog](changelog.md) has the details and background for every change.
 
+## 1.0.26 <small>November 14, 2026</small>
+
+- **Fixed:** After practice, terrorists no longer spawn with the full practice grenade set and an AK-47.
+- **Fixed:** Switching the server from practice to another mode (retakes, deathmatch, prefire) without a map change no longer leaves players flying in noclip or respawning on death.
+
 ## 1.0.25 <small>November 13, 2026</small>
 
 - **New:** A match interrupted by a crash, restart or plugin reload comes back on its own (`matchzy_auto_recover`): MatchZy restores the newest round backup of that match with its rosters, team names, match id and score. Players on its roster are let in meanwhile instead of being kicked.
@@ -55,23 +60,23 @@ A short summary of each release. The [full changelog](changelog.md) has the deta
 - **Changed:** On Metamod servers the round backup files are moved from `csgo/addons/metamod/` to `csgo/` after each round start, so they no longer end up in the Metamod folder.
 - **Fixed:** Round backups are found in `csgo/backups/` on servers whose `gameinfo.gi` adds that folder (some Pelican/Pterodactyl eggs).
 
-## 1.0.21 <small>November 2, 2026</small>
-
-- **New:** `matchzy_warmup_instant_respawn true` gives a warmup with instant respawn at the team spawn, 2 seconds of spawn protection, no bomb, no friendly fire, buying all warmup and full money on every respawn. Off by default.
-- **New:** `matchzy_ready_max_missing` sets the fewest players a team can ready up with in a loaded match (`1` = at least 4 in a 5v5), however it readies up. Off by default.
-- **New:** `.smoketimer` in practice (on by default): after a spawn teleport, each smoke you throw reports how many seconds after your first move it was thrown and popped.
-- **New:** Chat translations in German, Spanish, French, Norwegian, Polish, Russian and Swedish (`!lang <code>`).
-- **Changed:** The `.showspawns` markers are shown when practice starts (`matchzy_spawn_markers_enabled_default true`), so E on a spawn box teleports you there without knowing the command.
-- **Changed:** A server started without `-allow_round_backup_files` warns admins in chat when a match is loaded and when it goes live, so missing round backups are noticed before a `.restore` is needed.
-- **Fixed:** With `matchzy_ready_hint_style 1` or `2` (or `matchzy_warmup_instant_respawn true`), players who join a team during warmup spawn at once instead of watching until the round ends.
-- **Fixed:** With `matchzy_ready_hint_style 1` or `2`, players who died in warmup sometimes only respawned when the round ended (after a match was loaded during warmup, a veto or a map reload).
-- **Fixed:** Ready reminders no longer suggest every player has to type `.ready` when the match needs fewer: ready teams drop out of the waiting list, and the counts show what the start needs.
-- **Fixed:** Warmup, the knife round, scrims and live matches always turn off knife dropping (`mp_drop_knife_enable 0`), and warmup and the knife round no longer hand out free defuse kits (`mp_defuser_allocation 0`). A value set by `server.cfg` or another plugin no longer carries into these modes.
-- **Fixed:** A pause called in the final round of a series (also an auto-pause after a disconnect) is cleared when the map ends instead of staying queued through the intermission.
-- **Security:** `noclip` in the console only works in practice mode. Before, MatchZy's own `noclip` handler skipped the `sv_cheats` check and let any alive player noclip in warmup, the knife round, scrims and live matches.
-- **Security:** MySqlConnector updated to 2.6.2 (GHSA-473q-m89c-ghf8). With MySQL stats, the older version could send the database password before checking the server's TLS certificate, so someone on the network between the game server and a remote MySQL server could read it.
-
 ## Older releases
+
+??? note "1.0.21 - November 2, 2026"
+
+    - **New:** `matchzy_warmup_instant_respawn true` gives a warmup with instant respawn at the team spawn, 2 seconds of spawn protection, no bomb, no friendly fire, buying all warmup and full money on every respawn. Off by default.
+    - **New:** `matchzy_ready_max_missing` sets the fewest players a team can ready up with in a loaded match (`1` = at least 4 in a 5v5), however it readies up. Off by default.
+    - **New:** `.smoketimer` in practice (on by default): after a spawn teleport, each smoke you throw reports how many seconds after your first move it was thrown and popped.
+    - **New:** Chat translations in German, Spanish, French, Norwegian, Polish, Russian and Swedish (`!lang <code>`).
+    - **Changed:** The `.showspawns` markers are shown when practice starts (`matchzy_spawn_markers_enabled_default true`), so E on a spawn box teleports you there without knowing the command.
+    - **Changed:** A server started without `-allow_round_backup_files` warns admins in chat when a match is loaded and when it goes live, so missing round backups are noticed before a `.restore` is needed.
+    - **Fixed:** With `matchzy_ready_hint_style 1` or `2` (or `matchzy_warmup_instant_respawn true`), players who join a team during warmup spawn at once instead of watching until the round ends.
+    - **Fixed:** With `matchzy_ready_hint_style 1` or `2`, players who died in warmup sometimes only respawned when the round ended (after a match was loaded during warmup, a veto or a map reload).
+    - **Fixed:** Ready reminders no longer suggest every player has to type `.ready` when the match needs fewer: ready teams drop out of the waiting list, and the counts show what the start needs.
+    - **Fixed:** Warmup, the knife round, scrims and live matches always turn off knife dropping (`mp_drop_knife_enable 0`), and warmup and the knife round no longer hand out free defuse kits (`mp_defuser_allocation 0`). A value set by `server.cfg` or another plugin no longer carries into these modes.
+    - **Fixed:** A pause called in the final round of a series (also an auto-pause after a disconnect) is cleared when the map ends instead of staying queued through the intermission.
+    - **Security:** `noclip` in the console only works in practice mode. Before, MatchZy's own `noclip` handler skipped the `sv_cheats` check and let any alive player noclip in warmup, the knife round, scrims and live matches.
+    - **Security:** MySqlConnector updated to 2.6.2 (GHSA-473q-m89c-ghf8). With MySQL stats, the older version could send the database password before checking the server's TLS certificate, so someone on the network between the game server and a remote MySQL server could read it.
 
 ??? note "1.0.20 - October 24, 2026"
 

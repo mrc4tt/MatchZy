@@ -3993,8 +3993,8 @@ namespace MatchZy
             // prac.cfg settings no mode cfg resets: undo them here, before sv_cheats goes off (buddha is
             // a cheat command). Otherwise all-talk and buddha stayed on into a dry run or warmup.
             Server.ExecuteCommand("buddha 0; buddha_ignore_bots 0; sv_full_alltalk 0; sv_showimpacts 0;");
-            Server.ExecuteCommand("sv_cheats false;sv_grenade_trajectory_prac_pipreview false;sv_grenade_trajectory_prac_trailtime 0; mp_ct_default_grenades \"\"; mp_ct_default_primary \"\"; mp_t_default_grenades\"\"; mp_t_default_primary\"\"; mp_teammates_are_enemies false;");
-            Server.ExecuteCommand("mp_death_drop_defuser true; mp_death_drop_taser true; mp_drop_knife_enable false; mp_death_drop_grenade 2; ammo_grenade_limit_total 4; mp_defuser_allocation 0; sv_infinite_ammo 0; mp_force_pick_time 15");
+            Server.ExecuteCommand("sv_cheats false;sv_grenade_trajectory_prac_pipreview false;sv_grenade_trajectory_prac_trailtime 0; mp_ct_default_grenades \"\"; mp_ct_default_primary \"\"; mp_t_default_grenades \"\"; mp_t_default_primary \"\"; mp_teammates_are_enemies false;");
+            Server.ExecuteCommand("mp_death_drop_defuser true; mp_death_drop_taser true; mp_drop_knife_enable false; mp_death_drop_grenade 2; ammo_grenade_limit_total 4; ammo_grenade_limit_flashbang 2; ammo_grenade_limit_default 1; mp_defuser_allocation 0; sv_infinite_ammo 0; mp_force_pick_time 15");
             // CS2 March 2026+: Re-enable magazine-based reload when exiting practice mode
             Server.ExecuteCommand("""sv_magazine_drop_enabled "true";""");
         }

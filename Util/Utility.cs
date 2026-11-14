@@ -810,6 +810,13 @@ namespace MatchZy
                     Server.ExecuteCommand("mp_buy_anywhere 0; mp_maxmoney 16000; mp_startmoney 800; mp_free_armor 0; mp_weapons_allow_typecount 5; mp_solid_teammates 1; mp_autoteambalance 1; mp_limitteams 2");
                     Server.ExecuteCommand("mp_warmuptime 30; mp_warmup_pausetimer 0; mp_roundtime 1.92; mp_roundtime_defuse 1.92; mp_roundtime_hostage 1.92");
                     Server.ExecuteCommand("mp_autokick 1; mp_spawnprotectiontime 5; mp_td_dmgtokick 300; mp_td_dmgtowarn 200; mp_td_spawndmgthreshold 50");
+                    Server.ExecuteCommand("mp_respawn_on_death_ct 0; mp_respawn_on_death_t 0; mp_ignore_round_win_conditions 0; mp_respawn_immunitytime 0");
+                    // Noclip is a per-pawn move type, not a convar: sv_cheats 0 does not end it, and a mode
+                    // switch without a map change (same game_alias) kept practice players flying.
+                    foreach (var p in Utilities.GetPlayers())
+                    {
+                        if (IsPlayerValid(p)) p.PlayerPawn.Value?.ResetNoclipToWalk();
+                    }
                     KickAllBotsProtectCSTV();
                     isPractice = false;
                 }

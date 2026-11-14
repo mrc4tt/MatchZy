@@ -2,6 +2,13 @@
 
 Based on [MatchZy](https://github.com/shobhit-pathak/MatchZy) by Shobhit Pathak, adapted for CS2 game-server hosting: remote log HTTP API, G5API compatibility, auto changelevel, advanced stats (HLTV 2.0 rating / KAST / clutch / opening duels), a coach system, a pause overhaul, and in-game admin and match-setup menus.
 
+# 1.0.26
+
+#### November 14, 2026
+
+- Leaving practice mode left terrorists with the full practice grenade set and an AK-47 on every spawn: the reset of `mp_t_default_grenades` and `mp_t_default_primary` was missing a space and never ran. The flashbang and per-type grenade limits from practice are now reset too.
+- Unloading MatchZy while practice was on (a host switching the server to retakes, deathmatch or prefire without a map change) kept practice players in noclip and kept respawn on death on. Noclip, `mp_respawn_on_death_ct/t`, `mp_ignore_round_win_conditions` and `mp_respawn_immunitytime` are now reset on unload.
+
 # 1.0.25
 
 #### November 13, 2026
