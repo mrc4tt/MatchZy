@@ -145,6 +145,7 @@ namespace MatchZy
 
         public FakeConVar<bool> stopCommandNoDamage = new("matchzy_stop_command_no_damage", "Whether the stop command becomes unavailable if a player damages a player from the opposing team.", false);
 
+        public FakeConVar<bool> pracUseOpensBuyMenu = new("matchzy_prac_use_opens_buymenu", "Whether E (+use) opens the buy menu in practice mode. Off keeps E free for the practice markers; B still opens the buy menu everywhere. Default: false", false);
         public FakeConVar<bool> pracDisableMagazineDrop = new("matchzy_prac_disable_magazine_drop", "Whether to disable magazine-based ammo discard on reload in practice mode (CS2 March 2026+ reload system). Default: true", true);
 
         // Registered as a real FakeConVar (not a ConsoleCommand) so a value set from a cfg

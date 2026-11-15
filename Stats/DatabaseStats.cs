@@ -26,7 +26,155 @@ namespace MatchZy
         // on a worker thread can race our open during the native bootstrap and segfault.
         static Database()
         {
-            EnsureSqliteProviderInitialized();
+            RegisterSqliteNativeResolver();
+            _staticSqliteInitError = EnsureSqliteProviderInitialized();
+        }
+
+        // Set by the static ctor (it cannot log: no plugin instance yet); InitializeDatabaseAsync logs them.
+        private static string? _staticSqliteInitError;
+        private static string? _sqliteResolverNote;
+
+        /// <summary>
+        /// Points SQLitePCLRaw's DllImport("e_sqlite3") straight at MatchZy's own SQLite build
+        /// (libe_sqlite3.so on Linux, e_sqlite3.dll on Windows, both shipped next to MatchZy.dll).
+        /// Normally the plugin loader finds it through MatchZy.deps.json + runtimes/<rid>/native/.
+        /// That failed after a plugin reload or a deploy without deps.json / runtimes: .NET then only
+        /// probed the runtime's shared folder (dotnet/shared/Microsoft.NETCore.App/...), threw
+        /// DllNotFoundException, and stats were disabled. The resolver tries the flat layout
+        /// (next to MatchZy.dll) and the runtimes/ layout itself, so neither file is required.
+        /// Returning Zero falls back to the default lookup.
+        /// </summary>
+        private static void RegisterSqliteNativeResolver()
+        {
+            bool windows = OperatingSystem.IsWindows();
+            if (!windows && !OperatingSystem.IsLinux())
+                return;
+            try
+            {
+                var dirs = new List<string>();
+                // Empty when the plugin is loaded from memory (hot reload), hence the fallback below.
+                string location = typeof(Database).Assembly.Location;
+                if (!string.IsNullOrEmpty(location))
+                    dirs.Add(Path.GetDirectoryName(location)!);
+                try
+                {
+                    // The static ctor runs from the plugin ctor on the game thread, so this native is safe.
+                    string pluginsDir = Path.Combine(Server.GameDirectory, "csgo", "addons", "counterstrikesharp", "plugins");
+                    dirs.Add(Path.Combine(pluginsDir, "MatchZy"));
+                    // A renamed plugin folder (e.g. "matchzy"; Linux paths are case-sensitive): any folder
+                    // directly under plugins/ that holds MatchZy.dll.
+                    if (Directory.Exists(pluginsDir))
+                    {
+                        foreach (var dir in Directory.EnumerateDirectories(pluginsDir))
+                        {
+                            if (File.Exists(Path.Combine(dir, "MatchZy.dll")))
+                                dirs.Add(dir);
+                        }
+                    }
+                }
+                catch { }
+
+                var candidates = dirs.Distinct()
+                    .SelectMany(d => windows
+                        ? new[]
+                        {
+                            Path.Combine(d, "e_sqlite3.dll"),
+                            Path.Combine(d, "runtimes", "win-x64", "native", "e_sqlite3.dll"),
+                        }
+                        : new[]
+                        {
+                            Path.Combine(d, "libe_sqlite3.so"),
+                            Path.Combine(d, "runtimes", "linux-x64", "native", "libe_sqlite3.so"),
+                        })
+                    .ToArray();
+                if (!candidates.Any(File.Exists))
+                    _sqliteResolverNote = $"no MatchZy SQLite library found (looked in: {string.Join(", ", dirs.Distinct())}); using the default lookup";
+
+                System.Runtime.InteropServices.NativeLibrary.SetDllImportResolver(typeof(SQLitePCL.SQLite3Provider_e_sqlite3).Assembly, (name, _, _) =>
+                {
+                    if (name != "e_sqlite3" && name != "libe_sqlite3")
+                        return IntPtr.Zero;
+                    foreach (var path in candidates)
+                    {
+                        if (!File.Exists(path))
+                            continue;
+                        string? shadow = windows ? null : ShadowCopySqliteNative(path);
+                        if (shadow != null && System.Runtime.InteropServices.NativeLibrary.TryLoad(shadow, out var shadowHandle))
+                            return shadowHandle;
+                        if (System.Runtime.InteropServices.NativeLibrary.TryLoad(path, out var handle))
+                            return handle;
+                    }
+                    return IntPtr.Zero;
+                });
+            }
+            catch (InvalidOperationException)
+            {
+                // A resolver is already set for this assembly (it is shared with another plugin's
+                // load context); that one handles the lookup.
+            }
+            catch (Exception)
+            {
+                // Never let the resolver setup break the plugin; the default lookup still runs.
+            }
+        }
+
+        // Linux maps a loaded .so straight from its file. Uploading a new libe_sqlite3.so over the
+        // old one in place (FTP overwrites the same inode; unzip replaces it with a new file) swaps
+        // the pages under the running library, and the dynamic linker then resolves symbols out
+        // of the new build's tables: a SIGSEGV in ld-linux on whichever thread calls SQLite next.
+        // So load a private copy instead, named by the file's content hash, under
+        // <plugin>/native-cache/. Nobody uploads into that folder, an unchanged library maps to the
+        // same copy on every reload (dlopen returns the same handle), and a changed one gets a new
+        // copy. Older copies are unlinked, which is safe on Linux even while one is mapped.
+        // Returns null when the copy cannot be made; the caller then loads the original.
+        private static string? ShadowCopySqliteNative(string source)
+        {
+            try
+            {
+                string hash;
+                using (var stream = File.OpenRead(source))
+                    hash = Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(stream))[..16].ToLowerInvariant();
+
+                string? pluginDir = Path.GetDirectoryName(source);
+                if (pluginDir == null)
+                    return null;
+                // runtimes/linux-x64/native/ layout: keep the cache next to MatchZy.dll.
+                if (string.Equals(Path.GetFileName(pluginDir), "native", StringComparison.Ordinal))
+                    pluginDir = Path.GetFullPath(Path.Combine(pluginDir, "..", "..", ".."));
+
+                string cacheRoot = Path.Combine(pluginDir, "native-cache");
+                string target = Path.Combine(cacheRoot, $"libe_sqlite3-{hash}.so");
+                if (!File.Exists(target))
+                {
+                    Directory.CreateDirectory(cacheRoot);
+                    string temp = $"{target}.{Environment.ProcessId}.tmp";
+                    File.Copy(source, temp, overwrite: true);
+                    try
+                    {
+                        // Atomic publish: another server sharing this install never sees a half copy.
+                        File.Move(temp, target, overwrite: false);
+                    }
+                    catch (IOException) when (File.Exists(target))
+                    {
+                        File.Delete(temp);
+                    }
+                }
+
+                foreach (var old in Directory.EnumerateFiles(cacheRoot, "libe_sqlite3-*"))
+                {
+                    if (string.Equals(old, target, StringComparison.Ordinal))
+                        continue;
+                    // Another server process may be copying right now; only sweep stale temp files.
+                    if (old.EndsWith(".tmp", StringComparison.Ordinal) && File.GetLastWriteTimeUtc(old) > DateTime.UtcNow.AddHours(-1))
+                        continue;
+                    try { File.Delete(old); } catch { }
+                }
+                return target;
+            }
+            catch
+            {
+                return null;
+            }
         }
 
         public void Dispose()
@@ -93,6 +241,10 @@ namespace MatchZy
 
         public async Task InitializeDatabaseAsync(string directory, string gameDirectory)
         {
+            if (_sqliteResolverNote != null)
+                Log($"[RegisterSqliteNativeResolver] {_sqliteResolverNote}");
+            if (_staticSqliteInitError != null)
+                Log($"[EnsureSqliteProviderInitialized] Batteries_V2.Init() failed at load: {_staticSqliteInitError}");
             string? sqliteInitError = EnsureSqliteProviderInitialized();
             if (sqliteInitError != null)
                 Log($"[EnsureSqliteProviderInitialized] Batteries_V2.Init() failed: {sqliteInitError}");
@@ -253,19 +405,21 @@ namespace MatchZy
 
         private async Task CreateRequiredTablesSQLiteAsync(IDbConnection conn)
         {
-            // WAL lets reads run while a write is in progress and makes overlapping writes (round end,
-            // map end and series end at the end of the last round) wait less for the file lock. The
-            // mode is stored in the database file, so setting it once at startup is enough.
+            // Rollback journal (DELETE), not WAL: WAL kept matchzy.db-wal and matchzy.db-shm next to
+            // the database for as long as the server ran, which admins took for leftovers or
+            // corruption, and a copy of matchzy.db alone could miss recent rounds still in the WAL.
+            // MatchZy writes a few rows per round, so WAL's concurrency gains nothing here; writers
+            // wait on the file lock (Default Timeout=30). The mode is stored in the file: switching
+            // an existing WAL database back checkpoints it and removes the -wal/-shm files.
             try
             {
-                string? mode = await conn.ExecuteScalarAsync<string>("PRAGMA journal_mode=WAL;");
-                // SQLite falls back silently (e.g. on a filesystem without shared-memory locking).
-                if (!string.Equals(mode, "wal", StringComparison.OrdinalIgnoreCase))
-                    Log($"[CreateRequiredTablesSQLite] SQLite journal mode is '{mode}', not WAL.");
+                string? mode = await conn.ExecuteScalarAsync<string>("PRAGMA journal_mode=DELETE;");
+                if (!string.Equals(mode, "delete", StringComparison.OrdinalIgnoreCase))
+                    Log($"[CreateRequiredTablesSQLite] SQLite journal mode is '{mode}', not DELETE.");
             }
             catch (Exception ex)
             {
-                Log($"[CreateRequiredTablesSQLite] Could not enable WAL mode: {ex.Message}");
+                Log($"[CreateRequiredTablesSQLite] Could not set the journal mode: {ex.Message}");
             }
 
             await conn.ExecuteAsync(

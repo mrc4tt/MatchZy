@@ -17,6 +17,16 @@
          world-collision bounces everywhere, CI included. At RUNTIME the Trace touch points are
          additionally gated on MatchZy.HasCssTraceApi (Util/CssApiCompat.cs), so the same DLL also
          runs on stock upstream CounterStrikeSharp, which lacks the Trace types. -->
+    <!-- dotnet publish = flat linux-x64 layout (no runtimes/ tree with win/osx/arm/musl natives the
+         server never loads: 37 files instead of 59). Set here, not on the command line, so every
+         publish (tools/package.sh, release.yml, the build server's build-all.sh) gets it unchanged.
+         The Windows SQLite dll is added next to it by OverridePatchedSqliteNative, so one zip
+         serves Linux and Windows servers. Builds (dotnet build) are not affected. -->
+    <RuntimeIdentifier Condition="'$(RuntimeIdentifier)' == '' And '$(_IsPublishing)' == 'true'">linux-x64</RuntimeIdentifier>
+    <SelfContained Condition="'$(_IsPublishing)' == 'true'">false</SelfContained>
+    <!-- Debug symbols inside MatchZy.dll instead of a separate MatchZy.pdb: one file less in the zip,
+         and exception stack traces in the logs keep their file and line numbers. -->
+    <DebugType>embedded</DebugType>
     <CssApiVersion Condition="'$(CssApiVersion)' == ''">1.0.398</CssApiVersion>
     <DefineConstants>$(DefineConstants);HAS_CSS_TRACE</DefineConstants>
     <!-- Same deal for the fork's CommandLine helper (engine ICommandLine access). Compiled in
@@ -44,6 +54,12 @@
          Do NOT bump to 3.x expecting it to "just work" on the container. -->
     <PackageReference Include="SQLitePCLRaw.bundle_e_sqlite3" Version="2.1.11" />
     <PackageReference Include="MySqlConnector" Version="2.6.2" />
+    <!-- Pulled in by MySqlConnector. CounterStrikeSharp shares its own Microsoft.Extensions.* (10.0.0 in
+         the fork) with every plugin (PreferSharedTypes), so MatchZy's copies were never loaded; they are
+         left out of the output. Keep these at the major version CSS ships (10.x): a newer one compiles
+         but its new APIs throw MissingMethodException at runtime against CSS's copy. -->
+    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.0" ExcludeAssets="runtime" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="10.0.0" ExcludeAssets="runtime" />
     <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
     <PackageReference Include="CS2MenuManager" Version="1.0.42">
       <PrivateAssets>none</PrivateAssets>
@@ -73,7 +89,16 @@
     <PropertyGroup>
       <_PatchedSqlite>$(MSBuildProjectDirectory)/native/linux-x64/libe_sqlite3.so</_PatchedSqlite>
     </PropertyGroup>
+    <Error Condition="!Exists('$(MSBuildProjectDirectory)/native/win-x64/e_sqlite3.dll')" Text="Patched e_sqlite3.dll missing at native/win-x64/. Run ./tools/build-sqlite-native.sh windows." />
     <Error Condition="!Exists('$(_PatchedSqlite)')" Text="Patched libe_sqlite3.so missing at $(_PatchedSqlite). Run ./tools/build-sqlite-native.sh." />
+    <!-- Both layouts: RID-agnostic output keeps it in runtimes/linux-x64/native/, a linux-x64 publish
+         puts it flat next to MatchZy.dll. Missing the flat one shipped the package's vulnerable native. -->
+    <Copy Condition="Exists('$(OutDir)libe_sqlite3.so')" SourceFiles="$(MSBuildProjectDirectory)/native/linux-x64/libe_sqlite3.so" DestinationFiles="$(OutDir)libe_sqlite3.so" OverwriteReadOnlyFiles="true" SkipUnchangedFiles="false" />
+    <Copy Condition="'$(PublishDir)' != '' And Exists('$(PublishDir)libe_sqlite3.so')" SourceFiles="$(MSBuildProjectDirectory)/native/linux-x64/libe_sqlite3.so" DestinationFiles="$(PublishDir)libe_sqlite3.so" OverwriteReadOnlyFiles="true" SkipUnchangedFiles="false" />
+    <!-- Windows: our own SQLite 3.50.2 e_sqlite3.dll (mingw build, tools/build-sqlite-native.sh windows)
+         next to MatchZy.dll in every publish, and over the package's vulnerable one in runtimes/win-x64. -->
+    <Copy Condition="'$(PublishDir)' != '' And Exists('$(PublishDir)MatchZy.dll')" SourceFiles="$(MSBuildProjectDirectory)/native/win-x64/e_sqlite3.dll" DestinationFiles="$(PublishDir)e_sqlite3.dll" OverwriteReadOnlyFiles="true" SkipUnchangedFiles="false" />
+    <Copy Condition="'$(PublishDir)' != '' And Exists('$(PublishDir)runtimes/win-x64/native/e_sqlite3.dll')" SourceFiles="$(MSBuildProjectDirectory)/native/win-x64/e_sqlite3.dll" DestinationFiles="$(PublishDir)runtimes/win-x64/native/e_sqlite3.dll" OverwriteReadOnlyFiles="true" SkipUnchangedFiles="false" />
     <Copy Condition="Exists('$(OutDir)runtimes/linux-x64/native/libe_sqlite3.so')" SourceFiles="$(_PatchedSqlite)" DestinationFiles="$(OutDir)runtimes/linux-x64/native/libe_sqlite3.so" OverwriteReadOnlyFiles="true" SkipUnchangedFiles="false" />
     <Copy Condition="'$(PublishDir)' != '' And Exists('$(PublishDir)runtimes/linux-x64/native/libe_sqlite3.so')" SourceFiles="$(_PatchedSqlite)" DestinationFiles="$(PublishDir)runtimes/linux-x64/native/libe_sqlite3.so" OverwriteReadOnlyFiles="true" SkipUnchangedFiles="false" />
   </Target>

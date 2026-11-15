@@ -507,6 +507,10 @@ namespace MatchZy
             public bool NotReadyVisible;
             public bool IsPlaying;
             public bool IsReady;
+            // Culture name the HTML was built in. A !lang / css_lang change touches none of the
+            // other stamps, so without this the panel kept the old language until something else
+            // changed (keepalive only re-sends the cached HTML).
+            public string Language;
             public string Html;
         }
         // Cached gamerules proxy for the ready-phase HUD sync (re-fetched when invalid, e.g. after
@@ -1037,12 +1041,14 @@ namespace MatchZy
                     bool isReadyNow = isPlayingNow
                         && playerReadyStatus.TryGetValue(uid, out bool readyFlag)
                         && readyFlag;
+                    string languageNow = target.GetLanguage().Name;
 
                     // Nothing this player's panel depends on has changed -> skip the build
                     // entirely. The blink state only matters while they are shown as NOT ready.
                     if (_lastPanelHtml.TryGetValue(uid, out var cachedState)
                         && cachedState.Version == _rpVersion
                         && ReferenceEquals(cachedState.Mode, mode)
+                        && string.Equals(cachedState.Language, languageNow, StringComparison.Ordinal)
                         && cachedState.IsPlaying == isPlayingNow
                         && cachedState.IsReady == isReadyNow
                         && (isReadyNow || !isPlayingNow || cachedState.NotReadyVisible == notReadyVisible))
@@ -1133,6 +1139,7 @@ namespace MatchZy
                         NotReadyVisible = notReadyVisible,
                         IsPlaying = isPlayingNow,
                         IsReady = isReadyNow,
+                        Language = languageNow,
                         Html = html,
                     };
 

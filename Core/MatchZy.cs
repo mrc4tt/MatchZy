@@ -541,6 +541,7 @@ namespace MatchZy
                 { ".prac", OnPracCommand },
                 { ".showspawns", OnShowSpawnsCommand },
                 { ".hidespawns", OnHideSpawnsCommand },
+                { ".spawns", OnToggleSpawnsCommand },
                 { ".tactics", OnPracCommand },
                 { ".training", OnPracCommand },
                 { ".dryrun", OnDryRunCommand },

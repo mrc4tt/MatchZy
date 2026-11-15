@@ -55,7 +55,7 @@ jobs:
           # are no longer shipped - install CounterStrikeSharp separately on the server.
           # MatchZyZip=false: skip the local-zip target in MatchZy.csproj (also skipped via CI=true);
           # this step builds the release zip itself below.
-          dotnet publish -c Release -o package/addons/counterstrikesharp/plugins/MatchZy -p:MatchZyZip=false
+          dotnet publish -c Release -r linux-x64 --self-contained false -o package/addons/counterstrikesharp/plugins/MatchZy -p:MatchZyZip=false
           # Nothing is shipped under cfg/: extracting an update over an existing install must never
           # overwrite an admin's files (config.cfg, mode cfgs, admins.json, database.json, ...), and a
           # cfg/MatchZy/ folder in the zip also created a second folder on servers that use

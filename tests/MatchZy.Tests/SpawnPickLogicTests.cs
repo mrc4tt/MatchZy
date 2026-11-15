@@ -73,7 +73,45 @@ public class SpawnPickLogicTests
     [Fact]
     public void PicksNearestOfMarkersInLine()
     {
-        Assert.Equal(1, Pick(AimAt(new Vector3(250, 0, MarkerMid)), Marker(250, 0), Marker(120, 0)));
+        // The view line runs through both markers (far box at floor + 10, crossing the near
+        // marker at ~38u): equally on the line, so the nearer one, in front, wins.
+        Assert.Equal(1, Pick(AimAt(new Vector3(250, 0, 10)), Marker(250, 0), Marker(120, 0)));
+    }
+
+    [Fact]
+    public void PreciselyAimedMarkerBeatsNearerNeighbourInTolerance()
+    {
+        // Spawns in a row: aiming dead on #2 (300u) while #3 (200u) is 15u off the line, inside the
+        // 24u tolerance. Before, the nearer #3 won.
+        Vector3 forward = AimAt(new Vector3(300, 0, MarkerMid));
+        Assert.Equal(0, Pick(forward, Marker(300, 0), Marker(200, 15)));
+        // Same the other way round: dead on the near one, the far one 15u off.
+        forward = AimAt(new Vector3(200, 0, MarkerMid));
+        Assert.Equal(1, Pick(forward, Marker(300, 15), Marker(200, 0)));
+    }
+
+    [Fact]
+    public void CrosshairOnDrawnBoxWinsOverCloserLineMiss()
+    {
+        // Crosshair on #2's drawn square (300u, floor + 8). #3's line is only 6u off the view at
+        // 200u, inside both tolerances, but the crosshair is not on #3's box or number.
+        Vector3 forward = AimAt(new Vector3(300, 10, SpawnPickLogic.FloorLift));
+        Assert.Equal(0, Pick(forward, Marker(300, 0), Marker(200, 12)));
+    }
+
+    [Fact]
+    public void CrosshairOnNumberPicksIt()
+    {
+        Vector3 forward = AimAt(new Vector3(300, 0, SpawnPickLogic.LabelHeight));
+        Assert.Equal(1, Pick(forward, Marker(300, 60), Marker(300, 0)));
+    }
+
+    [Fact]
+    public void FrontBoxUnderCrosshairBeatsBoxBehindIt()
+    {
+        // Looking steeply down through the near box onto the far one: the near one is in front.
+        Vector3 forward = AimAt(new Vector3(100, 0, SpawnPickLogic.FloorLift));
+        Assert.Equal(1, Pick(forward, Marker(200, 0, floorZ: -100), Marker(100, 0)));
     }
 
     [Fact]

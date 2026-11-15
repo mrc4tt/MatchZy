@@ -36,6 +36,20 @@ namespace MatchZy
             nameof(RefreshTeamEntities),
             nameof(OnAdvancedStatsRoundStart),
             nameof(UpdateAliveCounts),
+            // AutoStart fires ~1s after load / map start and runs the warmup entry path on the
+            // game thread in the same frame as the cfg's mp_restartgame. A hot reload loads a
+            // fresh in-memory assembly, so all of these are cold again on every reload.
+            nameof(AutoStart),
+            nameof(StartWarmup),
+            nameof(StartSleepMode),
+            nameof(ExecWarmupCfg),
+            nameof(ExecWarmupModeCfg),
+            nameof(WarmupInstantRespawnCommands),
+            nameof(KickAllBotsProtectCSTV),
+            nameof(ApplyBotTeam),
+            nameof(MarkReadyPhaseStarted),
+            nameof(SendReadyStatusHintMessage),
+            nameof(ClearRoundHistory),
         };
 
         private const BindingFlags AllDeclaredMethods = BindingFlags.Instance | BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.DeclaredOnly;

@@ -4,6 +4,15 @@ A short summary of each release. The [full changelog](changelog.md) has the deta
 
 ## 1.0.26 <small>November 14, 2026</small>
 
+- **Fixed:** In practice, E no longer opens the buy menu, so it always works on spawn markers and lineups. B still opens the buy menu.
+- **Fixed:** E on the spawn markers picks exactly the box or number under your crosshair.
+- **New:** `.spawns` toggles the practice spawn markers on and off.
+- **New:** Chat in Brazilian Portuguese and Turkish (`!lang pt-BR`, `!lang tr`).
+- **Changed:** The release zip is 2.4 MB with 35 files (was 36 MB unpacked, 59 files): only the Linux and Windows files a server uses, and a slimmer SQLite. Windows servers also get the patched SQLite 3.50.2.
+    After updating you can delete the old `runtimes/` folder, `MatchZy.pdb` and `Microsoft.Extensions.*.dll` in the plugin folder.
+- **Fixed:** No more `matchzy.db-wal` and `matchzy.db-shm` files next to `matchzy.db`. They are removed on the next start, and `matchzy.db` alone is a complete backup.
+- **Fixed:** Stats no longer turn off after a plugin reload with "Unable to load shared library 'e_sqlite3'".
+- **Fixed:** The ready panel switches language right away after `!lang`.
 - **Fixed:** After practice, terrorists no longer spawn with the full practice grenade set and an AK-47.
 - **Fixed:** Switching the server from practice to another mode (retakes, deathmatch, prefire) without a map change no longer leaves players flying in noclip or respawning on death.
 

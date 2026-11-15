@@ -1,5 +1,6 @@
 using CounterStrikeSharp.API;
 using CounterStrikeSharp.API.Core;
+using CounterStrikeSharp.API.Modules.Memory;
 
 namespace MatchZy
 {
@@ -14,6 +15,7 @@ namespace MatchZy
             RegisterListener<Listeners.OnTick>(OnBotCombatTick);
             RegisterListener<Listeners.OnTick>(OnPathReplayTick);
             RegisterListener<Listeners.OnTick>(OnRunBoostTick);
+            RegisterListener<Listeners.OnServerPostEntityThink>(OnPracticeBuyZonePostThink);
             RegisterListener<Listeners.OnPlayerButtonsChanged>(OnBotSpawnMarkerButtonHandler);
             RegisterEventHandler<EventPlayerDeath>(OnPracticeDeathPre, HookMode.Pre);
             RegisterEventHandler<EventPlayerSpawn>(OnPracticeSpawnPost);
@@ -21,6 +23,87 @@ namespace MatchZy
             RegisterStrategyRecorder();
             RegisterUtilityExpire();
             RegisterListener<Listeners.OnPlayerButtonsChanged>(OnSmokeTimerButtonHandler);
+        }
+
+        // E (+use) opens the buy menu on the client whenever the networked m_bInBuyZone is true, and
+        // with mp_buy_anywhere the engine sets it true everywhere, so E opened the buy menu instead of
+        // using the practice markers. Forcing it false after every entity think (the engine sets it
+        // again each tick under mp_buy_anywhere) keeps E free; B (buymenu) does not depend on it and still opens the menu.
+        // Practice only and off with matchzy_prac_use_opens_buymenu true.
+        private void OnPracticeBuyZonePostThink()
+        {
+            if (!isPractice || pracUseOpensBuyMenu.Value)
+            {
+                if (buyZoneSuppressed)
+                {
+                    buyZoneSuppressed = false;
+                    RestoreBuyZoneFlags();
+                    // Leaving practice starts warmup, whose mp_restartgame respawns everyone a moment
+                    // later; check again once they stand at their spawn.
+                    AddTimer(2.0f, RestoreBuyZoneFlags, CounterStrikeSharp.API.Modules.Timers.TimerFlags.STOP_ON_MAPCHANGE);
+                }
+                return;
+            }
+            buyZoneSuppressed = true;
+            foreach (var player in Utilities.GetPlayers())
+            {
+                if (player == null || !player.IsValid || player.IsBot)
+                    continue;
+                var pawn = player.PlayerPawn?.Value;
+                if (pawn == null || !pawn.IsValid)
+                    continue;
+                if (!Schema.GetSchemaValue<bool>(pawn.Handle, "CCSPlayerPawn", "m_bInBuyZone"))
+                    continue;
+                Schema.SetSchemaValue(pawn.Handle, "CCSPlayerPawn", "m_bInBuyZone", false);
+                Utilities.SetStateChanged(pawn, "CCSPlayerPawn", "m_bInBuyZone");
+            }
+        }
+
+        // True while OnPracticeBuyZonePostThink is forcing m_bInBuyZone false.
+        private bool buyZoneSuppressed;
+
+        // Without mp_buy_anywhere the engine only writes m_bInBuyZone when a pawn enters or leaves a
+        // func_buyzone trigger. A player who was already standing in the zone when practice ended
+        // (or after a respawn into it) gets no new touch, so the false we forced stuck and buying was
+        // refused with "left the buy zone". Recompute it once from the buy zone bounds; the engine's
+        // touch logic takes over from there.
+        private void RestoreBuyZoneFlags()
+        {
+            try
+            {
+                var zones = Utilities.FindAllEntitiesByDesignerName<CBaseEntity>("func_buyzone")
+                    .Where(zone => zone != null && zone.IsValid && zone.Collision != null && zone.AbsOrigin != null)
+                    .ToList();
+                foreach (var player in Utilities.GetPlayers())
+                {
+                    if (player == null || !player.IsValid || player.IsBot)
+                        continue;
+                    var pawn = player.PlayerPawn?.Value;
+                    if (pawn == null || !pawn.IsValid || pawn.AbsOrigin == null)
+                        continue;
+                    var feet = pawn.AbsOrigin;
+                    bool inZone = zones.Any(zone =>
+                    {
+                        if (zone.TeamNum != 0 && zone.TeamNum != pawn.TeamNum)
+                            return false;
+                        var origin = zone.AbsOrigin!;
+                        var mins = zone.Collision!.Mins;
+                        var maxs = zone.Collision!.Maxs;
+                        float z = feet.Z + 16f;
+                        return feet.X >= origin.X + mins.X && feet.X <= origin.X + maxs.X
+                            && feet.Y >= origin.Y + mins.Y && feet.Y <= origin.Y + maxs.Y
+                            && z >= origin.Z + mins.Z && z <= origin.Z + maxs.Z;
+                    });
+                    if (Schema.GetSchemaValue<bool>(pawn.Handle, "CCSPlayerPawn", "m_bInBuyZone") == inZone)
+                        continue;
+                    Schema.SetSchemaValue(pawn.Handle, "CCSPlayerPawn", "m_bInBuyZone", inZone);
+                    Utilities.SetStateChanged(pawn, "CCSPlayerPawn", "m_bInBuyZone");
+                }
+            }
+            catch (Exception e)
+            {
+                Log($"[RestoreBuyZoneFlags] {e.GetType().Name}: {e.Message}");
+            }
         }
 
         // Practice start and end: every extra goes back to its default, so a new session never

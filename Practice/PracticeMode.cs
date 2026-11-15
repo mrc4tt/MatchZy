@@ -5007,6 +5007,15 @@ namespace MatchZy
             return SpawnPickLogic.PickMarker(new System.Numerics.Vector3(origin.X, origin.Y, origin.Z), eye, forward, markers);
         }
 
+        [ConsoleCommand("css_spawns", "Toggles the competitive spawn markers")]
+        public void OnToggleSpawnsCommand(CCSPlayerController? player, CommandInfo? command)
+        {
+            if (spawnMarkersActive)
+                OnHideSpawnsCommand(player, command);
+            else
+                OnShowSpawnsCommand(player, command);
+        }
+
         [ConsoleCommand("css_hidespawns", "Hides the highlighted spawns")]
         public void OnHideSpawnsCommand(CCSPlayerController? player, CommandInfo? command)
         {
