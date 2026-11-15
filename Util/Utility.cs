@@ -3917,6 +3917,14 @@ namespace MatchZy
             return message;
         }
 
+        // One help chat line ("Label: commands"), split over several lines with the same label when
+        // the list is too long for one chat message (HelpLineLogic).
+        private void PrintHelpLine(CCSPlayerController player, string lineKey, string label, string commands)
+        {
+            foreach (var chunk in HelpLineLogic.Split(commands, HelpLineLogic.MaxLineChars - label.Length - 2))
+                player.PrintToChat(Localizer.ForPlayer(player, lineKey, label, chunk));
+        }
+
         private void SendAvailableCommandsMessage(CCSPlayerController? player)
         {
             if (!IsPlayerValid(player))
@@ -3930,15 +3938,16 @@ namespace MatchZy
                 // Chat summary in the player's language; the command names themselves are not translated.
                 string L(string key, params object[] a) => Localizer.ForPlayer(player!, key, a);
                 player!.PrintToChat($"{chatPrefix} {L("matchzy.help.practice.title")}");
-                player.PrintToChat(L("matchzy.help.line", L("matchzy.help.label.spawns"), ".spawn .ctspawn .tspawn .bestspawn .worstspawn"));
-                player.PrintToChat(L("matchzy.help.line", L("matchzy.help.label.bots"), ".bot .cbot .boost .runboost .nobot .dismiss .dismissall .kevlar .armor .botgun .botshoot .botrespawn .startround .rec .stoprecord .replay .saverec .loadrec .stratrec .strat .strats .createstrat .stratslot"));
-                player.PrintToChat(L("matchzy.help.line", L("matchzy.help.label.positions"), ".sbp .lbp .botspawn .placebot .showbotspawn .botjiggle"));
-                player.PrintToChat(L("matchzy.help.line", L("matchzy.help.label.nades"), ".savenade .loadnade .listnades .rethrow .throwindex"));
-                player.PrintToChat(L("matchzy.help.line", L("matchzy.help.label.utility"), ".clear .ff .god .xray .expire .coloredsmokes .traj .impacts .break .cam .timer"));
-                player.PrintToChat(L("matchzy.help.line", L("matchzy.help.label.teams"), ".ct .t .spec"));
+                PrintHelpLine(player!, "matchzy.help.line", L("matchzy.help.label.spawns"), ".spawn .ctspawn .tspawn .bestspawn .worstspawn .spawns");
+                PrintHelpLine(player!, "matchzy.help.line", L("matchzy.help.label.bots"), ".bot .cbot .boost .runboost .nobot .dismiss .dismissall .kevlar .armor .botgun .botshoot .botrespawn .startround");
+                PrintHelpLine(player!, "matchzy.help.line", L("matchzy.help.label.replay"), ".rec .stoprecord .replay .saverec .loadrec .stratrec .strat .strats .createstrat .stratslot");
+                PrintHelpLine(player!, "matchzy.help.line", L("matchzy.help.label.positions"), ".sbp .lbp .botspawn .placebot .showbotspawn .botjiggle");
+                PrintHelpLine(player!, "matchzy.help.line", L("matchzy.help.label.nades"), ".savenade .loadnade .listnades .rethrow .throwindex");
+                PrintHelpLine(player!, "matchzy.help.line", L("matchzy.help.label.utility"), ".clear .ff .god .xray .expire .coloredsmokes .traj .impacts .break .cam .timer");
+                PrintHelpLine(player!, "matchzy.help.line", L("matchzy.help.label.teams"), ".ct .t .spec");
                 if (isAdmin)
                 {
-                    player.PrintToChat(L("matchzy.help.adminline", L("matchzy.help.label.admin"), ".exitprac .match .scrim .dryrun .fas .grt .rs"));
+                    PrintHelpLine(player!, "matchzy.help.adminline", L("matchzy.help.label.admin"), ".exitprac .match .scrim .dryrun .fas .grt .rs");
                 }
                 player.PrintToChat($" {L(isAdmin ? "matchzy.help.fulllist.admin" : "matchzy.help.fulllist")}");
 
@@ -3960,10 +3969,10 @@ namespace MatchZy
             if (isDryRun)
             {
                 player!.PrintToChat($"{chatPrefix} {H("matchzy.help.dryrun.title")}");
-                player.PrintToChat(H("matchzy.help.line", H("matchzy.help.label.exit"), ".exitdry .stopdry .enddry"));
+                PrintHelpLine(player!, "matchzy.help.line", H("matchzy.help.label.exit"), ".exitdry .stopdry .enddry");
                 if (isAdmin)
                 {
-                    player.PrintToChat(H("matchzy.help.adminline", H("matchzy.help.label.admin"), ".match .prac"));
+                    PrintHelpLine(player!, "matchzy.help.adminline", H("matchzy.help.label.admin"), ".match .prac");
                 }
                 return;
             }
@@ -3972,7 +3981,7 @@ namespace MatchZy
             if (isVeto)
             {
                 player!.PrintToChat($"{chatPrefix} {H("matchzy.help.veto.title")}");
-                player.PrintToChat(H("matchzy.help.line", H("matchzy.help.label.banpick"), ".ban <map> .pick <map>"));
+                PrintHelpLine(player!, "matchzy.help.line", H("matchzy.help.label.banpick"), ".ban <map> .pick <map>");
                 player.PrintToChat($" {H("matchzy.help.veto.captains")}");
                 return;
             }
@@ -3986,7 +3995,7 @@ namespace MatchZy
                 player.PrintToChat(H("matchzy.help.mode", ".prac", H("matchzy.help.mode.prac")));
                 player.PrintToChat(H("matchzy.help.mode", ".dry", H("matchzy.help.mode.dry")));
                 if (isAdmin)
-                    player.PrintToChat(H("matchzy.help.adminline", H("matchzy.help.label.admin"), ".start .knife .endmatch"));
+                    PrintHelpLine(player!, "matchzy.help.adminline", H("matchzy.help.label.admin"), ".start .knife .endmatch");
                 return;
             }
 
@@ -4006,10 +4015,10 @@ namespace MatchZy
 
                 player!.PrintToChat($"{chatPrefix} {H(isScrim ? "matchzy.help.title.scrim" : "matchzy.help.title.match")}");
                 player.PrintToChat(H("matchzy.help.status", knife, demorec, playout));
-                player.PrintToChat(H("matchzy.help.line", H("matchzy.help.label.ready"), ".ready .unready .coach <side>"));
+                PrintHelpLine(player!, "matchzy.help.line", H("matchzy.help.label.ready"), ".ready .unready .coach <side>");
                 // No timeout numbers here: the live cfg has not run yet, so mp_team_timeout_* still
                 // holds the warmup values. The real numbers are printed when the match goes live.
-                player.PrintToChat(H("matchzy.help.line", H("matchzy.help.label.pauselive"), ".tac .tech"));
+                PrintHelpLine(player!, "matchzy.help.line", H("matchzy.help.label.pauselive"), ".tac .tech");
                 if (isAdmin)
                 {
                     // .scrim and .playout are the same command (switch to scrim mode); name both so
@@ -4017,7 +4026,7 @@ namespace MatchZy
                     string adminCmds = isScrim
                         ? ".start .match .endmatch"
                         : ".start .knife .scrim / .playout .endmatch";
-                    player.PrintToChat(H("matchzy.help.adminline", H("matchzy.help.label.admin"), adminCmds));
+                    PrintHelpLine(player!, "matchzy.help.adminline", H("matchzy.help.label.admin"), adminCmds);
                 }
                 return;
             }
@@ -4039,7 +4048,7 @@ namespace MatchZy
                 player.PrintToChat(H("matchzy.help.paused.unpause"));
                 if (isAdmin)
                 {
-                    player.PrintToChat(H("matchzy.help.adminline", H("matchzy.help.label.admin"), H("matchzy.help.paused.admin")));
+                    PrintHelpLine(player!, "matchzy.help.adminline", H("matchzy.help.label.admin"), H("matchzy.help.paused.admin"));
                 }
                 return;
             }
@@ -4057,14 +4066,14 @@ namespace MatchZy
                     int tacLeft = player.Team == CsTeam.Terrorist ? helpRules.TerroristTimeOuts : helpRules.CTTimeOuts;
                     tac = H("matchzy.help.tacleft", tacLeft);
                 }
-                player!.PrintToChat(H("matchzy.help.line", H("matchzy.help.label.pause"), $".pause {tac} .tech"));
+                PrintHelpLine(player!, "matchzy.help.line", H("matchzy.help.label.pause"), $".pause {tac} .tech");
                 if (isStopCommandAvailable)
                 {
-                    player.PrintToChat(H("matchzy.help.line", H("matchzy.help.label.round"), H("matchzy.help.live.round")));
+                    PrintHelpLine(player!, "matchzy.help.line", H("matchzy.help.label.round"), H("matchzy.help.live.round"));
                 }
                 if (isAdmin)
                 {
-                    player.PrintToChat(H("matchzy.help.adminline", H("matchzy.help.label.admin"), H("matchzy.help.live.admin")));
+                    PrintHelpLine(player!, "matchzy.help.adminline", H("matchzy.help.label.admin"), H("matchzy.help.live.admin"));
                 }
                 return;
             }

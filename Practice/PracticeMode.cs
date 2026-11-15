@@ -377,8 +377,16 @@ namespace MatchZy
             AddTimer(1.5f, () => { if (isPractice) WarmSpawnFloorCache(); }, TimerFlags.STOP_ON_MAPCHANGE);
             if (spawnMarkersEnabledDefault.Value)
                 AddTimer(2.0f, () => { if (isPractice) ShowAllSpawnMarkers(); }, TimerFlags.STOP_ON_MAPCHANGE);
-            foreach (var helpPlayer in Utilities.GetPlayers())
-                SendPracticeHelp(helpPlayer);
+            // Not in this frame: the practice cfg above runs on a later frame, and every notify cvar
+            // it changes prints "Server cvar ... changed" to chat, which pushed the first help lines
+            // out of the chat window. Send the list once that burst is over.
+            AddTimer(1.5f, () =>
+            {
+                if (!isPractice)
+                    return;
+                foreach (var helpPlayer in Utilities.GetPlayers())
+                    SendPracticeHelp(helpPlayer);
+            }, TimerFlags.STOP_ON_MAPCHANGE);
         }
 
         private static readonly string[] PracticeHelpKeys =

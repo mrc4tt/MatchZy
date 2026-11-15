@@ -4,6 +4,7 @@ A short summary of each release. The [full changelog](changelog.md) has the deta
 
 ## 1.0.26 <small>November 14, 2026</small>
 
+- **Fixed:** `.help` in practice shows every command again: long lists continue on a new line instead of being cut off, and the list shown when practice starts is no longer pushed out of chat by server messages.
 - **Fixed:** In practice, E no longer opens the buy menu, so it always works on spawn markers and lineups. B still opens the buy menu.
 - **Fixed:** E on the spawn markers picks exactly the box or number under your crosshair.
 - **New:** `.spawns` toggles the practice spawn markers on and off.
