@@ -82,8 +82,13 @@ namespace MatchZy
         // not kicked by the loaded match's roster check (same rule as EventPlayerConnectFull).
         private void FlushPendingLoadConnects(bool loaded)
         {
+            // The pending load resolved on this map: its timeout was stopped by the map change.
+            pendingMatchLoadToken++;
+            pendingMatchLoadTimer = null;
             var userIds = pendingLoadConnects.ToList();
             pendingLoadConnects.Clear();
+            // Players let in while the load was pending skipped the roster check.
+            RecheckRosterAfterPendingLoad(userIds);
             if (!loaded)
                 return;
             foreach (int userId in userIds)

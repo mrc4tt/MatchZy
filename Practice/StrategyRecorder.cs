@@ -149,6 +149,7 @@ namespace MatchZy
                 .Where(p => IsHumanPlayerValid(p) && p.PawnIsAlive && p.Team == player.Team && !activePathRecordings.ContainsKey(p.SteamID))
                 .OrderBy(p => p.PlayerName, StringComparer.OrdinalIgnoreCase))
             {
+                StopNadeFollowForRecording(p);
                 strat.Roles.Add(new StratRole
                 {
                     Name = p.PlayerName,
@@ -484,6 +485,8 @@ namespace MatchZy
             }
 
             var botRoles = strat.Roles.Where(r => r.Slot != meRole).ToList();
+            if (meRole != -1)
+                StopNadeFollowForRecording(player);
             StopStratPlayback();
             stratPlaybackOwner = player.SteamID;
             stratPlaybackPending = true;
@@ -771,6 +774,7 @@ namespace MatchZy
             var strat = new StratRecording { MapName = Server.MapName, Team = team };
             strat.Roles.AddRange(others);
 
+            StopNadeFollowForRecording(player);
             StopStratPlayback();
             stratPlaybackOwner = steamId;
             stratPlaybackPending = true;
@@ -918,15 +922,23 @@ namespace MatchZy
             return _savedStrats;
         }
 
-        // Serialized on the game thread (the Roles lists are mutated there, e.g. .stratslot), only the
-        // disk write runs off it, ordered per file (WritePracticeJsonOrdered). The path is resolved
-        // here, never in the task.
+        // The Roles lists are mutated on the game thread (e.g. .stratslot), so the game thread takes a
+        // deep copy and the serializing plus the disk write run off it on that copy, ordered per file
+        // (WritePracticeJsonOrdered). The path is resolved here, never in the task.
         private bool WriteSavedStrats(Dictionary<string, SavedStrat> strats)
         {
             if (_savedStratsLoadFailed)
                 return false;
             string file = SavedStratsFile(_savedStratsMap);
-            WritePracticeJsonOrdered(file, JsonSerializer.Serialize(strats, SavedPathJsonOpts), "StratRec");
+            var snapshot = new Dictionary<string, SavedStrat>(strats.Count, StringComparer.OrdinalIgnoreCase);
+            foreach (var (name, strat) in strats)
+            {
+                var copy = new SavedStrat { Team = strat.Team, Roles = new List<SavedStratRole>(strat.Roles.Count) };
+                foreach (var role in strat.Roles)
+                    copy.Roles.Add(new SavedStratRole { Slot = role.Slot, Name = role.Name, Path = CloneSavedPath(role.Path) });
+                snapshot[name] = copy;
+            }
+            WritePracticeJsonOrdered(file, () => JsonSerializer.Serialize(snapshot, SavedPathJsonOpts), "StratRec");
             return true;
         }
 

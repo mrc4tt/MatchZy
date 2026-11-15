@@ -809,6 +809,9 @@ namespace MatchZy
                     }
 
                     int restoreTimer = liveSetupRequired ? 2 : 0;
+                    // Keeps the round_start "live match in warmup" fix from ending the warmup (a game
+                    // restart) between here and the load.
+                    MarkRoundRestoreRequested();
                     if (liveSetupRequired)
                     {
                         string gameMode = backupData.GetValueOrDefault("game_mode", "live");

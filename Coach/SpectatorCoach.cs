@@ -55,6 +55,12 @@ public partial class MatchZy
         // game_mode value last sent to this coach's client only (null = nothing sent, the client has
         // the server's own value). See ApplySpectatorCoachXrayBlock.
         public string? SentGameMode;
+        // The coached team's side as the ENGINE has it (T/CT; None = not known yet, teamSides is
+        // used). teamSides flips at the round_end before halftime/OT (SwapSidesInTeamData), but the
+        // engine moves the players only at the next RestartRound; every mode-3 path reads this
+        // instead, so in that window the coach is not pointed at the enemy. See
+        // UpdateSpectatorCoachSide.
+        public CsTeam Side = CsTeam.None;
     }
 
     private readonly Dictionary<CCSPlayerController, SpectatorCoachState> _spectatorCoaches = new();
@@ -62,6 +68,9 @@ public partial class MatchZy
     // Previous sv_coaching_enabled value while a mode-3 coach exists; null = not touched by us.
     // "" = the cvar was not found (logged once), so there is nothing to restore.
     private string? _specCoachSavedCoachingCvar;
+    // mp_forcecamera value before a spectator coach forced it from 0 to 1; null = not touched by
+    // us. Put back together with sv_coaching_enabled when the last coach is gone.
+    private string? _specCoachSavedForceCamera;
     private int _specCoachTickCounter;
     private long _specCoachLastErrorLogMs;
     private long _specCoachLastCameraLogMs;
@@ -94,16 +103,30 @@ public partial class MatchZy
     {
         RegisterListener<Listeners.OnTick>(SpectatorCoachTick);
         RegisterListener<Listeners.OnServerPostEntityThink>(SpectatorCoachCameraPostThink);
-        // New map: the previous map's glow props are gone with it, so only forget them (no Kill).
-        RegisterListener<Listeners.OnMapStart>(_ => _specCoachGlows.Clear());
+        // New map: the previous map's glow props and C4 entities are gone with it, so only forget
+        // them (no Kill). The coach bomb hand-off flags are cleared too: their 1 s reset timers are
+        // STOP_ON_MAPCHANGE, so a flag set just before the change would stay set on the new map and
+        // block every hand-off there.
+        RegisterListener<Listeners.OnMapStart>(_ =>
+        {
+            _specCoachGlows.Clear();
+            _specCoachC4Indices.Clear();
+            coachBombRecoveryPending = false;
+            c4KillQueued.Clear();
+        });
         // Radar positions of players outside the coach's view come in CCSUsrMsg_
         // ProcessSpottedEntityUpdate, sent to each client every 0.5-1 s (RE of build 14196). A
         // spectator coach is taken off its recipients, so the radar can only show players the
         // coach's own client has as entities (the observed teammate's surroundings).
         try
         {
-            int umId = 325;
-            try { int found = UserMessage.FindIdByName("CS_UM_ProcessSpottedEntityUpdate"); if (found > 0) umId = found; } catch { }
+            // Resolved by name only: a hardcoded id would hook whatever message has that id on a
+            // build where the numbering moved.
+            int umId = 0;
+            try { umId = UserMessage.FindIdByName("CS_UM_ProcessSpottedEntityUpdate"); } catch { umId = 0; }
+            if (umId <= 0)
+                Log("[SpectatorCoach] CS_UM_ProcessSpottedEntityUpdate not found; radar message hook skipped.");
+            else
             HookUserMessage(umId, um =>
             {
                 if (_spectatorCoaches.Count == 0)
@@ -190,13 +213,34 @@ public partial class MatchZy
 
     private void ForceSpectatorCoachStateResend()
     {
-        foreach (var state in _spectatorCoaches.Values)
+        if (_spectatorCoaches.Count == 0)
+            return;
+        foreach (var (coach, state) in _spectatorCoaches)
         {
             state.AppliedCoachingTeam = -1;
             state.SentGameMode = null; // send the x-ray block again for the new round
+            // The engine has moved the players by now (halftime/OT swap happens in RestartRound,
+            // before round_poststart): take the coached team's new side here, synchronously, so
+            // the camera lock and CheckTransmit of this very frame already use it. Only a field
+            // write, nothing is created.
+            if (coach != null && coach.IsValid && coach.Connected == PlayerConnectedState.Connected)
+                UpdateSpectatorCoachSide(coach, state, roundStarted: true);
         }
-        if (_spectatorCoaches.Count > 0)
-            SpectatorCoachMaintain();
+        // The maintain pass spawns glow props and writes networked fields. round_poststart fires
+        // inside RestartRound, where a new entity is the "WriteEnterPVS: GetEntServerClass failed"
+        // window: run it on the next frame (it re-validates every coach itself).
+        Server.NextFrame(() =>
+        {
+            try
+            {
+                if (_spectatorCoaches.Count > 0)
+                    SpectatorCoachMaintain();
+            }
+            catch (Exception e)
+            {
+                LogSpectatorCoachError("round start resend", e);
+            }
+        });
     }
 
     // CS2 never clears m_iCoachingTeam itself (CS:GO's JoinTeam did): a player who joins T/CT with
@@ -205,11 +249,24 @@ public partial class MatchZy
     {
         try
         {
-            if (@event.Team != (int)CsTeam.Terrorist && @event.Team != (int)CsTeam.CounterTerrorist)
-                return HookResult.Continue;
             var player = @event.Userid;
             if (player == null || !player.IsValid)
                 return HookResult.Continue;
+            if (@event.Team == (int)CsTeam.Spectator)
+            {
+                // The move to Spectator landed: protect the coach from now on instead of from the
+                // next 0.1 s pass (hide_enemies, glows and the camera lock key on ReachedSpectator).
+                if (_spectatorCoaches.TryGetValue(player, out var arrived))
+                    arrived.ReachedSpectator = true;
+                else
+                    QueueRosteredSpectatorCoach(player);
+                return HookResult.Continue;
+            }
+            if (@event.Team != (int)CsTeam.Terrorist && @event.Team != (int)CsTeam.CounterTerrorist)
+                return HookResult.Continue;
+            // A config-listed coach (mode 3) who just got a side: make them spectator coach now.
+            if (!_spectatorCoaches.ContainsKey(player))
+                QueueRosteredSpectatorCoach(player);
             // A spectator coach who picked a side from the team menu: its old observer pawn must not
             // stay on T/CT until the next maintain pass drops the coach.
             if (_spectatorCoaches.TryGetValue(player, out var coachState))
@@ -245,7 +302,9 @@ public partial class MatchZy
     /// </summary>
     private bool _specCoachBetaLogged;
 
-    private void StartSpectatorCoach(CCSPlayerController player, Team team, CsTeam side)
+    // announce false: the re-queue of a listed coach who left Spectator, which can repeat; the
+    // global "is now coach" line is then not sent again.
+    private void StartSpectatorCoach(CCSPlayerController player, Team team, CsTeam side, bool announce = true)
     {
         if (!_specCoachBetaLogged)
         {
@@ -253,14 +312,22 @@ public partial class MatchZy
             Log("[SpectatorCoach] matchzy_coaching_mode 3 (spectator coach) is BETA. Report issues at github.com/mrc4tt/MatchZy/issues.");
         }
         team.coach.Add(player);
-        _spectatorCoaches[player] = new SpectatorCoachState { StartedAtMs = Environment.TickCount64 };
+        // Side from the team's players where they are on the server (the coach is excluded as a
+        // match coach now); the side passed in otherwise.
+        CsTeam engineSide = EngineSideOfTeam(team);
+        _spectatorCoaches[player] = new SpectatorCoachState
+        {
+            StartedAtMs = Environment.TickCount64,
+            Side = IsPlaySide(engineSide) ? engineSide : side,
+        };
         ResetCoachScoreboard(player);
         ApplyClanTag(player, $"[{team.teamName} COACH]");
         if (player.InGameMoneyServices != null)
             player.InGameMoneyServices.Account = 0;
         Log($"[SpectatorCoach] {player.PlayerName} ({player.SteamID}) is now spectator coach of {team.teamName} (side {side}); moving to Spectator.");
         ReplyToUserCommand(player, Localizer.ForPlayer(player, "matchzy.coach.spectatormode", team.teamName));
-        PrintLocalizedToAll("matchzy.coach.announce", player.PlayerName, team.teamName);
+        if (announce)
+            PrintLocalizedToAll("matchzy.coach.announce", player.PlayerName, team.teamName);
         // Command handler -> engine team move: defer out of the chat/command dispatch (hard rule 4).
         Server.NextFrame(() => MoveSpectatorCoachToSpectator(player));
     }
@@ -298,12 +365,43 @@ public partial class MatchZy
                     MoveToSpectatorWhenDead(player, suicideSent: true);
             });
         };
-        // A T carrying the C4 would drop it on death: hand it to a teammate first (killed via entity
-        // IO, so the suicide waits a frame for it to be gone).
+        // A T carrying the C4 would drop it on death: hand it to a teammate first. The hand-off
+        // takes several frames (C4 made active, drop a frame later, then moved to the carrier), so
+        // the suicide waits until the coach no longer holds it.
         if (player.TeamNum == (byte)CsTeam.Terrorist && HandOffCoachBomb(player, "SpectatorCoach"))
-            Server.NextFrame(killThenMove);
+            Server.NextFrame(() => KillSpectatorCoachWhenBombGone(player, killThenMove, 1));
         else
             killThenMove();
+    }
+
+    // ~1 s at 64 tick: a hand-off that has not landed by then will not; the coach is moved anyway.
+    private const int SpecCoachBombWaitFrames = 64;
+
+    private void KillSpectatorCoachWhenBombGone(CCSPlayerController player, Action killThenMove, int frame)
+    {
+        try
+        {
+            if (player == null || !player.IsValid || player.Connected != PlayerConnectedState.Connected || !IsSpectatorCoach(player))
+                return;
+            if (player.PawnIsAlive && player.TeamNum == (byte)CsTeam.Terrorist && HoldsBomb(player))
+            {
+                if (frame < SpecCoachBombWaitFrames)
+                {
+                    // A hand-off whose weapon switch was refused cleared its pending flag: start it
+                    // again now and then (a no-op while one is still running).
+                    if (frame % 16 == 0)
+                        HandOffCoachBomb(player, "SpectatorCoach retry");
+                    Server.NextFrame(() => KillSpectatorCoachWhenBombGone(player, killThenMove, frame + 1));
+                    return;
+                }
+                Log($"[SpectatorCoach] {player.PlayerName} still holds the C4 after {SpecCoachBombWaitFrames} frames; moving to Spectator anyway (the C4 drops where they stand).");
+            }
+            killThenMove();
+        }
+        catch (Exception e)
+        {
+            LogSpectatorCoachError("bomb wait", e);
+        }
     }
 
     /// <summary>
@@ -313,7 +411,9 @@ public partial class MatchZy
     /// </summary>
     private void EndSpectatorCoach(CCSPlayerController player)
     {
-        CsTeam side = GetCoachTeam(player);
+        // The side the engine has the team on right now (between the halftime round_end and the
+        // swap, teamSides already names the next half's side).
+        CsTeam side = RefreshedSpectatorCoachSide(player);
         DropSpectatorCoach(player, "uncoach");
         if (player.InGameMoneyServices != null)
             player.InGameMoneyServices.Account = 0;
@@ -339,7 +439,7 @@ public partial class MatchZy
         {
             if (coach == null || !coach.IsValid || coach.Connected != PlayerConnectedState.Connected)
                 continue;
-            CsTeam side = GetCoachTeam(coach);
+            CsTeam side = RefreshedSpectatorCoachSide(coach);
             DropSpectatorCoach(coach, reason);
             if ((side == CsTeam.Terrorist || side == CsTeam.CounterTerrorist) && coach.Team == CsTeam.Spectator)
             {
@@ -411,7 +511,7 @@ public partial class MatchZy
         {
             foreach (var (coach, state) in _spectatorCoaches)
                 if (state.ReachedSpectator && coach != null && coach.IsValid)
-                    LockSpectatorCoachCamera(coach, GetCoachTeam(coach), state);
+                    LockSpectatorCoachCamera(coach, SpectatorCoachSide(coach), state);
         }
         catch (Exception e)
         {
@@ -426,14 +526,7 @@ public partial class MatchZy
         // (client and server then show every player to observers). A cfg run later (warmup, a
         // match config) can set it back to 0, so keep it at 1 while a spectator coach exists.
         if (_spectatorCoaches.Count > 0)
-        {
-            var forceCam = ConVar.Find("mp_forcecamera");
-            if (forceCam != null && GetConvarStringValue(forceCam).Trim() == "0")
-            {
-                SetReplicatedCvar("mp_forcecamera", "1");
-                Log("[SpectatorCoach] mp_forcecamera 0 -> 1 (coach radar would show every player)");
-            }
-        }
+            ForceSpectatorCoachCamera();
         foreach (var (coach, state) in _spectatorCoaches.ToList())
         {
             if (coach == null || !coach.IsValid || coach.Connected != PlayerConnectedState.Connected)
@@ -464,8 +557,14 @@ public partial class MatchZy
                 // Joined a side on their own (team menu) or the move never landed: a mode-3 coach on
                 // T/CT has no body handling at all, so stop treating them as a coach.
                 Log($"[SpectatorCoach] {coach.PlayerName} is on {coach.Team}, not Spectator (reached before: {state.ReachedSpectator}); dropping coach status.");
+                bool leftOnPurpose = state.ReachedSpectator;
                 DropSpectatorCoach(coach, "not on Spectator");
                 PrintToPlayerChat(coach, Localizer.ForPlayer(coach, "matchzy.coach.spectatorleft"));
+                // Listed only as a coach in the match config: may not become an extra player (same
+                // rule as .uncoach), so they are made spectator coach again. Not after a move that
+                // never landed, which would only repeat.
+                if (leftOnPurpose)
+                    QueueRosteredSpectatorCoach(coach, announce: false);
                 continue;
             }
             else
@@ -473,8 +572,10 @@ public partial class MatchZy
                 continue; // move still in flight
             }
 
-            // The coached team keeps its Team object across halftime; its side does not.
-            CsTeam side = GetCoachTeam(coach);
+            // The coached team keeps its Team object across halftime; its side does not. Followed
+            // from where the team's players are (engine), not from teamSides.
+            UpdateSpectatorCoachSide(coach, state, roundStarted: false);
+            CsTeam side = SpectatorCoachSide(coach);
             int want = side == CsTeam.Terrorist || side == CsTeam.CounterTerrorist ? (int)side : 0;
             // A plain field write is not networked: without SetStateChanged the client keeps 0 and
             // treats the coach as a plain spectator (enemy x-ray outlines, every player on the radar).
@@ -529,7 +630,7 @@ public partial class MatchZy
         }
     }
 
-    private void SetSpectatorCoachCvar(bool on)
+    private void SetSpectatorCoachCvar(bool on, bool logAfter = true)
     {
         if (on && _specCoachSavedCoachingCvar == null)
         {
@@ -543,25 +644,51 @@ public partial class MatchZy
             _specCoachSavedCoachingCvar = GetConvarStringValue(cvar);
             SetReplicatedCvar("sv_coaching_enabled", "1");
             Log($"[SpectatorCoach] sv_coaching_enabled {_specCoachSavedCoachingCvar} -> 1 (spectator coach present)");
-            // The engine's coach radar (own team + spotted enemies only) also needs
-            // mp_forcecamera != 0; with 0 the radar and the server's spotted-entity message show
-            // every player to observers (RE of build 14196, radar filter init).
-            var forceCam = ConVar.Find("mp_forcecamera");
-            if (forceCam != null && GetConvarStringValue(forceCam).Trim() == "0")
-            {
-                SetReplicatedCvar("mp_forcecamera", "1");
-                Log("[SpectatorCoach] mp_forcecamera 0 -> 1 (coach radar would show every player)");
-            }
+            ForceSpectatorCoachCamera();
         }
-        else if (!on && _specCoachSavedCoachingCvar != null)
+        else if (!on)
         {
+            RestoreSpectatorCoachCamera(logAfter);
+            if (_specCoachSavedCoachingCvar == null)
+                return;
             string saved = _specCoachSavedCoachingCvar;
             _specCoachSavedCoachingCvar = null;
             if (saved == "")
                 return;
-            SetReplicatedCvar("sv_coaching_enabled", saved);
+            SetReplicatedCvar("sv_coaching_enabled", saved, logAfter);
             Log($"[SpectatorCoach] sv_coaching_enabled restored to {saved} (no spectator coach left)");
         }
+    }
+
+    // The engine's coach radar (own team + spotted enemies only) also needs mp_forcecamera != 0;
+    // with 0 the radar and the server's spotted-entity message show every player to observers (RE
+    // of build 14196, radar filter init). A cfg run later (warmup, a match config) can set it back
+    // to 0, so this runs on every maintain pass; the value from before the first force is kept.
+    private void ForceSpectatorCoachCamera()
+    {
+        var forceCam = ConVar.Find("mp_forcecamera");
+        if (forceCam == null)
+            return;
+        string current = GetConvarStringValue(forceCam).Trim();
+        if (current != "0")
+            return;
+        _specCoachSavedForceCamera ??= current;
+        SetReplicatedCvar("mp_forcecamera", "1");
+        Log("[SpectatorCoach] mp_forcecamera 0 -> 1 (coach radar would show every player)");
+    }
+
+    private void RestoreSpectatorCoachCamera(bool logAfter = true)
+    {
+        if (_specCoachSavedForceCamera == null)
+            return;
+        string saved = _specCoachSavedForceCamera;
+        _specCoachSavedForceCamera = null;
+        var forceCam = ConVar.Find("mp_forcecamera");
+        // Only put it back while it still holds our 1: a cfg that set its own value since wins.
+        if (forceCam == null || GetConvarStringValue(forceCam).Trim() != "1")
+            return;
+        SetReplicatedCvar("mp_forcecamera", saved, logAfter);
+        Log($"[SpectatorCoach] mp_forcecamera restored to {saved} (no spectator coach left)");
     }
 
     // CheckTransmit crosses into managed code every tick for every client: registered only while a
@@ -602,7 +729,7 @@ public partial class MatchZy
                     FilterSpectatorCoachGlows(info, CsTeam.None, 0);
                     continue;
                 }
-                CsTeam side = GetCoachTeam(receiver);
+                CsTeam side = SpectatorCoachSide(receiver);
                 if (side != CsTeam.Terrorist && side != CsTeam.CounterTerrorist)
                 {
                     FilterSpectatorCoachGlows(info, CsTeam.None, 0);
@@ -673,6 +800,10 @@ public partial class MatchZy
                     }
                 }
 
+                // TODO planted_c4 (CPlantedC4) is not filtered: a CT coach still receives the planted
+                // bomb before the CTs spot it. Not added blind: removing another networked entity
+                // class from the coach's transmit set is the same WriteEnterPVS crash window that made
+                // hide_enemies opt-in; needs a live test (and the bomb-timer HUD checked) first.
                 // The C4 is not always listed in MyWeapons: hide it by owner too. A dropped C4 (no
                 // owner) is hidden from a CT coach until the CTs spot it or the watched CT sees it,
                 // so it is not on the coach's radar either.
@@ -763,7 +894,10 @@ public partial class MatchZy
                 mates.Add(pp);
         }
         if (mates.Count == 0)
+        {
+            HoldSpectatorCoachCameraFixed(coach, obsPawn, obs, targetEnt, side);
             return;
+        }
         CCSPlayerPawn mate = mates[0];
         if (!targetOk)
         {
@@ -789,6 +923,38 @@ public partial class MatchZy
         {
             _specCoachLastCameraLogMs = now;
             Log($"[SpectatorCoach] camera lock {coach.PlayerName}: mode {mode} -> {obs.ObserverMode}");
+        }
+    }
+
+    /// <summary>
+    /// Nobody of the coached team is alive (the team was wiped while the bomb ticks, or before the
+    /// spawns): a free, chase or in-eye camera on an enemy would let the coach watch the other team.
+    /// The camera is held in fixed mode, without an enemy as target, until a teammate is alive again
+    /// (the in-eye lock takes over on its own then, since fixed is not in-eye).
+    /// </summary>
+    private void HoldSpectatorCoachCameraFixed(CCSPlayerController coach, CBaseEntity obsPawn, CPlayer_ObserverServices obs, CBaseEntity? targetEnt, CsTeam side)
+    {
+        bool changed = false;
+        byte before = obs.ObserverMode;
+        if (before != (byte)ObserverMode_t.OBS_MODE_FIXED)
+        {
+            obs.ObserverMode = (byte)ObserverMode_t.OBS_MODE_FIXED;
+            changed = true;
+        }
+        if (targetEnt != null && targetEnt.IsValid && targetEnt.TeamNum != (byte)side
+            && (targetEnt.TeamNum == (byte)CsTeam.Terrorist || targetEnt.TeamNum == (byte)CsTeam.CounterTerrorist))
+        {
+            obs.ObserverTarget.Raw = uint.MaxValue; // invalid handle: no target
+            changed = true;
+        }
+        if (!changed)
+            return;
+        Utilities.SetStateChanged(obsPawn, "CBasePlayerPawn", "m_pObserverServices");
+        long now = Environment.TickCount64;
+        if (now - _specCoachLastCameraLogMs > 10000)
+        {
+            _specCoachLastCameraLogMs = now;
+            Log($"[SpectatorCoach] camera lock {coach.PlayerName}: no living teammate, mode {before} -> fixed");
         }
     }
 
@@ -871,7 +1037,8 @@ public partial class MatchZy
     // still replicated, and the client reads its own hidden copy.
     private readonly HashSet<string> _unlockedCvars = new();
 
-    private void SetReplicatedCvar(string name, string value)
+    // logAfter false: no next-frame log line (Unload: the plugin is gone by then).
+    private void SetReplicatedCvar(string name, string value, bool logAfter = true)
     {
         UnlockCvar(name);
         // A set to the value the server already holds is no change, so nothing would be sent: the
@@ -882,6 +1049,8 @@ public partial class MatchZy
             Server.ExecuteCommand($"{name} {(value == "1" ? "0" : "1")}; {name} {value}");
         else
             Server.ExecuteCommand($"{name} {value}");
+        if (!logAfter)
+            return;
         Server.NextFrame(() =>
         {
             var cv = ConVar.Find(name);
@@ -938,7 +1107,7 @@ public partial class MatchZy
     // watched teammate's view cone, clear line from the teammate's eyes, sighting grace left).
     private void DumpSpectatorCoachEnemies(CCSPlayerController coach, SpectatorCoachState state, CBaseEntity? target, Action<string> Out)
     {
-        CsTeam side = GetCoachTeam(coach);
+        CsTeam side = SpectatorCoachSide(coach);
         Out($"  hide_enemies {specCoachHideEnemies.Value}, trace api {HasCssTraceApi}, listener {_specCoachTransmitHandler != null}, side {side}");
         var players = Utilities.GetPlayers();
         CCSPlayerPawn? eyePawn = target != null && target.IsValid ? Utilities.GetEntityFromIndex<CCSPlayerPawn>((int)target.Index) : null;
@@ -1004,7 +1173,7 @@ public partial class MatchZy
         {
             if (!state.ReachedSpectator || coach == null || !coach.IsValid)
                 continue;
-            CsTeam side = GetCoachTeam(coach);
+            CsTeam side = SpectatorCoachSide(coach);
             if (side != CsTeam.Terrorist && side != CsTeam.CounterTerrorist)
                 continue;
             players ??= Utilities.GetPlayers();
@@ -1200,6 +1369,261 @@ public partial class MatchZy
         {
             LogSpectatorCoachError("x-ray block restore", e);
         }
+    }
+
+    private static bool IsPlaySide(CsTeam t) => t == CsTeam.Terrorist || t == CsTeam.CounterTerrorist;
+
+    /// <summary>
+    /// The side a mode-3 coach's team is on as the engine has it. Every mode-3 path reads this
+    /// instead of GetCoachTeam (teamSides): at the round_end before halftime/OT SwapSidesInTeamData
+    /// already flips teamSides, while the engine moves the players only at the next RestartRound.
+    /// </summary>
+    private CsTeam SpectatorCoachSide(CCSPlayerController coach)
+    {
+        if (_spectatorCoaches.TryGetValue(coach, out var state) && IsPlaySide(state.Side))
+            return state.Side;
+        return GetCoachTeam(coach);
+    }
+
+    // Brings the stored side up to date first (command paths: .uncoach, match reset).
+    private CsTeam RefreshedSpectatorCoachSide(CCSPlayerController coach)
+    {
+        if (_spectatorCoaches.TryGetValue(coach, out var state))
+            UpdateSpectatorCoachSide(coach, state, roundStarted: false);
+        return SpectatorCoachSide(coach);
+    }
+
+    /// <summary>
+    /// A side read from teamSides, as the engine has it right now: between the halftime/OT
+    /// round_end (SwapSidesInTeamData already flipped teamSides) and the RestartRound that moves the
+    /// players, the gamerules flag m_bSwitchingTeamsAtRoundReset is set and the engine still has the
+    /// team on the other side. Not for round_poststart (the swap is done there).
+    /// </summary>
+    private CsTeam EngineSideFromTeamSides(CsTeam teamSidesSide)
+    {
+        if (!IsPlaySide(teamSidesSide))
+            return teamSidesSide;
+        bool pending = false;
+        try { pending = GetGameRules()?.SwitchingTeamsAtRoundReset == true; } catch { }
+        if (!pending)
+            return teamSidesSide;
+        return teamSidesSide == CsTeam.Terrorist ? CsTeam.CounterTerrorist : CsTeam.Terrorist;
+    }
+
+    private Team? SpectatorCoachTeamOf(CCSPlayerController coach)
+        => matchzyTeam1.coach.Contains(coach) ? matchzyTeam1 : matchzyTeam2.coach.Contains(coach) ? matchzyTeam2 : null;
+
+    /// <summary>
+    /// The side the team's rostered players are on right now (majority of connected, non-coach
+    /// players of its "players" roster on T/CT). None when the team has no roster or nobody of it
+    /// is on a side (or as many on each), so the caller falls back to teamSides.
+    /// </summary>
+    private CsTeam EngineSideOfTeam(Team team)
+    {
+        if (RosterSize(team.teamPlayers) == 0)
+            return CsTeam.None;
+        int t = 0, ct = 0;
+        foreach (var p in Utilities.GetPlayers())
+        {
+            if (p == null || !p.IsValid || p.IsBot || p.IsHLTV || p.Connected != PlayerConnectedState.Connected)
+                continue;
+            if (IsMatchCoach(p) || !LookupRosterEntry(team.teamPlayers, p.SteamID))
+                continue;
+            if (p.TeamNum == (byte)CsTeam.Terrorist) t++;
+            else if (p.TeamNum == (byte)CsTeam.CounterTerrorist) ct++;
+        }
+        return t > ct ? CsTeam.Terrorist : ct > t ? CsTeam.CounterTerrorist : CsTeam.None;
+    }
+
+    /// <summary>
+    /// Follows the engine: the side of the team's rostered players when there are some on a side;
+    /// otherwise teamSides, but only when the side is not known yet or at round_poststart
+    /// (<paramref name="roundStarted"/>), where the engine has done any pending swap and teamSides
+    /// matches it again. Between the halftime round_end and the restart the stored side stays.
+    /// </summary>
+    private void UpdateSpectatorCoachSide(CCSPlayerController coach, SpectatorCoachState state, bool roundStarted)
+    {
+        Team? team = SpectatorCoachTeamOf(coach);
+        if (team == null)
+            return;
+        CsTeam next = EngineSideOfTeam(team);
+        if (!IsPlaySide(next) && roundStarted)
+            next = GetCoachTeam(coach);
+        else if (!IsPlaySide(next) && !IsPlaySide(state.Side))
+            next = EngineSideFromTeamSides(GetCoachTeam(coach));
+        if (!IsPlaySide(next) || next == state.Side)
+            return;
+        Log($"[SpectatorCoach] {coach.PlayerName}: coached side {state.Side} -> {next}{(roundStarted ? " (round start)" : "")}");
+        state.Side = next;
+        // Sightings and the last camera target belong to the old side's players.
+        state.EnemyVisibleUntil.Clear();
+        state.LastTargetIndex = 0;
+    }
+
+    /// <summary>
+    /// matchzy_coaching_mode 3: a player listed under a team's "coaches" becomes that team's
+    /// spectator coach (not a body coach) once they are on a team (T, CT or Spectator; never from
+    /// team None, mid-connect). Called from AssignRosteredCoach and the player_team event; runs on
+    /// the next frame and checks everything again there.
+    /// </summary>
+    private void QueueRosteredSpectatorCoach(CCSPlayerController player, bool announce = true)
+    {
+        if (coachingMode.Value != 3 || !isMatchSetup || isPractice)
+            return;
+        if (player == null || !player.IsValid || player.IsBot || player.IsHLTV || GetRosteredCoachTeam(player.SteamID) == null)
+            return;
+        Server.NextFrame(() =>
+        {
+            try
+            {
+                TryStartRosteredSpectatorCoach(player, announce);
+            }
+            catch (Exception e)
+            {
+                Log($"[SpectatorCoach] rostered coach start failed: {e.Message}");
+            }
+        });
+    }
+
+    private void TryStartRosteredSpectatorCoach(CCSPlayerController player, bool announce)
+    {
+        if (coachingMode.Value != 3 || !isMatchSetup || isPractice)
+            return;
+        if (player == null || !player.IsValid || player.Connected != PlayerConnectedState.Connected || player.IsBot || player.IsHLTV)
+            return;
+        if (IsSpectatorCoach(player) || matchzyTeam1.coach.Contains(player) || matchzyTeam2.coach.Contains(player))
+            return;
+        Team? team = GetRosteredCoachTeam(player.SteamID);
+        if (team == null)
+            return;
+        // Listed as a player too: plays instead (same rule as AssignRosteredCoach).
+        if (LookupRosterEntry(matchzyTeam1.teamPlayers, player.SteamID) || LookupRosterEntry(matchzyTeam2.teamPlayers, player.SteamID))
+            return;
+        if (player.Team != CsTeam.Terrorist && player.Team != CsTeam.CounterTerrorist && player.Team != CsTeam.Spectator)
+            return;
+        CsTeam side = teamSides.TryGetValue(team, out string? s)
+            ? (s == "CT" ? CsTeam.CounterTerrorist : s == "TERRORIST" ? CsTeam.Terrorist : CsTeam.None)
+            : CsTeam.None;
+        StartSpectatorCoach(player, team, EngineSideFromTeamSides(side), announce);
+    }
+
+    /// <summary>
+    /// Disconnect of a spectator coach: m_iCoachingTeam is cleared while the controller is still
+    /// valid (CS2 never clears it, and the controller slot is reused), the coach leaves
+    /// _spectatorCoaches and the coach sets, and sv_coaching_enabled / mp_forcecamera go back when
+    /// it was the last one. Safe to call for any player.
+    /// </summary>
+    public void OnSpectatorCoachDisconnect(CCSPlayerController? player)
+    {
+        try
+        {
+            if (player == null)
+                return;
+            bool wasCoach = _spectatorCoaches.TryGetValue(player, out var state);
+            if (wasCoach && state != null)
+            {
+                RestoreSpectatorCoachPawnTeam(player, state);
+                state.SentGameMode = null; // nothing to restore on a client that is leaving
+                _spectatorCoaches.Remove(player);
+                matchzyTeam1.coach.Remove(player);
+                matchzyTeam2.coach.Remove(player);
+                Log($"[SpectatorCoach] {(player.IsValid ? player.PlayerName : "coach")} disconnected; spectator coach removed.");
+            }
+            if (player.IsValid)
+                ClearSpectatorCoachingTeam(player);
+            if (wasCoach && _spectatorCoaches.Count == 0)
+            {
+                // Glows and the transmit listener follow on the next 0.1 s pass (the tick keeps
+                // running while the listener is registered).
+                SetSpectatorCoachCvar(false);
+                _specCoachServerRadarOk = false;
+            }
+        }
+        catch (Exception e)
+        {
+            Log($"[SpectatorCoach] disconnect cleanup failed: {e.Message}");
+        }
+    }
+
+    /// <summary>
+    /// Plugin unload (hot reload included): undoes everything mode 3 changed on the server, so
+    /// nothing outlives the plugin. Per coach as DropSpectatorCoach (m_iCoachingTeam cleared,
+    /// observer pawn team and the client's game_mode restored, clan tag cleared), then
+    /// sv_coaching_enabled and mp_forcecamera back, glows killed, CheckTransmit removed,
+    /// bot_controllable and the coach comm patch restored. Safe with no coaches and when called
+    /// twice. No Server.NextFrame is queued from here.
+    /// <paramref name="touchEntities"/> false (Unload after OnMapEnd: entity wrappers may point at
+    /// freed memory): no controller, pawn or glow entity is read or written, and the coach sets are
+    /// pruned by reference only (no hashing of a controller). Only managed state is cleared and the
+    /// cvars and the comm patch (plain memory, not an entity) are put back.
+    /// </summary>
+    public void ShutdownSpectatorCoachesForUnload(bool touchEntities = true)
+    {
+        if (!touchEntities)
+        {
+            try
+            {
+                var gone = _spectatorCoaches.Keys.ToList();
+                matchzyTeam1.coach.RemoveWhere(c => gone.Any(k => ReferenceEquals(k, c)));
+                matchzyTeam2.coach.RemoveWhere(c => gone.Any(k => ReferenceEquals(k, c)));
+            }
+            catch (Exception e)
+            {
+                Log($"[SpectatorCoach] unload: coach sets: {e.Message}");
+            }
+        }
+        foreach (var (coach, state) in touchEntities ? _spectatorCoaches.ToList() : new())
+        {
+            try
+            {
+                bool valid = coach != null && coach.IsValid;
+                RestoreSpectatorCoachPawnTeam(valid ? coach : null, state);
+                if (valid && coach!.Connected == PlayerConnectedState.Connected)
+                {
+                    RestoreSpectatorCoachXrayBlock(coach, state);
+                    ClearSpectatorCoachingTeam(coach);
+                    coach.Clan = "";
+                    Utilities.SetStateChanged(coach, "CCSPlayerController", "m_szClan");
+                }
+                if (coach != null)
+                {
+                    matchzyTeam1.coach.Remove(coach);
+                    matchzyTeam2.coach.Remove(coach);
+                }
+            }
+            catch (Exception e)
+            {
+                Log($"[SpectatorCoach] unload: coach cleanup failed: {e.Message}");
+            }
+        }
+        _spectatorCoaches.Clear();
+        _specCoachServerRadarOk = false;
+        _specCoachC4Indices.Clear();
+        _specCoachHiddenPawns.Clear();
+        try
+        {
+            // Parked at round_prestart (raw write to 0, restore queued for the next frame): the
+            // queued restore must not set 1 again after the plugin is gone.
+            if (_coachingCvarParked)
+            {
+                _coachingCvarParked = false;
+                if (_specCoachSavedCoachingCvar == null)
+                    SetConvarValue(ConVar.Find("sv_coaching_enabled"), "1");
+            }
+        }
+        catch (Exception e) { Log($"[SpectatorCoach] unload: parked cvar: {e.Message}"); }
+        if (touchEntities)
+        {
+            try { RemoveAllSpectatorCoachGlows(); } catch (Exception e) { Log($"[SpectatorCoach] unload: glows: {e.Message}"); }
+        }
+        else
+        {
+            _specCoachGlows.Clear(); // the level's entities are going away with the map
+        }
+        try { SetSpectatorCoachTransmit(false); } catch (Exception e) { Log($"[SpectatorCoach] unload: transmit: {e.Message}"); }
+        try { SetSpectatorCoachCvar(false, logAfter: false); } catch (Exception e) { Log($"[SpectatorCoach] unload: cvars: {e.Message}"); }
+        try { RestoreBotControllable(); } catch (Exception e) { Log($"[SpectatorCoach] unload: bot_controllable: {e.Message}"); }
+        try { DisableCoachCommPatch("unload"); } catch (Exception e) { Log($"[SpectatorCoach] unload: comm patch: {e.Message}"); }
     }
 
     private void LogSpectatorCoachError(string where, Exception e)

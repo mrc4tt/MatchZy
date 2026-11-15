@@ -131,6 +131,37 @@ namespace MatchZy
             ResetSmokeSpawnTimer();
         }
 
+        /// <summary>
+        /// Plugin unload (plain and hot reload): ends every grenade follow camera (pawn and weapon
+        /// visible again, move type restored, a living pawn put back where it threw), removes the
+        /// lineup trainer targets and hud hint, the .xray glow props, and sets the tier0 Assert
+        /// channel back to normal. Safe with no players; each part is guarded on its own.
+        /// touchEntities false (map ending: entity wrappers and handles may point at freed memory):
+        /// only the managed state is cleared, no entity is read, moved or killed.
+        /// </summary>
+        public void ShutdownPracticeExtrasForUnload(bool touchEntities = true)
+        {
+            if (!touchEntities)
+            {
+                _nadeFollows.Clear();
+                try { ForgetNadeTutorialState(); }
+                catch (Exception e) { Log($"[PracticeExtras] unload trainer: {e.Message}"); }
+                xrayGlows.Clear();
+                xrayEnabled = false;
+                try { RefreshGlowAssertQuiet(forceOff: true); }
+                catch (Exception e) { Log($"[PracticeExtras] unload assert: {e.Message}"); }
+                return;
+            }
+            try { ResetNadeFollow(mapStart: false, unloading: true); }
+            catch (Exception e) { Log($"[PracticeExtras] unload follow: {e.Message}"); }
+            try { ShutdownNadeTutorial(); }
+            catch (Exception e) { Log($"[PracticeExtras] unload trainer: {e.Message}"); }
+            try { ResetXray(); }
+            catch (Exception e) { Log($"[PracticeExtras] unload xray: {e.Message}"); }
+            try { RefreshGlowAssertQuiet(forceOff: true); }
+            catch (Exception e) { Log($"[PracticeExtras] unload assert: {e.Message}"); }
+        }
+
         // Chat dispatch for the extras (both the bare and the argument forms). Returns true when the
         // command word was one of these.
         private bool HandlePracticeExtraChatCommand(CCSPlayerController player, string cmdWord, string arg)

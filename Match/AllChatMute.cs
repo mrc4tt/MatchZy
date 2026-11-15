@@ -53,6 +53,9 @@ namespace MatchZy
             bool muteLine = IsChatCommandLine(line, "mute");
             if (allChatMuteVotesNeeded.Value > 0 && muteLine && IsSimpleAdminLoaded())
             {
+                // An admin's bare !mute is CS2-SimpleAdmin's (it opens its mute menu): let it through.
+                if (IsPlayerAdmin(player, "css_mute", "@css/chat", "@css/config"))
+                    return HookResult.Continue;
                 var told = player;
                 Server.NextFrame(() =>
                 {

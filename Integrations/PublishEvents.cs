@@ -67,12 +67,17 @@ namespace MatchZy
             "series_start", "going_live", "map_result", "series_end", "demo_upload_ended", "server_shutdown",
         };
 
-        // A delivery-logged match event that hit a transient failure (timeout, network error, 5xx) is
+        // A delivery-logged match event that hit a transient failure (no connection, 5xx, 408, 429) is
         // sent again before the sender moves on, so one receiver hiccup no longer loses a map result
-        // and the queue order is kept. 4xx means the receiver rejected the event itself, and a retry
-        // would get the same answer. Lifecycle events are left out: server_shutdown is sent while the
-        // process is exiting and cannot wait.
+        // and the queue order is kept. Other 4xx means the receiver rejected the event itself, and a
+        // retry would get the same answer. A timeout is not retried: the receiver may already have
+        // processed the POST (a duplicate map_result / series_end), it was only slow to answer.
+        // Lifecycle events are left out: server_shutdown is sent while the process is exiting and
+        // cannot wait.
         private static readonly TimeSpan[] MatchEventRetryDelays = { TimeSpan.FromSeconds(2), TimeSpan.FromSeconds(5) };
+        // No retry starts later than this after the first attempt, so a slow receiver cannot hold
+        // the queue (and every event behind it) for minutes.
+        private static readonly TimeSpan MatchEventRetryBudget = TimeSpan.FromSeconds(30);
 
         private static bool RetriesOnFailure(MatchZyEvent e) =>
             DeliveryLoggedEvents.Contains(e.EventName) && e is not ServerLifecycleEvent;
@@ -103,11 +108,17 @@ namespace MatchZy
                         }
                         TimeSpan? timeout = live ? LiveEventTimeout
                             : item.Event is ServerLifecycleEvent ? LifecycleEventTimeout : null;
+                        var retryClock = System.Diagnostics.Stopwatch.StartNew();
                         var (ok, retryable) = await SendEventCoreAsync(item.Event, item.Target, item.MatchId, timeout, token).ConfigureAwait(false);
                         if (!ok && retryable && RetriesOnFailure(item.Event))
                         {
                             for (int attempt = 0; attempt < MatchEventRetryDelays.Length && !ok && retryable; attempt++)
                             {
+                                if (retryClock.Elapsed + MatchEventRetryDelays[attempt] > MatchEventRetryBudget)
+                                {
+                                    Log($"[SendEventAsync] Giving up on {item.Event.EventName}: retry budget of {MatchEventRetryBudget.TotalSeconds:0} s used up.");
+                                    break;
+                                }
                                 Log($"[SendEventAsync] Retrying {item.Event.EventName} in {MatchEventRetryDelays[attempt].TotalSeconds:0} s (attempt {attempt + 2}/{MatchEventRetryDelays.Length + 1}).");
                                 await Task.Delay(MatchEventRetryDelays[attempt], token).ConfigureAwait(false);
                                 (ok, retryable) = await SendEventCoreAsync(item.Event, item.Target, item.MatchId, timeout, token).ConfigureAwait(false);
@@ -173,8 +184,9 @@ namespace MatchZy
         }
 
         // Ok: the event was delivered or there was nothing to send; false when the receiver failed or
-        // timed out (feeds the live-event backoff in RunEventSenderAsync). Retryable: the failure was
-        // a timeout, a network error or a 5xx, so the same request may succeed later.
+        // timed out (feeds the live-event backoff in RunEventSenderAsync). Retryable: the request never
+        // reached the receiver (connection error) or it answered 5xx / 408 / 429, so the same request
+        // may succeed later without being processed twice.
         private async Task<(bool Ok, bool Retryable)> SendEventCoreAsync(MatchZyEvent @event, RemoteLogTarget target, long currentMatchId, TimeSpan? timeout, CancellationToken shutdown)
         {
             try
@@ -223,7 +235,8 @@ namespace MatchZy
                 if (!response.IsSuccessStatusCode)
                 {
                     Log($"[SendEventAsync] {@event.EventName} (match {eventMatchId}) to {RedactUrl(target.Url)} failed: {(int)response.StatusCode} {response.StatusCode}");
-                    return (false, (int)response.StatusCode >= 500);
+                    int status = (int)response.StatusCode;
+                    return (false, status >= 500 || status == 408 || status == 429);
                 }
                 if (logDelivery)
                     Log($"[SendEventAsync] {@event.EventName} (match {eventMatchId}) delivered to {RedactUrl(target.Url)}: {(int)response.StatusCode}");
@@ -235,14 +248,19 @@ namespace MatchZy
             }
             catch (TaskCanceledException)
             {
+                // Not retryable: the POST may have arrived and been processed.
                 Log($"[SendEventAsync] Request timed out for {@event.EventName}");
-                return (false, true);
+                return (false, false);
             }
             catch (HttpRequestException e)
             {
-                // DNS failure, connection refused or reset: the receiver may be back in a moment.
-                Log($"[SendEventAsync] {@event.EventName} network error: {e.Message}");
-                return (false, true);
+                // DNS failure or connection refused: the request never reached the receiver, which may
+                // be back in a moment. A connection that broke after the request was sent (response
+                // ended, unknown) may have been processed, so it is not sent again.
+                bool notSent = e.HttpRequestError is HttpRequestError.ConnectionError or HttpRequestError.NameResolutionError
+                    or HttpRequestError.SecureConnectionError or HttpRequestError.ProxyTunnelError;
+                Log($"[SendEventAsync] {@event.EventName} network error ({e.HttpRequestError}): {e.Message}");
+                return (false, notSent);
             }
             catch (Exception e)
             {

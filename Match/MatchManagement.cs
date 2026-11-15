@@ -470,6 +470,7 @@ namespace MatchZy
                         return false;
                     }
                     pendingMatchLoadJson = jsonData;
+                    ArmPendingMatchLoadTimeout(mapName);
                     ChangeMap(mapName, 0);
                     return true;
                 }
@@ -556,8 +557,12 @@ namespace MatchZy
                     {
                         Log($"[LoadMatchFromJSON] Discarding matchid {allocatedId}: the match was reset or replaced while it was being allocated.");
                         // The allocation created matches/maps rows; close them so they do not stay
-                        // "running" forever (end_time NULL).
-                        CancelOrphanMatchRow(allocatedId, currentMapNumForInit);
+                        // "running" forever (end_time NULL). Only an id this load allocated: an id the
+                        // JSON supplied belongs to the match itself, and a reload of that same match
+                        // (panel re-send, .recover, auto-recover) during the await would otherwise
+                        // set end_time on the rows of the match that is now running.
+                        if (preassignedId <= 0)
+                            CancelOrphanMatchRow(allocatedId, currentMapNumForInit);
                         return;
                     }
                     // series_start only for a load that is still current (queued here, on the game
@@ -587,7 +592,8 @@ namespace MatchZy
                     if (liveMatchId > 0 && liveMatchId != allocatedId)
                     {
                         Log($"[LoadMatchFromJSON] Keeping matchid {liveMatchId}; the early allocation {allocatedId} arrived after the match had started.");
-                        CancelOrphanMatchRow(allocatedId, currentMapNumForInit);
+                        if (preassignedId <= 0)
+                            CancelOrphanMatchRow(allocatedId, currentMapNumForInit);
                         return;
                     }
                     if (allocatedId > 0)
@@ -618,6 +624,78 @@ namespace MatchZy
             SendEventAsync(owedSeriesStart(liveMatchId), owedSeriesStartTarget);
             owedSeriesStart = null;
             owedSeriesStartTarget = null;
+        }
+
+        // A load waiting for its changelevel (pendingMatchLoadJson) is only resolved by OnMapStart.
+        // If the map never changes (workshop download fails, a collection map that is missing,
+        // host_workshop_map error) the stashed config stayed pending forever and every later
+        // matchzy_loadmatch / get5_loadmatch_url was rejected as "already setup". A map change
+        // resolves the load, so the timeout is stopped by it (STOP_ON_MAPCHANGE). A workshop or
+        // collection map can need a first-time download, during which host_workshop_map keeps the
+        // old map running for minutes; dropping the load then lost the match when the download
+        // finished, so those get a much longer timeout.
+        private const float PendingMatchLoadTimeoutSeconds = 120f;
+        private const float PendingWorkshopMatchLoadTimeoutSeconds = 900f;
+        private CounterStrikeSharp.API.Modules.Timers.Timer? pendingMatchLoadTimer = null;
+        private int pendingMatchLoadToken = 0;
+
+        private void ArmPendingMatchLoadTimeout(string mapName)
+        {
+            pendingMatchLoadTimer?.Kill();
+            pendingMatchLoadTimer = null;
+            int token = ++pendingMatchLoadToken;
+            string? changeCommand = BuildMapChangeCommand(mapName);
+            bool workshop = changeCommand != null && !changeCommand.StartsWith("changelevel", StringComparison.OrdinalIgnoreCase);
+            float timeoutSeconds = workshop ? PendingWorkshopMatchLoadTimeoutSeconds : PendingMatchLoadTimeoutSeconds;
+            pendingMatchLoadTimer = AddTimer(timeoutSeconds, () =>
+            {
+                try
+                {
+                    if (token != pendingMatchLoadToken)
+                        return;
+                    pendingMatchLoadTimer = null;
+                    if (pendingMatchLoadJson == null)
+                        return;
+                    Log($"[LoadMatchFromJSON] The map change to '{mapName}' for the pending match load did not happen within {timeoutSeconds:0}s; dropping the pending load.");
+                    // Only the players let in while the load was pending skipped the roster check;
+                    // DropPendingMatchLoad clears the set.
+                    var letInWhilePending = pendingLoadConnects.ToList();
+                    // The panel was told the load succeeded. With a matchid from the JSON it can be
+                    // told it is gone (match_cancelled, to the match config's URL).
+                    if (liveMatchId > 0 && !isMatchSetup && !matchStarted)
+                    {
+                        PublishEvent(new MatchCancelledEvent
+                        {
+                            MatchId = liveMatchId,
+                            Reason = "load_failed",
+                            Team1 = new MatchZyTeamWrapper(matchzyTeam1.id, matchzyTeam1.teamName),
+                            Team2 = new MatchZyTeamWrapper(matchzyTeam2.id, matchzyTeam2.teamName),
+                            Team1Score = 0,
+                            Team2Score = 0,
+                        });
+                    }
+                    DropPendingMatchLoad();
+                    PrintLocalizedToAdmins("matchzy.mm.matchloadfailed");
+                    RecheckRosterAfterPendingLoad(letInWhilePending);
+                }
+                catch (Exception e)
+                {
+                    Log($"[PendingMatchLoadTimeout FATAL] {e.Message}");
+                }
+            }, CounterStrikeSharp.API.Modules.Timers.TimerFlags.STOP_ON_MAPCHANGE);
+        }
+
+        // Forget a pending (changelevel-waiting) match load. Also called by ResetMatch outside a map
+        // change, so .endmatch / a failed load clears it too.
+        private void DropPendingMatchLoad()
+        {
+            pendingMatchLoadToken++;
+            pendingMatchLoadTimer?.Kill();
+            pendingMatchLoadTimer = null;
+            pendingMatchLoadJson = null;
+            pendingMatchLoadIsG5 = false;
+            pendingMatchLoadConfigFile = "";
+            pendingLoadConnects.Clear();
         }
 
         // A matches/maps row created for an id the match does not use: mark it cancelled.

@@ -42,6 +42,19 @@ namespace MatchZy
         // coach's suicide cash penalty suppressed like the freeze-time kill.
         public HookResult OnCoachBotTakeover(EventBotTakeover @event, GameEventInfo info)
         {
+            try
+            {
+                return HandleCoachBotTakeover(@event);
+            }
+            catch (Exception e)
+            {
+                Log($"[EventBotTakeover FATAL] {e.Message}");
+                return HookResult.Continue;
+            }
+        }
+
+        private HookResult HandleCoachBotTakeover(EventBotTakeover @event)
+        {
             CCSPlayerController? coach = @event.Userid;
             if (!matchStarted || !IsPlayerValid(coach) || !GetAllCoaches().Contains(coach!))
                 return HookResult.Continue;
@@ -62,17 +75,24 @@ namespace MatchZy
             CCSPlayerController coachRef = coach;
             Server.NextFrame(() =>
             {
-                if (!IsPlayerValid(coachRef) || !coachRef.ControllingBot)
-                    return;
-                var body = coachRef.Pawn.Value;
-                if (body == null || !body.IsValid || body.LifeState != (byte)LifeState_t.LIFE_ALIVE)
-                    return;
-                WithCoachSuicideCashSuppressed(() =>
+                try
                 {
-                    body.TakesDamage = true;
-                    body.CommitSuicide(explode: false, force: true);
-                });
-                PrintToPlayerChat(coachRef, Localizer.ForPlayer(coachRef, "matchzy.coach.nobotcontrol"));
+                    if (!IsPlayerValid(coachRef) || !coachRef.ControllingBot)
+                        return;
+                    var body = coachRef.Pawn.Value;
+                    if (body == null || !body.IsValid || body.LifeState != (byte)LifeState_t.LIFE_ALIVE)
+                        return;
+                    WithCoachSuicideCashSuppressed(() =>
+                    {
+                        body.TakesDamage = true;
+                        body.CommitSuicide(explode: false, force: true);
+                    });
+                    PrintToPlayerChat(coachRef, Localizer.ForPlayer(coachRef, "matchzy.coach.nobotcontrol"));
+                }
+                catch (Exception e)
+                {
+                    Log($"[EventBotTakeover FATAL] next frame: {e.Message}");
+                }
             });
             return HookResult.Continue;
         }

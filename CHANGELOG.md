@@ -2,17 +2,37 @@
 
 Based on [MatchZy](https://github.com/shobhit-pathak/MatchZy) by Shobhit Pathak, adapted for CS2 game-server hosting: remote log HTTP API, G5API compatibility, auto changelevel, advanced stats (HLTV 2.0 rating / KAST / clutch / opening duels), a coach system, a pause overhaul, and in-game admin and match-setup menus.
 
-# 1.0.27-beta.1
+# 1.0.26
 
-#### November 14, 2026
+#### November 15, 2026
 
+- Spectator coach (mode 3): at halftime and overtime the coach no longer briefly follows, sees and talks to the other team between the last round of the half and the side swap. MatchZy swaps its side data at round end, but the engine moves the players only at the next round start; the coach now follows the engine's sides.
+- Spectator coach: unloading or reloading MatchZy puts back sv_coaching_enabled, mp_forcecamera, bot_controllable, the coach comm patch and the coach's own game settings. Left on, sv_coaching_enabled could crash the next round start once MatchZy's guard was gone.
+- Spectator coach: a coach who disconnects no longer leaves the engine coach flag behind for the next player in that slot.
+- Spectator coach: coaches listed under "coaches" in the match config become spectator coaches in mode 3 instead of coaches with a body.
+- `matchzy_spectator_coach_hide_enemies` now defaults to false (beta, opt-in): it was linked to "WriteEnterPVS: GetEntServerClass failed" crashes around round starts.
+- Spectator coach: glow outlines are created one frame after the round start instead of during it, when nobody of the coached team is alive the camera is held still instead of free, mp_forcecamera goes back to its old value when the last coach leaves, and a terrorist coach keeps the C4 until it has been handed to a teammate.
+- Coach C4 hand-off no longer stays blocked after a map change, and the coach comm patch is only removed when the patched bytes are still ours.
+- A match load that waits for a map change no longer blocks the server if the map never loads (failed workshop download, missing collection map). The load is dropped after 2 minutes for stock maps and 15 minutes for workshop and collection maps (time for a first download); admins get a chat line, and when the match config has a matchid the panel gets `match_cancelled` with the new reason `load_failed`. `.endmatch` and other resets clear it too.
+- With `matchzy_kick_when_no_match_loaded`, players who joined while a match load waited for its map change are checked against the roster once the load finishes, fails or times out. Players who were on the server before the load are not affected.
+- Reloading the same match while it is being set up (panel re-send, `.recover`, automatic recovery) no longer marks that match as ended in the database.
+- A round restore during warmup (crash recovery, `.restore`, `.recover`) can no longer be undone by the "live match fell back into warmup" fix: it waits for restores and runs at most once every 10 seconds.
+- Automatic recovery, `.recover` and `matchzy_loadbackup` wait while a match load is still waiting for its map change instead of starting a second load.
+- Match result events (going_live, map_result, series_end) are no longer sent twice after a slow receiver: a timed-out request is not retried. Connection failures and HTTP 5xx/408/429 are still retried, for at most 30 seconds.
+- With CS2-SimpleAdmin and `matchzy_allchat_mute_votes` above 0, an admin's `!mute` reaches CS2-SimpleAdmin again.
+- In practice mode the bot quota no longer kicks any bot or SourceTV (MatchZy manages practice bots itself), also when `matchzy_cstv_kick_guard` is off.
+- Ending practice (`.exitprac`, `.match`, loading a match) while the grenade camera follows a throw puts you back where you threw, instead of inside a wall or in the sky.
+- The grenade camera no longer starts while you record (`.rec`, `.stratrec`, `.stratslot` or their countdowns), so the camera flight is not saved into recorded paths; starting a recording ends a running grenade camera first.
+- The grenade camera keeps your previous movement state (noclip, frozen) and makes the right weapon visible again when it ends; teleporting during it (`.loadnade`, `.back`, `.noclip`) ends it cleanly.
+- Unloading or reloading MatchZy removes the grenade camera, the lineup trainer targets and hint, `.shownades` markers and `.xray` glows, and turns engine assert messages back on.
+- Turning `.noclip` off while the grenade camera follows a throw puts you back where you threw.
+- Saving or deleting recordings and strategies no longer causes a short hitch on maps with many saved paths.
 - Practice `.bot` adds one bot again: it used to add two and kick one right away (`[SpawnBot] kicking extra pair bot` in the log).
 - Practice `.xray` no longer fills the server console with `Assertion Failed ... EF_IN_STAGING_LIST` lines while it is on.
 - New (beta) spectator coach, `matchzy_coaching_mode 3`: the coach has no body and watches from the Spectator team, locked in first person on their own team, like coaching in CS:GO. The radar shows the own team and spotted enemies only, unspotted enemies and a dropped bomb (CT coach) are not sent to the coach, teammates are outlined through walls and enemies never are. The coach goes back to the team at `.uncoach` and at the end of the match.
 - New convars for the spectator coach: `matchzy_spectator_coach_hide_enemies`, `matchzy_spectator_coach_no_xray`, `matchzy_spectator_coach_team_xray`, `matchzy_spectator_coach_pawn_team` (all default on) and `matchzy_coach_comm_unrestricted` (default off: coach voice and team chat to the team at any time, CS:GO's `sv_coach_comm_unrestricted`). New gamedata signatures `CCSGameRules_CanPlayerHear_CoachCommGate` and `CPlayer_ObserverServices::IsValidObserverTarget`.
 - Removed `matchzy_prac_disable_magazine_drop` (removed from config.cfg on update): CS2 no longer has `sv_magazine_drop_enabled`, so `.prac` and leaving practice only printed an unknown-command line.
 - New `matchzy_cstv_kick_guard` (default on): when CS2's bot quota trims bots (a lowered `bot_quota`, or `bot_quota_mode fill` and a player joining a team) it kicked SourceTV first, which stopped GOTV and split the running demo in two. The quota now skips SourceTV and kicks a real bot instead (new gamedata signature `KickBotFromTeam`).
-- The SQLite database no longer leaves `matchzy.db-wal` and `matchzy.db-shm` next to `matchzy.db`: it uses the normal rollback journal again. An existing database is switched on the next start and the two files are removed. `matchzy.db` alone is now always a complete copy.
 - A live match that the engine put back into warmup ("Game Commencing" when the first player joins a team that was empty at `.start`, for example bots added later or a team coached from Spectator) now ends that warmup again on its own.
 - `.match`, `.prac` and `.sleep` called by another plugin (a practice add-on leaving practice from its own map-end listener) now run a frame later and are ignored while the map is changing. Running the mode switch during a changelevel worked on a level that was being torn down and could crash the server.
 - A coach's bomb is no longer deleted and replaced: the coach drops it and the dropped C4 is moved to a teammate, who picks it up. Deleting and re-giving C4s around round (re)starts could still end the server with "WriteEnterPVS: GetEntServerClass failed". A coach's other weapons are removed by the engine again (as in 1.0.24) once the bomb is handed on, instead of being deleted one by one.
@@ -59,10 +79,6 @@ Based on [MatchZy](https://github.com/shobhit-pathak/MatchZy) by Shobhit Pathak,
 - Practice: `.showbotpos` markers are no longer drawn after a map change out of practice.
 - An error in an event handler is logged with its event name and no longer skips the rest of the handler's work.
 - A failed demo upload no longer writes the S3 signature details from the receiver's reply to the log.
-
-# 1.0.26
-
-#### November 14, 2026
 
 - `.help` showed long command lists cut off: CS2 cuts a chat message that is too long instead of wrapping it, so in practice mode most of the Bots line (`.botshoot`, `.rec`, `.strat` and the rest) was never visible. Long lists now continue on extra lines with the same label (at most 68 characters a line), and the recording and strat commands have their own Rec/Strats line. `.spawns` is listed too. The command list shown when practice starts was sent in the same frame as the practice cfg, whose "Server cvar ... changed" notices then pushed its first lines out of the chat window; it now comes 1.5 seconds later.
 - Stats could be off after a plugin reload or an update with `[InitializeDatabase - FATAL] ... Unable to load shared library 'e_sqlite3'`: .NET only looked for SQLite in its own runtime folder when MatchZy.deps.json / runtimes/ were not used. MatchZy now loads its own libe_sqlite3.so itself, next to MatchZy.dll or in runtimes/linux-x64/native/.

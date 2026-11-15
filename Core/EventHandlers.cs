@@ -13,6 +13,56 @@ public partial class MatchZy
     // the new map starts. A player joining in that window counts as joining a loaded match too.
     private bool IsMatchLoadedOrPending() => isMatchSetup || pendingMatchLoadJson != null;
 
+    // The matchModeOnly kick of the connect gate (EventPlayerConnectFull).
+    private void KickNotInMatch(CCSPlayerController player, string source)
+    {
+        string steamId = player.SteamID.ToString();
+        Log($"[{source}] KICKING PLAYER STEAMID: {steamId}, Name: {player.PlayerName} (NOT ALLOWED!)");
+        PrintLocalizedToAll("matchzy.cmd.kicknotinmatch", player.PlayerName);
+        // Two very different causes: no match config loaded at all (a failed or
+        // missing load: everyone is kicked), or a loaded match without this SteamID.
+        if (isMatchSetup)
+            KickPlayerDeferred(player, "not_in_match", Localizer.ForPlayer(player, "matchzy.kick.notinmatch", liveMatchId, steamId));
+        else
+            KickPlayerDeferred(player, "no_match_loaded", Localizer.ForPlayer(player, "matchzy.kick.nomatchloaded"));
+    }
+
+    // The connect gate skips the matchModeOnly roster check while a load waits for its changelevel
+    // (the rosters are only filled when OnMapStart re-loads the config). Once the load resolves
+    // (loaded, failed or timed out) the players who got in during that window (and only those:
+    // players left from before the load were never subject to it) are checked the same way the
+    // gate checks them.
+    private void RecheckRosterAfterPendingLoad(List<int> letInWhilePending)
+    {
+        if (!matchModeOnly || letInWhilePending.Count == 0)
+            return;
+        Server.NextFrame(() =>
+        {
+            try
+            {
+                if (!matchModeOnly || pendingMatchLoadJson != null)
+                    return;
+                foreach (int userId in letInWhilePending)
+                {
+                    var player = Utilities.GetPlayerFromUserid(userId);
+                    if (player == null || !IsHumanPlayerValid(player) || !player.UserId.HasValue)
+                        continue;
+                    if (GetPlayerTeam(player) != CsTeam.None)
+                        continue;
+                    if (!isMatchSetup && IsOnInterruptedMatchRoster(player.SteamID, out _))
+                        continue;
+                    if (IsPlayerAdmin(player, "", "@css/config"))
+                        continue;
+                    KickNotInMatch(player, "RecheckRosterAfterPendingLoad");
+                }
+            }
+            catch (Exception e)
+            {
+                Log($"[RecheckRosterAfterPendingLoad FATAL] {e.Message}");
+            }
+        });
+    }
+
     public HookResult EventPlayerConnectFullHandler(EventPlayerConnectFull @event, GameEventInfo info)
     {
         try
@@ -55,16 +105,10 @@ public partial class MatchZy
                     // Not while a loaded match waits for its changelevel: the rosters are only filled
                     // when OnMapStart re-loads the config, so a rostered player connecting in that
                     // window looked like "not in the match" and was kicked.
+                    // RecheckRosterAfterPendingLoad applies this check once the load resolves.
                     else if (matchModeOnly && pendingMatchLoadJson == null && !IsPlayerAdmin(player, "", "@css/config"))
                     {
-                        Log($"[EventPlayerConnectFull] KICKING PLAYER STEAMID: {steamId}, Name: {player.PlayerName} (NOT ALLOWED!)");
-                        PrintLocalizedToAll("matchzy.cmd.kicknotinmatch", player.PlayerName);
-                        // Two very different causes: no match config loaded at all (a failed or
-                        // missing load: everyone is kicked), or a loaded match without this SteamID.
-                        if (isMatchSetup)
-                            KickPlayerDeferred(player, "not_in_match", Localizer.ForPlayer(player, "matchzy.kick.notinmatch", liveMatchId, steamId));
-                        else
-                            KickPlayerDeferred(player, "no_match_loaded", Localizer.ForPlayer(player, "matchzy.kick.nomatchloaded"));
+                        KickNotInMatch(player, "EventPlayerConnectFull");
                         return HookResult.Continue;
                     }
                     // Only a loaded match has a roster to leave a player out of. An admin who
@@ -318,6 +362,9 @@ public partial class MatchZy
                 SetPlayerVisible(player);
                 player.Clan = "";
             }
+            // Spectator coach: clear the engine coach flag (m_iCoachingTeam) while the controller is still
+            // valid, or a reconnect into this slot became an unfiltered engine coach.
+            try { OnSpectatorCoachDisconnect(player); } catch (Exception e) { Log($"[EventPlayerDisconnect] spectator coach cleanup: {e.Message}"); }
 
             // Cleanup practice mode data
             noFlashList.Remove(userId);
@@ -500,6 +547,23 @@ public partial class MatchZy
         }
     }
 
+    // When the "live match fell back into warmup" fix last ended the warmup (EventRoundStartHandler).
+    // mp_warmup_end restarts the game, so a round key would repeat; a time throttle keeps a warmup
+    // that does not end from looping restarts and still lets a later fallback be fixed.
+    private DateTime warmupFallbackFixedUtc = DateTime.MinValue;
+    private const double WarmupFallbackThrottleSeconds = 10;
+
+    // When a backup load was last scheduled or let through. The gap between scheduling it (the match
+    // is already set live, still in warmup) and isRoundRestoring being set is up to a few seconds.
+    private DateTime lastRoundRestoreRequestUtc = DateTime.MinValue;
+    private const double RoundRestoreWindowSeconds = 15;
+
+    private void MarkRoundRestoreRequested() => lastRoundRestoreRequestUtc = DateTime.UtcNow;
+
+    private bool IsRoundRestoreActive() =>
+        isRoundRestoring || isRoundRestorePending
+        || (DateTime.UtcNow - lastRoundRestoreRequestUtc).TotalSeconds < RoundRestoreWindowSeconds;
+
     public HookResult EventRoundStartHandler(EventRoundStart @event, GameEventInfo info)
     {
         try
@@ -510,14 +574,30 @@ public partial class MatchZy
             // e.g. bots added after .start, or everyone coaching from Spectator) is put back into
             // warmup by the engine when the first player joins that team. A live match is never in
             // warmup: end it again, next frame (engine re-entry).
-            if (isMatchLive && !isPaused && GetGameRules()?.WarmupPeriod == true)
+            // Never during a round restore (crash recovery, .restore, a queued warmup restore): the
+            // match is set live in warmup before the backup loads, and mp_warmup_end restarts the
+            // game, which can wipe the restored score. At most once per 10 s, so a warmup that
+            // does not end cannot loop restarts.
+            var warmupRules = isMatchLive && !isPaused ? GetGameRules() : null;
+            if (warmupRules?.WarmupPeriod == true && !IsRoundRestoreActive())
             {
-                Log("[EventRoundStart] Live match fell back into warmup (a team was empty); ending the warmup again.");
-                Server.NextFrame(() =>
+                if ((DateTime.UtcNow - warmupFallbackFixedUtc).TotalSeconds >= WarmupFallbackThrottleSeconds)
                 {
-                    if (isMatchLive && GetGameRules()?.WarmupPeriod == true)
-                        Server.ExecuteCommand("mp_warmup_end");
-                });
+                    warmupFallbackFixedUtc = DateTime.UtcNow;
+                    Log("[EventRoundStart] Live match fell back into warmup (a team was empty); ending the warmup again.");
+                    Server.NextFrame(() =>
+                    {
+                        try
+                        {
+                            if (isMatchLive && !IsRoundRestoreActive() && GetGameRules()?.WarmupPeriod == true)
+                                Server.ExecuteCommand("mp_warmup_end");
+                        }
+                        catch (Exception e)
+                        {
+                            Log($"[EventRoundStart FATAL] warmup end: {e.Message}");
+                        }
+                    });
+                }
             }
             // Re-assert the bot team every round: follows halftime/overtime side swaps and
             // round restores, and refills bots the engine dropped.

@@ -2275,6 +2275,15 @@ public partial class MatchZy
         if (matchzyTeam1.coach.Contains(player) || matchzyTeam2.coach.Contains(player))
             return;
 
+        // matchzy_coaching_mode 3: a listed coach is a spectator coach, never a body coach. The
+        // start (move to Spectator) waits until the player is on a team; the player_team event
+        // queues it again when they get one.
+        if (coachingMode.Value == 3)
+        {
+            QueueRosteredSpectatorCoach(player);
+            return;
+        }
+
         coachTeam.coach.Add(player);
         ResetCoachScoreboard(player);
         ApplyClanTag(player, $"[{coachTeam.teamName} COACH]");

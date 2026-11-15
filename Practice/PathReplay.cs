@@ -143,7 +143,9 @@ namespace MatchZy
                 return;
             }
 
-            // Frozen for a 3 second countdown, so every take starts the same way.
+            // Frozen for a 3 second countdown, so every take starts the same way. A running grenade
+            // camera ends first (the pawn goes back to where it threw).
+            StopNadeFollowForRecording(player);
             int generation = ++recCountdownGeneration;
             pendingRecCountdowns[steamId] = generation;
             Server.NextFrame(() => FreezeStratPlayer(player));
@@ -747,16 +749,45 @@ namespace MatchZy
             return true;
         }
 
-        // Serialized on the game thread: the commands keep mutating the same dictionaries and lists
-        // (a shallow snapshot shares them), and System.Text.Json walking a list another thread is
-        // changing throws or writes a torn file. Only the disk write runs off the game thread.
+        // The commands keep mutating the same dictionaries and lists (a shallow snapshot shares
+        // them), and System.Text.Json walking a list another thread is changing throws or writes a
+        // torn file. So the game thread takes a deep copy (cheap: array copies) and the serializing
+        // of every path of the map plus the disk write run off the game thread on that copy.
         private bool WriteSavedPaths(Dictionary<string, SavedPath> paths)
         {
             if (_savedPathsLoadFailed)
                 return false;
             string file = SavedPathsFile(_savedPathsMap);
-            WritePracticeJsonOrdered(file, JsonSerializer.Serialize(paths, SavedPathJsonOpts), "PathReplay");
+            var snapshot = new Dictionary<string, SavedPath>(paths.Count, StringComparer.OrdinalIgnoreCase);
+            foreach (var (name, path) in paths)
+                snapshot[name] = CloneSavedPath(path);
+            WritePracticeJsonOrdered(file, () => JsonSerializer.Serialize(snapshot, SavedPathJsonOpts), "PathReplay");
             return true;
+        }
+
+        // Deep copy (own lists and arrays) for an off-thread serialize.
+        private static SavedPath CloneSavedPath(SavedPath p)
+        {
+            var c = new SavedPath { Team = p.Team, Frames = new List<float[]>(p.Frames.Count), Throws = new List<SavedPathThrow>(p.Throws.Count) };
+            foreach (var f in p.Frames)
+                c.Frames.Add((float[])f.Clone());
+            foreach (var t in p.Throws)
+            {
+                c.Throws.Add(new SavedPathThrow
+                {
+                    Frame = t.Frame,
+                    Type = t.Type,
+                    Pos = (float[])t.Pos.Clone(),
+                    Ang = (float[])t.Ang.Clone(),
+                    Vel = (float[])t.Vel.Clone(),
+                    Spin = (float[])t.Spin.Clone(),
+                    PlayerPos = (float[])t.PlayerPos.Clone(),
+                    PlayerAng = (float[])t.PlayerAng.Clone(),
+                    ItemIndex = t.ItemIndex,
+                    Duck = t.Duck,
+                });
+            }
+            return c;
         }
 
         // Per-file write order for the off-thread practice JSON writes. Each write takes a sequence
@@ -768,13 +799,16 @@ namespace MatchZy
         private long _practiceJsonWriteSeq;
 
         // Game thread: file is already resolved (Server.GameDirectory is never read in the task).
-        private void WritePracticeJsonOrdered(string file, string json, string logTag)
+        // serialize runs inside the task: it must only touch a snapshot the game thread no longer
+        // changes (no Server.*, no entities).
+        private void WritePracticeJsonOrdered(string file, Func<string> serialize, string logTag)
         {
             long seq = ++_practiceJsonWriteSeq;
             Task.Run(() =>
             {
                 try
                 {
+                    string json = serialize();
                     lock (_practiceJsonWriteLock)
                     {
                         if (_practiceJsonWrittenSeq.TryGetValue(file, out long written) && written > seq)

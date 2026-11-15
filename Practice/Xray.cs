@@ -140,9 +140,10 @@ namespace MatchZy
         /// <returns>True when the quiet flag was just switched on through the console command fallback: it only runs later in the
         /// frame (server command buffer), so props made right now would still print the assert.
         /// The caller then makes them a moment later.</returns>
-        private bool RefreshGlowAssertQuiet()
+        private bool RefreshGlowAssertQuiet(bool forceOff = false)
         {
-            bool want = (xrayEnabled && isPractice) || _glowUsersCoach;
+            // forceOff (plugin unload): back to normal whoever still uses glows.
+            bool want = !forceOff && ((xrayEnabled && isPractice) || _glowUsersCoach);
             if (_glowAssertQuiet == want || (_glowAssertQuiet == null && !want))
                 return false;
             _glowAssertQuiet = want;

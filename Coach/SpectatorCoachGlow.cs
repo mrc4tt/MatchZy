@@ -44,7 +44,7 @@ public partial class MatchZy
             {
                 if (!state.ReachedSpectator || coach == null || !coach.IsValid)
                     continue;
-                CsTeam side = GetCoachTeam(coach);
+                CsTeam side = SpectatorCoachSide(coach);
                 if (side == CsTeam.Terrorist) coachT = true;
                 else if (side == CsTeam.CounterTerrorist) coachCT = true;
             }
@@ -124,11 +124,27 @@ public partial class MatchZy
         }
     }
 
+    // "Kill" only deletes at the end of the frame, and the CheckTransmit filter that keeps the
+    // props away from everyone else can go in the same frame (last coach gone, unload): blank the
+    // prop first (no glow, not drawn), so a client that receives it in that last frame sees nothing.
     private static void KillSpecCoachGlow(SpecCoachGlow g)
     {
         var glow = new CHandle<CBaseModelEntity>(g.GlowRaw).Value;
         if (glow != null && glow.IsValid)
+        {
+            try
+            {
+                glow.Glow.GlowType = 0;
+                glow.Glow.GlowRange = 0;
+                Utilities.SetStateChanged(glow, "CBaseModelEntity", "m_Glow");
+                glow.RenderMode = RenderMode_t.kRenderNone;
+                glow.Render = Color.FromArgb(0, glow.Render.R, glow.Render.G, glow.Render.B);
+                Utilities.SetStateChanged(glow, "CBaseModelEntity", "m_nRenderMode");
+                Utilities.SetStateChanged(glow, "CBaseModelEntity", "m_clrRender");
+            }
+            catch { }
             glow.AcceptInput("Kill");
+        }
         var relay = new CHandle<CBaseModelEntity>(g.RelayRaw).Value;
         if (relay != null && relay.IsValid)
             relay.AcceptInput("Kill");

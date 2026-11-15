@@ -57,9 +57,11 @@ namespace MatchZy
             public bool HintShown;
         }
 
+        // Raw entity handles (index + serial), not wrappers: a target removed by the engine (map
+        // change, cleanup) then resolves to null instead of freed or reused entity memory.
         private sealed class JtSpotTargets
         {
-            public readonly List<CBaseEntity> Targets = new();
+            public readonly List<uint> Targets = new();
             public int Shown = -1;
         }
 
@@ -74,7 +76,27 @@ namespace MatchZy
         private readonly Dictionary<ulong, JtPersonal> _jtPersonal = new();
         private CounterStrikeSharp.API.Modules.Timers.Timer? _jtTimer;
         private Listeners.CheckTransmit? _jtTransmit;
-        private CEnvHudHint? _jtHint;
+        // Raw handle of the shared env_hudhint (JtNoHandle = none).
+        private uint _jtHintRaw = JtNoHandle;
+        private const uint JtNoHandle = uint.MaxValue;
+
+        private static T? ResolveJt<T>(uint raw) where T : CEntityInstance
+        {
+            if (raw == JtNoHandle)
+                return null;
+            var e = new CHandle<T>(raw).Value;
+            return e != null && e.IsValid ? e : null;
+        }
+
+        private static void KillJtEntity(uint raw)
+        {
+            try { ResolveJt<CBaseEntity>(raw)?.AcceptInput("Kill"); } catch { }
+        }
+
+        // The group a view stands on, if it still exists: .shownades off or a library reload
+        // drops groups while a view can still point at one.
+        private bool JtGroupAlive(ulong id, NadeMarkerGroup? g)
+            => g != null && (activeNadeGroups.Contains(g) || (_jtPersonal.TryGetValue(id, out var p) && p.Group == g));
 
         // Targets of a spot stay until the player is this far away (a little more than they appear
         // at), so walking along the edge does not make them blink.
@@ -279,14 +301,17 @@ namespace MatchZy
                     foreach (var lu in g.Lineups)
                     {
                         var t = SpawnJtTarget(lu);
-                        if (t != null) spot.Targets.Add(t);
+                        if (t != null && t.IsValid) spot.Targets.Add(t.EntityHandle.Raw);
                     }
                     view.Spots[g] = spot;
                 }
                 if (spot.Shown != g.Current)
                 {
                     for (int i = 0; i < spot.Targets.Count; i++)
-                        SetJtTargetSelected(spot.Targets[i], i == g.Current);
+                    {
+                        var t = ResolveJt<CBaseEntity>(spot.Targets[i]);
+                        if (t != null) SetJtTargetSelected(t, i == g.Current);
+                    }
                     spot.Shown = g.Current;
                 }
             }
@@ -333,8 +358,8 @@ namespace MatchZy
         private static void DropJtSpot(CCSPlayerController? player, JtView view, NadeMarkerGroup g)
         {
             if (!view.Spots.Remove(g, out var spot)) return;
-            foreach (var t in spot.Targets)
-                try { if (t != null && t.IsValid) t.Remove(); } catch { }
+            foreach (uint t in spot.Targets)
+                KillJtEntity(t);
         }
 
         private void ClearJtView(CCSPlayerController? player, ulong id)
@@ -363,6 +388,9 @@ namespace MatchZy
         private bool ToggleJtZoneLineup(CCSPlayerController player)
         {
             if (!_jtViews.TryGetValue(player.SteamID, out var view) || view.OnSpot == null || view.OnSpot.Lineups.Count <= 1)
+                return false;
+            // Left as is otherwise: the zone check clears OnSpot (and hides the hint) next pass.
+            if (!JtGroupAlive(player.SteamID, view.OnSpot))
                 return false;
             var g = view.OnSpot;
             g.Current = (g.Current + 1) % g.Lineups.Count;
@@ -491,30 +519,46 @@ namespace MatchZy
             if (_jtViews.Count == 0) return;
             try
             {
+                // Resolve every target once per call, not once per recipient.
+                _jtTransmitTargets.Clear();
+                foreach (var (id, view) in _jtViews)
+                    foreach (var spot in view.Spots.Values)
+                        foreach (uint raw in spot.Targets)
+                        {
+                            var t = ResolveJt<CBaseEntity>(raw);
+                            if (t != null) _jtTransmitTargets.Add((id, t));
+                        }
+                if (_jtTransmitTargets.Count == 0) return;
                 foreach ((CCheckTransmitInfo info, CCSPlayerController? player) in infoList)
                 {
                     if (player == null || !player.IsValid) continue;
-                    foreach (var (id, view) in _jtViews)
-                    {
-                        if (id == player.SteamID) continue;
-                        foreach (var spot in view.Spots.Values)
-                            foreach (var t in spot.Targets)
-                                if (t != null && t.IsValid) info.TransmitEntities.Remove(t);
-                    }
+                    ulong viewer = player.SteamID;
+                    foreach (var (owner, t) in _jtTransmitTargets)
+                        if (owner != viewer) info.TransmitEntities.Remove(t);
                 }
             }
             catch { }
+            finally { _jtTransmitTargets.Clear(); }
         }
+
+        private readonly List<(ulong Owner, CBaseEntity Target)> _jtTransmitTargets = new();
 
         // ── hud hint ─────────────────────────────────────────────────────────────────────
 
         private CEnvHudHint? JtHintEntity()
         {
-            if (_jtHint != null && _jtHint.IsValid)
-                return _jtHint;
-            _jtHint = Utilities.CreateEntityByName<CEnvHudHint>("env_hudhint");
-            _jtHint?.DispatchSpawn();
-            return _jtHint;
+            var hint = ResolveJt<CEnvHudHint>(_jtHintRaw);
+            if (hint != null)
+                return hint;
+            hint = Utilities.CreateEntityByName<CEnvHudHint>("env_hudhint");
+            if (hint == null)
+            {
+                _jtHintRaw = JtNoHandle;
+                return null;
+            }
+            hint.DispatchSpawn();
+            _jtHintRaw = hint.EntityHandle.Raw;
+            return hint;
         }
 
         // The hint shows to the activator only and stays until hidden.
@@ -539,7 +583,7 @@ namespace MatchZy
             try
             {
                 var pawn = player.PlayerPawn.Value;
-                var hint = _jtHint != null && _jtHint.IsValid ? _jtHint : null;
+                var hint = ResolveJt<CEnvHudHint>(_jtHintRaw);
                 if (pawn == null || hint == null) return;
                 hint.AcceptInput("HideHudHint", pawn, pawn);
             }
@@ -572,12 +616,37 @@ namespace MatchZy
         }
 
 
+        // Plugin unload (ShutdownPracticeExtrasForUnload): every view's targets and hint go, the
+        // watch timer and transmit listener stop, the shared hud hint entity is killed (entity IO).
+        private void ShutdownNadeTutorial()
+        {
+            foreach (ulong id in _jtViews.Keys.ToList())
+            {
+                try { ClearJtView(Utilities.GetPlayerFromSteamId(id), id); }
+                catch (Exception e) { Log($"[NadeTutorial] shutdown view: {e.Message}"); }
+            }
+            _jtViews.Clear();
+            _jtPersonal.Clear();
+            StopJtWatch();
+            KillJtEntity(_jtHintRaw);
+            _jtHintRaw = JtNoHandle;
+        }
+
+        // Unload while the map ends: forget everything, touch no entity (timer and listener only).
+        private void ForgetNadeTutorialState()
+        {
+            _jtViews.Clear();
+            _jtPersonal.Clear();
+            _jtHintRaw = JtNoHandle;
+            StopJtWatch();
+        }
+
         // The previous map's entities are gone: forget them without touching them.
         private void ForgetJtOnMapStart()
         {
             _jtViews.Clear();
             _jtPersonal.Clear();
-            _jtHint = null;
+            _jtHintRaw = JtNoHandle;
             _jtTimer = null; // STOP_ON_MAPCHANGE already removed it
             if (_jtTransmit != null)
             {

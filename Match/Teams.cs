@@ -72,6 +72,13 @@ namespace MatchZy
             HandleCoachCommand(player, command.ArgString);
         }
 
+        // Listed under a team's "coaches" and under no team's "players": one rule for body and
+        // spectator (mode 3) coaches alike.
+        private bool IsCoachOnlyListed(CCSPlayerController player)
+            => GetRosteredCoachTeam(player.SteamID) != null
+                && !LookupRosterEntry(matchzyTeam1.teamPlayers, player.SteamID)
+                && !LookupRosterEntry(matchzyTeam2.teamPlayers, player.SteamID);
+
         [ConsoleCommand("css_play", "Sets coach for the requested team")]
         [ConsoleCommand("css_uncoach", "Sets coach for the requested team")]
         public void OnUnCoachCommand(CCSPlayerController? player, CommandInfo? command)
@@ -86,10 +93,10 @@ namespace MatchZy
             // before the pawn check below.
             if (player != null && player.IsValid && IsSpectatorCoach(player))
             {
-                // Same rule as below: a coach-only roster entry would become an extra player.
-                if (GetRosteredCoachTeam(player.SteamID) != null
-                    && !LookupRosterEntry(matchzyTeam1.teamPlayers, player.SteamID)
-                    && !LookupRosterEntry(matchzyTeam2.teamPlayers, player.SteamID))
+                // Same rule as the body coach below: a coach-only roster entry would become an extra
+                // player. Mode 3 makes listed coaches spectator coaches (AssignRosteredCoach), so
+                // they land here.
+                if (IsCoachOnlyListed(player))
                 {
                     ReplyToUserCommand(player, Localizer.ForPlayer(player, "matchzy.matchmsg.uncoachlisted"));
                     return;
@@ -105,9 +112,7 @@ namespace MatchZy
                 return;
             }
             // Listed only as a coach (not as a player): uncoaching would put an extra player on the team.
-            if (GetRosteredCoachTeam(player.SteamID) != null
-                && !LookupRosterEntry(matchzyTeam1.teamPlayers, player.SteamID)
-                && !LookupRosterEntry(matchzyTeam2.teamPlayers, player.SteamID))
+            if (IsCoachOnlyListed(player))
             {
                 ReplyToUserCommand(player, Localizer.ForPlayer(player, "matchzy.matchmsg.uncoachlisted"));
                 return;

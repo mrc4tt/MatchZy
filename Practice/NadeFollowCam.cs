@@ -24,7 +24,9 @@ namespace MatchZy
     {
         private sealed class NadeFollow
         {
-            public uint ProjectileIndex;
+            // Raw entity handles (index + serial): a bare index can be reused by another entity.
+            public uint ProjectileRaw;
+            public uint WeaponRaw = uint.MaxValue; // the weapon made invisible at the start
             public Vector StartPos = null!;
             public QAngle StartAng = null!;
             public Vector CamPos = null!;
@@ -35,7 +37,8 @@ namespace MatchZy
             public float Dist = NfDistFollow, PitchOffset = NfPitchFollow;
             public float TargetDist = NfDistFollow, TargetPitchOffset = NfPitchFollow;
             public int TrailTick;
-            public MoveType_t PrevMove = MoveType_t.MOVETYPE_WALK; // .noclip stays on after the camera
+            // The pawn's own move type before the camera (.noclip stays on after it).
+            public MoveType_t PrevMove = MoveType_t.MOVETYPE_WALK;
         }
 
         private const float NfDistFollow = 140.0f;   // behind the grenade while it flies
@@ -44,7 +47,8 @@ namespace MatchZy
         private const float NfPitchLanded = -10.0f;
         private const float NfFollowLerp = 0.15f;    // per tick, lower = smoother / more lag
         private const float NfLandedSeconds = 8.0f;
-        private const float NfMaxSeconds = 30.0f;    // hard stop (a stuck decoy, a lost projectile)
+        private const float NfMaxSeconds = 30.0f;
+        private const float NfStillAtCamSq = 96.0f * 96.0f; // a tick of falling is far less    // hard stop (a stuck decoy, a lost projectile)
 
         private enum NadeFollowMode { Lineup, Always, Off }
 
@@ -88,23 +92,33 @@ namespace MatchZy
             ulong id = player.SteamID;
             if (!isPractice || _nadeFollows.ContainsKey(id))
                 return;
+            // A throw during a recording (.rec, .stratrec, .stratslot or their countdown) would put
+            // the camera flight into the recorded path.
+            if (IsPracticeRecordingFor(id))
+                return;
             var mode = _nadeFollowEnabled.GetValueOrDefault(id, NadeFollowMode.Lineup);
-            bool onLineupSpot = _jtViews.TryGetValue(id, out var view) && view.OnSpot != null;
+            bool onLineupSpot = _jtViews.TryGetValue(id, out var view) && JtGroupAlive(id, view.OnSpot);
             if (mode == NadeFollowMode.Off || (mode == NadeFollowMode.Lineup && !onLineupSpot))
                 return;
             var pawn = player.PlayerPawn.Value;
             var o = pawn?.AbsOrigin;
-            if (pawn == null || o == null || !player.PawnIsAlive)
+            if (pawn == null || !pawn.IsValid || o == null || !player.PawnIsAlive || !projectile.IsValid)
+                return;
+            // Frozen (MOVETYPE_NONE: a countdown, a coach): the camera would unfreeze the pawn, and a
+            // freeze lifted meanwhile would be put back afterwards.
+            if (pawn.MoveType == MoveType_t.MOVETYPE_NONE)
                 return;
             var eye = pawn.EyeAngles;
+            var weapon = pawn.WeaponServices?.ActiveWeapon.Value;
             var f = new NadeFollow
             {
-                ProjectileIndex = projectile.Index,
+                ProjectileRaw = projectile.EntityHandle.Raw,
+                WeaponRaw = weapon != null && weapon.IsValid ? weapon.EntityHandle.Raw : uint.MaxValue,
                 StartPos = new Vector(o.X, o.Y, o.Z),
                 StartAng = new QAngle(eye.X, eye.Y, 0),
                 CamPos = new Vector(o.X, o.Y, o.Z),
                 StartedAt = Server.CurrentTime,
-                PrevMove = pawn.MoveType == MoveType_t.MOVETYPE_NOCLIP ? MoveType_t.MOVETYPE_NOCLIP : MoveType_t.MOVETYPE_WALK,
+                PrevMove = pawn.MoveType,
             };
             _nadeFollows[id] = f;
             // The lineup hint goes while the camera flies (it comes back on the spot afterwards).
@@ -117,11 +131,13 @@ namespace MatchZy
             pawn.MoveType = MoveType_t.MOVETYPE_NOCLIP;
             pawn.ActualMoveType = MoveType_t.MOVETYPE_NOCLIP;
             Utilities.SetStateChanged(pawn, "CBaseEntity", "m_MoveType");
-            SetNadeFollowVisible(pawn, false);
+            SetNadeFollowVisible(pawn, false, f.WeaponRaw);
             player.PrintToCenter(Localizer.ForPlayer(player, "matchzy.pracmisc.follownadereturn"));
         }
 
-        private static void SetNadeFollowVisible(CCSPlayerPawn pawn, bool visible)
+        // The weapon is the one stored at the start (by raw handle), so the stop restores the same
+        // weapon even when the player switched weapons meanwhile.
+        private static void SetNadeFollowVisible(CCSPlayerPawn pawn, bool visible, uint weaponRaw)
         {
             try
             {
@@ -129,7 +145,7 @@ namespace MatchZy
                 pawn.RenderMode = RenderMode_t.kRenderTransAlpha;
                 pawn.Render = c;
                 Utilities.SetStateChanged(pawn, "CBaseModelEntity", "m_clrRender");
-                var weapon = pawn.WeaponServices?.ActiveWeapon.Value;
+                var weapon = weaponRaw == uint.MaxValue ? null : new CHandle<CBasePlayerWeapon>(weaponRaw).Value;
                 if (weapon != null && weapon.IsValid)
                 {
                     weapon.RenderMode = RenderMode_t.kRenderTransAlpha;
@@ -156,6 +172,17 @@ namespace MatchZy
                         StopNadeFollow(player, id, putBack: player != null && player.IsValid && player.PawnIsAlive);
                         continue;
                     }
+                    // Something else changed the move type: the camera is over. A practice teleport
+                    // (.loadnade, .back) moved the pawn away from the camera spot: it stays where that
+                    // put it. Still at the camera spot (.noclip turned off, a freeze): put it back where
+                    // it threw, not left inside a wall or in the air.
+                    if (pawn.MoveType != MoveType_t.MOVETYPE_NOCLIP)
+                    {
+                        var at = pawn.AbsOrigin;
+                        bool atCam = at != null && JtDistSq(at, f.CamPos) <= NfStillAtCamSq;
+                        StopNadeFollow(player, id, putBack: atCam);
+                        continue;
+                    }
                     bool jump = (player.Buttons & PlayerButtons.Jump) != 0 && now - f.StartedAt > 0.4f;
                     bool expired = now - f.StartedAt > NfMaxSeconds || (f.LandedAt >= 0 && now - f.LandedAt > NfLandedSeconds);
                     if (jump || expired)
@@ -168,7 +195,7 @@ namespace MatchZy
                     f.PitchOffset += (f.TargetPitchOffset - f.PitchOffset) * 0.2f;
 
                     Vector? target = f.Landing;
-                    var proj = Utilities.GetEntityFromIndex<CBaseCSGrenadeProjectile>((int)f.ProjectileIndex);
+                    var proj = new CHandle<CBaseCSGrenadeProjectile>(f.ProjectileRaw).Value;
                     if (proj != null && proj.IsValid && proj.AbsOrigin != null && f.Landing == null)
                     {
                         var g = proj.AbsOrigin;
@@ -238,45 +265,68 @@ namespace MatchZy
                 beam.EndPos.Z = to.Z;
                 beam.Teleport(from, new QAngle(0, 0, 0), new Vector(0, 0, 0));
                 beam.DispatchSpawn();
+                // Raw handle + entity IO Kill: the wrapper may point at a freed or reused entity.
+                uint raw = beam.EntityHandle.Raw;
                 AddTimer(3.0f, () =>
                 {
-                    try { if (beam.IsValid) beam.Remove(); } catch { }
+                    try
+                    {
+                        var b = new CHandle<CBeam>(raw).Value;
+                        if (b != null && b.IsValid) b.AcceptInput("Kill");
+                    }
+                    catch { }
                 }, CounterStrikeSharp.API.Modules.Timers.TimerFlags.STOP_ON_MAPCHANGE);
             }
             catch { }
         }
 
         // Walk again, visible again, back where the throw was made (when putBack).
-        private void StopNadeFollow(CCSPlayerController? player, ulong id, bool putBack)
+        // unloading: no NextFrame follow-ups (the plugin is going away); one direct teleport and one
+        // body flatten instead of TeleportUpright's multi-frame flatten.
+        private void StopNadeFollow(CCSPlayerController? player, ulong id, bool putBack, bool unloading = false)
         {
             if (!_nadeFollows.Remove(id, out var f))
                 return;
             var pawn = player != null && player.IsValid ? player.PlayerPawn.Value : null;
             if (pawn == null || !pawn.IsValid)
                 return;
+            // The camera's own noclip is still on (not turned off by .noclip or a freeze meanwhile):
+            // only then is a previous .noclip put back after the teleport.
+            bool ownNoclip = pawn.MoveType == MoveType_t.MOVETYPE_NOCLIP;
             try
             {
-                if (pawn.MoveType == MoveType_t.MOVETYPE_NOCLIP && f.PrevMove != MoveType_t.MOVETYPE_NOCLIP)
+                // A ladder state does not survive the move away from the ladder: walk instead.
+                var restore = f.PrevMove == MoveType_t.MOVETYPE_LADDER ? MoveType_t.MOVETYPE_WALK : f.PrevMove;
+                if (pawn.MoveType == MoveType_t.MOVETYPE_NOCLIP && restore != MoveType_t.MOVETYPE_NOCLIP)
                 {
-                    pawn.MoveType = f.PrevMove;
-                    pawn.ActualMoveType = f.PrevMove;
+                    pawn.MoveType = restore;
+                    pawn.ActualMoveType = restore;
                     Utilities.SetStateChanged(pawn, "CBaseEntity", "m_MoveType");
                 }
-                SetNadeFollowVisible(pawn, true);
-                if (putBack)
+                SetNadeFollowVisible(pawn, true, f.WeaponRaw);
+                if (putBack && player != null && player.PawnIsAlive)
                 {
                     // A teleport with the saved pitch tilts the body model (the camera then looks
                     // down into the player's own body): TeleportUpright sets the view and flattens
                     // the body to yaw only, as every other practice teleport does.
-                    TeleportUpright(player, f.StartPos, f.StartAng);
-                    if (f.PrevMove == MoveType_t.MOVETYPE_NOCLIP)
+                    if (unloading)
+                    {
+                        pawn.Teleport(f.StartPos, f.StartAng, new Vector(0, 0, 0));
+                        pawn.ResetNoclipToWalk();
+                        FlattenBodyRotation(pawn, f.StartAng.Y);
+                    }
+                    else
+                    {
+                        TeleportUpright(player, f.StartPos, f.StartAng);
+                    }
+                    if (f.PrevMove == MoveType_t.MOVETYPE_NOCLIP && ownNoclip)
                     {
                         pawn.MoveType = MoveType_t.MOVETYPE_NOCLIP;
                         pawn.ActualMoveType = MoveType_t.MOVETYPE_NOCLIP;
                         Utilities.SetStateChanged(pawn, "CBaseEntity", "m_MoveType");
                     }
                 }
-                else if (player != null)
+                else if (player != null && !unloading)
                 {
                     FlattenBodyRotationFrames(player, pawn.EyeAngles.Y, 6);
                 }
@@ -287,12 +337,40 @@ namespace MatchZy
             }
         }
 
-        // Practice end / disconnect: stop and forget. Map start: the pawns are gone, only forget.
-        private void ResetNadeFollow(bool mapStart)
+        // True while the player records (.rec, .stratrec role, .stratslot take) or waits in one of
+        // their countdowns, or in the countdown of a ".strat <name> me" playback.
+        private bool IsPracticeRecordingFor(ulong id)
+            => activePathRecordings.ContainsKey(id) || pendingRecCountdowns.ContainsKey(id)
+               || IsStratRole(id) || IsSlotRecording(id) || (stratPlaybackPending && stratPlaybackOwner == id);
+
+        // A recording or its countdown starts: a running camera ends first and the pawn goes back to
+        // where it threw, so neither the freeze nor the recorded path sees the camera flight.
+        private void StopNadeFollowForRecording(CCSPlayerController? player)
+        {
+            if (player == null || !player.IsValid || !_nadeFollows.ContainsKey(player.SteamID))
+                return;
+            StopNadeFollow(player, player.SteamID, putBack: player.PawnIsAlive);
+        }
+
+        // Practice end / unload: stop and put a living pawn back where it threw (else it walks on
+        // where the camera was: in a wall, in the sky). Map start: the pawns are gone, only forget.
+        private void ResetNadeFollow(bool mapStart, bool unloading = false)
         {
             if (!mapStart)
                 foreach (ulong id in _nadeFollows.Keys.ToList())
-                    StopNadeFollow(Utilities.GetPlayerFromSteamId(id), id, putBack: false);
+                {
+                    try
+                    {
+                        var player = Utilities.GetPlayerFromSteamId(id);
+                        bool alive = player != null && player.IsValid && player.PawnIsAlive;
+                        StopNadeFollow(player, id, putBack: alive, unloading);
+                    }
+                    catch (Exception e)
+                    {
+                        _nadeFollows.Remove(id);
+                        Log($"[NadeFollow] reset: {e.Message}");
+                    }
+                }
             _nadeFollows.Clear();
             if (mapStart)
                 _nadeFollowEnabled.Clear();

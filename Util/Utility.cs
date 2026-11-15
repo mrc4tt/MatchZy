@@ -780,10 +780,20 @@ namespace MatchZy
             // Engine asserts back on the console (quieted while glows were in use).
             if (_glowAssertQuiet == true && !Tier0Logging.SetChannelFlag("Assert", Tier0Logging.LCF_DO_NOT_ECHO, false))
                 Server.ExecuteCommand("log_flags Assert -DoNotEcho");
-            // Engine code patched for matchzy_coach_comm_unrestricted must not outlive the plugin.
-            try { DisableCoachCommPatch("unload"); } catch { }
-            RestoreSpectatorCoachPawnTeams();
-            try { RemoveAllSpectatorCoachGlows(); } catch { }
+            // Practice extras (grenade camera, lineup trainer, .xray glows) and spectator coaches leave
+            // engine state behind that no other plugin resets: invisible noclip pawns, glow props, the
+            // tier0 Assert channel, sv_coaching_enabled / m_iCoachingTeam (the round_prestart guard
+            // against the engine's NULL-controller coach crash goes away with this plugin), the coach
+            // comm patch. Both run on a plain unload and a hot reload, whatever the mode.
+            // After OnMapEnd (or with no map running, e.g. server quit) the stored entity wrappers can
+            // point at freed memory: then only the managed state is cleared and no entity is touched.
+            bool unloadTouchEntities = !mapEnding && AreServerGlobalsReady();
+            try { ShutdownPracticeExtrasForUnload(unloadTouchEntities); } catch { }
+            if (unloadTouchEntities)
+            {
+                try { HideNadeMarkers(); } catch { }
+            }
+            try { ShutdownSpectatorCoachesForUnload(unloadTouchEntities); } catch { }
             // The ready-phase "fake warmup" (matchzy_ready_hint_style 1) forces m_bWarmupPeriod off +
             // RoundTime 0 + mp_ignore_round_win_conditions each tick from RenderReadyPanel. If the
             // plugin unloads/reloads while it is active, that per-tick upkeep stops but the gamerules
@@ -1943,6 +1953,15 @@ namespace MatchZy
                 mapChangePending = false;
                 currentMapFinished = false;
                 matchLoadGeneration++;
+                // A load waiting for its changelevel: OnMapEndHandler runs ResetMatch during that very
+                // changelevel and OnMapStart resumes the load, so keep it while the map is ending.
+                // Any other reset (.endmatch, a failed load, a mode switch) drops it; otherwise a
+                // changelevel that never happened kept rejecting every later load as "already setup".
+                if (!mapEnding && pendingMatchLoadJson != null)
+                {
+                    Log("[ResetMatch] Dropping the match load that was waiting for its map change.");
+                    DropPendingMatchLoad();
+                }
                 pauseCarriedToLive = null;
                 // Send match_cancelled whenever a loaded or started match is stopped with a reason:
                 // also in warmup, veto, knife and between the maps of a series, where the panel

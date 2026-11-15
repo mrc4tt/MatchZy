@@ -266,6 +266,9 @@ namespace MatchZy
             {
                 // No MatchZy backup of this match: use the loaded match, else the interrupted one.
                 string mapName = Server.MapName;
+                // A load waiting for its changelevel must not get a second load on top of it.
+                if (!isMatchSetup && pendingMatchLoadJson != null)
+                    return "";
                 if (!isMatchSetup)
                 {
                     var marker = ReadActiveMatchRaw();
@@ -330,6 +333,18 @@ namespace MatchZy
         // Shared by matchzy_loadbackup and matchzy_recover.
         private void LoadBackupFromArgument(CCSPlayerController? player, string rawArgs, string caller)
         {
+            // Called next frame: the admin may have left. Not IsPlayerValid: that needs a pawn, and
+            // an admin running it as a spectator or while dead must still get the replies.
+            if (player != null && (!player.IsValid || player.Connected != PlayerConnectedState.Connected))
+                player = null;
+            // A match load waiting for its changelevel would re-load its own config over the
+            // restored match on the next map start.
+            if (!isMatchSetup && pendingMatchLoadJson != null)
+            {
+                Log($"[LoadBackup] '{rawArgs}' refused ({caller}): a match load is waiting for its map change.");
+                ReplyToUserCommand(player, Localizer.ForPlayer(player, "matchzy.mm.matchisalreadysetup", liveMatchId));
+                return;
+            }
             string fileName = ResolveBackupName(rawArgs);
             if (fileName == "")
             {
@@ -415,7 +430,9 @@ namespace MatchZy
             if (!autoRecover.Value)
                 return;
             // A panel that loaded a match (or an admin who started something) in the meantime wins.
-            if (isMatchSetup || matchStarted || isPractice || isDryRun || isVeto || isRoundRestorePending)
+            // IsMatchLoadedOrPending: also a load that waits for its changelevel, which a recovery
+            // load would otherwise run over (and be replaced by on the next map start).
+            if (IsMatchLoadedOrPending() || matchStarted || isPractice || isDryRun || isVeto || isRoundRestorePending)
                 return;
             var marker = ReadActiveMatch(out var backup);
             if (marker == null)
@@ -507,13 +524,17 @@ namespace MatchZy
                 if (ownRawRestoreFile != null && string.Equals(file, ownRawRestoreFile, StringComparison.OrdinalIgnoreCase))
                 {
                     ownRawRestoreFile = null;
+                    MarkRoundRestoreRequested();
                     return HookResult.Continue;
                 }
                 string mode = (rawBackupRestoreMode.Value ?? "redirect").Trim().ToLowerInvariant();
                 if (mode == "allow" || file == "")
                 {
                     if (file != "")
+                    {
                         Log($"[RawRestore] mp_backup_restore_load_file {file} runs without MatchZy (matchzy_raw_backup_restore allow): rosters, team names and pause state are not restored.");
+                        MarkRoundRestoreRequested();
+                    }
                     return HookResult.Continue;
                 }
 

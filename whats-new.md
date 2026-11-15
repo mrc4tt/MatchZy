@@ -2,17 +2,21 @@
 
 A short summary of each release. The [full changelog](changelog.md) has the details and background for every change.
 
-## 1.0.27-beta.1 <small>November 14, 2026</small>
+## 1.0.26 <small>November 15, 2026</small>
 
 - **New:** (Beta) Spectator coach with `matchzy_coaching_mode 3`: no body, first person on the own team, radar with only the own team and spotted enemies, teammates outlined through walls, no enemy ghosting. See [Coaching](guides/coaching.md#spectator-coach-beta-matchzy_coaching_mode-3).
-- **Fixed:** The bot quota no longer kicks CSTV when it removes bots (a lowered `bot_quota`, or `bot_quota_mode fill` and a player joining a team), so the demo is no longer split in two (`matchzy_cstv_kick_guard`).
-- **Fixed:** Practice `.bot` adds one bot instead of adding two and kicking one.
-- **Changed:** SQLite no longer leaves `matchzy.db-wal` / `matchzy.db-shm` files; `matchzy.db` alone is a complete copy again.
 - **New:** Grenade follow camera in practice: a throw from a lineup spot is followed by the camera and shows where it lands; jump to come back. `.follownade` sets lineup spots / every throw / off.
 - **New:** Lineup trainer: `.shownades` spots get a glowing figure; near a spot you see the aim targets on the wall, and on the spot a hint box with the keys ("Left Click + Jump").
 - **New:** Players can vote all chat off with `.mute` (`matchzy_allchat_mute_votes`; `.nochat` with CS2-SimpleAdmin), so the teams can no longer write to each other; admins use `.allchat`.
-- **Fixed:** A server crash when a coach got the bomb (two hand-offs removed the same C4 at once).
+- **New:** `.spawns` toggles the practice spawn markers on and off.
+- **New:** Chat in Brazilian Portuguese and Turkish (`!lang pt-BR`, `!lang tr`).
 - **Changed:** Coaches can no longer take control of bots on their team.
+- **Changed:** `matchzy_demo_upload_url ""` and `matchzy_remote_backup_url ""` turn uploads off.
+- **Changed:** The release zip is 2.4 MB with 35 files (was 36 MB unpacked, 59 files): only the Linux and Windows files a server uses, and a slimmer SQLite. Windows servers also get the patched SQLite 3.50.2.
+    After updating you can delete the old `runtimes/` folder, `MatchZy.pdb` and `Microsoft.Extensions.*.dll` in the plugin folder.
+- **Fixed:** The bot quota no longer kicks CSTV when it removes bots (a lowered `bot_quota`, or `bot_quota_mode fill` and a player joining a team), so the demo is no longer split in two (`matchzy_cstv_kick_guard`).
+- **Fixed:** Practice `.bot` adds one bot instead of adding two and kicking one.
+- **Fixed:** A server crash when a coach got the bomb (two hand-offs removed the same C4 at once).
 - **Fixed:** `.uncoach` during freeze time no longer leaves an unkillable coach body in the round.
 - **Fixed:** `.matchsetup` with a veto and "Skip knife" gives team1 CT on every map, also the decider.
 - **Fixed:** A technical pause counts its time only while it is in effect, so a `.tech` early in a round is no longer used up without pausing.
@@ -28,23 +32,17 @@ A short summary of each release. The [full changelog](changelog.md) has the deta
 - **Fixed:** S3 demo uploads no longer overwrite one part with the next.
 - **Fixed:** MySQL stats with long team names or emoji player names; advanced stats with bots.
 - **Fixed:** Practice: leftover bots, bot settings and player settings after leaving practice or the server, stuck strat playback, broken save files.
-- **Changed:** `matchzy_demo_upload_url ""` and `matchzy_remote_backup_url ""` turn uploads off.
-- **Security:** A failed demo upload no longer logs the S3 signature details.
-
-## 1.0.26 <small>November 14, 2026</small>
-
+- **Fixed:** A match load whose map never loads no longer blocks the server (dropped after 2 minutes, 15 for workshop maps; panels get `match_cancelled` with reason `load_failed`), and recovery or a re-sent load no longer clash with it.
+- **Fixed:** Warmup-time round restores are no longer undone, and match result events are no longer sent twice after a slow receiver.
 - **Fixed:** `.help` in practice shows every command again: long lists continue on a new line instead of being cut off, and the list shown when practice starts is no longer pushed out of chat by server messages.
 - **Fixed:** In practice, E no longer opens the buy menu, so it always works on spawn markers and lineups. B still opens the buy menu.
 - **Fixed:** E on the spawn markers picks exactly the box or number under your crosshair.
-- **New:** `.spawns` toggles the practice spawn markers on and off.
-- **New:** Chat in Brazilian Portuguese and Turkish (`!lang pt-BR`, `!lang tr`).
-- **Changed:** The release zip is 2.4 MB with 35 files (was 36 MB unpacked, 59 files): only the Linux and Windows files a server uses, and a slimmer SQLite. Windows servers also get the patched SQLite 3.50.2.
-    After updating you can delete the old `runtimes/` folder, `MatchZy.pdb` and `Microsoft.Extensions.*.dll` in the plugin folder.
 - **Fixed:** No more `matchzy.db-wal` and `matchzy.db-shm` files next to `matchzy.db`. They are removed on the next start, and `matchzy.db` alone is a complete backup.
 - **Fixed:** Stats no longer turn off after a plugin reload with "Unable to load shared library 'e_sqlite3'".
 - **Fixed:** The ready panel switches language right away after `!lang`.
 - **Fixed:** After practice, terrorists no longer spawn with the full practice grenade set and an AK-47.
 - **Fixed:** Switching the server from practice to another mode (retakes, deathmatch, prefire) without a map change no longer leaves players flying in noclip or respawning on death.
+- **Security:** A failed demo upload no longer logs the S3 signature details.
 
 ## 1.0.25 <small>November 13, 2026</small>
 

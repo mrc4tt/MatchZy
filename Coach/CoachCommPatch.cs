@@ -23,6 +23,8 @@ public partial class MatchZy
 {
     private nint _coachCommSite;
     private byte[]? _coachCommOriginal;
+    // What we wrote there, checked again before the original bytes go back.
+    private byte[]? _coachCommPatched;
     private bool _coachCommGaveUp;
 
     [DllImport("libc.so.6", EntryPoint = "mprotect", SetLastError = true)]
@@ -109,6 +111,7 @@ public partial class MatchZy
             return;
         _coachCommSite = site;
         _coachCommOriginal = original;
+        _coachCommPatched = patch;
         Log($"[CoachCommPatch] coach voice + team chat unrestricted: patched 0x{site:X} ({kind}, was {BitConverter.ToString(original).Replace('-', ' ')}).");
     }
 
@@ -116,10 +119,24 @@ public partial class MatchZy
     {
         if (_coachCommOriginal == null || _coachCommSite == 0)
             return;
-        if (WriteCoachCommBytes(_coachCommSite, _coachCommOriginal))
-            Log($"[CoachCommPatch] original bytes restored at 0x{_coachCommSite:X} ({reason}); coach voice/chat restricted again.");
+        nint site = _coachCommSite;
+        byte[] original = _coachCommOriginal;
+        byte[]? patched = _coachCommPatched;
         _coachCommOriginal = null;
+        _coachCommPatched = null;
         _coachCommSite = 0;
+        // Only write back over our own bytes: another plugin (or a reloaded server module) may own
+        // that address by now, and writing the old bytes there would corrupt its code.
+        bool ours = patched != null;
+        for (int i = 0; ours && i < patched!.Length; i++)
+            ours = Marshal.ReadByte(site + i) == patched[i];
+        if (!ours)
+        {
+            Log($"[CoachCommPatch] 0x{site:X} no longer holds our patch bytes ({reason}); left alone, nothing restored.");
+            return;
+        }
+        if (WriteCoachCommBytes(site, original))
+            Log($"[CoachCommPatch] original bytes restored at 0x{site:X} ({reason}); coach voice/chat restricted again.");
     }
 
     private bool WriteCoachCommBytes(nint at, byte[] bytes)
