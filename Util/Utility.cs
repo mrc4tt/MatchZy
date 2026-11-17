@@ -2932,18 +2932,32 @@ namespace MatchZy
                 return;
             Server.NextFrame(() =>
             {
-                if (!player.IsValid)
-                    return;
-                if (TeamClanTagsActive)
+                // Guarded: an exception here escapes into the NextFrame task, where nobody
+                // observes it, and comes back later from the finalizer thread as an
+                // AggregateException (seen live: NullReferenceException in this lambda).
+                try
                 {
-                    if (ApplyTeamClanTag(player))
+                    if (!player.IsValid)
+                        return;
+                    if (TeamClanTagsActive)
+                    {
+                        if (ApplyTeamClanTag(player))
+                            PokeClanNameRefresh();
+                        return;
+                    }
+                    // m_szClan reads as null for a player who never had a clan tag set:
+                    // player.Clan.Length threw for them.
+                    string clan = player.Clan ?? "";
+                    if (clan.Length > 0 && !IsMatchCoach(player)
+                        && (clan == matchzyTeam1?.teamTag || clan == matchzyTeam2?.teamTag))
+                    {
+                        ApplyClanTag(player, "");
                         PokeClanNameRefresh();
+                    }
                 }
-                else if (!IsMatchCoach(player) && player.Clan.Length > 0
-                    && (player.Clan == matchzyTeam1.teamTag || player.Clan == matchzyTeam2.teamTag))
+                catch (Exception e)
                 {
-                    ApplyClanTag(player, "");
-                    PokeClanNameRefresh();
+                    Log($"[RefreshTeamClanTag FATAL] {e.GetType().Name}: {e.Message}");
                 }
             });
         }
