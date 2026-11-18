@@ -98,6 +98,20 @@ Based on [MatchZy](https://github.com/shobhit-pathak/MatchZy) by Shobhit Pathak,
 - Chat translations in Brazilian Portuguese (`pt-BR`) and Turkish (`tr`). Each player sees their own language once they pick it with `!lang`.
 - Leaving practice mode left terrorists with the full practice grenade set and an AK-47 on every spawn: the reset of `mp_t_default_grenades` and `mp_t_default_primary` was missing a space and never ran. The flashbang and per-type grenade limits from practice are now reset too.
 - Unloading MatchZy while practice was on (a host switching the server to retakes, deathmatch or prefire without a map change) kept practice players in noclip and kept respawn on death on. Noclip, `mp_respawn_on_death_ct/t`, `mp_ignore_round_win_conditions` and `mp_respawn_immunitytime` are now reset on unload.
+- Practice lineups: `.save` (also `.savelast`, `.sl`) saves the grenade you just threw as a lineup, with the grenade type, how it was thrown (jumpthrow, step, run, which mouse button) and the place the throw started from. `.save <name>` gives it a name. `.savenade` now also stores how the lineup was thrown when you have just thrown it.
+- Practice lineups: `.shownades` marks are the grenade of the lineup's type with a square on the floor, and the place each lineup lands is marked as well. Aim at a mark and press E to stand on the throw spot with the grenade in hand; E on a landing mark takes you to where it is thrown from (a menu when several lineups land there). Marks behind a wall cannot be picked.
+- Practice lineups: hold E on one of your own lineup marks to rename it, give it a description, put it in a set or delete it. The menu is moved with W / S and picked with E.
+- Practice lineups: standing on a lineup spot shows a ring for each lineup thrown from there, where it is aimed: red, and green when the crosshair is in it. Only that player sees them. `matchzy_practice_aim_rings` (default true). This replaces the aim target model and the hint box of the lineup trainer.
+- Practice lineups: a throw of a loaded lineup is compared with the saved one. Chat says how far from the saved landing it came down and, when it differed, why (aim moved, not on the spot, jump and throw not together).
+- Practice lineups: `matchzy_practice_aim_lock` (default true): with the pin pulled on the spot of a loaded lineup, an aim within one degree of the saved aim is put back on it exactly.
+- Practice lineups: `.train [type|set]` takes you through your saved lineups one by one and judges each throw (PERFECT, GOOD, MISS); `.skip` skips one.
+- (Beta) Grenade finder: `.draw` marks a box where a grenade should land and `.find` works out lineups that land in it from the area around you, for the grenade you hold (smoke, decoy, HE, flashbang, molotov). `.next` / `.prev` and E on a result go through them; `.find check` first throws them for real, hidden. Needs the MatchZy CounterStrikeSharp build. `matchzy_practice_finder_enabled` (default true) switches it off.
+- Practice: `.throwsync [names]` throws several saved lineups so that they go off together, `.nadespeed <10-500|off>` slows or speeds up time while your grenade is in the air, `.nextnade` / `.prevnade [type]` step through your lineups.
+- Practice: the grenade follow camera stays closer behind the grenade and pulls back when it has landed; pressing Inspect (F) while your grenade is in the air starts it.
+- Practice: `.help` shows a short list (save, show, train and the everyday commands); `.help more` shows every command by group. The same short list is shown when practice starts.
+- Practice lineups: a lineup spot that lies inside a kerb or a wall no longer leaves you stuck after the teleport: you are put on the nearest place a player fits, and chat says so.
+- `.delnade` of a lineup you had loaded also puts it away: its line on screen and its aim ring go, and E no longer takes you back to it.
+- New convars `matchzy_practice_autoshow_lineups` (default false: show a player's lineup marks without `.shownades`) and `matchzy_practice_debug_log` (default false: a debug log of throws and searches for fault finding).
 
 # 1.0.25
 
