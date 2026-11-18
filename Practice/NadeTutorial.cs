@@ -275,7 +275,7 @@ namespace MatchZy
         // 256 u out along the throw as seen from the spot: seen from beside it, it floats in the
         // air next to the crosshair and reads as wrong (the author, 2026-11-17). From elsewhere
         // the grenade model and the square on the floor mark the spot.
-        private const bool JtTargetsOnSpotOnly = true;
+        private static readonly bool JtTargetsOnSpotOnly = true;
 
         private void UpdateJtView(CCSPlayerController player, ulong id, Vector o, float now)
         {
@@ -606,12 +606,12 @@ namespace MatchZy
         // The hint shows to the activator only and stays until hidden.
         // Off (2026-11-17): the hint is the game's yellow box. The author wants one box on screen,
         // the red one, and that one already says how the loaded lineup is thrown.
-        private const bool JtHudHint = false;
+        private static readonly bool JtHudHint = false;
         private const float JtTargetFullSizeDistance = 400.0f;
         private const float JtTargetReach = 256.0f;
         // Off (the author, 2026-11-18): the aim mark of a saved lineup is the thin ring with four
         // ticks that hangs at the crosshair, the same as a search result's, not this red disc.
-        private const bool JtTargetDisc = false;
+        private static readonly bool JtTargetDisc = false;
 
         private void ShowJtHint(CCSPlayerController player, string message)
         {
