@@ -3784,7 +3784,7 @@ namespace MatchZy
                         if (player.PlayerPawn.Value == null)
                         {
                             Log($"[RespawnWhenTeamApplied] {player.PlayerName}: pawn handle empty, calling Respawn vfunc directly ({attemptsLeft} attempts left)");
-                            VirtualFunction.CreateVoid<IntPtr>(player.Handle, MzGameData.GetOffset("CCSPlayerController_Respawn"))(player.Handle);
+                            VoidThisVFunc(player.Handle, MzGameData.GetOffset("CCSPlayerController_Respawn"))(player.Handle);
                         }
                         else
                         {
