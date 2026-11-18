@@ -52,7 +52,7 @@ namespace MatchZy
         // Rolled back 2026-11-17: off = every mark and every throw spot is shown to every viewer,
         // as that morning. On = the grenade in hand filters the marks and the throw spots stay
         // hidden until a landing mark is picked.
-        private const bool LandingMarksByHand = false;
+        private static readonly bool LandingMarksByHand = false;
 
         // The same rule as the transmit filter below, for the aim pick.
         private bool LandingGroupShown(int slot, NadeMarkerGroup g)

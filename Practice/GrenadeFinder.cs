@@ -2475,9 +2475,11 @@ namespace MatchZy
         // Fewer results that work, rather than many that need a perfect hand: lineups that take
         // a step of the mouse either way are kept, the hair-fine ones only when there is nothing else
         // (they come with a warning then).
-        private const bool FinderOnlyForgiving = false;
-        private const bool FinderTryEveryType = false;
-        private const bool FinderAreaBounceSweep = false;
+        // Fixed switches, kept as fields and not constants: a constant makes the compiler report the
+        // branch that is switched off as unreachable code (CS0162).
+        private static readonly bool FinderOnlyForgiving = false;
+        private static readonly bool FinderTryEveryType = false;
+        private static readonly bool FinderAreaBounceSweep = false;
 
         private static List<FinderResult> FinderKeepForgiving(List<FinderResult> rated)
         {

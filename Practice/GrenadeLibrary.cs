@@ -520,7 +520,7 @@ namespace MatchZy
         // 40 u above the spot, glowing in the type's colour (the recipe other lineup plugins use,
         // and visible since the icons are spawned as prop_dynamic_override). true / "1" = the
         // player figure of before.
-        private const bool NadeSpotGhost = false;
+        private static readonly bool NadeSpotGhost = false;
         private const string NadeIconScale = "2";
 
         private void DrawNadeMarkerGroup(NadeMarkerGroup group)
