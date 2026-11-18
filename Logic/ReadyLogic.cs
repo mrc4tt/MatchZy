@@ -33,6 +33,15 @@ namespace MatchZy
             return Math.Min(Math.Max(playersPerTeam, 0), Math.Max(Math.Max(ownPresent, otherPresent), 0));
         }
 
+        // Two sides of different size that may start on their own: both have players and the short
+        // side misses at most maxMissing of the larger side's size (-1 = any difference).
+        public static bool UnevenSides(int side1, int side2, int maxMissing)
+        {
+            if (side1 <= 0 || side2 <= 0 || side1 == side2)
+                return false;
+            return maxMissing < 0 || Math.Abs(side1 - side2) <= maxMissing;
+        }
+
         // The match config's min_players_to_ready when it lets the side ready up with fewer than
         // `required` ready players, raised to the floor. 0 = not set, or not lower than required:
         // then every player the side needs has to be ready.

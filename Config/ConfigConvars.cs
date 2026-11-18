@@ -126,6 +126,8 @@ namespace MatchZy
 
         public FakeConVar<bool> readyUseKey = new("matchzy_ready_use_key", "Whether the use key (E) readies a player up during the ready phase, on top of .ready. E only readies, it never un-readies. The ready hints then say 'press E'. Default: true", true);
 
+        public FakeConVar<int> readyUnevenStartDelay = new("matchzy_ready_uneven_start_delay", "Matches without listed players and without players_per_team (.matchsetup, \"players\": \"any\"): when everyone on T and CT is ready but one side is short (4v5), the match starts by itself after this many seconds. .unready or a player joining a side stops the countdown. The short side may miss at most matchzy_forceready_max_missing players. 0 = off: the short side uses .forceready. Default: 20", 20, ConVarFlags.FCVAR_NONE, new CounterStrikeSharp.API.Modules.Cvars.Validators.RangeValidator<int>(0, 300));
+
         public FakeConVar<bool> readyHintBlinkEnabled = new("matchzy_ready_hint_blink", "Blink the 'YOU ARE NOT READY' line on the HTML READY-UP panel to grab attention. ONLY applies when matchzy_ready_hint_style is 1 (the HTML panel); no effect in classic style (0). Default: false", false);
 
         public FakeConVar<bool> readyClanTagEnabled = new("matchzy_ready_clantag_enabled", "Whether to show [READY] / [UNREADY] clan tags on the scoreboard during the ready phase. Default: true", true);

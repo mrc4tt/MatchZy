@@ -37,6 +37,19 @@ public class ReadyLogicTests
         => Assert.Equal(expected, ReadyLogic.OpenSideSize(own, other, perTeam));
 
     [Theory]
+    [InlineData(4, 5, 1, true)]
+    [InlineData(5, 4, 1, true)]
+    [InlineData(3, 4, 1, true)]
+    [InlineData(3, 5, 1, false)]   // two short
+    [InlineData(3, 5, 2, true)]
+    [InlineData(1, 5, -1, true)]   // -1: any difference
+    [InlineData(4, 4, 1, false)]   // even sides start at once, no countdown
+    [InlineData(0, 1, 1, false)]   // an empty side never starts
+    [InlineData(4, 5, 0, false)]   // 0: even teams only
+    public void UnevenSides(int side1, int side2, int maxMissing, bool expected)
+        => Assert.Equal(expected, ReadyLogic.UnevenSides(side1, side2, maxMissing));
+
+    [Theory]
     [InlineData(false, 1, 5, 0, 0)]  // not in the match config
     [InlineData(true, 0, 5, 0, 0)]
     [InlineData(true, 1, 5, 0, 1)]   // panel default 1: one ready player is enough

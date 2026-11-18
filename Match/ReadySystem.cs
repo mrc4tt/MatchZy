@@ -123,15 +123,24 @@ public partial class MatchZy
         // the two sides has. A 4v4 then starts once all 8 are ready; before, each side waited for
         // the mode's 5 and only an admin's .forcestart got the match going. Join ready mode keeps
         // players_per_team: there the side is ready the moment it is complete.
-        if (rosterSize <= 0 && !matchConfig.PlayersPerTeamSet && !team.botTeam
-            && ListedRosterSize(team) == 0 && !IsJoinReadyMode())
+        if (rosterSize <= 0 && IsOpenSizedTeam(team))
         {
             int otherSide = side == (int)CsTeam.CounterTerrorist ? (int)CsTeam.Terrorist : (int)CsTeam.CounterTerrorist;
             (int own, _) = GetTeamPlayerCount(side, false);
-            int other = IsBotSide(otherSide) ? 0 : GetTeamPlayerCount(otherSide, false).Item1;
+            // openSidesOwnSize: the uneven start countdown (ReadyUnevenStart.cs) takes each side
+            // at the size it has, so a 4v5 counts as complete.
+            int other = openSidesOwnSize || IsBotSide(otherSide) ? 0 : GetTeamPlayerCount(otherSide, false).Item1;
             rosterSize = ReadyLogic.OpenSideSize(own, other, perTeam);
         }
         return ReadyLogic.RequiredOnSide(perTeam, rosterSize, ReadyFloor());
+    }
+
+    // A team whose size nothing in the match config sets: no listed roster and no
+    // players_per_team (.matchsetup, "players": "any"). Not in join ready mode.
+    private bool IsOpenSizedTeam(Team team)
+    {
+        return isMatchSetup && !matchConfig.PlayersPerTeamSet && !team.botTeam
+            && ListedRosterSize(team) == 0 && !IsJoinReadyMode();
     }
 
     // matchzy_ready_max_missing: the fewest players a side of a loaded match can ready up with

@@ -724,6 +724,7 @@ namespace MatchZy
                 }
                 SyncUnreadyChatReminder();
                 HandleJoinStartCountdown();
+                HandleUnevenStartCountdown();
 
                 if (readyHintStyle.Value == 0)
                 {
