@@ -130,6 +130,8 @@ namespace MatchZy
         private bool _glowUsersCoach;
         // Last state sent with log_flags (null = never sent: the engine default, echo on).
         private bool? _glowAssertQuiet;
+        // True while lineup marks (.shownades) are up.
+        private bool _nadeMarksWanted;
 
         /// <summary>
         /// The tier0 log channel "Assert" carries the engine's debug asserts. While .xray or the
@@ -143,7 +145,8 @@ namespace MatchZy
         private bool RefreshGlowAssertQuiet(bool forceOff = false)
         {
             // forceOff (plugin unload): back to normal whoever still uses glows.
-            bool want = !forceOff && ((xrayEnabled && isPractice) || _glowUsersCoach);
+            // (The lineup marks and their aim targets are glow props too.)
+            bool want = !forceOff && ((xrayEnabled && isPractice) || _glowUsersCoach || (_nadeMarksWanted && isPractice));
             if (_glowAssertQuiet == want || (_glowAssertQuiet == null && !want))
                 return false;
             _glowAssertQuiet = want;

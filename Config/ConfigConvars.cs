@@ -10,6 +10,12 @@ namespace MatchZy
 {
     public partial class MatchZy
     {
+        public FakeConVar<bool> practiceAimLock = new("matchzy_practice_aim_lock", "Practice lineups: with the pin pulled on the spot of a loaded lineup, an aim that is within one degree of the saved aim is put back on it exactly, so a small nudge of the mouse does not spoil the throw. Default: true", true);
+        public FakeConVar<bool> practiceAimRings = new("matchzy_practice_aim_rings", "Practice lineups: a player standing on a saved lineup spot sees a ring for each lineup thrown from there, where it is aimed (red, green when the crosshair is in it). Only that player sees them. Default: true", true);
+        public FakeConVar<bool> practiceAutoShowLineups = new("matchzy_practice_autoshow_lineups", "Practice lineups: show a player's saved lineup marks as soon as they are in practice mode, without .shownades. Default: false", false);
+        public FakeConVar<bool> practiceFinderEnabled = new("matchzy_practice_finder_enabled", "Practice lineups: allow .draw and .find (draw a landing box, let the server work out lineups that land in it). Default: true", true);
+        public FakeConVar<bool> practiceDebugLog = new("matchzy_practice_debug_log", "Practice lineups: write a debug log of throws, verdicts and searches to <plugin>/calib/finder.log. For fault finding only. Default: false", false);
+
         public FakeConVar<bool> cstvKickGuard = new("matchzy_cstv_kick_guard", "Keep the bot quota from kicking the CSTV client: when CS2 trims bots (a lowered bot_quota, bot_quota_mode fill and a player joining a team) it kicks SourceTV first, which stops GOTV and splits the demo. Needs the KickBotFromTeam gamedata signature. Default: true", true);
         public FakeConVar<bool> demoLiveOnly = new("matchzy_demo_live_only", "Only live maps (match, scrim, hill) are recorded: MatchZy sets tv_autorecord 0 and stops any GOTV recording that runs outside a live map (CS2's tv_autorecord records every map from load, also practice and an idle server for hours). MatchZy's own match demos are not affected. false = tv_autorecord is left as the server sets it. Default: false", false);
         public FakeConVar<bool> statsIncludeBots = new("matchzy_stats_include_bots", "Whether bots on CT/T get player stats (database, CSV and stats events). Bots have no SteamID, so each is recorded under a stable id of 90000000000000000 plus a hash of its name. Default: false", false);

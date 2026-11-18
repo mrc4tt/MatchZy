@@ -371,6 +371,8 @@ namespace MatchZy
         // OnPlayerButtonsChanged: USE while standing in a green box deletes that spot.
         private void OnBotSpawnMarkerButtonHandler(CCSPlayerController player, PlayerButtons pressed, PlayerButtons released)
         {
+            if (IsFinderDrawing(player))
+                return;
             if (!_botSpawnVizOn || !isPractice || (pressed & PlayerButtons.Use) == 0)
                 return;
             if (!IsHumanPlayerValid(player) || !player.UserId.HasValue)
