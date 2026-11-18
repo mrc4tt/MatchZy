@@ -108,6 +108,19 @@ namespace MatchZy
             {
                 manifest.AddResource(JtGhostModel);
                 manifest.AddResource(JtTargetModel);
+                // The grenade models the library shows as icons. Without this a model nobody
+                // carries on the map yet (a molotov on a server of CTs, a decoy) is not loaded,
+                // and its icon is simply not there.
+                foreach (var model in new[]
+                {
+                    "weapons/models/grenade/smokegrenade/weapon_smokegrenade.vmdl",
+                    "weapons/models/grenade/flashbang/weapon_flashbang.vmdl",
+                    "weapons/models/grenade/hegrenade/weapon_hegrenade.vmdl",
+                    "weapons/models/grenade/molotov/weapon_molotov.vmdl",
+                    "weapons/models/grenade/incendiary/weapon_incendiarygrenade.vmdl",
+                    "weapons/models/grenade/decoy/weapon_decoy.vmdl",
+                })
+                    manifest.AddResource(model);
                 _jtModelsPrecached = true;
                 Log("[NadeTutorial] Lineup trainer models precached.");
             });
@@ -119,6 +132,8 @@ namespace MatchZy
             "Normal Throw" => "normal",
             "Jumpthrow" => "jump",
             "Run Throw" => "run",
+            // No hint text of its own yet: the run hint, the finder's on-screen line says the rest.
+            "Run Jumpthrow" => "run",
             "Walk Throw" => "walk",
             "Crouch Throw" => "crouch",
             _ => null,
@@ -138,10 +153,12 @@ namespace MatchZy
         // After a lineup load (.loadnade, a .shownades marker, the .nades menu). A lineup of a shown
         // marker selects it there (its targets stay where they are); any other lineup gets a one-off
         // spot for this player.
-        private void ShowNadeTutorial(CCSPlayerController player, string name, string nadeType, string throwType, Vector origin, QAngle angle)
+        private void ShowNadeTutorial(CCSPlayerController player, string name, string nadeType, string throwType, Vector origin, QAngle angle, string nadePos = "", string nadeVel = "")
         {
             if (!isPractice)
                 return;
+            // Aim mark, calculated flight path and after-throw verdict (GrenadeFinderGuide.cs).
+            ArmLibraryLineup(player, name, nadeType, throwType, origin, angle, nadePos, nadeVel);
             ulong id = player.SteamID;
             NadeMarkerGroup? marker = null;
             if (grenadeLibraryActive && _nadeViewers.Contains(id))
@@ -254,6 +271,12 @@ namespace MatchZy
             }
         }
 
+        // The aim target of a spot is only drawn for a player who stands on that spot. It hangs
+        // 256 u out along the throw as seen from the spot: seen from beside it, it floats in the
+        // air next to the crosshair and reads as wrong (the author, 2026-11-17). From elsewhere
+        // the grenade model and the square on the floor mark the spot.
+        private const bool JtTargetsOnSpotOnly = true;
+
         private void UpdateJtView(CCSPlayerController player, ulong id, Vector o, float now)
         {
             _jtViews.TryGetValue(id, out var view);
@@ -265,7 +288,7 @@ namespace MatchZy
             {
                 float d = JtDistSq(personal.Group.Pos, o);
                 bool had = view != null && view.Spots.ContainsKey(personal.Group);
-                if (d <= (had ? JtKeepDistSq : JtApproachDistSq))
+                if (d <= (had ? JtKeepDistSq : JtApproachDistSq) && (!JtTargetsOnSpotOnly || JtOnSpot(personal.Group, o)))
                     near.Add(personal.Group);
             }
             if (grenadeLibraryActive && _nadeViewers.Contains(id))
@@ -275,7 +298,7 @@ namespace MatchZy
                 {
                     if (hidden != null && hidden.Contains(g)) continue;
                     bool had = view != null && view.Spots.ContainsKey(g);
-                    if (JtDistSq(g.Pos, o) <= (had ? JtKeepDistSq : JtApproachDistSq))
+                    if (JtDistSq(g.Pos, o) <= (had ? JtKeepDistSq : JtApproachDistSq) && (!JtTargetsOnSpotOnly || JtOnSpot(g, o)))
                         near.Add(g);
                 }
             }
@@ -300,6 +323,8 @@ namespace MatchZy
                     spot = new JtSpotTargets();
                     foreach (var lu in g.Lineups)
                     {
+                        if (!JtTargetDisc)
+                            break;
                         var t = SpawnJtTarget(lu);
                         if (t != null && t.IsValid) spot.Targets.Add(t.EntityHandle.Raw);
                     }
@@ -424,6 +449,17 @@ namespace MatchZy
                 catch { }
             }
 #endif
+            // The disc hangs in the air on the line of the aim, a fixed 256 u out from the eye (or
+            // just in front of a surface that is nearer), and faces the player: the crosshair
+            // goes on it. (Until 2026-11-18 it was put on whatever the aim hit, up to 1200 u off:
+            // on a far wall it was small and easy to miss, aimed at the sky it was 600 u out, and
+            // the author asked for the mark that hangs at the crosshair, as the search's own.)
+            {
+                float reachTo = normal != null ? MathF.Sqrt(JtDistSq(hit, eye)) - 6.0f : JtTargetReach;
+                float reach = Math.Clamp(Math.Min(JtTargetReach, reachTo), 24.0f, JtTargetReach);
+                hit = new Vector(eye.X + dir.X * reach, eye.Y + dir.Y * reach, eye.Z + dir.Z * reach);
+                normal = null;
+            }
             // Facing: along the surface normal when one was hit, else back toward the player.
             float faceYaw, facePitch;
             if (normal != null)
@@ -448,6 +484,12 @@ namespace MatchZy
                 // turns that axis onto the facing direction (a ring flat on the wall, not lying on it).
                 prop.Teleport(hit, new QAngle(facePitch + 90.0f + extra.X, faceYaw + extra.Y, extra.Z), new Vector(0, 0, 0));
                 prop.DispatchSpawn();
+                // On a surface close to the spot (a low wall in front of the player) the full-size
+                // disc filled the screen (the author, 2026-11-17). Up to 400 u away it is scaled
+                // with the distance, so it looks the size it has at 400 u; further off it is left.
+                float away = MathF.Sqrt(JtDistSq(hit, eye));
+                if (away < JtTargetFullSizeDistance)
+                    prop.AcceptInput("SetScale", value: Math.Max(0.04f, away / JtTargetFullSizeDistance).ToString("0.###", System.Globalization.CultureInfo.InvariantCulture));
                 prop.Render = JtTargetColor;
                 Utilities.SetStateChanged(prop, "CBaseModelEntity", "m_clrRender");
                 return prop;
@@ -562,8 +604,19 @@ namespace MatchZy
         }
 
         // The hint shows to the activator only and stays until hidden.
+        // Off (2026-11-17): the hint is the game's yellow box. The author wants one box on screen,
+        // the red one, and that one already says how the loaded lineup is thrown.
+        private const bool JtHudHint = false;
+        private const float JtTargetFullSizeDistance = 400.0f;
+        private const float JtTargetReach = 256.0f;
+        // Off (the author, 2026-11-18): the aim mark of a saved lineup is the thin ring with four
+        // ticks that hangs at the crosshair, the same as a search result's, not this red disc.
+        private const bool JtTargetDisc = false;
+
         private void ShowJtHint(CCSPlayerController player, string message)
         {
+            if (!JtHudHint)
+                return;
             try
             {
                 var pawn = player.PlayerPawn.Value;

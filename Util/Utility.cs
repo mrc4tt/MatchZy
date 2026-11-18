@@ -4028,7 +4028,22 @@ namespace MatchZy
                 player.PrintToChat(Localizer.ForPlayer(player, lineKey, label, chunk));
         }
 
-        private void SendAvailableCommandsMessage(CCSPlayerController? player)
+        /// <summary>
+        /// The short practice help: the three lineup commands a new player needs, the everyday
+        /// basics, and where the rest is. Sent by .help and when practice starts.
+        /// </summary>
+        private void SendPracticeQuickHelp(CCSPlayerController player)
+        {
+            string L(string key, params object[] a) => Localizer.ForPlayer(player, key, a);
+            player.PrintToChat($"{chatPrefix} {L("matchzy.help.practice.title")}");
+            player.PrintToChat(L("matchzy.help.quick.save"));
+            player.PrintToChat(L("matchzy.help.quick.show"));
+            player.PrintToChat(L("matchzy.help.quick.train"));
+            PrintHelpLine(player, "matchzy.help.line", L("matchzy.help.label.basics"), ".spawn .bot .nobot .clear .rethrow .last .god .ct .t");
+            player.PrintToChat(L("matchzy.help.quick.more"));
+        }
+
+        private void SendAvailableCommandsMessage(CCSPlayerController? player, bool full = false)
         {
             if (!IsPlayerValid(player))
                 return;
@@ -4040,12 +4055,20 @@ namespace MatchZy
             {
                 // Chat summary in the player's language; the command names themselves are not translated.
                 string L(string key, params object[] a) => Localizer.ForPlayer(player!, key, a);
+                // Plain .help: the short list. ".help more": everything, by group.
+                if (!full)
+                {
+                    SendPracticeQuickHelp(player!);
+                    return;
+                }
                 player!.PrintToChat($"{chatPrefix} {L("matchzy.help.practice.title")}");
                 PrintHelpLine(player!, "matchzy.help.line", L("matchzy.help.label.spawns"), ".spawn .ctspawn .tspawn .bestspawn .worstspawn .spawns");
                 PrintHelpLine(player!, "matchzy.help.line", L("matchzy.help.label.bots"), ".bot .cbot .boost .runboost .nobot .dismiss .dismissall .kevlar .armor .botgun .botshoot .botrespawn .startround");
                 PrintHelpLine(player!, "matchzy.help.line", L("matchzy.help.label.replay"), ".rec .stoprecord .replay .saverec .loadrec .stratrec .strat .strats .createstrat .stratslot");
                 PrintHelpLine(player!, "matchzy.help.line", L("matchzy.help.label.positions"), ".sbp .lbp .botspawn .placebot .showbotspawn .botjiggle");
-                PrintHelpLine(player!, "matchzy.help.line", L("matchzy.help.label.nades"), ".savenade .loadnade .listnades .rethrow .throwindex");
+                PrintHelpLine(player!, "matchzy.help.line", L("matchzy.help.label.nades"), ".rethrow .throwindex .nadespeed .throwsync .follownade .traj");
+                PrintHelpLine(player!, "matchzy.help.line", L("matchzy.help.label.lineups"), ".save .savenade .shownades .hidenades .nades .loadnade .listnades .train .skip .nextnade .prevnade");
+                PrintHelpLine(player!, "matchzy.help.line", L("matchzy.help.label.finder"), ".draw .find .next .prev .results");
                 PrintHelpLine(player!, "matchzy.help.line", L("matchzy.help.label.utility"), ".clear .ff .god .xray .expire .coloredsmokes .traj .impacts .break .cam .timer");
                 PrintHelpLine(player!, "matchzy.help.line", L("matchzy.help.label.teams"), ".ct .t .spec");
                 if (isAdmin)

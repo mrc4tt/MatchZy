@@ -13,6 +13,7 @@ namespace MatchZy
         private void RegisterPracticeExtras()
         {
             RegisterListener<Listeners.OnTick>(OnBotCombatTick);
+            RegisterListener<Listeners.OnTick>(OnFinderTick);
             RegisterListener<Listeners.OnTick>(OnPathReplayTick);
             RegisterNadeTutorial();
             RegisterNadeFollowCam();
@@ -122,6 +123,7 @@ namespace MatchZy
             ResetPracticeRespawn();
             ResetStartRound();
             ClearBotSpawnMarkers();
+            ResetGrenadeFinder();
             ResetPathReplay();
             ResetBotLoadouts();
             ResetRunBoosts();

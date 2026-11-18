@@ -360,6 +360,8 @@ namespace MatchZy
         // Two right clicks within 0.4 s, or Shift + E, stop the recording.
         private void OnStopRecordButtons(CCSPlayerController player, PlayerButtons pressed, PlayerButtons released)
         {
+            if (IsFinderDrawing(player))
+                return;
             if (!isPractice || (pressed & (PlayerButtons.Attack2 | PlayerButtons.Use | PlayerButtons.Speed)) == 0)
                 return;
             if (activePathRecordings.Count == 0 && activeStrat == null && activeSlotRecording == null)
