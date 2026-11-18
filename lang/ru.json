@@ -762,5 +762,8 @@
     "matchzy.pracmisc.follownadeoff": "Камера гранаты выключена. (.follownade ещё раз: только точки лайнапов)",
     "matchzy.pracmisc.follownadereturn": "Прыгните, чтобы вернуться",
     "matchzy.pracmisc.follownadelineup": "Камера гранаты: автоматически при броске с точки лайнапа. Прыгните, чтобы вернуться. (.follownade ещё раз: каждый бросок)",
-    "matchzy.pracmisc.follownadealways": "Камера гранаты: каждый бросок. Прыгните, чтобы вернуться. (.follownade ещё раз: выкл.)"
+    "matchzy.pracmisc.follownadealways": "Камера гранаты: каждый бросок. Прыгните, чтобы вернуться. (.follownade ещё раз: выкл.)",
+    "matchzy.dmg.line": "{green}По: [{0} / {1} попаданий]{default} {red}От: [{2} / {3} попаданий]{default} - {4} ({green}{5} hp{default})",
+    "matchzy.dmg.killed": "{green}По: [{0} / {1} попаданий]{default} {red}От: [{2} / {3} попаданий]{default} - {4} ({red}убит{default})",
+    "matchzy.dmg.dead": "{green}По: [{0} / {1} попаданий]{default} {red}От: [{2} / {3} попаданий]{default} - {4} ({grey}мёртв{default})"
 }

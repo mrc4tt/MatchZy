@@ -762,5 +762,8 @@
     "matchzy.pracmisc.follownadeoff": "Câmera de acompanhar granada desativada. (.follownade de novo: só pontos de lineup)",
     "matchzy.pracmisc.follownadereturn": "Pule para voltar",
     "matchzy.pracmisc.follownadelineup": "Câmera de acompanhar granada: automática para arremessos de um ponto de lineup. Pule para voltar. (.follownade de novo: todo arremesso)",
-    "matchzy.pracmisc.follownadealways": "Câmera de acompanhar granada: todo arremesso. Pule para voltar. (.follownade de novo: desativada)"
+    "matchzy.pracmisc.follownadealways": "Câmera de acompanhar granada: todo arremesso. Pule para voltar. (.follownade de novo: desativada)",
+    "matchzy.dmg.line": "{green}Para: [{0} / {1} acertos]{default} {red}De: [{2} / {3} acertos]{default} - {4} ({green}{5} hp{default})",
+    "matchzy.dmg.killed": "{green}Para: [{0} / {1} acertos]{default} {red}De: [{2} / {3} acertos]{default} - {4} ({red}abatido{default})",
+    "matchzy.dmg.dead": "{green}Para: [{0} / {1} acertos]{default} {red}De: [{2} / {3} acertos]{default} - {4} ({grey}morto{default})"
 }

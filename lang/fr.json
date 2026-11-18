@@ -762,5 +762,8 @@
     "matchzy.pracmisc.follownadeoff": "Caméra de grenade désactivée. (.follownade à nouveau : points de lineup seulement)",
     "matchzy.pracmisc.follownadereturn": "Saute pour revenir",
     "matchzy.pracmisc.follownadelineup": "Caméra de grenade : automatique pour les lancers depuis un point de lineup. Saute pour revenir. (.follownade à nouveau : tous les lancers)",
-    "matchzy.pracmisc.follownadealways": "Caméra de grenade : tous les lancers. Saute pour revenir. (.follownade à nouveau : désactivée)"
+    "matchzy.pracmisc.follownadealways": "Caméra de grenade : tous les lancers. Saute pour revenir. (.follownade à nouveau : désactivée)",
+    "matchzy.dmg.line": "{green}À: [{0} / {1} touches]{default} {red}De: [{2} / {3} touches]{default} - {4} ({green}{5} hp{default})",
+    "matchzy.dmg.killed": "{green}À: [{0} / {1} touches]{default} {red}De: [{2} / {3} touches]{default} - {4} ({red}tué{default})",
+    "matchzy.dmg.dead": "{green}À: [{0} / {1} touches]{default} {red}De: [{2} / {3} touches]{default} - {4} ({grey}mort{default})"
 }

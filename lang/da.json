@@ -762,5 +762,8 @@
     "matchzy.pracmisc.follownadeoff": "Granatkamera fra. (.follownade igen: kun lineup-steder)",
     "matchzy.pracmisc.follownadereturn": "Hop for at komme tilbage",
     "matchzy.pracmisc.follownadelineup": "Granatkamera: automatisk ved kast fra et lineup-sted. Hop for at komme tilbage. (.follownade igen: alle kast)",
-    "matchzy.pracmisc.follownadealways": "Granatkamera: alle kast. Hop for at komme tilbage. (.follownade igen: fra)"
+    "matchzy.pracmisc.follownadealways": "Granatkamera: alle kast. Hop for at komme tilbage. (.follownade igen: fra)",
+    "matchzy.dmg.line": "{green}Til: [{0} / {1} hits]{default} {red}Fra: [{2} / {3} hits]{default} - {4} ({green}{5} hp{default})",
+    "matchzy.dmg.killed": "{green}Til: [{0} / {1} hits]{default} {red}Fra: [{2} / {3} hits]{default} - {4} ({red}dræbt{default})",
+    "matchzy.dmg.dead": "{green}Til: [{0} / {1} hits]{default} {red}Fra: [{2} / {3} hits]{default} - {4} ({grey}død{default})"
 }
