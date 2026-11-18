@@ -30,9 +30,22 @@ namespace MatchZy
             System.Threading.Channels.Channel.CreateUnbounded<QueuedEvent>(new System.Threading.Channels.UnboundedChannelOptions { SingleReader = true });
         private int _eventSenderStarted;
 
+        // The queue itself has no bound, and the failure backoff below only helps against a receiver
+        // that fails: one that answers slowly but successfully lets live events pile up for as long
+        // as the match runs. Past this many waiting events the high-volume live ones are dropped at
+        // the door; match events are always queued.
+        private const int MaxQueuedEventsBeforeLiveDrop = 2000;
+        private int _liveEventsDroppedQueueFull;
+
         private Task EnqueueEvent(MatchZyEvent @event, RemoteLogTarget target, long matchId)
         {
             var sent = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            if (_eventQueue.Reader.Count >= MaxQueuedEventsBeforeLiveDrop && IsHighVolumeLiveEvent(@event))
+            {
+                System.Threading.Interlocked.Increment(ref _liveEventsDroppedQueueFull);
+                sent.TrySetResult();
+                return sent.Task;
+            }
             if (System.Threading.Interlocked.Exchange(ref _eventSenderStarted, 1) == 0)
                 Task.Run(RunEventSenderAsync);
             if (!_eventQueue.Writer.TryWrite(new QueuedEvent(@event, target, matchId, sent)))
@@ -100,6 +113,9 @@ namespace MatchZy
                 {
                     try
                     {
+                        int queueFullDrops = System.Threading.Interlocked.Exchange(ref _liveEventsDroppedQueueFull, 0);
+                        if (queueFullDrops > 0)
+                            Log($"[SendEventAsync] Remote log is too slow: {queueFullDrops} live event(s) dropped with {MaxQueuedEventsBeforeLiveDrop}+ events waiting (match events are still sent).");
                         bool live = IsHighVolumeLiveEvent(item.Event);
                         if (live && DateTime.UtcNow < _dropLiveEventsUntil)
                         {
