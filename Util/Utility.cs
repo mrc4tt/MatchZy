@@ -724,6 +724,7 @@ namespace MatchZy
                 }
                 SyncUnreadyChatReminder();
                 HandleJoinStartCountdown();
+                HandleShortStartCountdown();
 
                 if (readyHintStyle.Value == 0)
                 {
@@ -766,7 +767,7 @@ namespace MatchZy
             string line1 = _rpCtNeed > 0
                 ? ReadySidesPlain(player)
                 : Localizer.ForPlayer(player, "matchzy.hint.waitingforplayers", _rpReady, _rpRequired);
-            string line2 = Localizer.ForPlayer(player, "matchzy.hint.usereadycommand");
+            string line2 = Localizer.ForPlayer(player, readyUseKey.Value ? "matchzy.hint.usereadykey" : "matchzy.hint.usereadycommand");
             if (ShortHandedHintSide(player.TeamNum) is (int shortPresent, int shortRequired))
                 line2 += "\n" + ShortHandedLine(player, player.TeamNum, shortPresent, shortRequired);
             return _rpWaiting.Length > 0
@@ -1145,7 +1146,7 @@ namespace MatchZy
                             if (isReadyNow)
                                 sb.Append($"<br><font class='fontSize-m' color='#37ff8b'>&#10004; {PanelSafe(Localizer.ForPlayer(target, "matchzy.ready.youready"))}</font>");
                             else if (notReadyVisible)
-                                sb.Append($"<br><font class='fontSize-m' color='#ff3b3b'>&#10008; {PanelSafe(Localizer.ForPlayer(target, "matchzy.ready.notready"))}</font>");
+                                sb.Append($"<br><font class='fontSize-m' color='#ff3b3b'>&#10008; {PanelSafe(Localizer.ForPlayer(target, readyUseKey.Value ? "matchzy.ready.notreadyuse" : "matchzy.ready.notready"))}</font>");
                             else
                                 sb.Append("<br><font class='fontSize-m' color='#ff3b3b'>&#160;</font>"); // blink off-frame: keep height
                         }
@@ -2513,6 +2514,10 @@ namespace MatchZy
             {
                 liveRequired = true;
             }
+
+            // The short start countdown (ReadyShortStart.cs) ran out with everyone still ready.
+            if (!isMatchSetup && shortStartNow && gatePlayers > 0 && countOfReadyPlayers >= gatePlayers)
+                liveRequired = true;
 
             if (liveRequired)
             {
@@ -4023,7 +4028,22 @@ namespace MatchZy
                 player.PrintToChat(Localizer.ForPlayer(player, lineKey, label, chunk));
         }
 
-        private void SendAvailableCommandsMessage(CCSPlayerController? player)
+        /// <summary>
+        /// The short practice help: the three lineup commands a new player needs, the everyday
+        /// basics, and where the rest is. Sent by .help and when practice starts.
+        /// </summary>
+        private void SendPracticeQuickHelp(CCSPlayerController player)
+        {
+            string L(string key, params object[] a) => Localizer.ForPlayer(player, key, a);
+            player.PrintToChat($"{chatPrefix} {L("matchzy.help.practice.title")}");
+            player.PrintToChat(L("matchzy.help.quick.save"));
+            player.PrintToChat(L("matchzy.help.quick.show"));
+            player.PrintToChat(L("matchzy.help.quick.train"));
+            PrintHelpLine(player, "matchzy.help.line", L("matchzy.help.label.basics"), ".spawn .bot .nobot .clear .rethrow .last .god .ct .t");
+            player.PrintToChat(L("matchzy.help.quick.more"));
+        }
+
+        private void SendAvailableCommandsMessage(CCSPlayerController? player, bool full = false)
         {
             if (!IsPlayerValid(player))
                 return;
@@ -4035,12 +4055,20 @@ namespace MatchZy
             {
                 // Chat summary in the player's language; the command names themselves are not translated.
                 string L(string key, params object[] a) => Localizer.ForPlayer(player!, key, a);
+                // Plain .help: the short list. ".help more": everything, by group.
+                if (!full)
+                {
+                    SendPracticeQuickHelp(player!);
+                    return;
+                }
                 player!.PrintToChat($"{chatPrefix} {L("matchzy.help.practice.title")}");
                 PrintHelpLine(player!, "matchzy.help.line", L("matchzy.help.label.spawns"), ".spawn .ctspawn .tspawn .bestspawn .worstspawn .spawns");
                 PrintHelpLine(player!, "matchzy.help.line", L("matchzy.help.label.bots"), ".bot .cbot .boost .runboost .nobot .dismiss .dismissall .kevlar .armor .botgun .botshoot .botrespawn .startround");
                 PrintHelpLine(player!, "matchzy.help.line", L("matchzy.help.label.replay"), ".rec .stoprecord .replay .saverec .loadrec .stratrec .strat .strats .createstrat .stratslot");
                 PrintHelpLine(player!, "matchzy.help.line", L("matchzy.help.label.positions"), ".sbp .lbp .botspawn .placebot .showbotspawn .botjiggle");
-                PrintHelpLine(player!, "matchzy.help.line", L("matchzy.help.label.nades"), ".savenade .loadnade .listnades .rethrow .throwindex");
+                PrintHelpLine(player!, "matchzy.help.line", L("matchzy.help.label.nades"), ".rethrow .throwindex .nadespeed .throwsync .follownade .traj");
+                PrintHelpLine(player!, "matchzy.help.line", L("matchzy.help.label.lineups"), ".save .savenade .shownades .hidenades .nades .loadnade .listnades .train .skip .nextnade .prevnade");
+                PrintHelpLine(player!, "matchzy.help.line", L("matchzy.help.label.finder"), ".draw .find .next .prev .results");
                 PrintHelpLine(player!, "matchzy.help.line", L("matchzy.help.label.utility"), ".clear .ff .god .xray .expire .coloredsmokes .traj .impacts .break .cam .timer");
                 PrintHelpLine(player!, "matchzy.help.line", L("matchzy.help.label.teams"), ".ct .t .spec");
                 if (isAdmin)

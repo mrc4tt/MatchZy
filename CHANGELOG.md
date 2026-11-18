@@ -4,8 +4,13 @@ Based on [MatchZy](https://github.com/shobhit-pathak/MatchZy) by Shobhit Pathak,
 
 # 1.0.26
 
-#### November 15, 2026
+#### November 18, 2026
 
+- New `matchzy_ready_use_key` (default true): the use key (E) readies a player up during the ready phase, on top of `.ready`. E only readies, it never un-readies, and it does nothing for spectators, coaches, in join ready mode or while a center menu is open. The ready panel and the classic center text say "press E or type .ready".
+- A match without listed players and without `players_per_team` (`.matchsetup`, or teams with `"players": "any"`) now starts when everyone on T and CT is ready and both sides have the same number of players. The side needs as many players as the larger of the two sides has (at most the mode's team size), so a 4v4 starts once all 8 are ready. Before, each side waited for 5 players and only an admin's `.forcestart` started the match. A match config that sets `players_per_team` or lists the players is unchanged, and so is join ready mode.
+- New `matchzy_ready_short_start_delay` (default 20, 0 = off): when everyone on T and CT is ready but there are fewer players than the match waits for, the chat counts down and the match starts as it stands, without an admin or `.forceready`. In a pug that is fewer than `matchzy_minimum_ready_required` players (10), so a 3v3, 4v4 or 4v5 now starts by itself; before, it sat in warmup until an admin used `.forcestart`. In a match without listed players and without `players_per_team` it is uneven sides (4v5). `.unready` or a player joining a side stops the countdown. The sides may differ by at most `matchzy_forceready_max_missing` players (default 1), so a 3v5 still waits.
+- The round-end damage report uses the FACEIT layout, `To: [87 / 3 hits] From: [100 / 4 hits] - name (13 hp)`, with the dealt part in green and the taken part in red. A dead enemy shows `(killed)` when you got the kill and `(dead)` otherwise. The lines are sorted by damage dealt and are in each player's own language (they were English only).
+- The ready-up start check no longer fails on a player who has no ready entry yet.
 - Spectator coach (mode 3): at halftime and overtime the coach no longer briefly follows, sees and talks to the other team between the last round of the half and the side swap. MatchZy swaps its side data at round end, but the engine moves the players only at the next round start; the coach now follows the engine's sides.
 - Spectator coach: unloading or reloading MatchZy puts back sv_coaching_enabled, mp_forcecamera, bot_controllable, the coach comm patch and the coach's own game settings. Left on, sv_coaching_enabled could crash the next round start once MatchZy's guard was gone.
 - Spectator coach: a coach who disconnects no longer leaves the engine coach flag behind for the next player in that slot.
@@ -92,6 +97,20 @@ Based on [MatchZy](https://github.com/shobhit-pathak/MatchZy) by Shobhit Pathak,
 - Chat translations in Brazilian Portuguese (`pt-BR`) and Turkish (`tr`). Each player sees their own language once they pick it with `!lang`.
 - Leaving practice mode left terrorists with the full practice grenade set and an AK-47 on every spawn: the reset of `mp_t_default_grenades` and `mp_t_default_primary` was missing a space and never ran. The flashbang and per-type grenade limits from practice are now reset too.
 - Unloading MatchZy while practice was on (a host switching the server to retakes, deathmatch or prefire without a map change) kept practice players in noclip and kept respawn on death on. Noclip, `mp_respawn_on_death_ct/t`, `mp_ignore_round_win_conditions` and `mp_respawn_immunitytime` are now reset on unload.
+- Practice lineups: `.save` (also `.savelast`, `.sl`) saves the grenade you just threw as a lineup, with the grenade type, how it was thrown (jumpthrow, step, run, which mouse button) and the place the throw started from. `.save <name>` gives it a name. `.savenade` now also stores how the lineup was thrown when you have just thrown it.
+- Practice lineups: `.shownades` marks are the grenade of the lineup's type with a square on the floor, and the place each lineup lands is marked as well. Aim at a mark and press E to stand on the throw spot with the grenade in hand; E on a landing mark takes you to where it is thrown from (a menu when several lineups land there). Marks behind a wall cannot be picked.
+- Practice lineups: hold E on one of your own lineup marks to rename it, give it a description, put it in a set or delete it. The menu is moved with W / S and picked with E.
+- Practice lineups: standing on a lineup spot shows a ring for each lineup thrown from there, where it is aimed: red, and green when the crosshair is in it. Only that player sees them. `matchzy_practice_aim_rings` (default true). This replaces the aim target model and the hint box of the lineup trainer.
+- Practice lineups: a throw of a loaded lineup is compared with the saved one. Chat says how far from the saved landing it came down and, when it differed, why (aim moved, not on the spot, jump and throw not together).
+- Practice lineups: `matchzy_practice_aim_lock` (default true): with the pin pulled on the spot of a loaded lineup, an aim within one degree of the saved aim is put back on it exactly.
+- Practice lineups: `.train [type|set]` takes you through your saved lineups one by one and judges each throw (PERFECT, GOOD, MISS); `.skip` skips one.
+- (Beta) Grenade finder: `.draw` marks a box where a grenade should land and `.find` works out lineups that land in it from the area around you, for the grenade you hold (smoke, decoy, HE, flashbang, molotov). `.next` / `.prev` and E on a result go through them; `.find check` first throws them for real, hidden. Needs the MatchZy CounterStrikeSharp build. `matchzy_practice_finder_enabled` (default true) switches it off.
+- Practice: `.throwsync [names]` throws several saved lineups so that they go off together, `.nadespeed <10-500|off>` slows or speeds up time while your grenade is in the air, `.nextnade` / `.prevnade [type]` step through your lineups.
+- Practice: the grenade follow camera stays closer behind the grenade and pulls back when it has landed; pressing Inspect (F) while your grenade is in the air starts it.
+- Practice: `.help` shows a short list (save, show, train and the everyday commands); `.help more` shows every command by group. The same short list is shown when practice starts.
+- Practice lineups: a lineup spot that lies inside a kerb or a wall no longer leaves you stuck after the teleport: you are put on the nearest place a player fits, and chat says so.
+- `.delnade` of a lineup you had loaded also puts it away: its line on screen and its aim ring go, and E no longer takes you back to it.
+- New convars `matchzy_practice_autoshow_lineups` (default false: show a player's lineup marks without `.shownades`) and `matchzy_practice_debug_log` (default false: a debug log of throws and searches for fault finding).
 
 # 1.0.25
 

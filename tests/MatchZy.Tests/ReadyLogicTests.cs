@@ -27,6 +27,41 @@ public class ReadyLogicTests
         => Assert.Equal(expected, ReadyLogic.RequiredOnSide(perTeam, roster, floor));
 
     [Theory]
+    [InlineData(4, 4, 5, 4)]  // 4v4 without rosters: each side needs 4
+    [InlineData(4, 5, 5, 5)]  // 4v5: the short side still needs 5
+    [InlineData(5, 4, 5, 5)]
+    [InlineData(6, 6, 5, 5)]  // never above players_per_team
+    [InlineData(0, 0, 5, 0)]  // nobody there: RequiredOnSide keeps players_per_team
+    [InlineData(3, 0, 5, 3)]  // against a bot team: the humans on the side
+    public void OpenSideSize(int own, int other, int perTeam, int expected)
+        => Assert.Equal(expected, ReadyLogic.OpenSideSize(own, other, perTeam));
+
+    [Theory]
+    [InlineData(4, 5, 1, true)]
+    [InlineData(5, 4, 1, true)]
+    [InlineData(3, 4, 1, true)]
+    [InlineData(3, 5, 1, false)]   // two short
+    [InlineData(3, 5, 2, true)]
+    [InlineData(1, 5, -1, true)]   // -1: any difference
+    [InlineData(4, 4, 1, false)]   // even sides start at once, no countdown
+    [InlineData(0, 1, 1, false)]   // an empty side never starts
+    [InlineData(4, 5, 0, false)]   // 0: even teams only
+    public void UnevenSides(int side1, int side2, int maxMissing, bool expected)
+        => Assert.Equal(expected, ReadyLogic.UnevenSides(side1, side2, maxMissing));
+
+    [Theory]
+    [InlineData(4, 4, 1, true)]
+    [InlineData(3, 3, 0, true)]
+    [InlineData(4, 5, 1, true)]
+    [InlineData(4, 5, 0, false)]
+    [InlineData(3, 5, 1, false)]
+    [InlineData(1, 5, -1, true)]
+    [InlineData(0, 4, 1, false)]   // one side empty
+    [InlineData(2, 0, -1, false)]
+    public void ShortSides(int side1, int side2, int maxMissing, bool expected)
+        => Assert.Equal(expected, ReadyLogic.ShortSides(side1, side2, maxMissing));
+
+    [Theory]
     [InlineData(false, 1, 5, 0, 0)]  // not in the match config
     [InlineData(true, 0, 5, 0, 0)]
     [InlineData(true, 1, 5, 0, 1)]   // panel default 1: one ready player is enough

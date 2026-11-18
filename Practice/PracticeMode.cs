@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Drawing;
 using System.Text.Json;
 using CounterStrikeSharp.API;
@@ -387,13 +388,6 @@ namespace MatchZy
             }, TimerFlags.STOP_ON_MAPCHANGE);
         }
 
-        private static readonly string[] PracticeHelpKeys =
-        {
-            "matchzy.prac.help.spawns", "matchzy.prac.help.bots", "matchzy.prac.help.botpositions",
-            "matchzy.prac.help.nades", "matchzy.prac.help.nadethrow", "matchzy.prac.help.utility",
-            "matchzy.prac.help.positions", "matchzy.prac.help.sides", "matchzy.prac.help.full"
-        };
-
         /// <summary>
         /// Prints the short practice command list to one player. Sent to everyone when practice
         /// starts, and to a player who joins while practice is already running (they used to get
@@ -403,8 +397,9 @@ namespace MatchZy
         {
             if (helpPlayer == null || !helpPlayer.IsValid || helpPlayer.IsBot || helpPlayer.IsHLTV)
                 return;
-            foreach (var helpKey in PracticeHelpKeys)
-                helpPlayer.PrintToChat($" {Localizer.ForPlayer(helpPlayer, helpKey)}");
+            // The short list (2026-11-17): nine lines of command names were more than a new
+            // player reads. ".help more" has them all.
+            SendPracticeQuickHelp(helpPlayer);
         }
 
         public void GetSpawns()
@@ -579,6 +574,18 @@ namespace MatchZy
                 string activeWeapon = playerPawn.WeaponServices?.ActiveWeapon?.Value?.DesignerName ?? "";
                 string nadeType = GetNadeType(activeWeapon);
 
+                // "Throw it, then .savenade": after the throw the grenade is often gone from the
+                // hand. The throw says which grenade it was. Spot and aim stay what the player has
+                // when they save (what they see is what is saved): taking them from the throw
+                // instead put the aim mark somewhere else than the crosshair.
+                var justThrown = RecentThrowNear(player, playerPos, nadeType);
+                if (justThrown != null && nadeType == "")
+                    nadeType = justThrown.Type switch
+                    {
+                        "smoke" => "Smoke", "flash" => "Flash", "hegrenade" => "HE", "decoy" => "Decoy",
+                        "molotov" => "Molly", "incendiary" => "Incendiary", _ => "",
+                    };
+
                 // Define the file path
                 string savednadesfileName = MatchZyCfgRel("savednades.json");
                 string savednadesPath = Path.Join(Server.GameDirectory + "/csgo/cfg", savednadesfileName);
@@ -643,12 +650,18 @@ namespace MatchZy
                         { "Throw", lineupThrow },
                     };
 
+                    // The throw itself, when the player just threw this lineup: where the game let
+                    // go of the grenade and how fast. With it the lineup can be thrown again exactly
+                    // whatever the throw was (walk, crouch, right click), its landing calculated and
+                    // its throw type read off the numbers instead of taken from a typed word.
+                    AddLastThrowToLineup(player, savedNadesDict[playerSteamID][lineupName], nadeType, playerPos);
+
                     // Serialize the updated dictionary back to JSON
                     string updatedJson = JsonSerializer.Serialize(savedNadesDict, new JsonSerializerOptions { WriteIndented = true });
 
                     // Write the updated JSON content back to the file
                     File.WriteAllText(savednadesPath, updatedJson);
-                    RefreshNadeMarkersIfActive(player);
+                    ShowNadeMarksAfterSave(player);
 
                     PrintToPlayerChat(player, Localizer.ForPlayer(player, "matchzy.pm.lineupsavedsucces", lineupName));
                     PrintLocalizedToAll("matchzy.pm.playersavedlineup", player.PlayerName, $"{lineupName} {playerPos} {playerAngle}");
@@ -749,6 +762,7 @@ namespace MatchZy
                 if (deleted.Count > 0)
                 {
                     File.WriteAllText(savednadesPath, JsonSerializer.Serialize(savedNadesDict, new JsonSerializerOptions { WriteIndented = true }));
+                    ForgetDeletedLineups(player, deleted);
                     RefreshNadeMarkersIfActive(player);
                     ReplyToUserCommand(player, Localizer.ForPlayer(player, "matchzy.pm.nadesdeleted", string.Join(", ", deleted)));
                 }
@@ -1045,7 +1059,8 @@ namespace MatchZy
                                         _ => "weapon_smokegrenade",
                                     };
                                     TeleportAndClearPose(player, loadedPlayerPos, loadedPlayerAngle, wantDucked: false, deployWeapon: nadeWeapon, giveDeploy: true);
-                                    ShowNadeTutorial(player, nearestName, nadeType, lineupInfo.GetValueOrDefault("Throw") ?? "", loadedPlayerPos, loadedPlayerAngle);
+                                    ShowNadeTutorial(player, nearestName, nadeType, LineupThrowLabel(lineupInfo, loadedPlayerPos), loadedPlayerPos, loadedPlayerAngle,
+                                        lineupInfo.GetValueOrDefault("NadePos") ?? "", lineupInfo.GetValueOrDefault("NadeVel") ?? "");
 
                                     // Extract description, if available
                                     string? lineupDesc = lineupInfo.ContainsKey("Desc") ? lineupInfo["Desc"] : null;
@@ -3228,6 +3243,82 @@ namespace MatchZy
             }
         }
 
+        // Extra keys (strings, as every value in the file; readers ignore keys they do not know):
+        // NadePos / NadeVel = the projectile at release, ThrowFrom / ThrowAim = the player then,
+        // Duck = crouch amount, ViewHeight = their eye height on the spot (lower on slopes).
+        // The player's most recent throw from about here (within three minutes), of the grenade
+        // type given ("" = any). Null when there is none.
+        private GrenadeThrownData? RecentThrowNear(CCSPlayerController player, Vector playerPos, string nadeType)
+        {
+            if (!player.UserId.HasValue || !lastGrenadesData.TryGetValue(player.UserId.Value, out var throws) || throws.Count == 0)
+                return null;
+            string wanted = nadeType switch
+            {
+                "Smoke" => "smoke", "Flash" => "flash", "HE" => "hegrenade", "Decoy" => "decoy",
+                "Molly" => "molotov", "Incendiary" => "incendiary", _ => "",
+            };
+            for (int i = throws.Count - 1; i >= 0 && i >= throws.Count - 5; i--)
+            {
+                var t = throws[i];
+                if ((wanted != "" && t.Type != wanted) || (DateTime.Now - t.ThrownTime).TotalSeconds > 180)
+                    continue;
+                float dx = t.PlayerPosition.X - playerPos.X, dy = t.PlayerPosition.Y - playerPos.Y;
+                if (dx * dx + dy * dy <= 250f * 250f)
+                    return t;
+            }
+            return null;
+        }
+
+        private void AddLastThrowToLineup(CCSPlayerController player, Dictionary<string, string> lineup, string nadeType, Vector playerPos)
+        {
+            try
+            {
+                var pawn = player.PlayerPawn?.Value;
+                if (pawn != null && pawn.IsValid && (pawn.Flags & (uint)PlayerFlags.FL_ONGROUND) != 0)
+                    lineup["ViewHeight"] = pawn.ViewOffset.Z.ToString("0.###", CultureInfo.InvariantCulture);
+                if (!player.UserId.HasValue || !lastGrenadesData.TryGetValue(player.UserId.Value, out var throws) || throws.Count == 0)
+                    return;
+                string wanted = nadeType switch
+                {
+                    "Smoke" => "smoke", "Flash" => "flash", "HE" => "hegrenade", "Decoy" => "decoy",
+                    "Molly" => "molotov", "Incendiary" => "incendiary", _ => "",
+                };
+                for (int i = throws.Count - 1; i >= 0 && i >= throws.Count - 5; i--)
+                {
+                    var t = throws[i];
+                    // A recent throw of the same grenade from about here (a run-up ends a little away).
+                    if ((wanted != "" && t.Type != wanted) || (DateTime.Now - t.ThrownTime).TotalSeconds > 180)
+                        continue;
+                    float dx = t.PlayerPosition.X - playerPos.X, dy = t.PlayerPosition.Y - playerPos.Y;
+                    if (dx * dx + dy * dy > 250f * 250f)
+                        continue;
+                    // Only the throw of this very lineup: thrown with the aim that is being saved.
+                    // (A throw with another aim would give the lineup a landing it does not have.)
+                    var aimNow = player.PlayerPawn?.Value?.EyeAngles;
+                    if (aimNow == null)
+                        return;
+                    float dPitch = Math.Abs(aimNow.X - t.PlayerAngle.X), dYaw = Math.Abs(aimNow.Y - t.PlayerAngle.Y);
+                    if (dYaw > 180f) dYaw = 360f - dYaw;
+                    if (dPitch > 0.5f || dYaw > 0.5f)
+                        return;
+                    lineup["NadePos"] = LineupFormat.Format(t.Position.X, t.Position.Y, t.Position.Z);
+                    lineup["NadeVel"] = LineupFormat.Format(t.Velocity.X, t.Velocity.Y, t.Velocity.Z);
+                    lineup["ThrowFrom"] = LineupFormat.Format(t.PlayerPosition.X, t.PlayerPosition.Y, t.PlayerPosition.Z);
+                    // How it was thrown, as .save notes it (jumpthrow, step, run, which button).
+                    if ((!lineup.TryGetValue("Throw", out var given) || string.IsNullOrWhiteSpace(given))
+                        && lastThrownInfo.TryGetValue(player.Slot, out var how) && (DateTime.Now - how.At).TotalSeconds <= 180)
+                        lineup["Throw"] = how.Throw;
+                    lineup["ThrowAim"] = LineupFormat.Format(t.PlayerAngle.X, t.PlayerAngle.Y, 0f);
+                    lineup["Duck"] = t.DuckAmount.ToString("0.##", CultureInfo.InvariantCulture);
+                    return;
+                }
+            }
+            catch (Exception e)
+            {
+                Log($"[SaveNade] throw data not added: {e.Message}");
+            }
+        }
+
         // Store a recorded throw into the per-player history (source for .last / .back / .rt /
         // .throwindex). Shared by the normal AbsVelocity path and the position-delta recovery
         // path in OnEntitySpawnedHandler.
@@ -5020,6 +5111,8 @@ namespace MatchZy
         private void OnSpawnMarkerButtonHandler(CCSPlayerController player, PlayerButtons pressed, PlayerButtons released)
         {
             if (!spawnMarkersActive || !isPractice)
+                return;
+            if (IsFinderDrawing(player))
                 return;
             if ((pressed & PlayerButtons.Use) == 0)
                 return;

@@ -39,13 +39,28 @@ namespace MatchZy
             public int TrailTick;
             // The pawn's own move type before the camera (.noclip stays on after it).
             public MoveType_t PrevMove = MoveType_t.MOVETYPE_WALK;
+            // The camera takes over only once the grenade is a little away from the thrower
+            // (until then the player sees their own throw as usual).
+            public bool Following;
+            public uint PrevFov;
+            public bool FovSet;
+            public bool Smoke;
         }
 
-        private const float NfDistFollow = 140.0f;   // behind the grenade while it flies
-        private const float NfPitchFollow = -20.0f;
-        private const float NfDistLanded = 600.0f;   // backed off once it lands
-        private const float NfPitchLanded = -10.0f;
-        private const float NfFollowLerp = 0.15f;    // per tick, lower = smoother / more lag
+        // Set up as lineup workshop maps have it: close behind the grenade in flight, far back
+        // once it has landed, a wide view, the first look slightly from above.
+        private const float NfDistFollow = 108.0f;   // behind the grenade while it flies
+        private const float NfStartFactor = 1.25f;   // takes over when the grenade is this many follow distances away
+        private const float NfStartPitch = 25.0f;    // first look: from above, down at the grenade
+        private const uint NfFov = 95;
+        private const float NfSmokeLift = 32.0f;     // a landed smoke is looked at a little above the floor
+        // 0: the eye (not the feet) is put on the line behind the grenade, so the grenade sits on
+        // the crosshair whichever way the player looks.
+        private const float NfPitchFollow = 0.0f;
+        private const float NfDistLanded = 608.0f;   // backed off once it lands
+        private const float NfPitchLanded = 0.0f;
+        private const float NfMinDist = 44.0f;       // pulled in no closer than this when a wall is in the way
+        private const float NfFollowLerp = 0.3125f;  // per tick (20 x the tick time), lower = smoother / more lag
         private const float NfLandedSeconds = 8.0f;
         private const float NfMaxSeconds = 30.0f;
         private const float NfStillAtCamSq = 96.0f * 96.0f; // a tick of falling is far less    // hard stop (a stuck decoy, a lost projectile)
@@ -60,6 +75,9 @@ namespace MatchZy
         private void RegisterNadeFollowCam()
         {
             RegisterListener<Listeners.OnTick>(OnNadeFollowTick);
+            RegisterListener<Listeners.OnTick>(OnNadeSpeedTick);
+            RegisterLookMenu();
+            RegisterSpotRings();
         }
 
         [ConsoleCommand("css_follownade", "Practice: the camera follows your thrown grenade (toggle)")]
@@ -87,18 +105,31 @@ namespace MatchZy
         }
 
         // From OnEntitySpawnedHandler (next frame after the projectile spawned, thrower resolved).
-        private void TryStartNadeFollow(CCSPlayerController player, CBaseCSGrenadeProjectile projectile)
+        // The last grenade each player threw: the inspect key (F) while it is still in the air
+        // puts the camera on it, whatever the mode. No bind to set up, no chat command.
+        private readonly Dictionary<ulong, uint> _nadeFollowLast = new();
+
+        private void TryStartNadeFollow(CCSPlayerController player, CBaseCSGrenadeProjectile projectile, bool byKey = false)
         {
             ulong id = player.SteamID;
             if (!isPractice || _nadeFollows.ContainsKey(id))
                 return;
+            if (!byKey && projectile.IsValid)
+                _nadeFollowLast[id] = projectile.EntityHandle.Raw;
             // A throw during a recording (.rec, .stratrec, .stratslot or their countdown) would put
             // the camera flight into the recorded path.
             if (IsPracticeRecordingFor(id))
                 return;
             var mode = _nadeFollowEnabled.GetValueOrDefault(id, NadeFollowMode.Lineup);
             bool onLineupSpot = _jtViews.TryGetValue(id, out var view) && JtGroupAlive(id, view.OnSpot);
-            if (mode == NadeFollowMode.Off || (mode == NadeFollowMode.Lineup && !onLineupSpot))
+            // A grenade finder lineup counts as a lineup spot too (the throw may be a running one).
+            var here = player.PlayerPawn.Value?.AbsOrigin;
+            if (!onLineupSpot && here != null && finderArmed.TryGetValue(player.Slot, out var armedFinder))
+            {
+                float fdx = here.X - armedFinder.Plan.Feet.X, fdy = here.Y - armedFinder.Plan.Feet.Y;
+                onLineupSpot = fdx * fdx + fdy * fdy < 200f * 200f;
+            }
+            if (!byKey && (mode == NadeFollowMode.Off || (mode == NadeFollowMode.Lineup && !onLineupSpot)))
                 return;
             var pawn = player.PlayerPawn.Value;
             var o = pawn?.AbsOrigin;
@@ -128,11 +159,33 @@ namespace MatchZy
                 view.HintShown = false;
                 view.HintFor = -1;
             }
+            f.Smoke = projectile.DesignerName == "smokegrenade_projectile";
+        }
+
+        // The grenade is far enough away: the pawn becomes the camera (noclip, invisible, wide
+        // view) right behind and above the grenade, looking down at it along the throw direction.
+        private void BeginNadeFollowFlight(CCSPlayerController player, CCSPlayerPawn pawn, NadeFollow f, Vector grenade)
+        {
+            f.Following = true;
+            f.PrevMove = pawn.MoveType;
             pawn.MoveType = MoveType_t.MOVETYPE_NOCLIP;
             pawn.ActualMoveType = MoveType_t.MOVETYPE_NOCLIP;
             Utilities.SetStateChanged(pawn, "CBaseEntity", "m_MoveType");
             SetNadeFollowVisible(pawn, false, f.WeaponRaw);
-            player.PrintToCenter(Localizer.ForPlayer(player, "matchzy.pracmisc.follownadereturn"));
+            f.PrevFov = player.DesiredFOV;
+            f.FovSet = true;
+            player.DesiredFOV = NfFov;
+            Utilities.SetStateChanged(player, "CBasePlayerController", "m_iDesiredFOV");
+            float yaw = pawn.EyeAngles.Y;
+            double y = yaw * Math.PI / 180.0, p = NfStartPitch * Math.PI / 180.0;
+            f.CamPos = new Vector(
+                grenade.X - (float)(Math.Cos(p) * Math.Cos(y)) * NfDistFollow,
+                grenade.Y - (float)(Math.Cos(p) * Math.Sin(y)) * NfDistFollow,
+                grenade.Z + (float)Math.Sin(p) * NfDistFollow - pawn.ViewOffset.Z);
+            // Only a teleport with an angle turns the player's view (hard rule 10); the tilted
+            // body does not matter, the pawn is invisible until the camera ends.
+            pawn.Teleport(f.CamPos, new QAngle(NfStartPitch, yaw, 0), new Vector(0, 0, 0));
+            player.PrintToCenterAlert(Localizer.ForPlayer(player, "matchzy.pracmisc.follownadereturn"));
         }
 
         // The weapon is the one stored at the start (by raw handle), so the stop restores the same
@@ -158,6 +211,33 @@ namespace MatchZy
 
         public void OnNadeFollowTick()
         {
+            if (_nadeFollowLast.Count > 0)
+            {
+                try
+                {
+                    foreach (var (who, raw) in _nadeFollowLast.ToList())
+                    {
+                        var thrown = new CHandle<CBaseCSGrenadeProjectile>(raw).Value;
+                        if (!isPractice || thrown == null || !thrown.IsValid)
+                        {
+                            _nadeFollowLast.Remove(who); // landed and gone, or went off
+                            continue;
+                        }
+                        if (_nadeFollows.ContainsKey(who))
+                            continue;
+                        var presser = Utilities.GetPlayerFromSteamId(who);
+                        if (presser == null || !presser.IsValid || !presser.PawnIsAlive || (presser.Buttons & PlayerButtons.Inspect) == 0)
+                            continue;
+                        _nadeFollowLast.Remove(who);
+                        TryStartNadeFollow(presser, thrown, byKey: true);
+                    }
+                }
+                catch (Exception e)
+                {
+                    Log($"[NadeFollow] key: {e.Message}");
+                    _nadeFollowLast.Clear();
+                }
+            }
             if (_nadeFollows.Count == 0)
                 return;
             try
@@ -172,6 +252,34 @@ namespace MatchZy
                         StopNadeFollow(player, id, putBack: player != null && player.IsValid && player.PawnIsAlive);
                         continue;
                     }
+                    if (!f.Following)
+                    {
+                        var early = new CHandle<CBaseCSGrenadeProjectile>(f.ProjectileRaw).Value;
+                        var eo = pawn.AbsOrigin;
+                        if (early == null || !early.IsValid || early.AbsOrigin == null || eo == null || pawn.MoveType == MoveType_t.MOVETYPE_NONE)
+                        {
+                            _nadeFollows.Remove(id); // gone before the camera took over: nothing to undo
+                            continue;
+                        }
+                        var ga = early.AbsOrigin;
+                        float ex = ga.X - eo.X, ey = ga.Y - eo.Y, ez = ga.Z - (eo.Z + pawn.ViewOffset.Z);
+                        float limit = NfDistFollow * NfStartFactor;
+                        if (ex * ex + ey * ey + ez * ez < limit * limit && now - f.StartedAt < 1.0f)
+                            continue;
+                        // Back to where they stood when the camera took over is wrong for a jumpthrow
+                        // (in the air) or a running throw: a finder lineup has its own spot.
+                        if (finderArmed.TryGetValue(player.Slot, out var armedNow))
+                        {
+                            float sx = f.StartPos.X - armedNow.Plan.Feet.X, sy = f.StartPos.Y - armedNow.Plan.Feet.Y;
+                            if (sx * sx + sy * sy < 200f * 200f)
+                            {
+                                f.StartPos = new Vector(armedNow.Plan.Feet.X, armedNow.Plan.Feet.Y, armedNow.Plan.Feet.Z + 0.1f);
+                                f.StartAng = new QAngle(armedNow.Plan.Pitch, armedNow.Plan.Yaw, 0);
+                            }
+                        }
+                        BeginNadeFollowFlight(player, pawn, f, new Vector(ga.X, ga.Y, ga.Z));
+                        continue;
+                    }
                     // Something else changed the move type: the camera is over. A practice teleport
                     // (.loadnade, .back) moved the pawn away from the camera spot: it stays where that
                     // put it. Still at the camera spot (.noclip turned off, a freeze): put it back where
@@ -183,7 +291,9 @@ namespace MatchZy
                         StopNadeFollow(player, id, putBack: atCam);
                         continue;
                     }
-                    bool jump = (player.Buttons & PlayerButtons.Jump) != 0 && now - f.StartedAt > 0.4f;
+                    // Jump, a click or use ends it (the throw's own click is over after 0.4 s).
+                    bool jump = (player.Buttons & (PlayerButtons.Jump | PlayerButtons.Attack | PlayerButtons.Attack2 | PlayerButtons.Use)) != 0
+                        && now - f.StartedAt > 0.4f;
                     bool expired = now - f.StartedAt > NfMaxSeconds || (f.LandedAt >= 0 && now - f.LandedAt > NfLandedSeconds);
                     if (jump || expired)
                     {
@@ -195,6 +305,9 @@ namespace MatchZy
                     f.PitchOffset += (f.TargetPitchOffset - f.PitchOffset) * 0.2f;
 
                     Vector? target = f.Landing;
+                    // The pawn is given the grenade's own speed while it flies: the client then
+                    // carries the view on between ticks instead of stepping (smoother to watch).
+                    Vector camVelocity = new(0, 0, 0);
                     var proj = new CHandle<CBaseCSGrenadeProjectile>(f.ProjectileRaw).Value;
                     if (proj != null && proj.IsValid && proj.AbsOrigin != null && f.Landing == null)
                     {
@@ -202,6 +315,7 @@ namespace MatchZy
                         var gp = new Vector(g.X, g.Y, g.Z);
                         var v = proj.AbsVelocity;
                         float speed = (float)Math.Sqrt(v.X * v.X + v.Y * v.Y + v.Z * v.Z);
+                        camVelocity = new Vector(v.X, v.Y, v.Z);
                         if (f.LastNadePos != null && ++f.TrailTick % 3 == 0)
                             DrawNadeFollowTrail(f.LastNadePos, gp);
                         if (f.TrailTick % 3 == 0)
@@ -224,17 +338,29 @@ namespace MatchZy
                     }
                     if (target == null)
                         continue;
+                    if (f.Smoke && f.Landing != null)
+                        target = new Vector(target.X, target.Y, target.Z + NfSmokeLift);
 
                     // Behind the target along the player's own view (they can look around).
                     var eye = pawn.EyeAngles;
                     double yaw = eye.Y * Math.PI / 180.0, pitch = (eye.X + f.PitchOffset) * Math.PI / 180.0;
                     float fx = (float)(Math.Cos(pitch) * Math.Cos(yaw)), fy = (float)(Math.Cos(pitch) * Math.Sin(yaw)), fz = (float)-Math.Sin(pitch);
-                    float dx = target.X - fx * f.Dist, dy = target.Y - fy * f.Dist, dz = target.Z - fz * f.Dist;
+                    float dist = f.Dist;
+                    // A wall between the grenade and the camera: pull the camera in front of it
+                    // (a noclip view inside a wall shows the map from the outside).
+                    if (HasCssTraceApi)
+                    {
+                        var from = new System.Numerics.Vector3(target.X, target.Y, target.Z + 2f);
+                        var to = from - new System.Numerics.Vector3(fx, fy, fz) * dist;
+                        if (FinderTrace(from, to, out _, out _, out float frac, pawn))
+                            dist = Math.Max(NfMinDist, dist * frac - 10f);
+                    }
+                    float dx = target.X - fx * dist, dy = target.Y - fy * dist, dz = target.Z + 2f - fz * dist - pawn.ViewOffset.Z;
                     f.CamPos = new Vector(
                         f.CamPos.X + (dx - f.CamPos.X) * NfFollowLerp,
                         f.CamPos.Y + (dy - f.CamPos.Y) * NfFollowLerp,
                         f.CamPos.Z + (dz - f.CamPos.Z) * NfFollowLerp);
-                    pawn.Teleport(f.CamPos, null, new Vector(0, 0, 0));
+                    pawn.Teleport(f.CamPos, null, camVelocity);
                 }
             }
             catch (Exception e)
@@ -287,9 +413,16 @@ namespace MatchZy
         {
             if (!_nadeFollows.Remove(id, out var f))
                 return;
+            if (f.FovSet && player != null && player.IsValid)
+            {
+                player.DesiredFOV = f.PrevFov;
+                Utilities.SetStateChanged(player, "CBasePlayerController", "m_iDesiredFOV");
+            }
             var pawn = player != null && player.IsValid ? player.PlayerPawn.Value : null;
             if (pawn == null || !pawn.IsValid)
                 return;
+            if (!f.Following)
+                return; // the camera never took over: nothing was changed
             // The camera's own noclip is still on (not turned off by .noclip or a freeze meanwhile):
             // only then is a previous .noclip put back after the teleport.
             bool ownNoclip = pawn.MoveType == MoveType_t.MOVETYPE_NOCLIP;
@@ -372,6 +505,7 @@ namespace MatchZy
                     }
                 }
             _nadeFollows.Clear();
+            _nadeFollowLast.Clear();
             if (mapStart)
                 _nadeFollowEnabled.Clear();
         }

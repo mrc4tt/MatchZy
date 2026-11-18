@@ -30,6 +30,9 @@ namespace MatchZy
             public string Name = "";
             public string Type = "";
             public string Throw = "";
+            public string NadePos = "", NadeVel = ""; // the release itself, when the file has it
+            public string Landing = ""; // where it ended when it was saved (a check for the calculation)
+            public string Set = "";     // the player's own grouping, for .train <set>
             public string Desc = "";
             public bool Global;
         }
@@ -43,6 +46,7 @@ namespace MatchZy
             public int Current;
             public CBaseModelEntity? Glow;         // grenade model (or the trainer ghost) glowing through walls
             public bool Ghost;                     // Glow is the trainer ghost: fixed green, not the type color
+            public int Side;                       // 0, 1, 2...: place among the markers that share this spot
         }
 
         // Lineups within this radius of each other share one marker.
@@ -115,7 +119,8 @@ namespace MatchZy
         {
             "flash" => "weapons/models/grenade/flashbang/weapon_flashbang.vmdl",
             "he" => "weapons/models/grenade/hegrenade/weapon_hegrenade.vmdl",
-            "molly" => "weapons/models/grenade/molotov/weapon_molotov.vmdl",
+            "molly" or "molotov" => "weapons/models/grenade/molotov/weapon_molotov.vmdl",
+            "incendiary" => "weapons/models/grenade/incendiary/weapon_incendiarygrenade.vmdl",
             "decoy" => "weapons/models/grenade/decoy/weapon_decoy.vmdl",
             _ => "weapons/models/grenade/smokegrenade/weapon_smokegrenade.vmdl",
         };
@@ -127,12 +132,17 @@ namespace MatchZy
             {
                 Vector p = lu.Pos.PlayerPosition;
                 NadeMarkerGroup? g = null;
+                int side = 0;
                 foreach (var grp in groups)
                 {
                     float dx = grp.Pos.X - p.X, dy = grp.Pos.Y - p.Y, dz = grp.Pos.Z - p.Z;
-                    if (dx * dx + dy * dy + dz * dz <= NadeGroupRadiusSq) { g = grp; break; }
+                    if (dx * dx + dy * dy + dz * dz > NadeGroupRadiusSq) continue;
+                    // The same spot with another grenade type is its own marker, next to this one
+                    // (one marker that only changed colour did not show what else is thrown here).
+                    if (!LandingMarksByHand || string.Equals(grp.Lineups[0].Type, lu.Type, StringComparison.OrdinalIgnoreCase)) { g = grp; break; }
+                    side++;
                 }
-                if (g == null) { g = new NadeMarkerGroup { Pos = p }; groups.Add(g); }
+                if (g == null) { g = new NadeMarkerGroup { Pos = p, Side = side }; groups.Add(g); }
                 g.Lineups.Add(lu);
             }
             return groups;
@@ -153,6 +163,7 @@ namespace MatchZy
             "normal" or "normalthrow" => "Normal Throw",
             "jump" or "jumpthrow" or "jt" => "Jumpthrow",
             "run" or "runthrow" => "Run Throw",
+            "runjump" or "runjumpthrow" or "rjt" => "Run Jumpthrow",
             "walk" or "walkthrow" => "Walk Throw",
             "crouch" or "crouchthrow" or "duck" => "Crouch Throw",
             _ => null,
@@ -164,7 +175,7 @@ namespace MatchZy
         private readonly Dictionary<int, float> lastNadeMarkerUseTime = new();
         private readonly Dictionary<int, float> lastNadeToggleTime = new();
         // Aim-test heights above a marker: beam nub (~9u) and floating label (~48u).
-        private static readonly float[] NadeAimZOffsets = { 9.0f, 48.0f };
+        private static readonly float[] NadeAimZOffsets = { 9.0f, 40.0f, 48.0f };
 
         private string GrenadeLibraryPath =>
             Path.Join(Server.GameDirectory + "/csgo/cfg", MatchZyCfgRel("grenadelibrary.json"));
@@ -234,6 +245,10 @@ namespace MatchZy
         public void ShowNadesWithFilter(CCSPlayerController? player, string filter)
         {
             if (!isPractice || !IsPlayerValid(player)) return;
+            // The marks and aim targets are glow props: each prints a harmless engine assert when
+            // it is made. Kept off the console while marks are up (as for .xray).
+            _nadeMarksWanted = true;
+            RefreshGlowAssertQuiet();
             filter = (filter ?? "").Trim().Trim('"');
             if (filter.Length > 0)
             {
@@ -267,6 +282,8 @@ namespace MatchZy
             try
             {
                 HideNadeMarkers(); // clear any previous set first
+                _nadeMarksWanted = true;
+                RefreshGlowAssertQuiet();
                 var lineups = LoadLineupsForCurrentMap(player!);
                 if (lineups.Count == 0)
                 {
@@ -289,6 +306,7 @@ namespace MatchZy
                     }
                 }
                 activeNadeGroups.AddRange(groups);
+                DrawLandingSpots(lineups);
                 grenadeLibraryActive = true;
                 _nadeViewers.Add(player!.SteamID);
                 SetNadeTransmitListener(true);
@@ -317,6 +335,17 @@ namespace MatchZy
         // Re-render the markers from the current saved lineups if the library is showing. Call after a
         // save / delete / import / libadd / libremove so a changed lineup shows/disappears immediately
         // without the player having to toggle .shownades off and on.
+        // After a save: the new mark is there to see at once, also for a player who had not
+        // asked for the marks yet (saving and seeing nothing read as "it did not work").
+        public void ShowNadeMarksAfterSave(CCSPlayerController? player)
+        {
+            if (!isPractice || !IsPlayerValid(player)) return;
+            if (grenadeLibraryActive && _nadeViewers.Contains(player!.SteamID))
+                RefreshNadeMarkersIfActive(player);
+            else
+                ShowNadesWithFilter(player, "");
+        }
+
         public void RefreshNadeMarkersIfActive(CCSPlayerController? player)
         {
             if (!grenadeLibraryActive || !isPractice || !IsPlayerValid(player)) return;
@@ -325,6 +354,8 @@ namespace MatchZy
                 var viewers = new HashSet<ulong>(_nadeViewers);
                 var filters = new Dictionary<ulong, string>(_nadeViewerFilters);
                 HideNadeMarkers(); // clears markers + grenadeLibraryActive + viewers
+                _nadeMarksWanted = true;
+                RefreshGlowAssertQuiet();
                 _nadeViewers.UnionWith(viewers);
                 foreach (var (steam, f) in filters)
                     _nadeViewerFilters[steam] = f;
@@ -333,6 +364,7 @@ namespace MatchZy
                 foreach (var g in groups)
                     DrawNadeMarkerGroup(g);
                 activeNadeGroups.AddRange(groups);
+                DrawLandingSpots(lineups);
                 grenadeLibraryActive = lineups.Count > 0;
                 SetNadeTransmitListener(grenadeLibraryActive);
             }
@@ -374,6 +406,8 @@ namespace MatchZy
                     HashSet<NadeMarkerGroup>? filteredOut = _nadeViewerFilters.TryGetValue(player.SteamID, out var viewerFilter)
                         ? NadeGroupsHiddenByFilter(viewerFilter)
                         : null;
+                    // The grenade in hand and the picked landing mark decide the rest.
+                    FilterLandingTransmit(player.Slot, info);
                     foreach (var g in activeNadeGroups)
                     {
                         if (filteredOut != null && filteredOut.Contains(g))
@@ -396,11 +430,14 @@ namespace MatchZy
 
         public void HideNadeMarkers()
         {
+            _nadeMarksWanted = false;
+            RefreshGlowAssertQuiet();
             foreach (var ent in nadeMarkerEntities)
             {
                 try { if (ent != null && ent.IsValid) ent.Remove(); } catch { }
             }
             nadeMarkerEntities.Clear();
+            ForgetLandingSpots(removeEntities: true);
             activeNadeGroups.Clear();
             _nadeViewers.Clear();
             _nadeViewerFilters.Clear();
@@ -438,6 +475,7 @@ namespace MatchZy
             startRoundPending = false;
             startRoundFrozen.Clear();
             ForgetBotSpawnMarkersOnMapStart();
+            ForgetGrenadeFinderOnMapStart();
             ForgetRecDisplaysOnMapStart();
             ForgetNavFloorCache();
             // Userids from the previous map mean nothing now.
@@ -475,6 +513,16 @@ namespace MatchZy
         }
 
         // ── marker rendering ─────────────────────────────────────────────────────────────
+        // A saved lineup is marked with the grenade it throws (model of its type, in the type's
+        // colour, enlarged so it reads from a distance), not with a player figure: the author's
+        // call, so players find their own saved lineups by grenade.
+        // A lineup is marked with the grenade it throws: the model of its type, twice its size,
+        // 40 u above the spot, glowing in the type's colour (the recipe other lineup plugins use,
+        // and visible since the icons are spawned as prop_dynamic_override). true / "1" = the
+        // player figure of before.
+        private static readonly bool NadeSpotGhost = false;
+        private const string NadeIconScale = "2";
+
         private void DrawNadeMarkerGroup(NadeMarkerGroup group)
         {
             NadeLineup lu = group.Lineups[group.Current];
@@ -483,7 +531,9 @@ namespace MatchZy
 
             // Lineup trainer (NadeTutorial.cs): a spot is only the glowing ghost; the targets near it
             // and the hud hint on it say the rest (no beam, no label).
-            var ghost = SpawnJtGhost(pos, lu.Pos.PlayerAngle.Y);
+            // The author's call after testing: a throw spot is marked with the grenade itself in
+            // its type colour (what is thrown from here), not with a player figure.
+            var ghost = NadeSpotGhost ? SpawnJtGhost(pos, lu.Pos.PlayerAngle.Y) : null;
             if (ghost != null)
             {
                 group.Glow = ghost;
@@ -496,16 +546,40 @@ namespace MatchZy
             // Models not precached yet (plugin loaded in the middle of a map): the grenade glow
             // stands in for the ghost until the next map.
             // Glowing grenade model just above the spot, visible through walls (GlowType 3).
-            var glow = Utilities.CreateEntityByName<CBaseModelEntity>("prop_dynamic");
+            var glow = Utilities.CreateEntityByName<CBaseModelEntity>("prop_dynamic_override");
             if (glow != null)
             {
-                glow.SetModel(NadeGlowModel(lu.Type));
+                // Order as other lineup plugins have it working: no collision, placed, spawned,
+                // and only then the model (set before the spawn the icon was not there for the
+                // author: nothing to see, nothing to pick).
+                glow.Collision.CollisionGroup = 2;
+                glow.Collision.SolidType = SolidType_t.SOLID_NONE;
                 glow.Spawnflags = 256u; // no collisions
-                glow.Teleport(new Vector(pos.X, pos.Y, pos.Z + 24.0f), new QAngle(0, lu.Pos.PlayerAngle.Y, 0), new Vector(0, 0, 0));
+                // Markers that share a spot stand in a row across the throw direction.
+                double across = (lu.Pos.PlayerAngle.Y + 90.0) * Math.PI / 180.0;
+                float shift = group.Side * 22.0f;
+                glow.Teleport(new Vector(pos.X + (float)Math.Cos(across) * shift, pos.Y + (float)Math.Sin(across) * shift, pos.Z + 40.0f),
+                    new QAngle(0, lu.Pos.PlayerAngle.Y, 0), new Vector(0, 0, 0));
                 glow.DispatchSpawn();
+                glow.SetModel(NadeGlowModel(lu.Type));
+                // A grenade is a few units tall: enlarged so the type is plain to see from across a site.
+                glow.AcceptInput("SetScale", value: NadeIconScale);
                 SetNadeGlowColor(glow, color);
                 group.Glow = glow;
                 nadeMarkerEntities.Add(glow);
+            }
+            // The place to stand, on the floor itself: a square in the type's colour. Lines are
+            // always drawn, so a spot can be seen and picked even where a model does not show.
+            try
+            {
+                var feet = new System.Numerics.Vector3(pos.X, pos.Y, pos.Z);
+                foreach (uint raw in FloorHuggingBox(feet, 14f, color, null))
+                    if (new CHandle<CBaseEntity>(raw).Value is CBaseEntity line && line.IsValid)
+                        nadeMarkerEntities.Add(line);
+            }
+            catch (Exception e)
+            {
+                Log($"[GrenadeLibrary] floor mark: {e.Message}");
             }
             EnsureJtWatch();
         }
@@ -569,11 +643,34 @@ namespace MatchZy
                     Pos = new Position(pos, ang),
                     Name = kv.Key,
                     Type = info.TryGetValue("Type", out var t) ? t : "",
-                    Throw = info.TryGetValue("Throw", out var th) ? th : "",
+                    Throw = LineupThrowLabel(info, pos),
+                    NadePos = info.TryGetValue("NadePos", out var np) ? np : "",
+                    NadeVel = info.TryGetValue("NadeVel", out var nv) ? nv : "",
+                    Landing = info.TryGetValue("Landing", out var ld) ? ld : "",
+                    Set = info.TryGetValue("Set", out var st) ? st : "",
                     Desc = info.TryGetValue("Desc", out var d) ? d : "",
                     Global = global,
                 });
             }
+        }
+
+        // How a lineup is thrown, in words. As it was saved; a lineup saved without that (.savenade
+        // does not ask) but with the throw it was made from says it by where the player was at the
+        // release: off the ground = a jump, away from the spot = a step or a run, ducked = crouch.
+        // (Loaded from a landing mark such a lineup only said "throw as saved", 2026-11-18.)
+        private static string LineupThrowLabel(Dictionary<string, string> info, Vector spot)
+        {
+            if (info.TryGetValue("Throw", out var saved) && !string.IsNullOrWhiteSpace(saved))
+                return saved;
+            if (!info.TryGetValue("ThrowFrom", out var fromStr) || !TryParseVector(fromStr, out Vector from))
+                return "";
+            float dx = from.X - spot.X, dy = from.Y - spot.Y;
+            float ground = MathF.Sqrt(dx * dx + dy * dy);
+            bool jumped = from.Z - spot.Z > 8f;
+            bool ducked = info.TryGetValue("Duck", out var duckStr)
+                && float.TryParse(duckStr, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out float duck) && duck >= 0.5f;
+            string kind = ground < 5f ? (ducked ? "Crouch" : "") : ground < 50f ? "Step" : "Run";
+            return jumped ? (kind == "" ? "Jumpthrow" : kind + " Jumpthrow") : (kind == "" ? "Normal Throw" : kind + " Throw");
         }
 
         private static bool TryParseVector(string s, out Vector v)
@@ -594,10 +691,30 @@ namespace MatchZy
 
         // Index of the marker group the player's crosshair is on (aim-cone against the beam nub AND
         // the floating label), or -1. Shared by E (teleport) and F (toggle).
+        // The player stands on the lineup they loaded and looks along its aim. Other marks often
+        // lie behind that aim (seen on banana 2026-11-17: aiming find4 the box named find7, whose
+        // mark was behind the aim ring, and the lineup's own line was gone). Then no mark counts
+        // as aimed at: no name, no E pick. A step off the spot, or a look away, and they do again.
+        private bool AimingOwnLineup(CCSPlayerController player)
+        {
+            var pawn = player.PlayerPawn?.Value;
+            if (pawn == null || !pawn.IsValid || pawn.AbsOrigin == null || !finderArmed.TryGetValue(player.Slot, out var armed))
+                return false;
+            var plan = armed.Plan;
+            float dx = pawn.AbsOrigin.X - plan.Feet.X, dy = pawn.AbsOrigin.Y - plan.Feet.Y;
+            if (dx * dx + dy * dy > 24f * 24f)
+                return false;
+            float dPitch = pawn.EyeAngles.X - plan.Pitch, dYaw = pawn.EyeAngles.Y - plan.Yaw;
+            while (dYaw > 180f) dYaw -= 360f;
+            while (dYaw < -180f) dYaw += 360f;
+            return dPitch * dPitch + dYaw * dYaw < 10f * 10f;
+        }
+
         private int AimedGroupIndex(CCSPlayerController player)
         {
             var pawn = player.PlayerPawn.Value;
             if (pawn?.AbsOrigin == null) return -1;
+            if (AimingOwnLineup(player)) return -1;
             Vector origin = pawn.AbsOrigin;
             Vector eye = new(origin.X, origin.Y, origin.Z + 64.0f);
             QAngle ang = pawn.EyeAngles;
@@ -611,6 +728,8 @@ namespace MatchZy
             float bestDot = spawnMarkerAimMinDot;
             for (int i = 0; i < activeNadeGroups.Count; i++)
             {
+                // A marker this player does not see cannot be picked.
+                if (!LandingGroupShown(player.Slot, activeNadeGroups[i])) continue;
                 Vector sp = activeNadeGroups[i].Pos;
                 foreach (float zOff in NadeAimZOffsets)
                 {
@@ -618,7 +737,12 @@ namespace MatchZy
                     float dist = (float)Math.Sqrt(tx * tx + ty * ty + tz * tz);
                     if (dist < 1.0f) continue;
                     float dot = (tx * fX + ty * fY + tz * fZ) / dist;
-                    if (dot > bestDot) { bestDot = dot; best = i; }
+                    if (dot > bestDot && MarkInSight(new System.Numerics.Vector3(eye.X, eye.Y, eye.Z),
+                            new System.Numerics.Vector3(sp.X, sp.Y, sp.Z + zOff), pawn))
+                    {
+                        bestDot = dot;
+                        best = i;
+                    }
                 }
             }
             return best;
@@ -647,16 +771,28 @@ namespace MatchZy
                 return;
             }
 
-            if ((pressed & PlayerButtons.Use) == 0) return;
+            // Only while a box is being drawn (R / E belong to that then). Results of an earlier
+            // .find lying around must not switch the library's E off: they did, for the rest of
+            // the map, and E on a lineup mark did nothing.
+            if (drawSessions.ContainsKey(player.Slot) || LookMenuOpen(player.Slot))
+                return;
+            // Pressed on a mark: remembered. Let go within a second = go there; held = its edit menu
+            // (opened by TickLineupMarks).
+            if ((pressed & PlayerButtons.Use) != 0)
+            {
+                int aimed = AimedGroupIndex(player);
+                if (aimed >= 0)
+                    nadeUseHold[player.Slot] = (Server.TickCount, activeNadeGroups[aimed].Lineups[activeNadeGroups[aimed].Current], false);
+                return;
+            }
+            if ((released & PlayerButtons.Use) == 0) return;
+            if (!nadeUseHold.Remove(player.Slot, out var held) || held.Done)
+                return;
             if (lastNadeMarkerUseTime.TryGetValue(uid, out float last) && now - last < spawnMarkerUseCooldown)
                 return;
 
-            int gi = AimedGroupIndex(player);
-            if (gi < 0) return;
-
             lastNadeMarkerUseTime[uid] = now;
-            var group = activeNadeGroups[gi];
-            NadeLineup target = group.Lineups[group.Current];
+            NadeLineup target = held.Lineup;
             Server.NextFrame(() =>
             {
                 if (IsPlayerValid(player))
@@ -675,11 +811,21 @@ namespace MatchZy
             if (!isPractice || !CanPracticeTeleport(player))
                 return;
             bool isCT = player.TeamNum == (byte)CsTeam.CounterTerrorist;
-            TeleportAndClearPose(player, target.Pos.PlayerPosition, target.Pos.PlayerAngle, wantDucked: false, deployWeapon: NadeTypeToWeapon(target.Type, isCT), giveDeploy: true);
+            // Not into a step or a wall (lineups saved from a search could lie in one).
+            var saved = target.Pos.PlayerPosition;
+            var at = FinderStandFeet(new System.Numerics.Vector3(saved.X, saved.Y, saved.Z), player.PlayerPawn?.Value);
+            WatchTeleportStuck(player, at, target.Pos.PlayerAngle.X, target.Pos.PlayerAngle.Y);
+            TeleportAndClearPose(player, new Vector(at.X, at.Y, at.Z), target.Pos.PlayerAngle, wantDucked: false, deployWeapon: NadeTypeToWeapon(target.Type, isCT), giveDeploy: true);
             string tag = target.Global ? " (G)" : "";
             string note = string.IsNullOrEmpty(target.Desc) ? "" : $" - {target.Desc}";
             ReplyToUserCommand(player, Localizer.ForPlayer(player, "matchzy.gl.loaded", $"[{target.Type}] {target.Name}{tag}{note}"));
-            ShowNadeTutorial(player, target.Name, target.Type, target.Throw, target.Pos.PlayerPosition, target.Pos.PlayerAngle);
+            // Moved off the saved spot (it lay inside a kerb or a wall): said plainly. The lineup
+            // keeps its saved landing: worked out anew from the moved spot it was 385 u wrong for
+            // find6 (2026-11-17), while the real throw from there landed 3 u from the saved one.
+            float shift = MathF.Sqrt((at.X - saved.X) * (at.X - saved.X) + (at.Y - saved.Y) * (at.Y - saved.Y) + (at.Z - saved.Z) * (at.Z - saved.Z));
+            if (shift > 0.5f)
+                PrintToPlayerChat(player, Localizer.ForPlayer(player, "matchzy.pp.menu.moved_spot", target.Name, shift));
+            ShowNadeTutorial(player, target.Name, target.Type, target.Throw, target.Pos.PlayerPosition, target.Pos.PlayerAngle, target.NadePos, target.NadeVel);
         }
 
         // Shared-pack (grenadelibrary.json) lineups for the current map, for the .nades menu.

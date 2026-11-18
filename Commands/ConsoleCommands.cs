@@ -1391,7 +1391,8 @@ namespace MatchZy
         [ConsoleCommand("css_matchzyhelp", "Triggers provided command on the server")]
         public void OnHelpCommand(CCSPlayerController? player, CommandInfo? command)
         {
-            SendAvailableCommandsMessage(player);
+            // "css_help more" (chat ".help more" comes in through the chat dispatch).
+            SendAvailableCommandsMessage(player, full: command != null && command.ArgCount > 1);
         }
 
         [ConsoleCommand("css_mhelp", "Shows all available commands for each mode (admin only)")]

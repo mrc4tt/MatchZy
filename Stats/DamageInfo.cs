@@ -1,5 +1,6 @@
 using CounterStrikeSharp.API;
 using CounterStrikeSharp.API.Core;
+using CounterStrikeSharp.API.Core.Translations;
 using CounterStrikeSharp.API.Modules.Utils;
 
 namespace MatchZy
@@ -54,6 +55,22 @@ namespace MatchZy
 
             targetInfo.DamageHP += @event.DmgHealth;
             targetInfo.Hits++;
+            // Health is what the victim has left after this hit: 0 = this attacker got the kill.
+            if (@event.Health <= 0)
+                targetInfo.Killed = true;
+        }
+
+        // One chat line per enemy at round end, in the FACEIT layout:
+        // "To: [87 / 3 hits] From: [100 / 4 hits] - name (13 hp)", ending in "(killed)" when the
+        // reader got the kill and "(dead)" when someone else did. The lines are in the reader's
+        // language and sorted by damage dealt, so the enemy you hurt most is on top.
+        private string DamageReportLine(CCSPlayerController reader, int dealt, int dealtHits, int taken, int takenHits,
+            string enemyName, int enemyHp, bool killedByReader)
+        {
+            if (enemyHp > 0)
+                return Localizer.ForPlayer(reader, "matchzy.dmg.line", dealt, dealtHits, taken, takenHits, enemyName, enemyHp);
+            return Localizer.ForPlayer(reader, killedByReader ? "matchzy.dmg.killed" : "matchzy.dmg.dead",
+                dealt, dealtHits, taken, takenHits, enemyName);
         }
 
         private void ShowDamageInfo()
@@ -63,6 +80,14 @@ namespace MatchZy
             try
             {
                 HashSet<(int, int)> processedPairs = new HashSet<(int, int)>();
+                var reports = new Dictionary<int, (CCSPlayerController Reader, List<(int Dealt, int Taken, string Line)> Lines)>();
+
+                void AddLine(int readerId, CCSPlayerController reader, int dealt, int taken, string line)
+                {
+                    if (!reports.TryGetValue(readerId, out var report))
+                        reports[readerId] = report = (reader, new List<(int, int, string)>());
+                    report.Lines.Add((dealt, taken, line));
+                }
 
                 foreach (var entry in playerDamageInfo)
                 {
@@ -72,23 +97,22 @@ namespace MatchZy
                         if (processedPairs.Contains((attackerId, targetId)) || processedPairs.Contains((targetId, attackerId)))
                             continue;
 
-                        // Access and use the damage information as needed.
                         int damageGiven = targetEntry.DamageHP;
                         int hitsGiven = targetEntry.Hits;
+                        bool attackerKilledTarget = targetEntry.Killed;
                         int damageTaken = 0;
                         int hitsTaken = 0;
+                        bool targetKilledAttacker = false;
 
                         if (playerDamageInfo.TryGetValue(targetId, out var targetInfo) && targetInfo.TryGetValue(attackerId, out var takenInfo))
                         {
                             damageTaken = takenInfo.DamageHP;
                             hitsTaken = takenInfo.Hits;
+                            targetKilledAttacker = takenInfo.Killed;
                         }
 
-                        if (!playerData.ContainsKey(attackerId) || !playerData.ContainsKey(targetId))
+                        if (!playerData.TryGetValue(attackerId, out var attackerController) || !playerData.TryGetValue(targetId, out var targetController))
                             continue;
-
-                        var attackerController = playerData[attackerId];
-                        var targetController = playerData[targetId];
 
                         if (attackerController != null && targetController != null)
                         {
@@ -104,18 +128,26 @@ namespace MatchZy
                                 continue;
 
                             int attackerHP = attackerController.PlayerPawn.Value.Health < 0 ? 0 : attackerController.PlayerPawn.Value.Health;
-                            string attackerName = attackerController.PlayerName;
-
                             int targetHP = targetController.PlayerPawn.Value.Health < 0 ? 0 : targetController.PlayerPawn.Value.Health;
-                            string targetName = targetController.PlayerName;
 
-                            PrintToPlayerChat(attackerController, $"{ChatColors.Green}To: [{damageGiven} / {hitsGiven} hits] From: [{damageTaken} / {hitsTaken} hits] - {targetName} - ({targetHP} hp){ChatColors.Default}");
-                            PrintToPlayerChat(targetController, $"{ChatColors.Green}To: [{damageTaken} / {hitsTaken} hits] From: [{damageGiven} / {hitsGiven} hits] - {attackerName} - ({attackerHP} hp){ChatColors.Default}");
+                            AddLine(attackerId, attackerController, damageGiven, damageTaken,
+                                DamageReportLine(attackerController, damageGiven, hitsGiven, damageTaken, hitsTaken,
+                                    targetController.PlayerName, targetHP, attackerKilledTarget));
+                            AddLine(targetId, targetController, damageTaken, damageGiven,
+                                DamageReportLine(targetController, damageTaken, hitsTaken, damageGiven, hitsGiven,
+                                    attackerController.PlayerName, attackerHP, targetKilledAttacker));
                         }
 
                         // Mark this pair as processed to avoid duplicates.
                         processedPairs.Add((attackerId, targetId));
                     }
+                }
+
+                foreach (var (reader, lines) in reports.Values)
+                {
+                    lines.Sort((x, y) => y.Dealt != x.Dealt ? y.Dealt.CompareTo(x.Dealt) : y.Taken.CompareTo(x.Taken));
+                    foreach (var line in lines)
+                        PrintToPlayerChat(reader, line.Line);
                 }
 
                 playerDamageInfo.Clear();
@@ -131,5 +163,6 @@ namespace MatchZy
     {
         public int DamageHP { get; set; } = 0;
         public int Hits { get; set; } = 0;
+        public bool Killed { get; set; } = false;
     }
 }

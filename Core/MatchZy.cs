@@ -547,6 +547,13 @@ namespace MatchZy
                 { ".showspawns", OnShowSpawnsCommand },
                 { ".hidespawns", OnHideSpawnsCommand },
                 { ".spawns", OnToggleSpawnsCommand },
+                { ".draw", OnFinderDrawCommand },
+                { ".find", OnFinderFindCommand },
+                { ".findgo", OnFinderGoCommand },
+                { ".results", OnFinderResultsCommand },
+                { ".n", OnFinderNextCommand },
+                { ".next", OnFinderNextCommand },
+                { ".prev", OnFinderPrevCommand },
                 { ".tactics", OnPracCommand },
                 { ".training", OnPracCommand },
                 { ".dryrun", OnDryRunCommand },
@@ -570,6 +577,15 @@ namespace MatchZy
                 { ".nadepreview", OnTrajCommand },
                 { ".nadecam", OnTrajCommand },
                 { ".follownade", OnFollowNadeCommand },
+                { ".train", OnTrainCommand },
+                { ".skip", OnTrainSkipCommand },
+                { ".savelast", OnSaveLastCommand },
+                { ".save", OnSaveLastCommand },
+                { ".sl", OnSaveLastCommand },
+                { ".throwsync", OnThrowSyncCommand },
+                { ".nadespeed", OnNadeSpeedCommand },
+                { ".nextnade", OnNextNadeCommand },
+                { ".prevnade", OnPrevNadeCommand },
                 { ".cam", OnTrajCommand },
                 { ".warmup", OnWarmupCommand },
                 { ".crouchbot", OnCrouchBotCommand },
@@ -750,6 +766,7 @@ namespace MatchZy
             // string has no server xref), so no print hook can suppress it. The hook only spammed
             // the DynoHook "could not allocate trampoline" error for zero benefit.
             RegisterListener<Listeners.OnTick>(RenderReadyPanel);
+            RegisterReadyUseKey();
             RegisterListener<Listeners.OnTick>(TechPauseHudAntiFlashTick);
             RegisterSpectatorCoachListeners();
             RegisterCoachCommPatch();
@@ -1929,6 +1946,16 @@ namespace MatchZy
                     if (cmdWord == ".liblist")
                     {
                         HandleLibListCommand(player, messageCommandArg);
+                    }
+
+                    if ((cmdWord is ".find" or ".findgo" or ".results" or ".draw" or ".throwsync" or ".nadespeed" or ".nextnade" or ".prevnade" or ".savelast" or ".save" or ".sl" or ".train") && messageCommandArg != "")
+                    {
+                        HandleFinderChatCommand(player, cmdWord, messageCommandArg);
+                    }
+
+                    if (cmdWord == ".help" && messageCommandArg != "")
+                    {
+                        SendAvailableCommandsMessage(player, full: true);
                     }
 
                     if (cmdWord == ".loadnade" || cmdWord == ".ln")
