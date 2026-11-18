@@ -763,6 +763,8 @@
     "matchzy.pracmisc.follownadereturn": "Geri dönmek için zıpla",
     "matchzy.pracmisc.follownadelineup": "Bomba takip kamerası: lineup noktasından yapılan atışlarda otomatik. Geri dönmek için zıpla. (.follownade tekrar: her atış)",
     "matchzy.pracmisc.follownadealways": "Bomba takip kamerası: her atış. Geri dönmek için zıpla. (.follownade tekrar: kapalı)",
+    "matchzy.ready.notreadyuse": "HAZIR DEĞİLSİN - E'ye bas veya .ready",
+    "matchzy.hint.usereadykey": "Hazır olmak için E'ye bas veya .ready yaz!",
     "matchzy.dmg.line": "{green}Verilen: [{0} / {1} isabet]{default} {red}Alınan: [{2} / {3} isabet]{default} - {4} ({green}{5} hp{default})",
     "matchzy.dmg.killed": "{green}Verilen: [{0} / {1} isabet]{default} {red}Alınan: [{2} / {3} isabet]{default} - {4} ({red}öldürdün{default})",
     "matchzy.dmg.dead": "{green}Verilen: [{0} / {1} isabet]{default} {red}Alınan: [{2} / {3} isabet]{default} - {4} ({grey}ölü{default})"

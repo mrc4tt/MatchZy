@@ -766,7 +766,7 @@ namespace MatchZy
             string line1 = _rpCtNeed > 0
                 ? ReadySidesPlain(player)
                 : Localizer.ForPlayer(player, "matchzy.hint.waitingforplayers", _rpReady, _rpRequired);
-            string line2 = Localizer.ForPlayer(player, "matchzy.hint.usereadycommand");
+            string line2 = Localizer.ForPlayer(player, readyUseKey.Value ? "matchzy.hint.usereadykey" : "matchzy.hint.usereadycommand");
             if (ShortHandedHintSide(player.TeamNum) is (int shortPresent, int shortRequired))
                 line2 += "\n" + ShortHandedLine(player, player.TeamNum, shortPresent, shortRequired);
             return _rpWaiting.Length > 0
@@ -1145,7 +1145,7 @@ namespace MatchZy
                             if (isReadyNow)
                                 sb.Append($"<br><font class='fontSize-m' color='#37ff8b'>&#10004; {PanelSafe(Localizer.ForPlayer(target, "matchzy.ready.youready"))}</font>");
                             else if (notReadyVisible)
-                                sb.Append($"<br><font class='fontSize-m' color='#ff3b3b'>&#10008; {PanelSafe(Localizer.ForPlayer(target, "matchzy.ready.notready"))}</font>");
+                                sb.Append($"<br><font class='fontSize-m' color='#ff3b3b'>&#10008; {PanelSafe(Localizer.ForPlayer(target, readyUseKey.Value ? "matchzy.ready.notreadyuse" : "matchzy.ready.notready"))}</font>");
                             else
                                 sb.Append("<br><font class='fontSize-m' color='#ff3b3b'>&#160;</font>"); // blink off-frame: keep height
                         }

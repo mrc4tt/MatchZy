@@ -25,6 +25,14 @@ namespace MatchZy
             return Math.Max(Math.Min(playersPerTeam, rosterSize), Math.Min(floor, playersPerTeam));
         }
 
+        // Team size of a side with no listed roster in a match config without players_per_team:
+        // the larger of the two sides on the server, at most players_per_team. 0 while both sides
+        // are empty (RequiredOnSide then keeps players_per_team).
+        public static int OpenSideSize(int ownPresent, int otherPresent, int playersPerTeam)
+        {
+            return Math.Min(Math.Max(playersPerTeam, 0), Math.Max(Math.Max(ownPresent, otherPresent), 0));
+        }
+
         // The match config's min_players_to_ready when it lets the side ready up with fewer than
         // `required` ready players, raised to the floor. 0 = not set, or not lower than required:
         // then every player the side needs has to be ready.

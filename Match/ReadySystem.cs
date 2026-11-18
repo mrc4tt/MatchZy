@@ -117,7 +117,21 @@ public partial class MatchZy
             return perTeam;
         if (!reverseTeamSides.TryGetValue(side == (int)CsTeam.CounterTerrorist ? "CT" : "TERRORIST", out Team? team))
             return perTeam;
-        return ReadyLogic.RequiredOnSide(perTeam, RosterPlayerCount(team), ReadyFloor());
+        int rosterSize = RosterPlayerCount(team);
+        // No listed roster and no players_per_team in the match config (.matchsetup, "any" teams):
+        // nothing says how big the teams are, so the side needs as many players as the larger of
+        // the two sides has. A 4v4 then starts once all 8 are ready; before, each side waited for
+        // the mode's 5 and only an admin's .forcestart got the match going. Join ready mode keeps
+        // players_per_team: there the side is ready the moment it is complete.
+        if (rosterSize <= 0 && !matchConfig.PlayersPerTeamSet && !team.botTeam
+            && ListedRosterSize(team) == 0 && !IsJoinReadyMode())
+        {
+            int otherSide = side == (int)CsTeam.CounterTerrorist ? (int)CsTeam.Terrorist : (int)CsTeam.CounterTerrorist;
+            (int own, _) = GetTeamPlayerCount(side, false);
+            int other = IsBotSide(otherSide) ? 0 : GetTeamPlayerCount(otherSide, false).Item1;
+            rosterSize = ReadyLogic.OpenSideSize(own, other, perTeam);
+        }
+        return ReadyLogic.RequiredOnSide(perTeam, rosterSize, ReadyFloor());
     }
 
     // matchzy_ready_max_missing: the fewest players a side of a loaded match can ready up with
@@ -383,7 +397,9 @@ public partial class MatchZy
             if (playerData[key].TeamNum == team)
             {
                 playerCount++;
-                if (playerReadyStatus[key] == true)
+                // TryGetValue: a player without a ready entry yet made this throw, and the caller
+                // (the start check after .ready) then never started the match.
+                if (playerReadyStatus.TryGetValue(key, out bool isReady) && isReady)
                     readyCount++;
             }
         }

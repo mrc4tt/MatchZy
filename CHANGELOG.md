@@ -4,8 +4,12 @@ Based on [MatchZy](https://github.com/shobhit-pathak/MatchZy) by Shobhit Pathak,
 
 # 1.0.26
 
-#### November 15, 2026
+#### November 18, 2026
 
+- New `matchzy_ready_use_key` (default true): the use key (E) readies a player up during the ready phase, on top of `.ready`. E only readies, it never un-readies, and it does nothing for spectators, coaches, in join ready mode or while a center menu is open. The ready panel and the classic center text say "press E or type .ready".
+- A match without listed players and without `players_per_team` (`.matchsetup`, or teams with `"players": "any"`) now starts when everyone on T and CT is ready and both sides have the same number of players. The side needs as many players as the larger of the two sides has (at most the mode's team size), so a 4v4 starts once all 8 are ready. Before, each side waited for 5 players and only an admin's `.forcestart` started the match. In a 4v5 the short side still uses `.forceready`. A match config that sets `players_per_team` or lists the players is unchanged, and so is join ready mode.
+- The round-end damage report uses the FACEIT layout, `To: [87 / 3 hits] From: [100 / 4 hits] - name (13 hp)`, with the dealt part in green and the taken part in red. A dead enemy shows `(killed)` when you got the kill and `(dead)` otherwise. The lines are sorted by damage dealt and are in each player's own language (they were English only).
+- The ready-up start check no longer fails on a player who has no ready entry yet.
 - Spectator coach (mode 3): at halftime and overtime the coach no longer briefly follows, sees and talks to the other team between the last round of the half and the side swap. MatchZy swaps its side data at round end, but the engine moves the players only at the next round start; the coach now follows the engine's sides.
 - Spectator coach: unloading or reloading MatchZy puts back sv_coaching_enabled, mp_forcecamera, bot_controllable, the coach comm patch and the coach's own game settings. Left on, sv_coaching_enabled could crash the next round start once MatchZy's guard was gone.
 - Spectator coach: a coach who disconnects no longer leaves the engine coach flag behind for the next player in that slot.

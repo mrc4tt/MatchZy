@@ -763,6 +763,8 @@
     "matchzy.pracmisc.follownadereturn": "Springe, um zurückzukehren",
     "matchzy.pracmisc.follownadelineup": "Granatenkamera: automatisch bei Würfen von einem Lineup-Punkt. Springe, um zurückzukehren. (.follownade erneut: jeder Wurf)",
     "matchzy.pracmisc.follownadealways": "Granatenkamera: jeder Wurf. Springe, um zurückzukehren. (.follownade erneut: aus)",
+    "matchzy.ready.notreadyuse": "NICHT BEREIT - drück E oder .ready",
+    "matchzy.hint.usereadykey": "Drück E oder gib .ready ein, um dich bereit zu melden!",
     "matchzy.dmg.line": "{green}An: [{0} / {1} Treffer]{default} {red}Von: [{2} / {3} Treffer]{default} - {4} ({green}{5} hp{default})",
     "matchzy.dmg.killed": "{green}An: [{0} / {1} Treffer]{default} {red}Von: [{2} / {3} Treffer]{default} - {4} ({red}getötet{default})",
     "matchzy.dmg.dead": "{green}An: [{0} / {1} Treffer]{default} {red}Von: [{2} / {3} Treffer]{default} - {4} ({grey}tot{default})"

@@ -763,6 +763,8 @@
     "matchzy.pracmisc.follownadereturn": "Skocz, aby wrócić",
     "matchzy.pracmisc.follownadelineup": "Kamera granatu: automatycznie przy rzutach z miejsca lineupu. Skocz, aby wrócić. (.follownade ponownie: każdy rzut)",
     "matchzy.pracmisc.follownadealways": "Kamera granatu: każdy rzut. Skocz, aby wrócić. (.follownade ponownie: wyłączona)",
+    "matchzy.ready.notreadyuse": "NIE GOTOWY - naciśnij E lub .ready",
+    "matchzy.hint.usereadykey": "Naciśnij E lub wpisz .ready, aby dać ready!",
     "matchzy.dmg.line": "{green}Do: [{0} / {1} trafień]{default} {red}Od: [{2} / {3} trafień]{default} - {4} ({green}{5} hp{default})",
     "matchzy.dmg.killed": "{green}Do: [{0} / {1} trafień]{default} {red}Od: [{2} / {3} trafień]{default} - {4} ({red}zabity{default})",
     "matchzy.dmg.dead": "{green}Do: [{0} / {1} trafień]{default} {red}Od: [{2} / {3} trafień]{default} - {4} ({grey}martwy{default})"

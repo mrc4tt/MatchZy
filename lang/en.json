@@ -763,6 +763,8 @@
     "matchzy.pracmisc.follownadereturn": "Jump to come back",
     "matchzy.pracmisc.follownadelineup": "Grenade follow camera: automatic for throws from a lineup spot. Jump to come back. (.follownade again: every throw)",
     "matchzy.pracmisc.follownadealways": "Grenade follow camera: every throw. Jump to come back. (.follownade again: off)",
+    "matchzy.ready.notreadyuse": "NOT READY - press E or type .ready",
+    "matchzy.hint.usereadykey": "Press E or type .ready to ready up!",
     "matchzy.dmg.line": "{green}To: [{0} / {1} hits]{default} {red}From: [{2} / {3} hits]{default} - {4} ({green}{5} hp{default})",
     "matchzy.dmg.killed": "{green}To: [{0} / {1} hits]{default} {red}From: [{2} / {3} hits]{default} - {4} ({red}killed{default})",
     "matchzy.dmg.dead": "{green}To: [{0} / {1} hits]{default} {red}From: [{2} / {3} hits]{default} - {4} ({grey}dead{default})"

@@ -47,6 +47,11 @@ namespace MatchZy
         [JsonPropertyName("players_per_team")]
         public int PlayersPerTeam { get; set; } = 5;
 
+        // False when the match config left players_per_team out. A team without a listed roster
+        // (.matchsetup, "players": "any") then readies up at the size of the teams on the server.
+        [JsonIgnore]
+        public bool PlayersPerTeamSet { get; set; } = false;
+
         [JsonPropertyName("min_players_to_ready")]
         public int MinPlayersToReady { get; set; } = 12;
 

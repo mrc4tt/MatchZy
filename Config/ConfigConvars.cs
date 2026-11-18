@@ -124,6 +124,8 @@ namespace MatchZy
 
         public FakeConVar<int> readyPerTeam = new("matchzy_ready_per_team", "Per-team ready-up. 0 = off (pug: matchzy_minimum_ready_required players in total, loaded match: every player on both teams). N = a team is ready once N of its players have typed .ready, and the match starts when CT and T are both ready. In a loaded match the team's registered players (its roster, at most players_per_team) must also all be on the side, unless the team uses .forceready. Works with and without a loaded match. Default: 0", 0, ConVarFlags.FCVAR_NONE, new CounterStrikeSharp.API.Modules.Cvars.Validators.RangeValidator<int>(0, 10));
 
+        public FakeConVar<bool> readyUseKey = new("matchzy_ready_use_key", "Whether the use key (E) readies a player up during the ready phase, on top of .ready. E only readies, it never un-readies. The ready hints then say 'press E'. Default: true", true);
+
         public FakeConVar<bool> readyHintBlinkEnabled = new("matchzy_ready_hint_blink", "Blink the 'YOU ARE NOT READY' line on the HTML READY-UP panel to grab attention. ONLY applies when matchzy_ready_hint_style is 1 (the HTML panel); no effect in classic style (0). Default: false", false);
 
         public FakeConVar<bool> readyClanTagEnabled = new("matchzy_ready_clantag_enabled", "Whether to show [READY] / [UNREADY] clan tags on the scoreboard during the ready phase. Default: true", true);

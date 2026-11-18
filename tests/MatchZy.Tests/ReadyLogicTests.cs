@@ -27,6 +27,16 @@ public class ReadyLogicTests
         => Assert.Equal(expected, ReadyLogic.RequiredOnSide(perTeam, roster, floor));
 
     [Theory]
+    [InlineData(4, 4, 5, 4)]  // 4v4 without rosters: each side needs 4
+    [InlineData(4, 5, 5, 5)]  // 4v5: the short side still needs 5
+    [InlineData(5, 4, 5, 5)]
+    [InlineData(6, 6, 5, 5)]  // never above players_per_team
+    [InlineData(0, 0, 5, 0)]  // nobody there: RequiredOnSide keeps players_per_team
+    [InlineData(3, 0, 5, 3)]  // against a bot team: the humans on the side
+    public void OpenSideSize(int own, int other, int perTeam, int expected)
+        => Assert.Equal(expected, ReadyLogic.OpenSideSize(own, other, perTeam));
+
+    [Theory]
     [InlineData(false, 1, 5, 0, 0)]  // not in the match config
     [InlineData(true, 0, 5, 0, 0)]
     [InlineData(true, 1, 5, 0, 1)]   // panel default 1: one ready player is enough

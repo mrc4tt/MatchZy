@@ -763,6 +763,8 @@
     "matchzy.pracmisc.follownadereturn": "Kërce për t'u kthyer",
     "matchzy.pracmisc.follownadelineup": "Kamera e granatës: automatike për hedhjet nga një vend lineup-i. Kërce për t'u kthyer. (.follownade përsëri: çdo hedhje)",
     "matchzy.pracmisc.follownadealways": "Kamera e granatës: çdo hedhje. Kërce për t'u kthyer. (.follownade përsëri: joaktive)",
+    "matchzy.ready.notreadyuse": "NUK JENI GATI - shtypni E ose .ready",
+    "matchzy.hint.usereadykey": "Shtypni E ose shkruani .ready për t'u bërë gati!",
     "matchzy.dmg.line": "{green}Te: [{0} / {1} goditje]{default} {red}Nga: [{2} / {3} goditje]{default} - {4} ({green}{5} hp{default})",
     "matchzy.dmg.killed": "{green}Te: [{0} / {1} goditje]{default} {red}Nga: [{2} / {3} goditje]{default} - {4} ({red}i vrarë{default})",
     "matchzy.dmg.dead": "{green}Te: [{0} / {1} goditje]{default} {red}Nga: [{2} / {3} goditje]{default} - {4} ({grey}i vdekur{default})"
