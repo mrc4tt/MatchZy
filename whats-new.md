@@ -5,7 +5,7 @@ A short summary of each release. The [full changelog](changelog.md) has the deta
 ## 1.0.26 <small>November 18, 2026</small>
 
 - **New:** Ready up with the use key (E) during the ready phase (`matchzy_ready_use_key`, on by default). `.ready` still works.
-- **New:** A `.matchsetup` match with uneven sides (4v5) starts by itself 20 seconds after everyone is ready (`matchzy_ready_uneven_start_delay`). `.unready` stops the countdown.
+- **New:** A pug with fewer than 10 players (3v3, 4v4, 4v5) starts by itself 20 seconds after everyone is ready, and so does a `.matchsetup` match with uneven sides (`matchzy_ready_short_start_delay`). `.unready` stops the countdown.
 - **New:** (Beta) Spectator coach with `matchzy_coaching_mode 3`: no body, first person on the own team, radar with only the own team and spotted enemies, teammates outlined through walls, no enemy ghosting. See [Coaching](guides/coaching.md#spectator-coach-beta-matchzy_coaching_mode-3).
 - **New:** Grenade follow camera in practice: a throw from a lineup spot is followed by the camera and shows where it lands; jump to come back. `.follownade` sets lineup spots / every throw / off.
 - **New:** Lineup trainer: `.shownades` spots get a glowing figure; near a spot you see the aim targets on the wall, and on the spot a hint box with the keys ("Left Click + Jump").

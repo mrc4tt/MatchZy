@@ -724,7 +724,7 @@ namespace MatchZy
                 }
                 SyncUnreadyChatReminder();
                 HandleJoinStartCountdown();
-                HandleUnevenStartCountdown();
+                HandleShortStartCountdown();
 
                 if (readyHintStyle.Value == 0)
                 {
@@ -2514,6 +2514,10 @@ namespace MatchZy
             {
                 liveRequired = true;
             }
+
+            // The short start countdown (ReadyShortStart.cs) ran out with everyone still ready.
+            if (!isMatchSetup && shortStartNow && gatePlayers > 0 && countOfReadyPlayers >= gatePlayers)
+                liveRequired = true;
 
             if (liveRequired)
             {

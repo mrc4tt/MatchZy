@@ -42,6 +42,15 @@ namespace MatchZy
             return maxMissing < 0 || Math.Abs(side1 - side2) <= maxMissing;
         }
 
+        // A pug with fewer ready players than matchzy_minimum_ready_required: the sides may start
+        // as they stand when both have players and differ by at most maxMissing (-1 = any).
+        public static bool ShortSides(int side1, int side2, int maxMissing)
+        {
+            if (side1 <= 0 || side2 <= 0)
+                return false;
+            return maxMissing < 0 || Math.Abs(side1 - side2) <= maxMissing;
+        }
+
         // The match config's min_players_to_ready when it lets the side ready up with fewer than
         // `required` ready players, raised to the floor. 0 = not set, or not lower than required:
         // then every player the side needs has to be ready.

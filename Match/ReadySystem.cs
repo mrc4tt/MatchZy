@@ -127,7 +127,7 @@ public partial class MatchZy
         {
             int otherSide = side == (int)CsTeam.CounterTerrorist ? (int)CsTeam.Terrorist : (int)CsTeam.CounterTerrorist;
             (int own, _) = GetTeamPlayerCount(side, false);
-            // openSidesOwnSize: the uneven start countdown (ReadyUnevenStart.cs) takes each side
+            // openSidesOwnSize: the uneven start countdown (ReadyShortStart.cs) takes each side
             // at the size it has, so a 4v5 counts as complete.
             int other = openSidesOwnSize || IsBotSide(otherSide) ? 0 : GetTeamPlayerCount(otherSide, false).Item1;
             rosterSize = ReadyLogic.OpenSideSize(own, other, perTeam);

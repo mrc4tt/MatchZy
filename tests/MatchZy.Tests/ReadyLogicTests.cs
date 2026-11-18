@@ -50,6 +50,18 @@ public class ReadyLogicTests
         => Assert.Equal(expected, ReadyLogic.UnevenSides(side1, side2, maxMissing));
 
     [Theory]
+    [InlineData(4, 4, 1, true)]
+    [InlineData(3, 3, 0, true)]
+    [InlineData(4, 5, 1, true)]
+    [InlineData(4, 5, 0, false)]
+    [InlineData(3, 5, 1, false)]
+    [InlineData(1, 5, -1, true)]
+    [InlineData(0, 4, 1, false)]   // one side empty
+    [InlineData(2, 0, -1, false)]
+    public void ShortSides(int side1, int side2, int maxMissing, bool expected)
+        => Assert.Equal(expected, ReadyLogic.ShortSides(side1, side2, maxMissing));
+
+    [Theory]
     [InlineData(false, 1, 5, 0, 0)]  // not in the match config
     [InlineData(true, 0, 5, 0, 0)]
     [InlineData(true, 1, 5, 0, 1)]   // panel default 1: one ready player is enough
