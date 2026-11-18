@@ -92,6 +92,7 @@ Based on [MatchZy](https://github.com/shobhit-pathak/MatchZy) by Shobhit Pathak,
 - Chat translations in Brazilian Portuguese (`pt-BR`) and Turkish (`tr`). Each player sees their own language once they pick it with `!lang`.
 - Leaving practice mode left terrorists with the full practice grenade set and an AK-47 on every spawn: the reset of `mp_t_default_grenades` and `mp_t_default_primary` was missing a space and never ran. The flashbang and per-type grenade limits from practice are now reset too.
 - Unloading MatchZy while practice was on (a host switching the server to retakes, deathmatch or prefire without a map change) kept practice players in noclip and kept respawn on death on. Noclip, `mp_respawn_on_death_ct/t`, `mp_ignore_round_win_conditions` and `mp_respawn_immunitytime` are now reset on unload.
+- `de_cbble` (Cobblestone) is in the default `matchzymaps.cfg`, the map list for the rotation after a match and the `.matchsetup` wizard. The file is only written when it does not exist, so a server that already has one adds the line `de_cbble` itself.
 
 # 1.0.25
 
