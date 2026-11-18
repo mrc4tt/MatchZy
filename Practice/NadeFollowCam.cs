@@ -56,6 +56,10 @@ namespace MatchZy
         private readonly Dictionary<ulong, NadeFollowMode> _nadeFollowEnabled = new();
         private readonly Dictionary<ulong, NadeFollow> _nadeFollows = new();
         private static readonly Color NfTrailColor = Color.FromArgb(255, 0, 200, 255);
+        private const float NfTrailSeconds = 3.0f;
+        // Trail beams waiting to be removed, oldest first (raw handle, Server.CurrentTime to remove at).
+        // Drained from the tick: a timer per beam was ~21 timers a second for every running camera.
+        private readonly Queue<(uint Raw, float KillAt)> _nfTrailBeams = new();
 
         private void RegisterNadeFollowCam()
         {
@@ -158,11 +162,13 @@ namespace MatchZy
 
         public void OnNadeFollowTick()
         {
-            if (_nadeFollows.Count == 0)
+            if (_nadeFollows.Count == 0 && _nfTrailBeams.Count == 0)
                 return;
             try
             {
                 float now = Server.CurrentTime;
+                while (_nfTrailBeams.Count > 0 && _nfTrailBeams.Peek().KillAt <= now)
+                    KillNadeFollowTrailBeam(_nfTrailBeams.Dequeue().Raw);
                 foreach (var (id, f) in _nadeFollows.ToList())
                 {
                     var player = Utilities.GetPlayerFromSteamId(id);
@@ -265,17 +271,18 @@ namespace MatchZy
                 beam.EndPos.Z = to.Z;
                 beam.Teleport(from, new QAngle(0, 0, 0), new Vector(0, 0, 0));
                 beam.DispatchSpawn();
-                // Raw handle + entity IO Kill: the wrapper may point at a freed or reused entity.
-                uint raw = beam.EntityHandle.Raw;
-                AddTimer(3.0f, () =>
-                {
-                    try
-                    {
-                        var b = new CHandle<CBeam>(raw).Value;
-                        if (b != null && b.IsValid) b.AcceptInput("Kill");
-                    }
-                    catch { }
-                }, CounterStrikeSharp.API.Modules.Timers.TimerFlags.STOP_ON_MAPCHANGE);
+                _nfTrailBeams.Enqueue((beam.EntityHandle.Raw, Server.CurrentTime + NfTrailSeconds));
+            }
+            catch { }
+        }
+
+        // Raw handle + entity IO Kill: the wrapper may point at a freed or reused entity.
+        private static void KillNadeFollowTrailBeam(uint raw)
+        {
+            try
+            {
+                var b = new CHandle<CBeam>(raw).Value;
+                if (b != null && b.IsValid) b.AcceptInput("Kill");
             }
             catch { }
         }
@@ -372,8 +379,16 @@ namespace MatchZy
                     }
                 }
             _nadeFollows.Clear();
+            // Map start: the beams went with the old map. Unload: the tick that drains them stops, so
+            // they are removed now. Practice end: the tick keeps removing them as they come due.
+            if (unloading)
+                while (_nfTrailBeams.Count > 0)
+                    KillNadeFollowTrailBeam(_nfTrailBeams.Dequeue().Raw);
             if (mapStart)
+            {
+                _nfTrailBeams.Clear();
                 _nadeFollowEnabled.Clear();
+            }
         }
     }
 }
