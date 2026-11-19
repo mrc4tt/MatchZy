@@ -1,4 +1,5 @@
 using Newtonsoft.Json.Linq;
+using CounterStrikeSharp.API;
 using CounterStrikeSharp.API.Core;
 using CounterStrikeSharp.API.Core.Attributes.Registration;
 using CounterStrikeSharp.API.Core.Translations;
@@ -313,7 +314,28 @@ public partial class MatchZy
             if (playerReadyStatus.TryGetValue(userId, out bool r) && r)
                 ready++;
         }
-        return (players, ready);
+        int testBots = ReadyTestBotsOnSide((int)CsTeam.CounterTerrorist) + ReadyTestBotsOnSide((int)CsTeam.Terrorist);
+        return (players + testBots, ready + testBots);
+    }
+
+    // matchzy_ready_test_bots: bots on T and CT count as players who are ready, so one person can
+    // fill the sides with bot_add_ct / bot_add_t and try the ready rules (3v3, 4v5, the short
+    // start countdown) alone. Bots are never in playerData, so they are counted here; a bot that
+    // is in it anyway is skipped and not counted twice. Off by default: testing only.
+    private int ReadyTestBotsOnSide(int team)
+    {
+        if (!readyTestBots.Value || (team != (int)CsTeam.CounterTerrorist && team != (int)CsTeam.Terrorist))
+            return 0;
+        int bots = 0;
+        foreach (var p in Utilities.GetPlayers())
+        {
+            if (p == null || !p.IsValid || !p.IsBot || p.IsHLTV || p.TeamNum != team)
+                continue;
+            if (p.UserId.HasValue && playerData.ContainsKey(p.UserId.Value))
+                continue;
+            bots++;
+        }
+        return bots;
     }
 
     // .ready / .unready / ping from a spectator or a coach: tell them and ignore it.
@@ -413,7 +435,8 @@ public partial class MatchZy
             }
         }
 
-        return (playerCount, readyCount);
+        int testBots = ReadyTestBotsOnSide(team);
+        return (playerCount + testBots, readyCount + testBots);
     }
 
     // Ready players a side contributes toward matchzy_ready_per_team (capped at N; a ready side
