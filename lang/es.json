@@ -696,6 +696,9 @@
     "matchzy.ready.joinstartcountdown": "Han entrado todos. La partida empieza en {green}{0}{default} segundos.",
     "matchzy.ready.joinstartin": "La partida empieza en {green}{0}{default}...",
     "matchzy.ready.joinstartstopped": "Un jugador se fue. La partida empezará cuando hayan vuelto todos.",
+    "matchzy.ready.shortstartcountdown": "Todos están listos. La partida empieza {0}v{1} en {green}{2}{default} segundos. Escribe {green}.unready{default} para esperar a más jugadores.",
+    "matchzy.ready.shortstartin": "La partida empieza {0}v{1} en {green}{2}{default}...",
+    "matchzy.ready.shortstartstopped": "Cuenta atrás detenida. La partida empieza cuando todos estén listos.",
     "matchzy.pause.techpause.startedunlimited": "{GREEN}{0}{DEFAULT} pidió una pausa técnica.",
     "matchzy.pause.anyonecanunpause": "Se acabó el tiempo de la pausa técnica. Cualquier equipo puede escribir ya {green}.unpause{default}.",
     "matchzy.pause.techhinttime": "{0}: pausa técnica. Cualquier equipo puede reanudar en {1}.",
@@ -762,5 +765,10 @@
     "matchzy.pracmisc.follownadeoff": "Cámara de granada desactivada. (.follownade otra vez: solo puntos de lineup)",
     "matchzy.pracmisc.follownadereturn": "Salta para volver",
     "matchzy.pracmisc.follownadelineup": "Cámara de granada: automática al lanzar desde un punto de lineup. Salta para volver. (.follownade otra vez: todos los lanzamientos)",
-    "matchzy.pracmisc.follownadealways": "Cámara de granada: todos los lanzamientos. Salta para volver. (.follownade otra vez: desactivada)"
+    "matchzy.pracmisc.follownadealways": "Cámara de granada: todos los lanzamientos. Salta para volver. (.follownade otra vez: desactivada)",
+    "matchzy.ready.notreadyuse": "NO ESTÁS LISTO - pulsa E o .ready",
+    "matchzy.hint.usereadykey": "¡Pulsa E o escribe .ready para marcarte como listo!",
+    "matchzy.dmg.line": "{green}A: [{0} / {1} impactos]{default} {red}De: [{2} / {3} impactos]{default} - {4} ({green}{5} hp{default})",
+    "matchzy.dmg.killed": "{green}A: [{0} / {1} impactos]{default} {red}De: [{2} / {3} impactos]{default} - {4} ({red}eliminado{default})",
+    "matchzy.dmg.dead": "{green}A: [{0} / {1} impactos]{default} {red}De: [{2} / {3} impactos]{default} - {4} ({grey}muerto{default})"
 }

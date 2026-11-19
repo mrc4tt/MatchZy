@@ -696,6 +696,9 @@
     "matchzy.ready.joinstartcountdown": "Alle sind beigetreten. Das Match startet in {green}{0}{default} Sekunden.",
     "matchzy.ready.joinstartin": "Das Match startet in {green}{0}{default}...",
     "matchzy.ready.joinstartstopped": "Ein Spieler hat das Spiel verlassen. Das Match startet, sobald wieder alle beigetreten sind.",
+    "matchzy.ready.shortstartcountdown": "Alle sind bereit. Das Match startet {0}v{1} in {green}{2}{default} Sekunden. Schreibe {green}.unready{default}, um auf weitere Spieler zu warten.",
+    "matchzy.ready.shortstartin": "Das Match startet {0}v{1} in {green}{2}{default}...",
+    "matchzy.ready.shortstartstopped": "Countdown gestoppt. Das Match startet, wenn alle bereit sind.",
     "matchzy.pause.techpause.startedunlimited": "{GREEN}{0}{DEFAULT} hat eine technische Pause angefordert.",
     "matchzy.pause.anyonecanunpause": "Die Zeit der technischen Pause ist abgelaufen. Jetzt kann jedes Team {green}.unpause{default} eingeben.",
     "matchzy.pause.techhinttime": "{0}: technische Pause. Jedes Team kann in {1} fortsetzen.",
@@ -762,5 +765,10 @@
     "matchzy.pracmisc.follownadeoff": "Granatenkamera aus. (.follownade erneut: nur Lineup-Punkte)",
     "matchzy.pracmisc.follownadereturn": "Springe, um zurückzukehren",
     "matchzy.pracmisc.follownadelineup": "Granatenkamera: automatisch bei Würfen von einem Lineup-Punkt. Springe, um zurückzukehren. (.follownade erneut: jeder Wurf)",
-    "matchzy.pracmisc.follownadealways": "Granatenkamera: jeder Wurf. Springe, um zurückzukehren. (.follownade erneut: aus)"
+    "matchzy.pracmisc.follownadealways": "Granatenkamera: jeder Wurf. Springe, um zurückzukehren. (.follownade erneut: aus)",
+    "matchzy.ready.notreadyuse": "NICHT BEREIT - drück E oder .ready",
+    "matchzy.hint.usereadykey": "Drück E oder gib .ready ein, um dich bereit zu melden!",
+    "matchzy.dmg.line": "{green}An: [{0} / {1} Treffer]{default} {red}Von: [{2} / {3} Treffer]{default} - {4} ({green}{5} hp{default})",
+    "matchzy.dmg.killed": "{green}An: [{0} / {1} Treffer]{default} {red}Von: [{2} / {3} Treffer]{default} - {4} ({red}getötet{default})",
+    "matchzy.dmg.dead": "{green}An: [{0} / {1} Treffer]{default} {red}Von: [{2} / {3} Treffer]{default} - {4} ({grey}tot{default})"
 }

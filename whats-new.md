@@ -2,18 +2,22 @@
 
 A short summary of each release. The [full changelog](changelog.md) has the details and background for every change.
 
-## 1.0.26 <small>November 15, 2026</small>
+## 1.0.26 <small>November 18, 2026</small>
 
+- **New:** Ready up with the use key (E) during the ready phase (`matchzy_ready_use_key`, on by default). `.ready` still works.
+- **New:** A pug with fewer than 10 players (3v3, 4v4, 4v5) starts by itself 20 seconds after everyone is ready, and so does a `.matchsetup` match with uneven sides (`matchzy_ready_short_start_delay`). `.unready` stops the countdown.
 - **New:** (Beta) Spectator coach with `matchzy_coaching_mode 3`: no body, first person on the own team, radar with only the own team and spotted enemies, teammates outlined through walls, no enemy ghosting. See [Coaching](guides/coaching.md#spectator-coach-beta-matchzy_coaching_mode-3).
 - **New:** Grenade follow camera in practice: a throw from a lineup spot is followed by the camera and shows where it lands; jump to come back. `.follownade` sets lineup spots / every throw / off.
 - **New:** Lineup trainer: `.shownades` spots get a glowing figure; near a spot you see the aim targets on the wall, and on the spot a hint box with the keys ("Left Click + Jump").
 - **New:** Players can vote all chat off with `.mute` (`matchzy_allchat_mute_votes`; `.nochat` with CS2-SimpleAdmin), so the teams can no longer write to each other; admins use `.allchat`.
 - **New:** `.spawns` toggles the practice spawn markers on and off.
 - **New:** Chat in Brazilian Portuguese and Turkish (`!lang pt-BR`, `!lang tr`).
+- **Changed:** The round-end damage report uses the FACEIT layout (`To: [87 / 3 hits] From: [100 / 4 hits] - name (13 hp)`), sorted by damage dealt and in each player's language.
 - **Changed:** Coaches can no longer take control of bots on their team.
 - **Changed:** `matchzy_demo_upload_url ""` and `matchzy_remote_backup_url ""` turn uploads off.
 - **Changed:** The release zip is 2.4 MB with 35 files (was 36 MB unpacked, 59 files): only the Linux and Windows files a server uses, and a slimmer SQLite. Windows servers also get the patched SQLite 3.50.2.
     After updating you can delete the old `runtimes/` folder, `MatchZy.pdb` and `Microsoft.Extensions.*.dll` in the plugin folder.
+- **Fixed:** A `.matchsetup` match played 4v4 (or 3v3) starts when everyone is ready, instead of waiting for 5 players per side until an admin used `.forcestart`.
 - **Fixed:** The bot quota no longer kicks CSTV when it removes bots (a lowered `bot_quota`, or `bot_quota_mode fill` and a player joining a team), so the demo is no longer split in two (`matchzy_cstv_kick_guard`).
 - **Fixed:** Practice `.bot` adds one bot instead of adding two and kicking one.
 - **Fixed:** A server crash when a coach got the bomb (two hand-offs removed the same C4 at once).

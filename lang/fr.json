@@ -696,6 +696,9 @@
     "matchzy.ready.joinstartcountdown": "Tout le monde est là. Le match commence dans {green}{0}{default} secondes.",
     "matchzy.ready.joinstartin": "Le match commence dans {green}{0}{default}...",
     "matchzy.ready.joinstartstopped": "Un joueur est parti. Le match commencera quand tout le monde sera de retour.",
+    "matchzy.ready.shortstartcountdown": "Tout le monde est prêt. Le match commence en {0}v{1} dans {green}{2}{default} secondes. Écris {green}.unready{default} pour attendre d'autres joueurs.",
+    "matchzy.ready.shortstartin": "Le match commence en {0}v{1} dans {green}{2}{default}...",
+    "matchzy.ready.shortstartstopped": "Compte à rebours arrêté. Le match commence quand tout le monde est prêt.",
     "matchzy.pause.techpause.startedunlimited": "{GREEN}{0}{DEFAULT} a demandé une pause technique.",
     "matchzy.pause.anyonecanunpause": "Le temps de pause technique est écoulé. N'importe quelle équipe peut maintenant taper {green}.unpause{default}.",
     "matchzy.pause.techhinttime": "{0} : pause technique. N'importe quelle équipe pourra reprendre dans {1}.",
@@ -762,5 +765,10 @@
     "matchzy.pracmisc.follownadeoff": "Caméra de grenade désactivée. (.follownade à nouveau : points de lineup seulement)",
     "matchzy.pracmisc.follownadereturn": "Saute pour revenir",
     "matchzy.pracmisc.follownadelineup": "Caméra de grenade : automatique pour les lancers depuis un point de lineup. Saute pour revenir. (.follownade à nouveau : tous les lancers)",
-    "matchzy.pracmisc.follownadealways": "Caméra de grenade : tous les lancers. Saute pour revenir. (.follownade à nouveau : désactivée)"
+    "matchzy.pracmisc.follownadealways": "Caméra de grenade : tous les lancers. Saute pour revenir. (.follownade à nouveau : désactivée)",
+    "matchzy.ready.notreadyuse": "PAS PRÊT - appuie sur E ou .ready",
+    "matchzy.hint.usereadykey": "Appuie sur E ou tape .ready pour te mettre prêt !",
+    "matchzy.dmg.line": "{green}À: [{0} / {1} touches]{default} {red}De: [{2} / {3} touches]{default} - {4} ({green}{5} hp{default})",
+    "matchzy.dmg.killed": "{green}À: [{0} / {1} touches]{default} {red}De: [{2} / {3} touches]{default} - {4} ({red}tué{default})",
+    "matchzy.dmg.dead": "{green}À: [{0} / {1} touches]{default} {red}De: [{2} / {3} touches]{default} - {4} ({grey}mort{default})"
 }

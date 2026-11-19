@@ -696,6 +696,9 @@
     "matchzy.ready.joinstartcountdown": "Alle er kommet ind. Kampen starter om {green}{0}{default} sekunder.",
     "matchzy.ready.joinstartin": "Kampen starter om {green}{0}{default}...",
     "matchzy.ready.joinstartstopped": "En spiller forlod serveren. Kampen starter, når alle er inde igen.",
+    "matchzy.ready.shortstartcountdown": "Alle er klar. Kampen starter {0}v{1} om {green}{2}{default} sekunder. Skriv {green}.unready{default} for at vente på flere spillere.",
+    "matchzy.ready.shortstartin": "Kampen starter {0}v{1} om {green}{2}{default}...",
+    "matchzy.ready.shortstartstopped": "Nedtællingen er stoppet. Kampen starter, når alle er klar.",
     "matchzy.pause.techpause.startedunlimited": "{GREEN}{0}{DEFAULT} har anmodet om en teknisk pause.",
     "matchzy.pause.anyonecanunpause": "Tiden for den tekniske pause er gået. Begge hold kan nu skrive {green}.unpause{default}.",
     "matchzy.pause.techhinttime": "{0}: teknisk pause. Begge hold kan unpause om {1}.",
@@ -762,5 +765,10 @@
     "matchzy.pracmisc.follownadeoff": "Granatkamera fra. (.follownade igen: kun lineup-steder)",
     "matchzy.pracmisc.follownadereturn": "Hop for at komme tilbage",
     "matchzy.pracmisc.follownadelineup": "Granatkamera: automatisk ved kast fra et lineup-sted. Hop for at komme tilbage. (.follownade igen: alle kast)",
-    "matchzy.pracmisc.follownadealways": "Granatkamera: alle kast. Hop for at komme tilbage. (.follownade igen: fra)"
+    "matchzy.pracmisc.follownadealways": "Granatkamera: alle kast. Hop for at komme tilbage. (.follownade igen: fra)",
+    "matchzy.ready.notreadyuse": "IKKE KLAR - tryk E eller skriv .ready",
+    "matchzy.hint.usereadykey": "Tryk E eller skriv .ready for at gøre dig klar!",
+    "matchzy.dmg.line": "{green}Til: [{0} / {1} hits]{default} {red}Fra: [{2} / {3} hits]{default} - {4} ({green}{5} hp{default})",
+    "matchzy.dmg.killed": "{green}Til: [{0} / {1} hits]{default} {red}Fra: [{2} / {3} hits]{default} - {4} ({red}dræbt{default})",
+    "matchzy.dmg.dead": "{green}Til: [{0} / {1} hits]{default} {red}Fra: [{2} / {3} hits]{default} - {4} ({grey}død{default})"
 }

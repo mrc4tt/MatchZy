@@ -124,6 +124,12 @@ namespace MatchZy
 
         public FakeConVar<int> readyPerTeam = new("matchzy_ready_per_team", "Per-team ready-up. 0 = off (pug: matchzy_minimum_ready_required players in total, loaded match: every player on both teams). N = a team is ready once N of its players have typed .ready, and the match starts when CT and T are both ready. In a loaded match the team's registered players (its roster, at most players_per_team) must also all be on the side, unless the team uses .forceready. Works with and without a loaded match. Default: 0", 0, ConVarFlags.FCVAR_NONE, new CounterStrikeSharp.API.Modules.Cvars.Validators.RangeValidator<int>(0, 10));
 
+        public FakeConVar<bool> readyUseKey = new("matchzy_ready_use_key", "Whether the use key (E) readies a player up during the ready phase, on top of .ready. E only readies, it never un-readies. The ready hints then say 'press E'. Default: true", true);
+
+        public FakeConVar<int> readyShortStartDelay = new("matchzy_ready_short_start_delay", "When everyone on T and CT is ready but there are fewer players than the match waits for, it starts by itself after this many seconds. Pug: fewer than matchzy_minimum_ready_required (3v3, 4v4, 4v5). Match without listed players and without players_per_team (.matchsetup, \"players\": \"any\"): uneven sides (4v5). .unready or a player joining a side stops the countdown. The sides may differ by at most matchzy_forceready_max_missing players. 0 = off. Default: 20", 20, ConVarFlags.FCVAR_NONE, new CounterStrikeSharp.API.Modules.Cvars.Validators.RangeValidator<int>(0, 300));
+
+        public FakeConVar<bool> readyTestBots = new("matchzy_ready_test_bots", "Testing only: bots on T and CT count as players who are ready, so one person can fill the sides with bot_add_ct / bot_add_t and try the ready rules and the short start countdown alone. Leave off on a server that plays matches. Default: false", false);
+
         public FakeConVar<bool> readyHintBlinkEnabled = new("matchzy_ready_hint_blink", "Blink the 'YOU ARE NOT READY' line on the HTML READY-UP panel to grab attention. ONLY applies when matchzy_ready_hint_style is 1 (the HTML panel); no effect in classic style (0). Default: false", false);
 
         public FakeConVar<bool> readyClanTagEnabled = new("matchzy_ready_clantag_enabled", "Whether to show [READY] / [UNREADY] clan tags on the scoreboard during the ready phase. Default: true", true);

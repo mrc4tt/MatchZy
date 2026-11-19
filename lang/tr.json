@@ -696,6 +696,9 @@
     "matchzy.ready.joinstartcountdown": "Herkes katıldı. Maç {green}{0}{default} saniye içinde başlıyor.",
     "matchzy.ready.joinstartin": "Maç {green}{0}{default} içinde başlıyor...",
     "matchzy.ready.joinstartstopped": "Bir oyuncu ayrıldı. Herkes tekrar katıldığında maç başlayacak.",
+    "matchzy.ready.shortstartcountdown": "Herkes hazır. Maç {0}v{1} olarak {green}{2}{default} saniye sonra başlıyor. Daha fazla oyuncu beklemek için {green}.unready{default} yaz.",
+    "matchzy.ready.shortstartin": "Maç {0}v{1} olarak {green}{2}{default} içinde başlıyor...",
+    "matchzy.ready.shortstartstopped": "Geri sayım durdu. Maç herkes hazır olunca başlar.",
     "matchzy.pause.techpause.startedunlimited": "{GREEN}{0}{DEFAULT} teknik mola istedi.",
     "matchzy.pause.anyonecanunpause": "Teknik mola süresi doldu. Artık iki takımdan biri {green}.unpause{default} yazabilir.",
     "matchzy.pause.techhinttime": "{0}: teknik mola. Takımlardan biri {1} içinde devam ettirebilir.",
@@ -762,5 +765,10 @@
     "matchzy.pracmisc.follownadeoff": "Bomba takip kamerası kapalı. (.follownade tekrar: yalnızca lineup noktaları)",
     "matchzy.pracmisc.follownadereturn": "Geri dönmek için zıpla",
     "matchzy.pracmisc.follownadelineup": "Bomba takip kamerası: lineup noktasından yapılan atışlarda otomatik. Geri dönmek için zıpla. (.follownade tekrar: her atış)",
-    "matchzy.pracmisc.follownadealways": "Bomba takip kamerası: her atış. Geri dönmek için zıpla. (.follownade tekrar: kapalı)"
+    "matchzy.pracmisc.follownadealways": "Bomba takip kamerası: her atış. Geri dönmek için zıpla. (.follownade tekrar: kapalı)",
+    "matchzy.ready.notreadyuse": "HAZIR DEĞİLSİN - E'ye bas veya .ready",
+    "matchzy.hint.usereadykey": "Hazır olmak için E'ye bas veya .ready yaz!",
+    "matchzy.dmg.line": "{green}Verilen: [{0} / {1} isabet]{default} {red}Alınan: [{2} / {3} isabet]{default} - {4} ({green}{5} hp{default})",
+    "matchzy.dmg.killed": "{green}Verilen: [{0} / {1} isabet]{default} {red}Alınan: [{2} / {3} isabet]{default} - {4} ({red}öldürdün{default})",
+    "matchzy.dmg.dead": "{green}Verilen: [{0} / {1} isabet]{default} {red}Alınan: [{2} / {3} isabet]{default} - {4} ({grey}ölü{default})"
 }
