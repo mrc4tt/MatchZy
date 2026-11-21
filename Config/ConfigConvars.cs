@@ -253,7 +253,7 @@ namespace MatchZy
             resetCvarsOnSeriesEnd = ParseCvarBool(args, resetCvarsOnSeriesEnd);
         }
 
-        [ConsoleCommand("matchzy_minimum_ready_required", "Minimum ready players required to start the match. Default: 10")]
+        [ConsoleCommand("matchzy_minimum_ready_required", "Minimum ready players required to start the match. Default: 2")]
         public void MatchZyMinimumReadyRequired(CCSPlayerController? player, CommandInfo command)
         {
             if (player != null)

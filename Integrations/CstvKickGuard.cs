@@ -37,7 +37,6 @@ namespace MatchZy
                 _kickBotFromTeam = new MemoryFunctionWithReturn<int, bool>(sig);
                 _kickBotFromTeamHook = OnKickBotFromTeam;
                 _kickBotFromTeam.Hook(_kickBotFromTeamHook, HookMode.Pre);
-                Log("[CstvKickGuard] KickBotFromTeam hooked: the bot quota no longer kicks the CSTV client.");
             }
             catch (Exception e)
             {
