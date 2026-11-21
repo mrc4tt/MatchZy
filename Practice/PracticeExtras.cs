@@ -17,6 +17,7 @@ namespace MatchZy
             RegisterNadeTutorial();
             RegisterNadeFollowCam();
             RegisterListener<Listeners.OnTick>(OnRunBoostTick);
+            RegisterListener<Listeners.OnTick>(OnBotJumpTick);
             RegisterListener<Listeners.OnServerPostEntityThink>(OnPracticeBuyZonePostThink);
             RegisterListener<Listeners.OnPlayerButtonsChanged>(OnBotSpawnMarkerButtonHandler);
             RegisterEventHandler<EventPlayerDeath>(OnPracticeDeathPre, HookMode.Pre);
@@ -126,6 +127,7 @@ namespace MatchZy
             ResetBotLoadouts();
             ResetRunBoosts();
             ResetXray();
+            ResetPracticeMovement();
             ResetStrats();
             ResetUtilityExpire();
             ResetSmokeSpawnTimer();
@@ -158,6 +160,8 @@ namespace MatchZy
             catch (Exception e) { Log($"[PracticeExtras] unload trainer: {e.Message}"); }
             try { ResetXray(); }
             catch (Exception e) { Log($"[PracticeExtras] unload xray: {e.Message}"); }
+            try { ResetPracticeMovement(); }
+            catch (Exception e) { Log($"[PracticeExtras] unload movement: {e.Message}"); }
             try { RefreshGlowAssertQuiet(forceOff: true); }
             catch (Exception e) { Log($"[PracticeExtras] unload assert: {e.Message}"); }
         }
@@ -186,6 +190,8 @@ namespace MatchZy
                 case ".playgroup": HandleStratCommand(player, arg); return true;
                 case ".strats": OnStratsMenuCommand(player, null); return true;
                 case ".xray": OnXrayConsoleCommand(player, null); return true;
+                case ".jump": OnBotJumpConsoleCommand(player, null); return true;
+                case ".bhop": OnBhopConsoleCommand(player, null); return true;
                 case ".expire": OnExpireConsoleCommand(player, null); return true;
                 case ".smoketimer": OnSmokeTimerConsoleCommand(player, null); return true;
                 case ".shownades": ShowNadesWithFilter(player, arg); return true;
