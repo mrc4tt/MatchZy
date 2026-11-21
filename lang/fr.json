@@ -252,6 +252,8 @@
     "matchzy.px.runboostbusy": "Ce bot est déjà utilisé (.runboost ou .replay).",
     "matchzy.px.xrayon": "Xray {green}ACTIVÉ{silver} : les joueurs sont visibles à travers les murs.",
     "matchzy.px.xrayoff": "Xray {red}DÉSACTIVÉ{silver}.",
+    "matchzy.px.bhopon": "Auto bunnyhop {green}ACTIVÉ{silver} : maintenez saut.",
+    "matchzy.px.bhopoff": "Auto bunnyhop {red}DÉSACTIVÉ{silver}.",
     "matchzy.rp.notalive": "Tu dois être vivant en T ou CT pour enregistrer un trajet.",
     "matchzy.rp.recstart": "Enregistrement de ton trajet {green}lancé{silver} (max {0} s). Tape {green}.rec{silver} ou {green}.stoprecord{silver}, fais un double clic droit ou appuie sur {green}Shift + E{silver} pour arrêter.",
     "matchzy.rp.reccountdown": "L'enregistrement commence dans {green}{0}{silver} secondes, tu es figé jusque-là.",

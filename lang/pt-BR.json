@@ -252,6 +252,8 @@
     "matchzy.px.runboostbusy": "Esse bot já está em uso (.runboost ou .replay).",
     "matchzy.px.xrayon": "Xray {green}LIGADO{silver}: os jogadores brilham através das paredes.",
     "matchzy.px.xrayoff": "Xray {red}DESLIGADO{silver}.",
+    "matchzy.px.bhopon": "Auto bunnyhop {green}LIGADO{silver}: segure o pulo.",
+    "matchzy.px.bhopoff": "Auto bunnyhop {red}DESLIGADO{silver}.",
     "matchzy.rp.notalive": "Você precisa estar vivo no T ou CT para gravar um caminho.",
     "matchzy.rp.recstart": "Gravação do seu caminho {green}iniciada{silver} (máx. {0} s). Digite {green}.rec{silver} ou {green}.stoprecord{silver}, dê um duplo clique direito ou aperte {green}Shift + E{silver} para parar.",
     "matchzy.rp.reccountdown": "A gravação começa em {green}{0}{silver} segundos, você fica congelado até lá.",

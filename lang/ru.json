@@ -252,6 +252,8 @@
     "matchzy.px.runboostbusy": "Этот бот уже занят (.runboost или .replay).",
     "matchzy.px.xrayon": "Xray {green}ВКЛ{silver}: игроки подсвечиваются сквозь стены.",
     "matchzy.px.xrayoff": "Xray {red}ВЫКЛ{silver}.",
+    "matchzy.px.bhopon": "Авто-банихоп {green}ВКЛ{silver}: удерживайте прыжок.",
+    "matchzy.px.bhopoff": "Авто-банихоп {red}ВЫКЛ{silver}.",
     "matchzy.rp.notalive": "Чтобы записать путь, нужно быть живым за T или CT.",
     "matchzy.rp.recstart": "Запись твоего пути {green}началась{silver} (макс. {0} с). Чтобы остановить, напиши {green}.rec{silver} или {green}.stoprecord{silver}, сделай двойной клик ПКМ или нажми {green}Shift + E{silver}.",
     "matchzy.rp.reccountdown": "Запись начнётся через {green}{0}{silver} сек., до этого ты заморожен.",

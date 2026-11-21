@@ -252,6 +252,8 @@
     "matchzy.px.runboostbusy": "Den bot er allerede i brug (.runboost eller .replay).",
     "matchzy.px.xrayon": "Xray {green}TIL{default}: spillere lyser gennem vægge.",
     "matchzy.px.xrayoff": "Xray {red}FRA{default}.",
+    "matchzy.px.bhopon": "Auto bunnyhop {green}TIL{default}: hold hop nede.",
+    "matchzy.px.bhopoff": "Auto bunnyhop {red}FRA{default}.",
     "matchzy.rp.notalive": "Du skal være i live på T eller CT for at optage en rute.",
     "matchzy.rp.recstart": "Optagelse af din rute er {green}startet{default} (maks {0} s). Skriv {green}.rec{default} eller {green}.stoprecord{default}, dobbelt højreklik eller tryk {green}Shift + E{default} for at stoppe.",
     "matchzy.rp.reccountdown": "Optagelsen starter om {green}{0}{default} sekunder, du er frosset indtil da.",

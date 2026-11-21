@@ -252,6 +252,8 @@
     "matchzy.px.runboostbusy": "Den boten er allerede i bruk (.runboost eller .replay).",
     "matchzy.px.xrayon": "Xray {green}PÅ{silver}: spillere lyser gjennom vegger.",
     "matchzy.px.xrayoff": "Xray {red}AV{silver}.",
+    "matchzy.px.bhopon": "Auto bunnyhop {green}PÅ{silver}: hold hopp inne.",
+    "matchzy.px.bhopoff": "Auto bunnyhop {red}AV{silver}.",
     "matchzy.rp.notalive": "Du må være i live på T eller CT for å ta opp en rute.",
     "matchzy.rp.recstart": "Opptak av ruten din {green}startet{silver} (maks {0} s). Skriv {green}.rec{silver} eller {green}.stoprecord{silver}, dobbelt høyreklikk eller trykk {green}Shift + E{silver} for å stoppe.",
     "matchzy.rp.reccountdown": "Opptaket starter om {green}{0}{silver} sekunder, du er frosset til da.",
