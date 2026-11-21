@@ -45,6 +45,7 @@ A short summary of each release. The [full changelog](changelog.md) has the deta
 - **Fixed:** Practice: `.boost` bots no longer respawn tilted, and you stay upright when lifted onto the bot.
 - **Fixed:** Practice: a placed bot looks up or down the way you did when you placed it, and stays upright.
 - **Changed:** Practice: a killed bot respawns right away instead of after the death animation.
+- **Changed:** Practice: `.bot` can add more than five bots per side.
 - **Changed:** Practice: the grenade preview camera starts off; turn it on with `.cam`, `.preview` or `.pip`.
 - **Changed:** Practice: `.spawns` boxes face the spawn's direction; no chat line when toggled.
 - **Changed:** Practice: xray is on when practice starts (T red, CT blue); `.xray` turns it off.

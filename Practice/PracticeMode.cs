@@ -2016,6 +2016,7 @@ namespace MatchZy
                 }
 
                 isSpawningBot = true;
+                RaisePracticeTeamSize();
 
                 // Determine target team
                 CsTeam targetTeam =
@@ -4158,6 +4159,7 @@ namespace MatchZy
             Server.ExecuteCommand("buddha 0; buddha_ignore_bots 0; sv_full_alltalk 0; sv_showimpacts 0;");
             // A .bot still waiting for its bot holds the quota think (HoldBotQuotaAdds).
             ReleaseBotQuotaAdds();
+            RestorePracticeTeamSize();
             // .bot / .botshoot set bot_stop/bot_freeze/bot_zombie 1 and bot_dont_shoot 1. They are cheat
             // cvars, so they can only be reset while sv_cheats is still on (same as LeaveModeOnUnload);
             // left at 1 the warmup and match bots stood still and never fired. bot_difficulty is left
