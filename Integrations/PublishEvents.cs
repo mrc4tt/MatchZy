@@ -35,12 +35,15 @@ namespace MatchZy
         // as the match runs. Past this many waiting events the high-volume live ones are dropped at
         // the door; match events are always queued.
         private const int MaxQueuedEventsBeforeLiveDrop = 2000;
+        // Events written and not yet taken by the sender. Counted here because the channel cannot
+        // say: an unbounded single-reader channel throws NotSupportedException from Reader.Count.
+        private int _eventQueueDepth;
         private int _liveEventsDroppedQueueFull;
 
         private Task EnqueueEvent(MatchZyEvent @event, RemoteLogTarget target, long matchId)
         {
             var sent = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-            if (_eventQueue.Reader.Count >= MaxQueuedEventsBeforeLiveDrop && IsHighVolumeLiveEvent(@event))
+            if (System.Threading.Volatile.Read(ref _eventQueueDepth) >= MaxQueuedEventsBeforeLiveDrop && IsHighVolumeLiveEvent(@event))
             {
                 System.Threading.Interlocked.Increment(ref _liveEventsDroppedQueueFull);
                 sent.TrySetResult();
@@ -48,7 +51,9 @@ namespace MatchZy
             }
             if (System.Threading.Interlocked.Exchange(ref _eventSenderStarted, 1) == 0)
                 Task.Run(RunEventSenderAsync);
-            if (!_eventQueue.Writer.TryWrite(new QueuedEvent(@event, target, matchId, sent)))
+            if (_eventQueue.Writer.TryWrite(new QueuedEvent(@event, target, matchId, sent)))
+                System.Threading.Interlocked.Increment(ref _eventQueueDepth);
+            else
                 sent.TrySetResult(); // queue closed (plugin unloading): drop
             return sent.Task;
         }
@@ -111,6 +116,7 @@ namespace MatchZy
             {
                 await foreach (var item in _eventQueue.Reader.ReadAllAsync(token).ConfigureAwait(false))
                 {
+                    System.Threading.Interlocked.Decrement(ref _eventQueueDepth);
                     try
                     {
                         int queueFullDrops = System.Threading.Interlocked.Exchange(ref _liveEventsDroppedQueueFull, 0);
