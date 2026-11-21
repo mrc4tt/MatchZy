@@ -5449,6 +5449,38 @@ namespace MatchZy
             FlattenBodyRotationFrames(player, angle.Y, 6);
         }
 
+        // Practice bot placement that keeps the look direction. In CS:GO a teleport angle with
+        // pitch only moved the view; in CS2 Teleport writes the whole angle into the model
+        // transform, so a bot placed while its owner looks up or down tilts and clips into the
+        // floor. The body is therefore teleported with yaw only, and the pitch goes to the view
+        // alone through setang (the same split .botshoot uses for its aim). Deferred one frame so
+        // it lands after the teleport, and sent twice because a respawning bot can have its view
+        // reset once more by the spawn itself.
+        public static void TeleportBotUpright(CCSPlayerController? bot, Vector position, QAngle angle)
+        {
+            if (bot == null || !bot.IsValid || bot.PlayerPawn.Value == null)
+                return;
+            float yaw = angle.Y;
+            float pitch = Math.Clamp(angle.X, -89f, 89f);
+            TeleportUpright(bot, position, new QAngle(0, yaw, 0));
+            if (Math.Abs(pitch) < 0.5f)
+                return;
+            string setang = string.Create(CultureInfo.InvariantCulture, $"setang {pitch:R} {yaw:R} 0");
+            ApplyBotLookFrames(bot, setang, 2);
+        }
+
+        private static void ApplyBotLookFrames(CCSPlayerController bot, string setang, int frames)
+        {
+            Server.NextFrame(() =>
+            {
+                if (!bot.IsValid || !bot.IsBot || !bot.PawnIsAlive || bot.PlayerPawn.Value == null)
+                    return;
+                bot.ExecuteClientCommandFromServer(setang);
+                if (frames > 1)
+                    ApplyBotLookFrames(bot, setang, frames - 1);
+            });
+        }
+
         // Server-side weapon switch by classname. CS2's `use weapon_x` / `slotN`
         // console commands do NOT switch when issued via ExecuteClientCommand on
         // this build, so we set the active-weapon handle directly (same mechanism
