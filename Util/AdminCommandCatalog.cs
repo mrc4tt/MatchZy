@@ -121,24 +121,28 @@ namespace MatchZy
             if (denied.Count > 0)
                 player.PrintToChat($" {ChatColors.Grey}{denied.Count} more need extra flags. Full list with required flags in console.");
 
-            // Console: everything, with the gate each one needs.
-            player.PrintToConsole("\n" + new string('=', 60));
-            player.PrintToConsole("MATCHZY ADMIN COMMANDS - [x] = you can use, [ ] = missing permission");
-            player.PrintToConsole(new string('=', 60));
-            string? lastCategory = null;
+            // Console: the same table as .help. First what this player can run, by category, then
+            // what they cannot, with the permission each one needs.
+            var sections = new List<HelpTableLogic.Section>();
+            HelpTableLogic.Section? current = null;
             foreach (var c in AdminCommandCatalog)
             {
-                if (c.Category != lastCategory)
-                {
-                    player.PrintToConsole($"\n[{c.Category}]");
-                    lastCategory = c.Category;
-                }
-                bool ok = IsPlayerAdmin(player, c.PermissionKey, c.Permissions);
-                player.PrintToConsole($" [{(ok ? "x" : " ")}] {c.Display,-52} {c.Description}");
-                if (!ok)
-                    player.PrintToConsole($"      needs: {DescribePerms(c.Permissions)}");
+                if (denied.Contains(c))
+                    continue;
+                if (current == null || current.Title != c.Category)
+                    sections.Add(current = new HelpTableLogic.Section(c.Category));
+                current.Rows.Add((c.Display, c.Description));
             }
-            player.PrintToConsole("\nFlag reference (SourceMod letters): g=@css/map (modes, prac, map), i=@css/config (match control), j=@css/chat (.asay), z=root (everything).");
+            if (denied.Count > 0)
+            {
+                var missing = new HelpTableLogic.Section("Not available to you (missing permission)");
+                foreach (var c in denied)
+                    missing.Rows.Add((c.Display, $"{c.Description} (needs {DescribePerms(c.Permissions)})"));
+                sections.Add(missing);
+            }
+            foreach (string line in HelpTableLogic.Format($"MatchZy - Admin commands ({allowedCount}/{AdminCommandCatalog.Length} available to you)", null, sections))
+                player.PrintToConsole(line);
+            player.PrintToConsole("Flag reference (SourceMod letters): g=@css/map (modes, prac, map), i=@css/config (match control), j=@css/chat (.asay), z=root (everything).");
             player.PrintToConsole("Player/practice commands: .help");
         }
     }

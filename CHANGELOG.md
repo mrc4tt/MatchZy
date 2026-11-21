@@ -100,6 +100,8 @@ Based on [MatchZy](https://github.com/shobhit-pathak/MatchZy) by Shobhit Pathak,
 - Practice: xray (players and bots glow through walls) is on when practice starts. `.xray` turns it off and on again. Terrorists glow red (was orange), counter-terrorists blue. Starting a dry run turns xray off.
 - Practice: `.jump` makes the bot at your aim jump once on its spot. `.bhop` turns auto bunnyhop (hold jump) on and off for everyone on the server. `.r` respawns you while in practice (outside practice it is still ready / unpause).
 - `.help` prints the commands of the current mode to the console as a table (command and description in two columns, grouped in sections), now also in match, scrim, warmup, veto and dry run, with the admin commands you are allowed to use. The practice list uses the same table.
+- `.mhelp` prints the admin commands to the console as the same table: the ones you can run by category, then the ones you cannot with the permission each needs.
+- An admin who joins gets one short chat line with the mode, the mode commands, `.ma` and `.mhelp`, instead of a long mode line followed by a second admin hint.
 - Practice: when a grenade rethrow signature does not resolve on this server, the console says so when practice starts (`Grenade rethrow factories resolved: 3/4 (windows)`) with the reason for each one. Nothing is printed when all four resolve. A grenade from `.rt` / `.throw` that bounces without ever detonating means its signature did not resolve.
 
 # 1.0.25

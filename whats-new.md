@@ -50,6 +50,7 @@ A short summary of each release. The [full changelog](changelog.md) has the deta
 - **Changed:** Practice: xray is on when practice starts (T red, CT blue); `.xray` turns it off.
 - **New:** Practice: `.jump` (bot at your aim jumps), `.bhop` (auto bunnyhop) and `.r` (respawn yourself).
 - **Changed:** `.help` prints a tidy command table to the console in every mode.
+- **Changed:** `.mhelp` prints the admin commands as the same console table, and the admin chat hints on joining are one short line.
 - **Fixed:** Practice: the console now says at practice start when a grenade rethrow signature did not resolve (`.rt` / `.throw` grenades that bounce and never detonate).
 - **Security:** A failed demo upload no longer logs the S3 signature details.
 
