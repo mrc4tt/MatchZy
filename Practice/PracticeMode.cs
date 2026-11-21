@@ -1125,6 +1125,8 @@ namespace MatchZy
             public uint Label;
             public bool Highlighted;
             public float FloorZ;
+            public float X, Y;
+            public bool Hidden;
         }
         readonly List<SpawnMarkerVisual> spawnMarkerVisuals = new();
         static readonly Color spawnMarkerHoverColor = Color.Lime;
@@ -1139,6 +1141,8 @@ namespace MatchZy
             spawnMarkerVisuals.Add(visual);
             Vector p = spawn.PlayerPosition;
             visual.FloorZ = SpawnMarkerFloorZ(p);
+            visual.X = p.X;
+            visual.Y = p.Y;
             float z = visual.FloorZ + spawnMarkerFloorLift;
             foreach (float half in new[] { spawnMarkerHalfSize })
             {
@@ -1297,6 +1301,30 @@ namespace MatchZy
             return result;
         }
 
+        // A beam with one end behind the viewer is drawn as a huge band across the whole screen
+        // (seen live: standing on or next to a spawn box covered the view in its colour). The
+        // outline of a box is therefore not drawn while a player stands this close to it; the
+        // number stays. Shared entities: it is hidden for everyone, which only matters to someone
+        // watching the exact box another player stands on.
+        const float spawnMarkerHideDistance = 110.0f;
+        const float spawnMarkerHideHeight = 160.0f;
+
+        private void SetSpawnMarkerHidden(SpawnMarkerVisual visual, bool hidden)
+        {
+            if (visual.Hidden == hidden)
+                return;
+            visual.Hidden = hidden;
+            const uint EF_NODRAW = 0x20;
+            foreach (uint raw in visual.Edges)
+            {
+                var beam = new CHandle<CBeam>(raw).Value;
+                if (beam == null || !beam.IsValid)
+                    continue;
+                beam.Effects = hidden ? beam.Effects | EF_NODRAW : beam.Effects & ~EF_NODRAW;
+                Utilities.SetStateChanged(beam, "CBaseEntity", "m_fEffects");
+            }
+        }
+
         // Recolor one marker's box and number (hover highlight). Shared entities, so every player
         // sees it; in practice that only shows where someone is aiming.
         private void SetSpawnMarkerHighlight(SpawnMarkerVisual visual, bool on)
@@ -1349,10 +1377,14 @@ namespace MatchZy
                 if (!spawnMarkersActive || !isPractice)
                     return;
                 var hovered = new HashSet<int>();
+                var eyes = new List<(float X, float Y, float Z)>();
                 foreach (var player in Utilities.GetPlayers())
                 {
                     if (!IsHumanPlayerValid(player) || !player.UserId.HasValue)
                         continue;
+                    var origin = player.PlayerPawn.Value?.AbsOrigin;
+                    if (origin != null)
+                        eyes.Add((origin.X, origin.Y, origin.Z));
                     int uid = player.UserId.Value;
                     int index = TargetSpawnMarkerIndex(player);
                     if (index >= 0)
@@ -1370,7 +1402,22 @@ namespace MatchZy
                     }
                 }
                 for (int i = 0; i < spawnMarkerVisuals.Count; i++)
-                    SetSpawnMarkerHighlight(spawnMarkerVisuals[i], hovered.Contains(i));
+                {
+                    var v = spawnMarkerVisuals[i];
+                    SetSpawnMarkerHighlight(v, hovered.Contains(i));
+                    bool near = false;
+                    foreach (var e in eyes)
+                    {
+                        float dx = e.X - v.X, dy = e.Y - v.Y;
+                        if (dx * dx + dy * dy < spawnMarkerHideDistance * spawnMarkerHideDistance
+                            && Math.Abs(e.Z - v.FloorZ) < spawnMarkerHideHeight)
+                        {
+                            near = true;
+                            break;
+                        }
+                    }
+                    SetSpawnMarkerHidden(v, near);
+                }
             }
             catch (Exception e)
             {
