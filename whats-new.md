@@ -8,6 +8,7 @@ A short summary of each release. The [full changelog](changelog.md) has the deta
 - **New:** Grenade follow camera in practice: a throw from a lineup spot is followed by the camera and shows where it lands; jump to come back. `.follownade` sets lineup spots / every throw / off.
 - **New:** Lineup trainer: `.shownades` spots get a glowing figure; near a spot you see the aim targets on the wall, and on the spot a hint box with the keys ("Left Click + Jump").
 - **New:** Players can vote all chat off with `.mute` (`matchzy_allchat_mute_votes`; `.nochat` with CS2-SimpleAdmin), so the teams can no longer write to each other; admins use `.allchat`.
+- **Changed:** `matchzy_minimum_ready_required` defaults to 2 (was 10). Existing config.cfg files keep their value.
 - **New:** `.spawns` toggles the practice spawn markers on and off.
 - **New:** Chat translations in Brazilian Portuguese and Turkish (`!lang pt-BR`, `!lang tr`).
 - **Changed:** Coaches can no longer take control of bots on their team.
