@@ -63,12 +63,13 @@ namespace MatchZy
                     AddTimer(0.5f, () => RespawnTrackedBotIfDead(b), TimerFlags.STOP_ON_MAPCHANGE);
                     if (b.IsValid && !b.PawnIsAlive)
                     {
-                        // One second apart: AddBot handles one bot at a time.
-                        float at = 1.0f + replaced++ * 1.0f;
+                        // Right after the second respawn try, then 0.6 s apart: AddBot handles
+                        // one bot at a time (0.3 s for the kick, 0.1 s or more for the claim).
+                        float at = 0.6f + replaced++ * 0.6f;
                         AddTimer(at, () => ReplaceDeadTrackedBot(b, caller), TimerFlags.STOP_ON_MAPCHANGE);
                     }
                 }
-                AddTimer(2.0f + replaced * 1.0f, () =>
+                AddTimer(1.2f + replaced * 0.6f, () =>
                 {
                     if (isPractice && botRespawnEnabled)
                         Server.ExecuteCommand("mp_ignore_round_win_conditions 0");

@@ -76,22 +76,6 @@ namespace MatchZy
             }
         }
 
-        private string TeamSizeStateForLog()
-        {
-            try
-            {
-                var rules = GetGameRules();
-                if (rules == null)
-                    return "no game rules";
-                return $"players T {rules.NumTerrorist} CT {rules.NumCT}, team size T {rules.MaxNumTerrorists} CT {rules.MaxNumCTs}, "
-                    + $"spawn points T {rules.SpawnPointCount_Terrorist} CT {rules.SpawnPointCount_CT}";
-            }
-            catch (Exception e)
-            {
-                return e.Message;
-            }
-        }
-
         private void RestorePracticeTeamSize()
         {
             try
