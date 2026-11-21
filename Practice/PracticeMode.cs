@@ -1708,7 +1708,16 @@ namespace MatchZy
             }
         }
 
-        private const int MaxPracticeBots = 5;
+        // Practice bots have no fixed cap: the free player slots are the limit. Listen servers can
+        // report a bogus Server.MaxPlayers (1), so that value is not trusted there.
+        private static int FreePracticeBotSlots()
+        {
+            int max = Server.MaxPlayers;
+            if (max <= 1)
+                return 64;
+            int occupied = Utilities.GetPlayers().Count(p => p?.IsValid == true && p.Connected == PlayerConnectedState.Connected);
+            return Math.Max(0, max - occupied);
+        }
 
         // Cached so the "bots are disabled" line is logged once per load, not on every .bot.
         private static bool? noBotsFlag;
@@ -1766,14 +1775,6 @@ namespace MatchZy
 
         private bool CanSpawnAnotherBot(CCSPlayerController? player)
         {
-            // Count current bots
-            int currentBotCount = Utilities.GetPlayers().Count(p => p?.IsValid == true && p.IsBot && !p.IsHLTV);
-            if (currentBotCount >= MaxPracticeBots)
-            {
-                player?.PrintToChat($" {ChatColors.Green}[MatchZy] {ChatColors.White}{Localizer.ForPlayer(player, "matchzy.prac.maxbots", MaxPracticeBots)}");
-                return false;
-            }
-
             // Protect the CSTV bot: bot_add on a full server makes the engine free a slot, and the
             // slot it takes is the CSTV bot's - which kicks CSTV and kills GOTV/demo recording. Count
             // every occupied slot (humans, bots AND CSTV) and refuse the spawn when there is no free
