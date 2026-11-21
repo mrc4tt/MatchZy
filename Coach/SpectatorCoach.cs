@@ -121,11 +121,22 @@ public partial class MatchZy
         try
         {
             // Resolved by name only: a hardcoded id would hook whatever message has that id on a
-            // build where the numbering moved.
+            // build where the numbering moved. The registry is keyed by the protobuf message name
+            // (CCSUsrMsg_...), not by the enum name (CS_UM_...), so the message name is tried
+            // first; the enum name stays as a last resort.
             int umId = 0;
-            try { umId = UserMessage.FindIdByName("CS_UM_ProcessSpottedEntityUpdate"); } catch { umId = 0; }
+            foreach (string candidate in new[]
+            {
+                "CCSUsrMsg_ProcessSpottedEntityUpdate",
+                "ProcessSpottedEntityUpdate",
+                "CS_UM_ProcessSpottedEntityUpdate",
+            })
+            {
+                try { umId = UserMessage.FindIdByName(candidate); } catch { umId = 0; }
+                if (umId > 0) break;
+            }
             if (umId <= 0)
-                Log("[SpectatorCoach] CS_UM_ProcessSpottedEntityUpdate not found; radar message hook skipped.");
+                Log("[SpectatorCoach] ProcessSpottedEntityUpdate not found under any name; radar message hook skipped.");
             else
             HookUserMessage(umId, um =>
             {
