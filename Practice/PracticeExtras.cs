@@ -16,6 +16,7 @@ namespace MatchZy
             RegisterListener<Listeners.OnTick>(OnPathReplayTick);
             RegisterNadeTutorial();
             RegisterNadeFollowCam();
+            RegisterListener<Listeners.OnServerPostEntityThink>(OnPathReplayPostThink);
             RegisterListener<Listeners.OnTick>(OnRunBoostTick);
             RegisterListener<Listeners.OnServerPostEntityThink>(OnPracticeBuyZonePostThink);
             RegisterListener<Listeners.OnPlayerButtonsChanged>(OnBotSpawnMarkerButtonHandler);
