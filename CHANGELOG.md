@@ -8,6 +8,7 @@ Based on [MatchZy](https://github.com/shobhit-pathak/MatchZy) by Shobhit Pathak,
 
 - Spectator coach (mode 3): at halftime and overtime the coach no longer briefly follows, sees and talks to the other team between the last round of the half and the side swap. MatchZy swaps its side data at round end, but the engine moves the players only at the next round start; the coach now follows the engine's sides.
 - Spectator coach: unloading or reloading MatchZy puts back sv_coaching_enabled, mp_forcecamera, bot_controllable, the coach comm patch and the coach's own game settings. Left on, sv_coaching_enabled could crash the next round start once MatchZy's guard was gone.
+- `matchzy_minimum_ready_required` defaults to 2 (was 10): a pug starts once two players are ready. Set it to 10 to wait for a full 5v5. A config.cfg already on the server keeps its value.
 - Practice: leaving practice mode turns infinite ammo off before cheats go off. It was sent after, so the server refused it and wrote "Convar 'sv_infinite_ammo' is cheat protected, change ignored" to the console. The same line is gone from the mode cfg files (warmup, live, scrim, dry run, sleep, hill), where it could only produce that message; remove `sv_infinite_ammo 0` from your own copies to silence it there.
 - Spectator coach: a coach who disconnects no longer leaves the engine coach flag behind for the next player in that slot.
 - Spectator coach: coaches listed under "coaches" in the match config become spectator coaches in mode 3 instead of coaches with a body.
