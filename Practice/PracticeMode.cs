@@ -2214,7 +2214,8 @@ namespace MatchZy
                         {
                             // Upright, like the first placement: the saved angle carries the owner's
                             // view pitch, and a plain teleport writes it into the model transform.
-                            TeleportUpright(player, botPosition.PlayerPosition, botPosition.PlayerAngle);
+                            TeleportBotUpright(player, botPosition.PlayerPosition, botPosition.PlayerAngle);
+                            GuardBotPlacement(player, botPosition, null, false);
                             bool isCrouched = (bool)botData["crouchstate"];
                             if (isCrouched)
                             {
@@ -2418,7 +2419,8 @@ namespace MatchZy
 
                 // Teleport bot to stored position, upright (the saved angle carries the owner's view
                 // pitch, and a plain teleport writes it into the model transform).
-                TeleportUpright(player, botPosition.PlayerPosition, botPosition.PlayerAngle);
+                TeleportBotUpright(player, botPosition.PlayerPosition, botPosition.PlayerAngle);
+                GuardBotPlacement(player, botPosition, null, false);
 
                 // Handle crouch state safely
                 if (botData.ContainsKey("crouchstate") && botData["crouchstate"] is bool isCrouched && isCrouched)
@@ -2567,7 +2569,10 @@ namespace MatchZy
                 // Capture the spawn spot on the first attempt so retries land the bot where
                 // the owner stood when the command was issued, not wherever they walked
                 // meanwhile. A posOverride (named bot position via .loadbotpos) still wins.
-                posOverride ??= new Position(botOwnerPawn.CBodyComponent!.SceneNode!.AbsOrigin, botOwnerPawn.CBodyComponent!.SceneNode!.AbsRotation);
+                // The angle is the owner's VIEW (pitch + yaw), not the body rotation: the bot is
+                // meant to look where the owner looked. TeleportBotUpright keeps the pitch off the body.
+                posOverride ??= new Position(botOwnerPawn.CBodyComponent!.SceneNode!.AbsOrigin,
+                    new QAngle(botOwnerPawn.EyeAngles.X, botOwnerPawn.EyeAngles.Y, 0));
 
                 // Gather ALL unused bots first and pick the claim afterwards. bot_add_t/_ct
                 // pair-spawns on current CS2 builds (one bot per team) and the enumeration
@@ -2672,7 +2677,8 @@ namespace MatchZy
                     // inherits facing) then flatten the body scene node over several frames so a
                     // look-down pitch never tilts the model flat / clips it under the map. Body
                     // stands upright at the owner's (or the saved spot's) position.
-                    TeleportUpright(claimedBot, botOwnerPosition.PlayerPosition, botOwnerPosition.PlayerAngle);
+                    TeleportBotUpright(claimedBot, botOwnerPosition.PlayerPosition, botOwnerPosition.PlayerAngle);
+                    GuardBotPlacement(claimedBot, botOwnerPosition, boost ? botOwner : null, crouch);
 
                     if (boost)
                     {
@@ -2780,6 +2786,63 @@ namespace MatchZy
             catch (Exception e)
             {
                 Log($"[SpawnBot] late sweep: {e.Message}");
+            }
+        }
+
+        // Safety net against sinking after a bot placement. The bot is put on the spot its owner
+        // stood on, so it can never legitimately end up below that height; a boosted owner can
+        // never legitimately be inside the bot it was lifted onto. Both happen when a teleport and
+        // the collision solve of the same tick disagree (the pair overlaps for a tick and gravity
+        // pulls one through the other, or through thin floor). Checked a few times in the first
+        // second and put back; after that the players are on their own again.
+        private const float BotSinkTolerance = 6.0f;
+
+        private void GuardBotPlacement(CCSPlayerController bot, Position spot, CCSPlayerController? boostedOwner, bool crouch)
+        {
+            float x = spot.PlayerPosition.X, y = spot.PlayerPosition.Y, z = spot.PlayerPosition.Z;
+            float yaw = spot.PlayerAngle.Y;
+            // Standing hull is 72 high, ducked 54.
+            float top = z + (crouch ? 54.0f : 72.0f);
+            foreach (float delay in new[] { 0.1f, 0.3f, 0.6f, 1.0f })
+            {
+                AddTimer(delay, () =>
+                {
+                    try
+                    {
+                        if (!isPractice || !IsPlayerValid(bot) || !bot.PawnIsAlive)
+                            return;
+                        var botPawn = bot.PlayerPawn.Value;
+                        var botOrigin = botPawn?.AbsOrigin;
+                        if (botPawn == null || botOrigin == null)
+                            return;
+                        if (botOrigin.Z < z - BotSinkTolerance)
+                        {
+                            Log($"[GuardBotPlacement] {bot.PlayerName} sank {z - botOrigin.Z:F1} units, putting it back");
+                            botPawn.Teleport(new Vector(x, y, z + 2.0f), new QAngle(0, yaw, 0), new Vector(0, 0, 0));
+                        }
+
+                        if (boostedOwner == null || !IsPlayerValid(boostedOwner) || !boostedOwner.PawnIsAlive)
+                            return;
+                        var ownerPawn = boostedOwner.PlayerPawn.Value;
+                        var ownerOrigin = ownerPawn?.AbsOrigin;
+                        if (ownerPawn == null || ownerOrigin == null)
+                            return;
+                        float dx = ownerOrigin.X - x, dy = ownerOrigin.Y - y;
+                        // Only while still above the bot's footprint (hull is 32 wide): an owner who
+                        // stepped off on purpose is left alone.
+                        bool overBot = dx * dx + dy * dy < 24.0f * 24.0f;
+                        if (overBot && ownerOrigin.Z < top - BotSinkTolerance && ownerOrigin.Z > z - 128.0f)
+                        {
+                            Log($"[GuardBotPlacement] {boostedOwner.PlayerName} sank into boost bot, lifting back");
+                            // Null angle: keep the owner's own view and an upright body.
+                            ownerPawn.Teleport(new Vector(ownerOrigin.X, ownerOrigin.Y, top + 2.0f), null, new Vector(0, 0, 0));
+                        }
+                    }
+                    catch (Exception e)
+                    {
+                        Log($"[GuardBotPlacement] {e.Message}");
+                    }
+                }, TimerFlags.STOP_ON_MAPCHANGE);
             }
         }
 
