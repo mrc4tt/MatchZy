@@ -48,17 +48,31 @@ namespace MatchZy
             botRespawnEnabled = enabled;
             if (enabled)
             {
-                Server.ExecuteCommand("mp_respawn_on_death_ct 1; mp_respawn_on_death_t 1; mp_ignore_round_win_conditions 0");
-                // Bring back the bots that died while it was off. Once more a moment later: right
-                // after the switch the respawn convars above may not have run yet, and a bot that
-                // has been dead for a while did not always come back on the first call.
+                // mp_ignore_round_win_conditions stays on until the dead bots are back: with a
+                // whole side dead, switching it off here ended the round on the spot.
+                Server.ExecuteCommand("mp_respawn_on_death_ct 1; mp_respawn_on_death_t 1");
+                // Bring back the bots that died while it was off. Respawn() did not revive a bot
+                // that had been dead for a while (live test: still dead, team and pawn fine), so
+                // after two tries such a bot is replaced by a new one on the same spot.
+                var caller = player!;
+                int replaced = 0;
                 foreach (var bot in TrackedPracticeBots())
                 {
                     var b = bot;
                     Server.NextFrame(() => RespawnIfDead(b));
-                    AddTimer(0.5f, () => RespawnTrackedBotIfDead(b, false), TimerFlags.STOP_ON_MAPCHANGE);
-                    AddTimer(1.5f, () => RespawnTrackedBotIfDead(b, true), TimerFlags.STOP_ON_MAPCHANGE);
+                    AddTimer(0.5f, () => RespawnTrackedBotIfDead(b), TimerFlags.STOP_ON_MAPCHANGE);
+                    if (b.IsValid && !b.PawnIsAlive)
+                    {
+                        // One second apart: AddBot handles one bot at a time.
+                        float at = 1.0f + replaced++ * 1.0f;
+                        AddTimer(at, () => ReplaceDeadTrackedBot(b, caller), TimerFlags.STOP_ON_MAPCHANGE);
+                    }
                 }
+                AddTimer(2.0f + replaced * 1.0f, () =>
+                {
+                    if (isPractice && botRespawnEnabled)
+                        Server.ExecuteCommand("mp_ignore_round_win_conditions 0");
+                }, TimerFlags.STOP_ON_MAPCHANGE);
             }
             else
             {
@@ -190,25 +204,64 @@ namespace MatchZy
             player.Respawn();
         }
 
-        // Second and third try for .botrespawn on. The last one logs why a bot is still dead.
-        private void RespawnTrackedBotIfDead(CCSPlayerController bot, bool lastTry)
+        // Second try for .botrespawn on.
+        private void RespawnTrackedBotIfDead(CCSPlayerController bot)
         {
-            if (!isPractice || !botRespawnEnabled || bot == null || !bot.IsValid || !bot.UserId.HasValue)
+            if (!isPractice || !botRespawnEnabled || bot == null || !bot.IsValid || !bot.UserId.HasValue || bot.PawnIsAlive)
                 return;
             lock (_botsDictLock)
             {
                 if (!pracUsedBots.ContainsKey(bot.UserId.Value))
                     return;
             }
-            if (bot.PawnIsAlive)
-                return;
             RespawnIfDead(bot);
-            if (lastTry)
-                Server.NextFrame(() =>
+        }
+
+        // Last resort for .botrespawn on: the bot is still dead, so it is kicked and a new bot is
+        // added on its spot, same team and crouch state, through the normal .bot path.
+        private void ReplaceDeadTrackedBot(CCSPlayerController bot, CCSPlayerController caller)
+        {
+            try
+            {
+                if (!isPractice || !botRespawnEnabled || bot == null || !bot.IsValid || !bot.IsBot || !bot.UserId.HasValue || bot.PawnIsAlive)
+                    return;
+                int uid = bot.UserId.Value;
+                Position? spot = null;
+                CCSPlayerController? owner = null;
+                bool crouch = false;
+                int remaining;
+                lock (_botsDictLock)
                 {
-                    if (bot.IsValid && !bot.PawnIsAlive)
-                        Log($"[BotRespawn] {bot.PlayerName} still dead after .botrespawn on (team {bot.TeamNum}, connected {bot.Connected}, pawn {(bot.PlayerPawn?.Value == null ? "none" : "ok")})");
-                });
+                    if (!pracUsedBots.TryGetValue(uid, out var data))
+                        return;
+                    if (data.TryGetValue("position", out var p) && p is Position pos) spot = pos;
+                    if (data.TryGetValue("owner", out var o) && o is CCSPlayerController oc) owner = oc;
+                    if (data.TryGetValue("crouchstate", out var c) && c is bool cb) crouch = cb;
+                    if (spot == null)
+                        return;
+                    pracUsedBots.Remove(uid);
+                    remaining = pracUsedBots.Count;
+                }
+                var team = (CsTeam)bot.TeamNum;
+                if (team != CsTeam.Terrorist && team != CsTeam.CounterTerrorist)
+                    return;
+                Log($"[BotRespawn] {bot.PlayerName} still dead after .botrespawn on, replacing it with a new bot on its spot");
+                ForgetBotLoadout(uid);
+                // Quota to what is left before the kick, as .kickbot does, so the slot is not refilled.
+                Server.ExecuteCommand($"bot_quota {remaining}");
+                Server.ExecuteCommand($"kickid {uid}");
+                var addFor = IsPlayerValid(owner) ? owner! : caller;
+                var addSpot = spot;
+                AddTimer(0.3f, () =>
+                {
+                    if (isPractice && IsPlayerValid(addFor))
+                        AddBot(addFor, crouch, team, false, addSpot);
+                }, TimerFlags.STOP_ON_MAPCHANGE);
+            }
+            catch (Exception e)
+            {
+                Log($"[BotRespawn] {e.Message}");
+            }
         }
 
         private void ResetPracticeRespawn()

@@ -1127,8 +1127,11 @@ namespace MatchZy
         }
         readonly List<SpawnMarkerVisual> spawnMarkerVisuals = new();
         static readonly Color spawnMarkerHoverColor = Color.Lime;
-        // Thin enough to read as a square outline on the floor; wider edges looked like a box.
-        const float spawnMarkerEdgeWidth = 3.0f;
+        // Beams always face the camera, so a wide edge stands up like the side of a box. The
+        // outline is two thin squares a few units apart instead: both lie in the floor plane, so
+        // together they read as one flat band.
+        const float spawnMarkerEdgeWidth = 1.5f;
+        const float spawnMarkerBandInset = 3.0f;
 
         public void ShowSpawnMarker(Position spawn, Color color, int number, string side)
         {
@@ -1137,10 +1140,13 @@ namespace MatchZy
             Vector p = spawn.PlayerPosition;
             visual.FloorZ = SpawnMarkerFloorZ(p);
             float z = visual.FloorZ + spawnMarkerFloorLift;
-            foreach (uint raw in DrawFloorBox(p.X, p.Y, z, spawnMarkerHalfSize, color, spawn.PlayerAngle.Y, spawnMarkerEdgeWidth))
+            foreach (float half in new[] { spawnMarkerHalfSize, spawnMarkerHalfSize - spawnMarkerBandInset })
             {
-                spawnMarkerEntities.Add(raw);
-                visual.Edges.Add(raw);
+                foreach (uint raw in DrawFloorBox(p.X, p.Y, z, half, color, spawn.PlayerAngle.Y, spawnMarkerEdgeWidth))
+                {
+                    spawnMarkerEntities.Add(raw);
+                    visual.Edges.Add(raw);
+                }
             }
 
             var text = Utilities.CreateEntityByName<CPointWorldText>("point_worldtext");
@@ -1305,7 +1311,7 @@ namespace MatchZy
                 if (beam == null || !beam.IsValid)
                     continue;
                 beam.Render = color;
-                beam.Width = on ? spawnMarkerEdgeWidth + 2.0f : spawnMarkerEdgeWidth;
+                beam.Width = on ? spawnMarkerEdgeWidth + 1.0f : spawnMarkerEdgeWidth;
                 Utilities.SetStateChanged(beam, "CBaseModelEntity", "m_clrRender");
                 Utilities.SetStateChanged(beam, "CBeam", "m_fWidth");
             }
@@ -2032,26 +2038,26 @@ namespace MatchZy
                 int quotaBotCount;
                 lock (_botsDictLock)
                     quotaBotCount = pracUsedBots.Count;
-                Server.ExecuteCommand($"bot_quota {quotaBotCount}");
 
                 // Add bot to opposite team or forced team. Use ONLY bot_add_t / bot_add_ct - it already
                 // routes the bot to that team. A preceding bot_join_team ALSO spawned a bot, so the two
                 // together produced two bots per .bot (confirmed via diag: one .bot -> Crew + Shamat).
-                if (targetTeam == CsTeam.Terrorist)
-                    Server.ExecuteCommand("bot_add_t");
-                else
-                    Server.ExecuteCommand("bot_add_ct");
-                // bot_add raised the quota by one, but the quota counts bots by pawn and the new
-                // bot has none until it spawns: the next quota think saw one bot missing and added a
-                // second one (one .bot -> two bots, one kicked by the claim pass). Put the quota back
-                // to the tracked count until SpawnBot claims the bot and re-pins it. Only while the
-                // KickBotFromTeam hook is active: it keeps the quota from kicking anything in
-                // practice, so a quota one below the real bot count is harmless. Without it the
-                // quota would kick the new bot.
+                string botAdd = targetTeam == CsTeam.Terrorist ? "bot_add_t" : "bot_add_ct";
                 if (_kickBotFromTeam != null)
                 {
-                    Server.ExecuteCommand($"bot_quota {quotaBotCount}");
+                    // One command string, so nothing can run between its parts: the quota think is
+                    // held (bot_join_delay, see HoldBotQuotaAdds) BEFORE the add, and the quota that
+                    // bot_add raised by one goes straight back to the tracked count. Sent as
+                    // separate commands, with the hold last, the think still added a second bot in
+                    // the tick after the add. Only while the KickBotFromTeam hook is active: it
+                    // keeps the quota from kicking anything in practice.
+                    Server.ExecuteCommand($"bot_join_delay 999999; bot_quota {quotaBotCount}; {botAdd}; bot_quota {quotaBotCount}");
                     HoldBotQuotaAdds();
+                }
+                else
+                {
+                    Server.ExecuteCommand($"bot_quota {quotaBotCount}");
+                    Server.ExecuteCommand(botAdd);
                 }
 
                 // Once bot is added, we teleport it to the requested position
@@ -2564,11 +2570,12 @@ namespace MatchZy
         // One .bot used to bring two bots: bot_add_t/_ct creates the requested bot, and the quota
         // think of the next tick added a second one on its own (kicked again 0.1 s later by the
         // claim pass, "[SpawnBot] kicking extra pair bot"). Pinning bot_quota around the add did
-        // not stop it. bot_join_delay does: while it is above the map time the quota think wants
-        // zero bots, so it adds none, and what it then tries to kick is refused by the
-        // KickBotFromTeam hook in practice. Held only from the add until the bot is claimed and
-        // the quota is pinned again; a timer lets go if the claim never happens. Only with the
-        // hook active: without it the think would kick every practice bot.
+        // not stop it. bot_join_delay is meant to: while it is above the map time the quota think
+        // wants zero bots, so it adds none, and what it then tries to kick is refused by the
+        // KickBotFromTeam hook in practice. AddBot sets it in the same command string as the add;
+        // it is held until the bot is claimed and the quota is pinned again (through the claim
+        // retries too), and a timer lets go if the claim never happens. Only with the hook active:
+        // without it the think would kick every practice bot.
         private int _botQuotaHoldSeq;
         private bool _botQuotaHeld;
 
@@ -2578,7 +2585,6 @@ namespace MatchZy
                 return;
             _botQuotaHeld = true;
             int seq = ++_botQuotaHoldSeq;
-            Server.ExecuteCommand("bot_join_delay 999999");
             // Not STOP_ON_MAPCHANGE: left held, no bot would join on the next map either.
             AddTimer(2.0f, () =>
             {
@@ -2669,9 +2675,6 @@ namespace MatchZy
                 // erroneous-spawn kicker and the late sweep leave the incoming bot alone.
                 if (claimedBot == null && attempt < 4)
                 {
-                    // Nothing to claim yet: if this build creates the requested bot through the
-                    // quota think, the hold would keep it out. Let it through for the retries.
-                    ReleaseBotQuotaAdds();
                     var retryOwner = botOwner;
                     var retryPos = posOverride;
                     AddTimer(0.15f, () =>
