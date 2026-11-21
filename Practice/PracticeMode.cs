@@ -2054,7 +2054,10 @@ namespace MatchZy
                 // practice, so a quota one below the real bot count is harmless. Without it the
                 // quota would kick the new bot.
                 if (_kickBotFromTeam != null)
+                {
                     Server.ExecuteCommand($"bot_quota {quotaBotCount}");
+                    HoldBotQuotaAdds();
+                }
 
                 // Once bot is added, we teleport it to the requested position
                 var targetPlayer = player; // Capture for timer safety
@@ -2563,6 +2566,40 @@ namespace MatchZy
             }
         }
 
+        // One .bot used to bring two bots: bot_add_t/_ct creates the requested bot, and the quota
+        // think of the next tick added a second one on its own (kicked again 0.1 s later by the
+        // claim pass, "[SpawnBot] kicking extra pair bot"). Pinning bot_quota around the add did
+        // not stop it. bot_join_delay does: while it is above the map time the quota think wants
+        // zero bots, so it adds none, and what it then tries to kick is refused by the
+        // KickBotFromTeam hook in practice. Held only from the add until the bot is claimed and
+        // the quota is pinned again; a timer lets go if the claim never happens. Only with the
+        // hook active: without it the think would kick every practice bot.
+        private int _botQuotaHoldSeq;
+        private bool _botQuotaHeld;
+
+        private void HoldBotQuotaAdds()
+        {
+            if (_kickBotFromTeam == null)
+                return;
+            _botQuotaHeld = true;
+            int seq = ++_botQuotaHoldSeq;
+            Server.ExecuteCommand("bot_join_delay 999999");
+            // Not STOP_ON_MAPCHANGE: left held, no bot would join on the next map either.
+            AddTimer(2.0f, () =>
+            {
+                if (seq == _botQuotaHoldSeq)
+                    ReleaseBotQuotaAdds();
+            });
+        }
+
+        private void ReleaseBotQuotaAdds()
+        {
+            if (!_botQuotaHeld)
+                return;
+            _botQuotaHeld = false;
+            Server.ExecuteCommand("bot_join_delay 0");
+        }
+
         private void SpawnBot(CCSPlayerController botOwner, bool crouch, bool boost = false, CsTeam targetTeam = CsTeam.None, Position? posOverride = null, int attempt = 0)
         {
             try
@@ -2637,6 +2674,9 @@ namespace MatchZy
                 // erroneous-spawn kicker and the late sweep leave the incoming bot alone.
                 if (claimedBot == null && attempt < 4)
                 {
+                    // Nothing to claim yet: if this build creates the requested bot through the
+                    // quota think, the hold would keep it out. Let it through for the retries.
+                    ReleaseBotQuotaAdds();
                     var retryOwner = botOwner;
                     var retryPos = posOverride;
                     AddTimer(0.15f, () =>
@@ -2736,6 +2776,8 @@ namespace MatchZy
                 lock (_botsDictLock)
                     trackedBotCount = pracUsedBots.Count;
                 Server.ExecuteCommand($"bot_quota_mode normal; bot_quota {trackedBotCount}");
+                // The quota now equals the bots in the game, so the quota think may run again.
+                ReleaseBotQuotaAdds();
 
                 if (!unusedBotFound)
                 {
@@ -4116,6 +4158,8 @@ namespace MatchZy
             // prac.cfg settings no mode cfg resets: undo them here, before sv_cheats goes off (buddha is
             // a cheat command). Otherwise all-talk and buddha stayed on into a dry run or warmup.
             Server.ExecuteCommand("buddha 0; buddha_ignore_bots 0; sv_full_alltalk 0; sv_showimpacts 0;");
+            // A .bot still waiting for its bot holds the quota think (HoldBotQuotaAdds).
+            ReleaseBotQuotaAdds();
             // .bot / .botshoot set bot_stop/bot_freeze/bot_zombie 1 and bot_dont_shoot 1. They are cheat
             // cvars, so they can only be reset while sv_cheats is still on (same as LeaveModeOnUnload);
             // left at 1 the warmup and match bots stood still and never fired. bot_difficulty is left
