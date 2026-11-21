@@ -1128,11 +1128,10 @@ namespace MatchZy
         }
         readonly List<SpawnMarkerVisual> spawnMarkerVisuals = new();
         static readonly Color spawnMarkerHoverColor = Color.Lime;
-        // Beams always face the camera, so a wide edge stands up like the side of a box. The
-        // outline is two thin squares a few units apart instead: both lie in the floor plane, so
-        // together they read as one flat band.
-        const float spawnMarkerEdgeWidth = 1.5f;
-        const float spawnMarkerBandInset = 3.0f;
+        // Beams always face the camera, so a wide edge stands up like the side of a box. One thin
+        // square in the floor plane reads as a flat outline. (Two squares a few units apart were
+        // tried as a band: the lines crossed at the corners and looked messy up close.)
+        const float spawnMarkerEdgeWidth = 2.0f;
 
         public void ShowSpawnMarker(Position spawn, Color color, int number, string side)
         {
@@ -1141,7 +1140,7 @@ namespace MatchZy
             Vector p = spawn.PlayerPosition;
             visual.FloorZ = SpawnMarkerFloorZ(p);
             float z = visual.FloorZ + spawnMarkerFloorLift;
-            foreach (float half in new[] { spawnMarkerHalfSize, spawnMarkerHalfSize - spawnMarkerBandInset })
+            foreach (float half in new[] { spawnMarkerHalfSize })
             {
                 foreach (uint raw in DrawFloorBox(p.X, p.Y, z, half, color, spawn.PlayerAngle.Y, spawnMarkerEdgeWidth))
                 {
