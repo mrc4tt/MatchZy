@@ -376,6 +376,7 @@ namespace MatchZy
             GetSpawns();
             ResetPracticeExtras();
             AddTimer(1.5f, () => { if (isPractice) WarmSpawnFloorCache(); }, TimerFlags.STOP_ON_MAPCHANGE);
+            AddTimer(2.0f, StartXrayDefault, TimerFlags.STOP_ON_MAPCHANGE);
             if (spawnMarkersEnabledDefault.Value)
                 AddTimer(2.0f, () => { if (isPractice) ShowAllSpawnMarkers(); }, TimerFlags.STOP_ON_MAPCHANGE);
             // Not in this frame: the practice cfg above runs on a later frame, and every notify cvar
@@ -1585,6 +1586,9 @@ namespace MatchZy
 
             isPractice = false;
             isDryRun = true;
+            // Xray is on by default in practice: a dry run is a real round, nobody glows through walls.
+            // Next frame: killing the glow props re-enters the engine from the command.
+            Server.NextFrame(ResetXray);
             autoStartLatched = true; // explicit mode choice; no autostart mode maps to dryrun, so leave the cvar alone
 
             // Start dryrun from an empty round-history strip - whatever practice/warmup left behind is
