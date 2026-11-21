@@ -49,6 +49,7 @@ A short summary of each release. The [full changelog](changelog.md) has the deta
 - **Changed:** Practice: `.spawns` boxes are thicker, face the spawn's direction, and also show the extra spawns in a darker colour.
 - **Changed:** Practice: xray is on when practice starts (T red, CT blue); `.xray` turns it off.
 - **New:** Practice: `.jump` (bot at your aim jumps), `.bhop` (auto bunnyhop) and `.r` (respawn yourself).
+- **Changed:** `.help` prints a tidy command table to the console in every mode.
 - **Fixed:** Practice: the console now says at practice start when a grenade rethrow signature did not resolve (`.rt` / `.throw` grenades that bounce and never detonate).
 - **Security:** A failed demo upload no longer logs the S3 signature details.
 
