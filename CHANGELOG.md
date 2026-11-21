@@ -4,7 +4,7 @@ Based on [MatchZy](https://github.com/shobhit-pathak/MatchZy) by Shobhit Pathak,
 
 # 1.0.26
 
-#### November 15, 2026
+#### November 20, 2026
 
 - Spectator coach (mode 3): at halftime and overtime the coach no longer briefly follows, sees and talks to the other team between the last round of the half and the side swap. MatchZy swaps its side data at round end, but the engine moves the players only at the next round start; the coach now follows the engine's sides.
 - Spectator coach: unloading or reloading MatchZy puts back sv_coaching_enabled, mp_forcecamera, bot_controllable, the coach comm patch and the coach's own game settings. Left on, sv_coaching_enabled could crash the next round start once MatchZy's guard was gone.
@@ -92,6 +92,8 @@ Based on [MatchZy](https://github.com/shobhit-pathak/MatchZy) by Shobhit Pathak,
 - Chat translations in Brazilian Portuguese (`pt-BR`) and Turkish (`tr`). Each player sees their own language once they pick it with `!lang`.
 - Leaving practice mode left terrorists with the full practice grenade set and an AK-47 on every spawn: the reset of `mp_t_default_grenades` and `mp_t_default_primary` was missing a space and never ran. The flashbang and per-type grenade limits from practice are now reset too.
 - Unloading MatchZy while practice was on (a host switching the server to retakes, deathmatch or prefire without a map change) kept practice players in noclip and kept respawn on death on. Noclip, `mp_respawn_on_death_ct/t`, `mp_ignore_round_win_conditions` and `mp_respawn_immunitytime` are now reset on unload.
+- Practice: a `.boost` / `.crouchboost` bot no longer comes back tilted after it respawns when you looked up or down while placing it, and your own body is held upright while you are lifted onto the bot. The respawn teleport used the saved view pitch, which the engine writes into the model transform.
+- Practice: when a grenade rethrow signature does not resolve on this server, the console says so when practice starts (`Grenade rethrow factories resolved: 3/4 (windows)`) with the reason for each one. Nothing is printed when all four resolve. A grenade from `.rt` / `.throw` that bounces without ever detonating means its signature did not resolve.
 
 # 1.0.25
 
