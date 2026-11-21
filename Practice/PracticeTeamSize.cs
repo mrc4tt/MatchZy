@@ -1,4 +1,6 @@
+using CounterStrikeSharp.API;
 using CounterStrikeSharp.API.Core;
+using CounterStrikeSharp.API.Modules.Utils;
 using CounterStrikeSharp.API.Modules.Memory;
 
 namespace MatchZy
@@ -39,6 +41,54 @@ namespace MatchZy
             catch (Exception e)
             {
                 Log($"[PracticeTeamSize] {e.Message}");
+            }
+            SyncTeamPlayerCounts();
+        }
+
+        // The "team is full" check of bot_add compares the game rules' own head count
+        // (m_iNumTerrorist / m_iNumCT) with the limit, and that count is only refreshed at certain
+        // points (round restart, team change). After .nobots kicked a full side it still held the
+        // old number, and the next .bot was refused with "Could not add bot to the game: Team is
+        // full" on an empty team. Written fresh before every bot add.
+        private void SyncTeamPlayerCounts()
+        {
+            try
+            {
+                var rules = GetGameRules();
+                if (rules == null)
+                    return;
+                int t = 0, ct = 0;
+                foreach (var p in Utilities.GetPlayers())
+                {
+                    if (p?.IsValid != true || p.IsHLTV || p.Connected != PlayerConnectedState.Connected)
+                        continue;
+                    if (p.TeamNum == (byte)CsTeam.Terrorist) t++;
+                    else if (p.TeamNum == (byte)CsTeam.CounterTerrorist) ct++;
+                }
+                if (rules.NumTerrorist != t)
+                    Schema.SetSchemaValue(rules.Handle, "CCSGameRules", "m_iNumTerrorist", t);
+                if (rules.NumCT != ct)
+                    Schema.SetSchemaValue(rules.Handle, "CCSGameRules", "m_iNumCT", ct);
+            }
+            catch (Exception e)
+            {
+                Log($"[PracticeTeamSize] {e.Message}");
+            }
+        }
+
+        private string TeamSizeStateForLog()
+        {
+            try
+            {
+                var rules = GetGameRules();
+                if (rules == null)
+                    return "no game rules";
+                return $"players T {rules.NumTerrorist} CT {rules.NumCT}, team size T {rules.MaxNumTerrorists} CT {rules.MaxNumCTs}, "
+                    + $"spawn points T {rules.SpawnPointCount_Terrorist} CT {rules.SpawnPointCount_CT}";
+            }
+            catch (Exception e)
+            {
+                return e.Message;
             }
         }
 

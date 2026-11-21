@@ -2861,6 +2861,7 @@ namespace MatchZy
 
                 if (!unusedBotFound)
                 {
+                    Log($"[SpawnBot] no bot arrived for team {(byte)targetTeam} ({TeamSizeStateForLog()}; {BotQuotaStateForLog()})");
                     PrintLocalizedToAll("matchzy.pm.botlimit");
                 }
 
