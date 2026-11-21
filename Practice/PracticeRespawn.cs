@@ -49,10 +49,15 @@ namespace MatchZy
             if (enabled)
             {
                 Server.ExecuteCommand("mp_respawn_on_death_ct 1; mp_respawn_on_death_t 1; mp_ignore_round_win_conditions 0");
+                // Bring back the bots that died while it was off. Once more a moment later: right
+                // after the switch the respawn convars above may not have run yet, and a bot that
+                // has been dead for a while did not always come back on the first call.
                 foreach (var bot in TrackedPracticeBots())
                 {
                     var b = bot;
                     Server.NextFrame(() => RespawnIfDead(b));
+                    AddTimer(0.5f, () => RespawnTrackedBotIfDead(b, false), TimerFlags.STOP_ON_MAPCHANGE);
+                    AddTimer(1.5f, () => RespawnTrackedBotIfDead(b, true), TimerFlags.STOP_ON_MAPCHANGE);
                 }
             }
             else
@@ -183,6 +188,27 @@ namespace MatchZy
             if (player.PlayerPawn?.Value == null)
                 return;
             player.Respawn();
+        }
+
+        // Second and third try for .botrespawn on. The last one logs why a bot is still dead.
+        private void RespawnTrackedBotIfDead(CCSPlayerController bot, bool lastTry)
+        {
+            if (!isPractice || !botRespawnEnabled || bot == null || !bot.IsValid || !bot.UserId.HasValue)
+                return;
+            lock (_botsDictLock)
+            {
+                if (!pracUsedBots.ContainsKey(bot.UserId.Value))
+                    return;
+            }
+            if (bot.PawnIsAlive)
+                return;
+            RespawnIfDead(bot);
+            if (lastTry)
+                Server.NextFrame(() =>
+                {
+                    if (bot.IsValid && !bot.PawnIsAlive)
+                        Log($"[BotRespawn] {bot.PlayerName} still dead after .botrespawn on (team {bot.TeamNum}, connected {bot.Connected}, pawn {(bot.PlayerPawn?.Value == null ? "none" : "ok")})");
+                });
         }
 
         private void ResetPracticeRespawn()

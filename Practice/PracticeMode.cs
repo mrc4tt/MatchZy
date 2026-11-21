@@ -210,7 +210,6 @@ namespace MatchZy
         public Dictionary<byte, List<Position>> coachSpawns = GetEmptySpawnsData();
         // Enabled spawns above the lowest priority: the engine only uses them once the match spawns
         // are taken. Shown by .spawns in a dimmer colour, never numbered (.spawn N is match spawns only).
-        public Dictionary<byte, List<Position>> extraSpawnsData = GetEmptySpawnsData();
 
         // (Backup)
         private readonly object _botsDictLock = new();
@@ -415,7 +414,6 @@ namespace MatchZy
         {
             // Resetting spawn data to avoid any glitches
             spawnsData = GetEmptySpawnsData();
-            extraSpawnsData = GetEmptySpawnsData();
 
             int ctSkipped = 0, tSkipped = 0;
             try
@@ -471,7 +469,8 @@ namespace MatchZy
                         skipped++;
                     continue;
                 }
-                (spawn.Priority == minPriority ? spawnsData : extraSpawnsData)[team].Add(new Position(origin, rotation));
+                if (spawn.Priority == minPriority)
+                    spawnsData[team].Add(new Position(origin, rotation));
             }
             return skipped;
         }
@@ -1128,12 +1127,10 @@ namespace MatchZy
         }
         readonly List<SpawnMarkerVisual> spawnMarkerVisuals = new();
         static readonly Color spawnMarkerHoverColor = Color.Lime;
-        const float spawnMarkerEdgeWidth = 7.0f;
-        static readonly Color spawnMarkerExtraCt = Color.FromArgb(255, 40, 95, 170);
-        static readonly Color spawnMarkerExtraT = Color.FromArgb(255, 185, 80, 15);
+        // Thin enough to read as a square outline on the floor; wider edges looked like a box.
+        const float spawnMarkerEdgeWidth = 3.0f;
 
-        // extra: a spawn outside the match set. Same box, no number (Number 0), no aim text.
-        public void ShowSpawnMarker(Position spawn, Color color, int number, string side, bool extra = false)
+        public void ShowSpawnMarker(Position spawn, Color color, int number, string side)
         {
             var visual = new SpawnMarkerVisual { Side = side, Number = number, BaseColor = color };
             spawnMarkerVisuals.Add(visual);
@@ -1145,8 +1142,6 @@ namespace MatchZy
                 spawnMarkerEntities.Add(raw);
                 visual.Edges.Add(raw);
             }
-            if (extra)
-                return;
 
             var text = Utilities.CreateEntityByName<CPointWorldText>("point_worldtext");
             if (text == null)
@@ -1310,7 +1305,7 @@ namespace MatchZy
                 if (beam == null || !beam.IsValid)
                     continue;
                 beam.Render = color;
-                beam.Width = on ? spawnMarkerEdgeWidth + 3.0f : spawnMarkerEdgeWidth;
+                beam.Width = on ? spawnMarkerEdgeWidth + 2.0f : spawnMarkerEdgeWidth;
                 Utilities.SetStateChanged(beam, "CBaseModelEntity", "m_clrRender");
                 Utilities.SetStateChanged(beam, "CBeam", "m_fWidth");
             }
@@ -5128,7 +5123,6 @@ namespace MatchZy
                 if (!isPractice || !IsPlayerValid(player))
                     return;
                 ShowAllSpawnMarkers();
-                PrintToPlayerChat(player!, Localizer.ForPlayer(player, "matchzy.pm.spawnmarkerson"));
             });
         }
 
@@ -5151,18 +5145,6 @@ namespace MatchZy
             {
                 ShowSpawnMarker(tSpawns[i], Color.Orange, i + 1, "T");
                 activeSpawnMarkers.Add(tSpawns[i]);
-            }
-            // The spawns outside the match set, dimmer and without a number. Same list as the
-            // match spawns, so aiming at one and pressing USE works the same way.
-            foreach (var extra in extraSpawnsData[(byte)CsTeam.CounterTerrorist])
-            {
-                ShowSpawnMarker(extra, spawnMarkerExtraCt, 0, "CT", extra: true);
-                activeSpawnMarkers.Add(extra);
-            }
-            foreach (var extra in extraSpawnsData[(byte)CsTeam.Terrorist])
-            {
-                ShowSpawnMarker(extra, spawnMarkerExtraT, 0, "T", extra: true);
-                activeSpawnMarkers.Add(extra);
             }
             // Arm the +use teleport now that markers are drawn.
             spawnMarkersActive = activeSpawnMarkers.Count > 0;
@@ -5253,7 +5235,6 @@ namespace MatchZy
             if (!IsPlayerValid(player))
                 return;
             RemoveSpawnBeams();   // also disarms the +use interaction
-            PrintToPlayerChat(player!, Localizer.ForPlayer(player, "matchzy.pm.spawnmarkersoff"));
         }
 
         private void ResetAllPlayerPracticeSettings(bool enteringPractice)
