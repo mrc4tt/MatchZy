@@ -2052,8 +2052,8 @@ namespace MatchZy
                     // separate commands, with the hold last, the think still added a second bot in
                     // the tick after the add. Only while the KickBotFromTeam hook is active: it
                     // keeps the quota from kicking anything in practice.
-                    Server.ExecuteCommand($"bot_join_delay 999999; bot_quota {quotaBotCount}; {botAdd}; bot_quota {quotaBotCount}");
                     HoldBotQuotaAdds();
+                    Server.ExecuteCommand($"bot_join_delay 999999; bot_quota {quotaBotCount}; {botAdd}; bot_quota {quotaBotCount}");
                 }
                 else
                 {
@@ -2568,10 +2568,13 @@ namespace MatchZy
             }
         }
 
-        // One .bot used to bring two bots: bot_add_t/_ct creates the requested bot, and the quota
-        // think of the next tick added a second one on its own (kicked again 0.1 s later by the
-        // claim pass, "[SpawnBot] kicking extra pair bot"). Pinning bot_quota around the add did
-        // not stop it. bot_join_delay is meant to: while it is above the map time the quota think
+        // One .bot used to bring two bots (the second kicked 0.1 s later by the claim pass,
+        // "[SpawnBot] kicking extra pair bot"). From the server binary (build 14200): bot_add from
+        // the console does not raise bot_quota by one, it sets it to
+        // max(quota + 1, humans on a team - spectators + bots), so with one player on a team the
+        // quota lands one above the bots in the game, and with more players further above. The
+        // quota think of the next tick (bot_quota_mode normal: wanted = bot_quota) then adds the
+        // difference itself, on any team. Pinning bot_quota around the add did not stop it. bot_join_delay is meant to: while it is above the map time the quota think
         // wants zero bots, so it adds none, and what it then tries to kick is refused by the
         // KickBotFromTeam hook in practice. AddBot sets it in the same command string as the add;
         // it is held until the bot is claimed and the quota is pinned again (through the claim
@@ -2586,12 +2589,34 @@ namespace MatchZy
                 return;
             _botQuotaHeld = true;
             int seq = ++_botQuotaHoldSeq;
+            // Written to the convar directly, so it holds from this instant and does not depend
+            // on when the command buffer runs; the command string in AddBot repeats it.
+            try { ConVar.Find("bot_join_delay")?.SetValue(999999); }
+            catch (Exception e) { Log($"[SpawnBot] bot_join_delay could not be set directly: {e.Message}"); }
             // Not STOP_ON_MAPCHANGE: left held, no bot would join on the next map either.
             AddTimer(2.0f, () =>
             {
                 if (seq == _botQuotaHoldSeq)
                     ReleaseBotQuotaAdds();
             });
+        }
+
+        // For the "extra pair bot" log line: what the quota think saw.
+        private string BotQuotaStateForLog()
+        {
+            try
+            {
+                int quota = ConVar.Find("bot_quota")?.GetPrimitiveValue<int>() ?? -1;
+                int delay = ConVar.Find("bot_join_delay")?.GetPrimitiveValue<int>() ?? -1;
+                int tracked;
+                lock (_botsDictLock)
+                    tracked = pracUsedBots.Count;
+                return $"bot_quota {quota}, bot_join_delay {delay}, held {_botQuotaHeld}, tracked {tracked}, hook {(_kickBotFromTeam != null)}";
+            }
+            catch (Exception e)
+            {
+                return e.Message;
+            }
         }
 
         private void ReleaseBotQuotaAdds()
@@ -2698,7 +2723,7 @@ namespace MatchZy
                 {
                     if (extra == claimedBot)
                         continue;
-                    Log($"[SpawnBot] kicking extra pair bot {extra.PlayerName} (team {extra.TeamNum}, wanted {(byte)targetTeam})");
+                    Log($"[SpawnBot] kicking extra pair bot {extra.PlayerName} (team {extra.TeamNum}, wanted {(byte)targetTeam}; {BotQuotaStateForLog()})");
                     Server.ExecuteCommand($"kickid {extra.UserId!.Value}");
                 }
 
