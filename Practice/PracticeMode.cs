@@ -2018,6 +2018,13 @@ namespace MatchZy
                 isSpawningBot = true;
                 RaisePracticeTeamSize();
 
+                // Where the bot goes, taken now (the owner may walk on before the claim) and
+                // handed to the spawn handler: see PlaceIncomingBot.
+                var ownerPawnNow = player.PlayerPawn.Value;
+                var ownerOriginNow = ownerPawnNow.CBodyComponent?.SceneNode?.AbsOrigin;
+                if (posOverride == null && ownerOriginNow != null)
+                    posOverride = new Position(ownerOriginNow, new QAngle(ownerPawnNow.EyeAngles.X, ownerPawnNow.EyeAngles.Y, 0));
+
                 // Determine target team
                 CsTeam targetTeam =
                     forceTeam
@@ -2044,6 +2051,8 @@ namespace MatchZy
                 // routes the bot to that team. A preceding bot_join_team ALSO spawned a bot, so the two
                 // together produced two bots per .bot (confirmed via diag: one .bot -> Crew + Shamat).
                 string botAdd = targetTeam == CsTeam.Terrorist ? "bot_add_t" : "bot_add_ct";
+                _incomingBotPlace = posOverride;
+                _incomingBotTeam = targetTeam;
                 if (_kickBotFromTeam != null)
                 {
                     // One command string, so nothing can run between its parts: the quota think is
@@ -2095,6 +2104,45 @@ namespace MatchZy
                 Log($"[AddBot - ERROR] {ex.GetType().Name}: {ex.Message}");
                 isSpawningBot = false;
             }
+        }
+
+        // The spot the bot being added right now is meant to stand on. The claim in SpawnBot runs
+        // 0.1 s or more after bot_add, and until then the bot stood on a map spawn in plain view:
+        // the client drew it there and then slid it across the map to the owner. The spawn handler
+        // moves it on the frame after it spawns instead, so the first position a client is sent
+        // for longer than a tick is the final one. SpawnBot still claims and places it afterwards.
+        private Position? _incomingBotPlace;
+        private CsTeam _incomingBotTeam = CsTeam.None;
+
+        private void PlaceIncomingBot(CCSPlayerController bot)
+        {
+            var place = _incomingBotPlace;
+            if (place == null)
+                return;
+            Server.NextFrame(() =>
+            {
+                try
+                {
+                    if (!isPractice || !isSpawningBot || !IsPlayerValid(bot) || !bot.IsBot || !bot.PawnIsAlive)
+                        return;
+                    var pawn = bot.PlayerPawn.Value;
+                    if (pawn == null || !pawn.IsValid)
+                        return;
+                    byte frame = pawn.InterpolationFrame;
+                    TeleportBotUpright(bot, place.PlayerPosition, place.PlayerAngle);
+                    // The client interpolates between two positions that share an interpolation
+                    // frame. If the teleport kept it, change it so the move is drawn as a snap.
+                    if (pawn.InterpolationFrame == frame)
+                    {
+                        pawn.InterpolationFrame = (byte)(frame + 1);
+                        Utilities.SetStateChanged(pawn, "CBaseEntity", "m_ubInterpolationFrame");
+                    }
+                }
+                catch (Exception e)
+                {
+                    Log($"[SpawnBot] early placement failed: {e.Message}");
+                }
+            });
         }
 
         private CCSPlayerController? GetClosestBotOfPlayer(CCSPlayerController player)
@@ -2268,6 +2316,11 @@ namespace MatchZy
                                 );
                             }
                         }
+                    }
+                    else if (isSpawningBot && !player.IsHLTV && _incomingBotPlace != null
+                        && (player.TeamNum == (byte)_incomingBotTeam || player.TeamNum == (byte)CsTeam.None))
+                    {
+                        PlaceIncomingBot(player);
                     }
                     else if (!isSpawningBot && !player.IsHLTV)
                     {
@@ -2802,6 +2855,7 @@ namespace MatchZy
                 Server.ExecuteCommand($"bot_quota_mode normal; bot_quota {trackedBotCount}");
                 // The quota now equals the bots in the game, so the quota think may run again.
                 ReleaseBotQuotaAdds();
+                _incomingBotPlace = null;
 
                 if (!unusedBotFound)
                 {
