@@ -17,6 +17,9 @@ jobs:
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v7
+        with:
+          # Full history and tags: the release notes compare cfg/config.cfg with the last release.
+          fetch-depth: 0
 
       - name: Install dependencies
         run: |
@@ -135,6 +138,12 @@ jobs:
             echo
             if [ -s whats-new-section.md ]; then
               cat whats-new-section.md
+              echo
+            fi
+            # Settings added to config.cfg and defaults changed since the last release.
+            python3 tools/config-notes.py "$VER" "${{ github.repository }}" > config-section.md || true
+            if [ -s config-section.md ]; then
+              cat config-section.md
               echo
             fi
             echo "**What's new:** https://matchzy.miksen.me/whats-new/ · **Full changelog:** [CHANGELOG.md]($CHANGELOG_URL)"
