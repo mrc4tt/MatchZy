@@ -334,7 +334,7 @@ namespace MatchZy
             else
             {
                 practiceUsesWarmup = true;
-                Server.ExecuteCommand("""sv_cheats "true"; mp_force_pick_time "0"; bot_quota "0"; sv_showimpacts "1"; mp_limitteams "0"; sv_deadtalk "true"; sv_full_alltalk "true"; sv_ignoregrenaderadio "false"; mp_forcecamera "0"; sv_grenade_trajectory_prac_pipreview "true"; sv_grenade_trajectory_prac_trailtime "3"; sv_infinite_ammo "1"; weapon_auto_cleanup_time "15"; weapon_max_before_cleanup "30"; mp_buy_anywhere "1"; mp_maxmoney "9999999"; mp_startmoney "9999999";""");
+                Server.ExecuteCommand("""sv_cheats "true"; mp_force_pick_time "0"; bot_quota "0"; sv_showimpacts "1"; mp_limitteams "0"; sv_deadtalk "true"; sv_full_alltalk "true"; sv_ignoregrenaderadio "false"; mp_forcecamera "0"; sv_grenade_trajectory_prac_pipreview "false"; sv_grenade_trajectory_prac_trailtime "3"; sv_infinite_ammo "1"; weapon_auto_cleanup_time "15"; weapon_max_before_cleanup "30"; mp_buy_anywhere "1"; mp_maxmoney "9999999"; mp_startmoney "9999999";""");
                 Server.ExecuteCommand("""mp_weapons_allow_typecount "-1"; mp_death_drop_defuser "false"; mp_death_drop_taser "false"; mp_drop_knife_enable "true"; mp_death_drop_grenade "0"; ammo_grenade_limit_total "5"; mp_defuser_allocation "2"; mp_free_armor "2"; mp_ct_default_grenades "weapon_incgrenade weapon_hegrenade weapon_smokegrenade weapon_flashbang weapon_decoy"; mp_ct_default_primary "weapon_m4a1";""");
                 Server.ExecuteCommand("""mp_t_default_grenades "weapon_molotov weapon_hegrenade weapon_smokegrenade weapon_flashbang weapon_decoy"; mp_t_default_primary "weapon_ak47"; mp_warmuptime 9999; mp_warmuptime_all_players_connected 0; mp_warmup_online_enabled "true"; mp_warmup_pausetimer "1"; mp_warmup_start; bot_quota_mode normal; mp_solid_teammates 2; mp_autoteambalance false; mp_teammates_are_enemies false; buddha 1; buddha_ignore_bots 1; buddha_reset_hp 100;""");
             }
@@ -4880,9 +4880,9 @@ namespace MatchZy
                 player.ReplicateConVar("sv_showimpacts", "1");
                 // Don't add to dictionary - let first .impacts command handle it
 
-                // Force grenade preview ON (default in practice)
-                _pipPreviewEnabled[player.Slot] = true;
-                player.ReplicateConVar("sv_grenade_trajectory_prac_pipreview", "1");
+                // Grenade preview camera is OFF by default; .cam / .preview / .pip turn it on per player.
+                _pipPreviewEnabled[player.Slot] = false;
+                player.ReplicateConVar("sv_grenade_trajectory_prac_pipreview", "0");
 
                 // Retry impacts after 2 seconds to ensure it sticks
                 AddTimer(
@@ -4893,6 +4893,7 @@ namespace MatchZy
                             return;
 
                         player.ReplicateConVar("sv_showimpacts", "1");
+                        ReapplyPipPreview(player);
                     }
                 );
             }
@@ -4936,6 +4937,7 @@ namespace MatchZy
         [ConsoleCommand("css_nadecam", "Toggles nade preview mode for practices")]
         [ConsoleCommand("css_traj", "Toggles sv_grenade_trajectory_prac_pipreview in practice mode")]
         [ConsoleCommand("css_pip", "Toggles sv_grenade_trajectory_prac_pipreview in practice mode")]
+        [ConsoleCommand("css_preview", "Toggles sv_grenade_trajectory_prac_pipreview in practice mode")]
         public void OnTrajCommand(CCSPlayerController? player, CommandInfo? command)
         {
             if (!RequirePractice(player))
@@ -4952,6 +4954,17 @@ namespace MatchZy
 
             // Notify only the player (not all chat)
             player.PrintToChat($" {Localizer.ForPlayer(player, "matchzy.prac.grenadepreviewcam", Localizer.ForPlayer(player, enabled ? "matchzy.cc.enabled" : "matchzy.cc.disabled"))}");
+        }
+
+        // Push the player's own preview state again (the server-wide convar can overwrite it).
+        private void ReapplyPipPreview(CCSPlayerController? player)
+        {
+            if (!isPractice || !IsPlayerValid(player) || player!.IsBot)
+                return;
+            int slot = player.Slot;
+            if (slot < 0 || slot >= _pipPreviewEnabled.Length)
+                return;
+            player.ReplicateConVar("sv_grenade_trajectory_prac_pipreview", _pipPreviewEnabled[slot] ? "1" : "0");
         }
 
         [ConsoleCommand("css_bestspawn", "Teleports you to your team's closest spawn from your current position")]
@@ -5189,8 +5202,14 @@ namespace MatchZy
                     if (playerImpacts.ContainsKey(player.Slot))
                         playerImpacts.Remove(player.Slot);
 
-                    _pipPreviewEnabled[player.Slot] = true;
-                    player.ReplicateConVar("sv_grenade_trajectory_prac_pipreview", "1");
+                    // Preview camera off by default; the player turns it on with .cam / .preview / .pip.
+                    _pipPreviewEnabled[player.Slot] = false;
+                    player.ReplicateConVar("sv_grenade_trajectory_prac_pipreview", "0");
+                    // prac.cfg runs a frame later, and a server that kept an older prac.cfg still
+                    // sets the convar to true there: the engine then replicates true to everyone
+                    // after the per-player value above. Send each player's own state once more.
+                    var late = player;
+                    AddTimer(1.0f, () => ReapplyPipPreview(late), TimerFlags.STOP_ON_MAPCHANGE);
                 }
                 else
                 {
