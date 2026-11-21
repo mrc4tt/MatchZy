@@ -300,6 +300,7 @@ namespace MatchZy
             // Practice manages its own bots; clear any warmup aim-bots first.
             KillWarmupBots();
             isPractice = true;
+            QuietLagCompensationLog(true);
             isDryRun = false;
             isWarmup = false;
             readyAvailable = false;
@@ -4240,6 +4241,7 @@ namespace MatchZy
             // A .bot still waiting for its bot holds the quota think (HoldBotQuotaAdds).
             ReleaseBotQuotaAdds();
             RestorePracticeTeamSize();
+            QuietLagCompensationLog(false);
             // .bot / .botshoot set bot_stop/bot_freeze/bot_zombie 1 and bot_dont_shoot 1. They are cheat
             // cvars, so they can only be reset while sv_cheats is still on (same as LeaveModeOnUnload);
             // left at 1 the warmup and match bots stood still and never fired. bot_difficulty is left

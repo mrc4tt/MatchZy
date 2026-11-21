@@ -62,5 +62,28 @@ namespace MatchZy
             _teamSizeBeforePracticeT = -1;
             _teamSizeBeforePracticeCt = -1;
         }
+
+        // Practice bots are teleported and respawned all the time, and each move clears the
+        // bot's lag compensation history. A shot at such a bot within the next few ticks makes
+        // the engine print a 15 line "No valid positions in history for BacktrackPlayer" report
+        // on its LagCompensation logging channel. Harmless there, so the channel is not echoed
+        // while practice is on. Matches keep the engine default.
+        private bool _lagCompLogQuiet;
+        private bool _lagCompChannelMissingLogged;
+
+        private void QuietLagCompensationLog(bool quiet)
+        {
+            if (_lagCompLogQuiet == quiet)
+                return;
+            if (Tier0Logging.SetChannelFlag("LagCompensation", Tier0Logging.LCF_DO_NOT_ECHO, quiet))
+            {
+                _lagCompLogQuiet = quiet;
+            }
+            else if (!_lagCompChannelMissingLogged)
+            {
+                _lagCompChannelMissingLogged = true;
+                Log("[Practice] LagCompensation logging channel not found; its console lines stay visible.");
+            }
+        }
     }
 }
