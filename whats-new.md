@@ -2,12 +2,19 @@
 
 A short summary of each release. The [full changelog](changelog.md) has the details and background for every change.
 
+## 1.0.27 <small>November 22, 2026</small>
+
+!!! warning "Action needed"
+    - On 1.0.26 with a panel that sets `matchzy_kick_when_no_match_loaded` in the match config: update. 1.0.26 ignored it, so people who are not in the match were not kicked.
+
+- **Fixed:** A match config can set `matchzy_kick_when_no_match_loaded` and `matchzy_whitelist_enabled_default` again; 1.0.26 refused both.
+
 ## 1.0.26 <small>November 22, 2026</small>
 
 !!! warning "Action needed"
     - Panels: if the server keeps its remote log, demo upload or backup header in config.cfg and your match config only sends a URL on another host, the header is no longer sent there. Send the header together with the URL in the match config's `cvars`.
     - The ready time limit (`get5_time_to_start`, `matchzy_forfeit_ready_timeout`) now only applies before the first map of a series.
-    - A match config can no longer set `sv_cheats`, the log file cvars and a few owner-only MatchZy settings. Passwords and game settings still work.
+    - A match config can no longer set `sv_cheats`, the log file cvars and a few owner-only MatchZy settings (not the kick and whitelist settings, see 1.0.27). Passwords and game settings still work.
     - After updating, delete the old `runtimes/` folder in the plugin folder if it is still there.
 
 - **New:** Lineups in practice: throw a grenade and type `.save`. It is saved with its type and how you threw it, and `.shownades` marks it with the grenade's model. Aim at a mark and press E to stand on the spot; a ring shows where to aim and turns green when the crosshair is in it.
