@@ -2215,7 +2215,9 @@ namespace MatchZy
                     // Update or add player - dictionary update is idempotent
                     playerData[userId] = player;
 
-                    if (isMatchSetup)
+                    // A match without any roster (.matchsetup: both teams have an empty player
+                    // list) has nobody to leave out: every player is tracked, like in a pug.
+                    if (isMatchSetup && IsTeamWhitelistConfigured())
                         AssignRosteredCoach(player);
 
                     // Only add to ready status if not already present
@@ -2578,6 +2580,8 @@ namespace MatchZy
                 // match normally instead of leaving the server in warmup with everyone ready.
                 Log($"[HandleMatchStart] Queued restore of {restoreFile} was refused; starting the match normally.");
             }
+            shortStartAt = null;
+            LockOpenMatchTeams();
 
             // Auto-naming disabled and both teams still on the scrim defaults (a Get5/JSON match has
             // explicit names by now and never enters the rename branches below): record the side
@@ -3163,6 +3167,18 @@ namespace MatchZy
             AddTimer(
                 delay,
                 () =>
+                    // The changelevel is queued: the next map's match starts there. Players still
+                    // carry "ready" from the finished map, so a .forceready, .start or a team join
+                    // during a slow change (workshop download) could start the match on the map that
+                    // is about to unload, and the change then cancelled it as "map_changed". Same
+                    // guard the veto's map change uses; OnMapStart clears it. Only when the change
+                    // can actually run, or the ready phase would be stuck on this map.
+                    if (IsSafeMapName(nextMap) && BuildMapChangeCommand(nextMap) != null)
+                    {
+                        mapChangePending = true;
+                        foreach (var key in playerReadyStatus.Keys.ToList())
+                            playerReadyStatus[key] = false;
+                    }
                 {
                     // Ensure demo is stopped before map change to prevent GOTV flush crash
                     StopDemoAndAnnounce();

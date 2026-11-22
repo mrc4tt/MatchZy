@@ -534,6 +534,10 @@ namespace MatchZy
 
         public void SwapPlayersToTeams()
         {
+            // No rosters (.matchsetup): the players chose their sides themselves, and GetPlayerTeam
+            // has no team for anyone, which would send every player to None.
+            if (!IsTeamWhitelistConfigured())
+                return;
             foreach (var key in playerData.Keys)
             {
                 var p = playerData[key];
@@ -845,11 +849,52 @@ namespace MatchZy
                 unpauseData["t"] = false;
                 unpauseData["pauseTeam"] = "";
             }
+            // Skipping only flipped the flags: the map list and the sides stayed empty (or half
+            // filled), so the series stopped after its first map (HandleMatchEnd read past the end
+            // of Maplist). Fill both the way a finished veto leaves them, the current map first.
+            CompleteMapListForSkippedVeto();
+            if (matchConfig.Maplist.Count > 0)
+            {
+                FinishVeto();
+                return;
+            }
             isWarmup = true;
             readyAvailable = true;
             isPreVeto = false;
             isVeto = false;
             StartWarmup();
+        }
+
+        private void CompleteMapListForSkippedVeto()
+        {
+            var pool = new List<string>(matchConfig.MapsLeftInVetoPool);
+            // Nothing picked yet: play the map the server is on first, when it is in the pool.
+            if (matchConfig.Maplist.Count == 0)
+            {
+                int current = pool.FindIndex(m => IsSameMap(m, Server.MapName));
+                if (current > 0)
+                {
+                    string map = pool[current];
+                    pool.RemoveAt(current);
+                    pool.Insert(0, map);
+                }
+            }
+            foreach (string map in pool)
+            {
+                if (matchConfig.Maplist.Count >= matchConfig.NumMaps)
+                    break;
+                if (!matchConfig.Maplist.Contains(map))
+                    matchConfig.Maplist.Add(map);
+            }
+            while (matchConfig.MapSides.Count < matchConfig.Maplist.Count)
+            {
+                matchConfig.MapSides.Add(matchConfig.MatchSideType switch
+                {
+                    "never_knife" => "team1_ct",
+                    "random" => new Random().Next(0, 2) == 0 ? "team1_ct" : "team1_t",
+                    _ => "knife",
+                });
+            }
         }
     }
 }
