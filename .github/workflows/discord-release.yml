@@ -1,0 +1,36 @@
+name: Announce release on Discord
+# A release published from a machine (tools/release.sh, or by hand on github.com) gets its
+# Discord announcement here. A release created by release.yml announces itself in that
+# workflow: releases made with the Actions token do not start other workflows, so the two
+# never both post.
+on:
+  release:
+    types: [published]
+
+permissions:
+  contents: read
+
+jobs:
+  announce:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout the released commit
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.release.tag_name }}
+
+      # Skipped when the DISCORD_RELEASE_WEBHOOK secret is not set. Pre-releases are not announced.
+      - name: Announce on Discord
+        if: ${{ !github.event.release.prerelease }}
+        env:
+          DISCORD_RELEASE_WEBHOOK: ${{ secrets.DISCORD_RELEASE_WEBHOOK }}
+          TAG: ${{ github.event.release.tag_name }}
+          REPO: ${{ github.repository }}
+        run: |
+          if [ -z "$DISCORD_RELEASE_WEBHOOK" ]; then
+            echo "DISCORD_RELEASE_WEBHOOK is not set, no announcement."
+            exit 0
+          fi
+          python3 tools/whats-new-section.py "$TAG" > whats-new-section.md
+          python3 tools/discord-release.py "$TAG" "$REPO" whats-new-section.md > discord.json
+          curl -sS --fail-with-body --max-time 30 -H "Content-Type: application/json" -d @discord.json "$DISCORD_RELEASE_WEBHOOK"
