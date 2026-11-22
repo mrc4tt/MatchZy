@@ -6,6 +6,7 @@ Based on [MatchZy](https://github.com/shobhit-pathak/MatchZy) by Shobhit Pathak,
 
 #### November 20, 2026
 
+- Practice `.replay` / `.strat` bots move without the weapon hitching on every step, look where the recording looked (pitch included), switch to the recorded weapon when they own it, and fire when the recording fired. The replay used to teleport the bot each tick, which made the client snap instead of interpolating; the interpolation frame is now kept between path steps and only changed on a real jump (start, loop, drift). New recordings store buttons and weapon changes; older ones still play. `matchzy_replay_smooth false` brings back the old behaviour.
 - Spectator coach (mode 3): at halftime and overtime the coach no longer briefly follows, sees and talks to the other team between the last round of the half and the side swap. MatchZy swaps its side data at round end, but the engine moves the players only at the next round start; the coach now follows the engine's sides.
 - Spectator coach: unloading or reloading MatchZy puts back sv_coaching_enabled, mp_forcecamera, bot_controllable, the coach comm patch and the coach's own game settings. Left on, sv_coaching_enabled could crash the next round start once MatchZy's guard was gone.
 - `matchzy_minimum_ready_required` defaults to 2 (was 10): a pug starts once two players are ready. Set it to 10 to wait for a full 5v5. A config.cfg already on the server keeps its value.

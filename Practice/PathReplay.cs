@@ -28,9 +28,18 @@ namespace MatchZy
     // Before each throw the bot draws that grenade (SelectItem redeploy, never a plain select: on a
     // grenade that throws it) and re-throws it on its tick from the recorded release point; a moment
     // later it goes back to its gun. The throw animation itself is not played.
+    //
+    // Smooth replay (matchzy_replay_smooth, default on): Teleport marks the entity as "teleported"
+    // (m_ubInterpolationFrame changes), so the client snaps instead of interpolating and the held
+    // weapon visibly hitches on every tick. While the bot follows its path, the interpolation frame
+    // is put back after each step; only the first frame, a loop restart and a big drift (> 32 units)
+    // are real teleports. The aim (eye angles, v_angle) is written again after the entities thought
+    // (OnServerPostEntityThink), so the bot's own look logic cannot overwrite it before the snapshot.
+    // Recordings also keep the buttons and the active weapon per tick; the bot switches to the
+    // recorded weapon when it owns it (the buttons are kept for a later input-driven replay).
     public partial class MatchZy
     {
-        private readonly record struct PathFrame(float X, float Y, float Z, float Pitch, float Yaw, float VX, float VY, float VZ, bool Duck);
+        private readonly record struct PathFrame(float X, float Y, float Z, float Pitch, float Yaw, float VX, float VY, float VZ, bool Duck, ulong Buttons = 0);
 
         private sealed class PathRecording
         {
@@ -39,6 +48,8 @@ namespace MatchZy
             public List<PathFrame> Frames { get; } = new();
             // Grenades thrown while recording, in throw order, keyed by the frame index they left the hand.
             public List<(int Frame, GrenadeThrownData Nade)> Throws { get; } = new();
+            // Active weapon changes (not grenades: the throws above draw those), keyed by frame.
+            public List<(int Frame, string Weapon)> Weapons { get; } = new();
         }
 
         private sealed class PathReplayState
@@ -56,6 +67,15 @@ namespace MatchZy
             public bool? LastDuck;
             public float LastPitch = float.NaN;
             public float LastYaw = float.NaN;
+            public int NextWeapon;
+            // Secondary fire (scope, knife stab) is held right now.
+            public bool Attack2;
+            // The recorded gun the bot holds, to go back to after a replayed throw.
+            public string? Gun;
+            // The frame being shown this tick, for the post-think aim write (-1 = none yet).
+            public int Shown = -1;
+            // Next step is a real teleport (start, loop restart).
+            public bool Snap = true;
             // A role of a .strat playback: the bot stays where its path ends (no kick, no message);
             // .strat stop removes the strategy's bots.
             public bool StratRole;
@@ -72,6 +92,10 @@ namespace MatchZy
         // A replay bot that is dead at the start (killed while spawning, .botrespawn pending) is
         // waited for this long before the replay gives up.
         private const int ReplayRespawnWaitTicks = 64 * 3;
+        // Farther than this from its frame, a smooth replay bot is teleported (client snaps once).
+        private const float ReplaySnapDistanceSq = 32.0f * 32.0f;
+        // Logged once per load: whether a Teleport changes the interpolation frame (smooth replay diagnosis).
+        private bool _replayInterpLogged;
 
         // Per recorder steamid: the recording in progress.
         private readonly Dictionary<ulong, PathRecording> activePathRecordings = new();
@@ -235,6 +259,19 @@ namespace MatchZy
             frames.RemoveRange(0, start);
             for (int i = 0; i < throws.Count; i++)
                 throws[i] = (Math.Clamp(throws[i].Frame - start, 0, frames.Count - 1), throws[i].Nade);
+            // Weapon changes move with the frames; the gun held at the cut start becomes frame 0.
+            var weapons = recording.Weapons;
+            string? held = null;
+            var kept = new List<(int Frame, string Weapon)>(weapons.Count);
+            foreach (var (frame, weapon) in weapons)
+            {
+                int at = frame - start;
+                if (at <= 0) held = weapon;
+                else if (at < frames.Count) kept.Add((at, weapon));
+            }
+            weapons.Clear();
+            if (held != null) weapons.Add((0, held));
+            weapons.AddRange(kept);
         }
 
         // .play / css_play: registered on OnUnCoachCommand (Teams.cs), which hands it to this in practice.
@@ -400,6 +437,7 @@ namespace MatchZy
                     continue;
                 }
                 recording.Frames.Add(frame);
+                RecordPathWeapon(player!, recording);
             }
             if (_pathStopList == null || _pathStopList.Count == 0)
                 return;
@@ -426,8 +464,42 @@ namespace MatchZy
             bool duck = false;
             if (pawn.MovementServices != null && pawn.MovementServices.Handle != IntPtr.Zero)
                 duck = new CCSPlayer_MovementServices(pawn.MovementServices.Handle).DuckAmount >= 0.5f;
-            frame = new PathFrame(o.X, o.Y, o.Z, e.X, e.Y, v.X, v.Y, v.Z, duck);
+            frame = new PathFrame(o.X, o.Y, o.Z, e.X, e.Y, v.X, v.Y, v.Z, duck, (ulong)player.Buttons);
             return true;
+        }
+
+        // The active weapon when it changed since the last recorded change (grenades excluded).
+        private static void RecordPathWeapon(CCSPlayerController player, PathRecording recording)
+        {
+            var weapon = player.PlayerPawn.Value?.WeaponServices?.ActiveWeapon.Value;
+            if (weapon == null || !weapon.IsValid)
+                return;
+            string name = weapon.DesignerName;
+            if (string.IsNullOrEmpty(name) || IsGrenadeClassname(name))
+                return;
+            if (recording.Weapons.Count > 0 && recording.Weapons[^1].Weapon == name)
+                return;
+            recording.Weapons.Add((recording.Frames.Count - 1, name));
+        }
+
+        private static bool BotOwnsWeapon(CCSPlayerPawn pawn, string name) =>
+            pawn.WeaponServices != null
+            && pawn.WeaponServices.MyWeapons.Any(h => h.Value != null && h.Value.IsValid && h.Value.DesignerName == name);
+
+        private static bool IsKnifeClassname(string name) =>
+            name.Contains("knife", StringComparison.Ordinal) || name.Contains("bayonet", StringComparison.Ordinal);
+
+        private static string? OwnedKnifeName(CCSPlayerPawn pawn)
+        {
+            if (pawn.WeaponServices == null)
+                return null;
+            foreach (var h in pawn.WeaponServices.MyWeapons)
+            {
+                var w = h.Value;
+                if (w != null && w.IsValid && IsKnifeClassname(w.DesignerName))
+                    return w.DesignerName;
+            }
+            return null;
         }
 
         private List<int>? _replayDoneList;
@@ -460,15 +532,18 @@ namespace MatchZy
                     }
                     state.Frame = 0;
                     state.NextThrow = 0;
+                    state.NextWeapon = 0;
                     state.DrawnFor = -1;
+                    state.Snap = true;
                 }
                 int frameIndex = state.Frame++;
                 PathFrame f = frames[frameIndex];
                 _replayPos.X = f.X; _replayPos.Y = f.Y; _replayPos.Z = f.Z;
                 _replayVel.X = f.VX; _replayVel.Y = f.VY; _replayVel.Z = f.VZ;
                 _replayAng.X = 0; _replayAng.Y = f.Yaw; _replayAng.Z = 0;
-                pawn.Teleport(_replayPos, _replayAng, _replayVel);
-                if (float.IsNaN(state.LastPitch) || Math.Abs(state.LastPitch - f.Pitch) > 0.5f || Math.Abs(state.LastYaw - f.Yaw) > 0.5f)
+                MoveReplayBot(pawn, state, f);
+                state.Shown = frameIndex;
+                if (float.IsNaN(state.LastPitch) || Math.Abs(state.LastPitch - f.Pitch) > 0.1f || Math.Abs(state.LastYaw - f.Yaw) > 0.1f)
                 {
                     state.LastPitch = f.Pitch;
                     state.LastYaw = f.Yaw;
@@ -478,6 +553,41 @@ namespace MatchZy
                 {
                     state.LastDuck = f.Duck;
                     SetReplayBotDuck(bot, f.Duck);
+                }
+
+                // The recorded gun changes, when the bot owns that gun and holds no replay grenade.
+                var weapons = state.Recording.Weapons;
+                while (state.NextWeapon < weapons.Count && weapons[state.NextWeapon].Frame <= frameIndex)
+                {
+                    string gun = weapons[state.NextWeapon++].Weapon;
+                    if (!BotOwnsWeapon(pawn, gun))
+                    {
+                        // Knives differ per team and skin (weapon_knife, weapon_knife_t, ...): use the
+                        // knife the bot has. Any other gun the player held is handed to the bot.
+                        string? knife = IsKnifeClassname(gun) ? OwnedKnifeName(pawn) : null;
+                        if (knife != null)
+                            gun = knife;
+                        else if (IsKnifeClassname(gun) || gun == "weapon_c4")
+                            continue;
+                        else
+                            bot.GiveNamedItem(gun);
+                    }
+                    state.Gun = gun;
+                    if (state.DrawnFor < state.NextThrow && state.HolsterAt < 0 && !SwitchWeaponNative(bot, gun))
+                        EquipWeaponByName(bot, gun);
+                }
+
+                // The recorded trigger, while the bot holds a gun or knife (not a replay grenade:
+                // those are re-thrown from the recorded release, a held trigger would throw twice).
+                bool gunInHand = state.DrawnFor < state.NextThrow && state.HolsterAt < 0;
+                var botState = pawn.Bot;
+                if (botState != null)
+                    SetBotAttacking(bot, botState, gunInHand && (f.Buttons & (ulong)PlayerButtons.Attack) != 0);
+                bool attack2 = gunInHand && (f.Buttons & (ulong)PlayerButtons.Attack2) != 0;
+                if (attack2 != state.Attack2)
+                {
+                    state.Attack2 = attack2;
+                    bot.ExecuteClientCommandFromServer(attack2 ? "+attack2" : "-attack2");
                 }
 
                 // Draw the next grenade shortly before its throw, so the bot holds it when it flies.
@@ -500,7 +610,10 @@ namespace MatchZy
                     state.HolsterAt = -1;
                     bool nextSoon = state.NextThrow < throws.Count && throws[state.NextThrow].Frame - ReplayNadeDrawLead <= frameIndex + 1;
                     if (!nextSoon)
-                        HolsterReplayNade(bot);
+                    {
+                        if (state.Gun == null || !BotOwnsWeapon(pawn, state.Gun) || !SwitchWeaponNative(bot, state.Gun))
+                            HolsterReplayNade(bot);
+                    }
                 }
             }
             if (_replayDoneList == null || _replayDoneList.Count == 0)
@@ -509,6 +622,70 @@ namespace MatchZy
             {
                 bool stratRole = activePathReplays.TryGetValue(uid, out var done) && done.StratRole;
                 EndPathReplay(uid, announce: !stratRole, kickBot: !stratRole);
+            }
+        }
+
+        // One replay step. The body gets yaw only (a pitched teleport tilts the model, issue #10).
+        private void MoveReplayBot(CCSPlayerPawn pawn, PathReplayState state, PathFrame f)
+        {
+            _replayPos.X = f.X; _replayPos.Y = f.Y; _replayPos.Z = f.Z;
+            _replayVel.X = f.VX; _replayVel.Y = f.VY; _replayVel.Z = f.VZ;
+            _replayAng.X = 0; _replayAng.Y = f.Yaw; _replayAng.Z = 0;
+
+            bool smooth = replaySmooth.Value && !state.Snap;
+            if (smooth)
+            {
+                var o = pawn.AbsOrigin;
+                float dx = o == null ? float.MaxValue : o.X - f.X, dy = o == null ? 0 : o.Y - f.Y, dz = o == null ? 0 : o.Z - f.Z;
+                smooth = dx * dx + dy * dy + dz * dz <= ReplaySnapDistanceSq;
+            }
+            state.Snap = false;
+
+            byte interp = pawn.InterpolationFrame;
+            pawn.Teleport(_replayPos, _replayAng, _replayVel);
+            byte after = pawn.InterpolationFrame;
+            if (!_replayInterpLogged)
+            {
+                _replayInterpLogged = true;
+                Log($"[PathReplay] Teleport {(after != interp ? "changes" : "keeps")} the interpolation frame ({interp} -> {after}).");
+            }
+            if (smooth && after != interp)
+            {
+                pawn.InterpolationFrame = interp;
+                Utilities.SetStateChanged(pawn, "CBaseEntity", "m_ubInterpolationFrame");
+            }
+        }
+
+        // After the entities thought (bots included): put the recorded aim back on every replay bot,
+        // so the networked eye angles are the player's, not the bot's own look target.
+        public void OnPathReplayPostThink()
+        {
+            if (!isPractice || activePathReplays.Count == 0 || !replaySmooth.Value)
+                return;
+            try
+            {
+                foreach (var (uid, state) in activePathReplays)
+                {
+                    if (state.Shown < 0 || state.Shown >= state.Recording.Frames.Count)
+                        continue;
+                    var bot = Utilities.GetPlayerFromUserid(uid);
+                    var pawn = bot?.PlayerPawn.Value;
+                    if (bot == null || !bot.IsValid || !bot.PawnIsAlive || pawn == null || !pawn.IsValid)
+                        continue;
+                    PathFrame f = state.Recording.Frames[state.Shown];
+                    QAngle eye = pawn.EyeAngles;
+                    if (eye.X != f.Pitch || eye.Y != f.Yaw)
+                    {
+                        eye.X = f.Pitch; eye.Y = f.Yaw; eye.Z = 0;
+                        Utilities.SetStateChanged(pawn, "CCSPlayerPawn", "m_angEyeAngles");
+                    }
+                    QAngle v = pawn.V_angle;
+                    v.X = f.Pitch; v.Y = f.Yaw; v.Z = 0;
+                }
+            }
+            catch (Exception e)
+            {
+                Log($"[PathReplay] post think: {e.Message}");
             }
         }
 
@@ -599,6 +776,16 @@ namespace MatchZy
         {
             if (!activePathReplays.Remove(uid, out var state))
                 return;
+            // Let go of the triggers the replay was holding.
+            var held = Utilities.GetPlayerFromUserid(uid);
+            if (held != null && held.IsValid)
+            {
+                var heldState = held.PlayerPawn.Value?.Bot;
+                if (heldState != null)
+                    SetBotAttacking(held, heldState, false);
+                if (state.Attack2)
+                    held.ExecuteClientCommandFromServer("-attack2");
+            }
             // A replay that ran to its end or was stopped with .replay stop removes its bot: it was
             // only there to walk the path.
             if (kickBot)
@@ -681,6 +868,15 @@ namespace MatchZy
             // X, Y, Z, Pitch, Yaw, VX, VY, VZ, Duck (0/1) per tick.
             public List<float[]> Frames { get; set; } = new();
             public List<SavedPathThrow> Throws { get; set; } = new();
+            // Since 1.0.26, optional: the buttons per tick and the active weapon changes.
+            public List<ulong>? Buttons { get; set; }
+            public List<SavedPathWeapon>? Weapons { get; set; }
+        }
+
+        private sealed class SavedPathWeapon
+        {
+            public int Frame { get; set; }
+            public string Name { get; set; } = "";
         }
 
         private static readonly JsonSerializerOptions SavedPathJsonOpts = new() { WriteIndented = false };
@@ -769,6 +965,10 @@ namespace MatchZy
         private static SavedPath CloneSavedPath(SavedPath p)
         {
             var c = new SavedPath { Team = p.Team, Frames = new List<float[]>(p.Frames.Count), Throws = new List<SavedPathThrow>(p.Throws.Count) };
+            if (p.Buttons != null)
+                c.Buttons = new List<ulong>(p.Buttons);
+            if (p.Weapons != null)
+                c.Weapons = p.Weapons.Select(w => new SavedPathWeapon { Frame = w.Frame, Name = w.Name }).ToList();
             foreach (var f in p.Frames)
                 c.Frames.Add((float[])f.Clone());
             foreach (var t in p.Throws)
@@ -834,6 +1034,8 @@ namespace MatchZy
         {
             Team = (int)r.Team,
             Frames = r.Frames.Select(f => new[] { f.X, f.Y, f.Z, f.Pitch, f.Yaw, f.VX, f.VY, f.VZ, f.Duck ? 1f : 0f }).ToList(),
+            Buttons = r.Frames.Select(f => f.Buttons).ToList(),
+            Weapons = r.Weapons.Select(w => new SavedPathWeapon { Frame = w.Frame, Name = w.Weapon }).ToList(),
             Throws = r.Throws.Select(t => new SavedPathThrow
             {
                 Frame = t.Frame,
@@ -852,12 +1054,18 @@ namespace MatchZy
         private static PathRecording? FromSavedPath(SavedPath s, string map)
         {
             var r = new PathRecording { MapName = map, Team = s.Team == (int)CsTeam.CounterTerrorist ? CsTeam.CounterTerrorist : CsTeam.Terrorist };
-            foreach (var f in s.Frames)
+            bool buttons = s.Buttons != null && s.Buttons.Count == s.Frames.Count;
+            for (int i = 0; i < s.Frames.Count; i++)
             {
+                var f = s.Frames[i];
                 if (f.Length < 9)
                     return null;
-                r.Frames.Add(new PathFrame(f[0], f[1], f[2], f[3], f[4], f[5], f[6], f[7], f[8] >= 0.5f));
+                r.Frames.Add(new PathFrame(f[0], f[1], f[2], f[3], f[4], f[5], f[6], f[7], f[8] >= 0.5f, buttons ? s.Buttons![i] : 0));
             }
+            if (s.Weapons != null)
+                foreach (var w in s.Weapons)
+                    if (w.Frame >= 0 && w.Frame < r.Frames.Count && w.Name.StartsWith("weapon_", StringComparison.Ordinal))
+                        r.Weapons.Add((w.Frame, w.Name));
             if (r.Frames.Count < 2)
                 return null;
             foreach (var t in s.Throws)
