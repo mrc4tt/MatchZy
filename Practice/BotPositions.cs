@@ -114,6 +114,8 @@ namespace MatchZy
             HandleSaveBotPosCommand(player, command.ArgString);
         }
 
+        private const int MaxBotPositionsPerMap = 64;
+
         public void HandleSaveBotPosCommand(CCSPlayerController? player, string name)
         {
             if (!isPractice || !IsPlayerValid(player) || player!.PlayerPawn.Value?.AbsOrigin == null)
@@ -142,6 +144,22 @@ namespace MatchZy
                 var data = LoadBotPositions();
                 string map = Server.MapName;
                 if (!data.TryGetValue(map, out var slots)) { slots = new(); data[map] = slots; }
+                // The file is shared by everyone in practice and rewritten on each save: a new
+                // name must be a plain one and fit under the cap. Saving over a name that is
+                // already in the file (whatever it looks like) still works.
+                if (!slots.ContainsKey(name))
+                {
+                    if (!SavedPathNameRegex.IsMatch(name))
+                    {
+                        ReplyToUserCommand(player, Localizer.ForPlayer(player, "matchzy.cc.usage", ".savebotpos <name> (a-z, 0-9, _ -)"));
+                        return;
+                    }
+                    if (slots.Count >= MaxBotPositionsPerMap)
+                    {
+                        ReplyToUserCommand(player, Localizer.ForPlayer(player, "matchzy.pm.savelimitreached", MaxBotPositionsPerMap, ".delbotpos"));
+                        return;
+                    }
+                }
                 slots[name] = new BotPos { X = o.X, Y = o.Y, Z = o.Z, Pitch = a.X, Yaw = a.Y, Team = player.TeamNum, Crouch = crouch };
                 if (!SaveBotPositions(data))
                 {

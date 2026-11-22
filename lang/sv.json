@@ -157,6 +157,7 @@
     "matchzy.pm.landmarkeron": "Landningsmarkörer {green}PÅ{default}: en markör placeras där varje granat detonerar.",
     "matchzy.pm.landmarkeroff": "Landningsmarkörer {red}AV{default}.",
     "matchzy.pm.nadelimitreached": "Gränsen för sparade lineups nådd ({0}). Radera några med .delnade innan du sparar fler.",
+    "matchzy.pm.savelimitreached": "Gränsen för sparade nådd ({0} på denna karta). Ta bort några med {1} innan du sparar fler.",
     "matchzy.pm.mynades": "Du har {green}{0}{default} av {green}{1}{default} sparade granat-lineups.",
     "matchzy.pm.arcon": "Banbågar {green}PÅ{default}: kastade granater ritar ut sin flygbana.",
     "matchzy.pm.arcoff": "Banbågar {red}AV{default}.",

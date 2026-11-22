@@ -157,6 +157,7 @@
     "matchzy.pm.landmarkeron": "Düşüş işaretleri {green}AÇIK{default}: her bombanın patladığı yere bir işaret konur.",
     "matchzy.pm.landmarkeroff": "Düşüş işaretleri {red}KAPALI{default}.",
     "matchzy.pm.nadelimitreached": "Kayıtlı lineup sınırına ulaşıldı ({0}). Daha fazla kaydetmeden önce .delnade ile bazılarını sil.",
+    "matchzy.pm.savelimitreached": "Kayıt sınırına ulaşıldı (bu haritada {0}). Daha fazla kaydetmeden önce {1} ile bazılarını sil.",
     "matchzy.pm.mynades": "{green}{1}{default} kayıtlı bomba lineup'ından {green}{0}{default} tanesi sende var.",
     "matchzy.pm.arcon": "Yörünge çizgileri {green}AÇIK{default}: atılan bombalar uçuş yolunu çizer.",
     "matchzy.pm.arcoff": "Yörünge çizgileri {red}KAPALI{default}.",

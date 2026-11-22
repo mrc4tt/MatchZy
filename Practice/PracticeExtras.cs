@@ -197,8 +197,21 @@ namespace MatchZy
         /// </summary>
         public void ShutdownPracticeExtrasForUnload(bool touchEntities = true)
         {
+            // A .nadespeed slow motion must not outlive the plugin.
+            try { RestoreNadeSpeed(); }
+            catch (Exception e) { Log($"[PracticeExtras] unload nadespeed: {e.Message}"); }
+            // On a hot reload nothing else leaves practice (LeaveModeOnUnload is skipped) and the
+            // new instance does not know practice was on: the quiet LagCompensation channel and a
+            // held bot quota (bot_join_delay) would stay for good. Both are no-ops when not active;
+            // a tier0 channel flag and a console command, no entity involved.
+            try { QuietLagCompensationLog(false); }
+            catch (Exception e) { Log($"[PracticeExtras] unload lagcomp log: {e.Message}"); }
+            try { ReleaseBotQuotaAdds(); }
+            catch (Exception e) { Log($"[PracticeExtras] unload bot quota: {e.Message}"); }
             if (!touchEntities)
             {
+                // The game rules go with the map: only forget the remembered team sizes.
+                ForgetPracticeTeamSize();
                 _nadeFollows.Clear();
                 try { ForgetNadeTutorialState(); }
                 catch (Exception e) { Log($"[PracticeExtras] unload trainer: {e.Message}"); }
@@ -208,6 +221,10 @@ namespace MatchZy
                 catch (Exception e) { Log($"[PracticeExtras] unload assert: {e.Message}"); }
                 return;
             }
+            // The raised team size is written into the game rules: put the map's own values back
+            // (does nothing when practice never raised it, or when there are no game rules).
+            try { RestorePracticeTeamSize(); }
+            catch (Exception e) { Log($"[PracticeExtras] unload team size: {e.Message}"); }
             try { ResetNadeFollow(mapStart: false, unloading: true); }
             catch (Exception e) { Log($"[PracticeExtras] unload follow: {e.Message}"); }
             try { ShutdownNadeTutorial(); }

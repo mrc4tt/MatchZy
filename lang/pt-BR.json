@@ -157,6 +157,7 @@
     "matchzy.pm.landmarkeron": "Marcadores de queda {green}LIGADOS{default}: um marcador é colocado onde cada granada explode.",
     "matchzy.pm.landmarkeroff": "Marcadores de queda {red}DESLIGADOS{default}.",
     "matchzy.pm.nadelimitreached": "Limite de lineups salvas atingido ({0}). Apague algumas com .delnade antes de salvar mais.",
+    "matchzy.pm.savelimitreached": "Limite de salvamentos atingido ({0} neste mapa). Remova alguns com {1} antes de salvar mais.",
     "matchzy.pm.mynades": "Você tem {green}{0}{default} de {green}{1}{default} lineups de granada salvas.",
     "matchzy.pm.arcon": "Trajetórias {green}LIGADAS{default}: as granadas jogadas desenham o caminho do voo.",
     "matchzy.pm.arcoff": "Trajetórias {red}DESLIGADAS{default}.",

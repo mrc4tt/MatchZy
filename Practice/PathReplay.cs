@@ -881,6 +881,8 @@ namespace MatchZy
 
         private static readonly JsonSerializerOptions SavedPathJsonOpts = new() { WriteIndented = false };
         private static readonly Regex SavedPathNameRegex = new("^[A-Za-z0-9_-]{1,32}$", RegexOptions.Compiled);
+        // Every player in practice can save and each save rewrites the whole file of the map.
+        private const int MaxSavedPathsPerMap = 64;
 
         // Saved paths of the current map, loaded on first use.
         private Dictionary<string, SavedPath>? _savedPaths;
@@ -932,6 +934,7 @@ namespace MatchZy
             path.Frames.RemoveAll(f => f == null);
             path.Throws ??= new();
             path.Throws.RemoveAll(t => t == null);
+            path.Weapons?.RemoveAll(w => w == null || w.Name == null);
             foreach (var t in path.Throws)
             {
                 t.Type ??= "";
@@ -1103,6 +1106,12 @@ namespace MatchZy
                 return;
             }
             var paths = LoadSavedPaths();
+            // Saving over an existing name is still allowed at the cap.
+            if (!paths.ContainsKey(name) && paths.Count >= MaxSavedPathsPerMap)
+            {
+                ReplyToUserCommand(player, Localizer.ForPlayer(player, "matchzy.pm.savelimitreached", MaxSavedPathsPerMap, ".delrec"));
+                return;
+            }
             paths[name] = ToSavedPath(recording);
             if (!WriteSavedPaths(paths))
             {

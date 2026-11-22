@@ -157,6 +157,7 @@
     "matchzy.pm.landmarkeron": "Marqueurs d'impact {green}ACTIVÉS{default} : un marqueur est placé là où chaque grenade explose.",
     "matchzy.pm.landmarkeroff": "Marqueurs d'impact {red}DÉSACTIVÉS{default}.",
     "matchzy.pm.nadelimitreached": "Limite de lineups sauvegardés atteinte ({0}). Supprimes-en avec .delnade avant d'en sauvegarder d'autres.",
+    "matchzy.pm.savelimitreached": "Limite de sauvegardes atteinte ({0} sur cette map). Supprimes-en avec {1} avant d'en sauvegarder d'autres.",
     "matchzy.pm.mynades": "Tu as {green}{0}{default} lineups de grenades sauvegardés sur {green}{1}{default}.",
     "matchzy.pm.arcon": "Trajectoires {green}ACTIVÉES{default} : les grenades lancées affichent leur trajectoire.",
     "matchzy.pm.arcoff": "Trajectoires {red}DÉSACTIVÉES{default}.",

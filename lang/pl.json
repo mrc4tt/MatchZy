@@ -157,6 +157,7 @@
     "matchzy.pm.landmarkeron": "Znaczniki lądowania {green}WŁ.{default}: w miejscu wybuchu każdego granatu pojawia się znacznik.",
     "matchzy.pm.landmarkeroff": "Znaczniki lądowania {red}WYŁ.{default}.",
     "matchzy.pm.nadelimitreached": "Osiągnięto limit zapisanych lineupów ({0}). Usuń kilka przez .delnade, zanim zapiszesz kolejne.",
+    "matchzy.pm.savelimitreached": "Osiągnięto limit zapisów ({0} na tej mapie). Usuń kilka przez {1}, zanim zapiszesz kolejne.",
     "matchzy.pm.mynades": "Masz {green}{0}{default} z {green}{1}{default} zapisanych lineupów.",
     "matchzy.pm.arcon": "Trajektorie {green}WŁ.{default}: rzucone granaty rysują swój tor lotu.",
     "matchzy.pm.arcoff": "Trajektorie {red}WYŁ.{default}.",

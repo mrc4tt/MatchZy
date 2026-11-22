@@ -157,6 +157,7 @@
     "matchzy.pm.landmarkeron": "Landemarker {green}AN{default}: Wo jede Granate detoniert, wird ein Marker gesetzt.",
     "matchzy.pm.landmarkeroff": "Landemarker {red}AUS{default}.",
     "matchzy.pm.nadelimitreached": "Limit für gespeicherte Lineups erreicht ({0}). Lösche einige mit .delnade, bevor du weitere speicherst.",
+    "matchzy.pm.savelimitreached": "Speicherlimit erreicht ({0} auf dieser Map). Entferne einige mit {1}, bevor du weitere speicherst.",
     "matchzy.pm.mynades": "Du hast {green}{0}{default} von {green}{1}{default} Granaten-Lineups gespeichert.",
     "matchzy.pm.arcon": "Flugbahnen {green}AN{default}: Geworfene Granaten zeichnen ihre Flugbahn.",
     "matchzy.pm.arcoff": "Flugbahnen {red}AUS{default}.",

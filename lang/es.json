@@ -157,6 +157,7 @@
     "matchzy.pm.landmarkeron": "Marcadores de impacto {green}ACTIVADOS{default}: se coloca un marcador donde detona cada granada.",
     "matchzy.pm.landmarkeroff": "Marcadores de impacto {red}DESACTIVADOS{default}.",
     "matchzy.pm.nadelimitreached": "Límite de lineups guardados alcanzado ({0}). Elimina algunos con .delnade antes de guardar más.",
+    "matchzy.pm.savelimitreached": "Límite de guardados alcanzado ({0} en este mapa). Elimina algunos con {1} antes de guardar más.",
     "matchzy.pm.mynades": "Tienes {green}{0}{default} de {green}{1}{default} lineups de granadas guardados.",
     "matchzy.pm.arcon": "Arcos de trayectoria {green}ACTIVADOS{default}: las granadas lanzadas dibujan su trayectoria.",
     "matchzy.pm.arcoff": "Arcos de trayectoria {red}DESACTIVADOS{default}.",

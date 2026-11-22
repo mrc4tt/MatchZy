@@ -3013,6 +3013,10 @@ namespace MatchZy
                     {
                         if (!isPractice || !IsPlayerValid(bot) || !bot.PawnIsAlive)
                             return;
+                        // A bot on a .replay / .strat path is moved by the recording: one that
+                        // starts by dropping off a ledge is below its start spot on purpose.
+                        if (bot.UserId.HasValue && IsBotReplayingPath(bot.UserId.Value))
+                            return;
                         var botPawn = bot.PlayerPawn.Value;
                         var botOrigin = botPawn?.AbsOrigin;
                         if (botPawn == null || botOrigin == null)
@@ -4381,6 +4385,11 @@ namespace MatchZy
                 fastForwardTimer?.Kill();
                 ResetFastForward();
             }
+            // Same for .nadespeed with a grenade still in the air: host_timescale is a cheat convar,
+            // so the tick's own reset came one frame after sv_cheats went off and was refused,
+            // leaving warmup or the match in slow motion.
+            RestoreNadeSpeed();
+            nadeSpeedScale = 1f;
             // prac.cfg settings no mode cfg resets: undo them here, before sv_cheats goes off (buddha is
             // a cheat command). Otherwise all-talk and buddha stayed on into a dry run or warmup.
             Server.ExecuteCommand("buddha 0; buddha_ignore_bots 0; sv_full_alltalk 0; sv_showimpacts 0;");

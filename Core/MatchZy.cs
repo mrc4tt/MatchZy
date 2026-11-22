@@ -1179,6 +1179,7 @@ namespace MatchZy
 
             RegisterListener<Listeners.OnMapStart>(mapName =>
             {
+                ForgetPracticeTeamSize();
                 // The cached cs_gamerules proxy belongs to the previous map's entity system.
                 InvalidateGameRulesCache();
                 ClearCoachSpawnCache();

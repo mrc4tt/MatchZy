@@ -157,6 +157,7 @@
     "matchzy.pm.landmarkeron": "Landing markers {green}ON{default}: a marker is placed where each grenade detonates.",
     "matchzy.pm.landmarkeroff": "Landing markers {red}OFF{default}.",
     "matchzy.pm.nadelimitreached": "Saved-lineup limit reached ({0}). Delete some with .delnade before saving more.",
+    "matchzy.pm.savelimitreached": "Save limit reached ({0} on this map). Remove some with {1} before saving more.",
     "matchzy.pm.mynades": "You have {green}{0}{default} of {green}{1}{default} saved grenade lineups.",
     "matchzy.pm.arcon": "Trajectory arcs {green}ON{default}: thrown grenades draw their flight path.",
     "matchzy.pm.arcoff": "Trajectory arcs {red}OFF{default}.",

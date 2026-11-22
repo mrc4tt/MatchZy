@@ -33,7 +33,6 @@ namespace MatchZy
             public int Still;
             public int Ticks;
             public System.Text.StringBuilder? Path;
-            public bool LogPath;
             public bool Detonated;
         }
 
