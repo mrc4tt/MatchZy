@@ -29,6 +29,10 @@ jobs:
 
       - name: Get MatchZy Version
         id: matchzy_version
+        env:
+          # Through the environment, not pasted into the script: a ref name is free text.
+          REF_TYPE: ${{ github.ref_type }}
+          REF_NAME: ${{ github.ref_name }}
         run: |
           VERSION=$(grep -oP 'ModuleVersion\s*=>\s*"\K[^"]*' Core/MatchZy.cs)
           if [ -z "$VERSION" ]; then
@@ -36,8 +40,8 @@ jobs:
             exit 1
           fi
           # A tag must match the version in the code, or the release and its zip would be mislabelled.
-          if [ "${{ github.ref_type }}" = "tag" ] && [ "${{ github.ref_name }}" != "$VERSION" ]; then
-            echo "Error: tag ${{ github.ref_name }} does not match ModuleVersion $VERSION in Core/MatchZy.cs"
+          if [ "$REF_TYPE" = "tag" ] && [ "$REF_NAME" != "$VERSION" ]; then
+            echo "Error: tag $REF_NAME does not match ModuleVersion $VERSION in Core/MatchZy.cs"
             exit 1
           fi
           echo "MATCHZY_VERSION=$VERSION" >> $GITHUB_ENV
@@ -70,6 +74,15 @@ jobs:
           # the gamedata dir). Provides the signatures MatchZy resolves by key - practice grenade
           # rethrow (.rt/.last/.back) and .breakrestore - so it works on stock CSS without editing
           # the core gamedata.json.
+          # The zip must carry the SQLite builds from native/, not the ones the NuGet package ships
+          # (older SQLite with a known advisory). The copy in MatchZy.csproj is conditional, so check it.
+          for pair in "native/linux-x64/libe_sqlite3.so:libe_sqlite3.so" "native/win-x64/e_sqlite3.dll:e_sqlite3.dll"; do
+            src="${pair%%:*}"; name="${pair##*:}"
+            if [ ! -f "package/addons/counterstrikesharp/plugins/MatchZy/$name" ] || ! cmp -s "$src" "package/addons/counterstrikesharp/plugins/MatchZy/$name"; then
+              echo "Error: $name in the package is not the build from $src"
+              exit 1
+            fi
+          done
           mkdir -p package/addons/counterstrikesharp/gamedata
           cp gamedata/matchzy.json package/addons/counterstrikesharp/gamedata/matchzy.json
           cd package && 7z a -tzip ../MatchZy-${{ env.MATCHZY_VERSION }}.zip . && cd ..

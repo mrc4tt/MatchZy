@@ -85,6 +85,9 @@ namespace MatchZy
         public void OnBotSpawnConsoleCommand(CCSPlayerController? player, CommandInfo command)
             => HandleBotSpawnCommand(player, command.ArgString);
 
+        private const int MaxBotSpawnPoolsPerMap = 32;
+        private const int MaxBotSpawnSpotsPerPool = 64;
+
         public void HandleBotSpawnCommand(CCSPlayerController? player, string name)
         {
             if (!RequirePractice(player) || !IsPlayerValid(player) || player!.PlayerPawn.Value?.AbsOrigin == null)
@@ -116,8 +119,26 @@ namespace MatchZy
                 string key = FindPoolName(pools, name) ?? name;
                 if (!pools.TryGetValue(key, out var spots))
                 {
+                    // The file is shared by everyone in practice and rewritten on each save: a
+                    // new pool needs a plain name and room under the cap. Pools already in the
+                    // file keep whatever name they have.
+                    if (!SavedPathNameRegex.IsMatch(key))
+                    {
+                        ReplyToUserCommand(player, Localizer.ForPlayer(player, "matchzy.cc.usage", ".botspawn <name> (a-z, 0-9, _ -)"));
+                        return;
+                    }
+                    if (pools.Count >= MaxBotSpawnPoolsPerMap)
+                    {
+                        ReplyToUserCommand(player, Localizer.ForPlayer(player, "matchzy.pm.savelimitreached", MaxBotSpawnPoolsPerMap, ".delbotspawn"));
+                        return;
+                    }
                     spots = new();
                     pools[key] = spots;
+                }
+                if (spots.Count >= MaxBotSpawnSpotsPerPool)
+                {
+                    ReplyToUserCommand(player, Localizer.ForPlayer(player, "matchzy.pm.savelimitreached", MaxBotSpawnSpotsPerPool, ".showbotspawn"));
+                    return;
                 }
                 spots.Add(new BotPos { X = o.X, Y = o.Y, Z = o.Z, Pitch = 0, Yaw = pawn.EyeAngles.Y, Team = player.TeamNum, Crouch = crouch });
                 if (!SaveBotSpawns(data))

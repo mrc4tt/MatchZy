@@ -2,9 +2,9 @@
 
 A short summary of each release. The [full changelog](changelog.md) has the details and background for every change.
 
-## 1.0.26 <small>November 20, 2026</small>
+## 1.0.26 <small>November 22, 2026</small>
 
-- **New:** Ready up with the use key (E) during the ready phase (`matchzy_ready_use_key`, on by default). `.ready` still works.
+- **New:** Ready up with the use key (E) during the ready phase (`matchzy_ready_use_key true`, off by default). `.ready` still works.
 - **New:** A pug with fewer than 10 players (3v3, 4v4, 4v5) starts by itself 20 seconds after everyone is ready, and so does a `.matchsetup` match with uneven sides (`matchzy_ready_short_start_delay`). `.unready` stops the countdown.
 - **New:** (Beta) Spectator coach with `matchzy_coaching_mode 3`: no body, first person on the own team, radar with only the own team and spotted enemies, teammates outlined through walls, no enemy ghosting. See [Coaching](guides/coaching.md#spectator-coach-beta-matchzy_coaching_mode-3).
 - **New:** Grenade follow camera in practice: a throw from a lineup spot is followed by the camera and shows where it lands; jump to come back. `.follownade` sets lineup spots / every throw / off.
@@ -12,7 +12,7 @@ A short summary of each release. The [full changelog](changelog.md) has the deta
 - **New:** `.train` takes you through your saved lineups one by one and judges each throw; hold E on a mark to rename or delete it.
 - **New:** (Beta) Grenade finder: `.draw` a box where a grenade should land, `.find` works out lineups that land in it from where you are.
 - **New:** Players can vote all chat off with `.mute` (`matchzy_allchat_mute_votes`; `.nochat` with CS2-SimpleAdmin), so the teams can no longer write to each other; admins use `.allchat`.
-- **Changed:** `matchzy_minimum_ready_required` defaults to 2 (was 10). Existing config.cfg files keep their value.
+- **Changed:** `matchzy_minimum_ready_required` defaults to 2 (was 10): a pug starts when two players are ready, at least one on each side. Existing config.cfg files keep their value.
 - **New:** `.spawns` toggles the practice spawn markers on and off.
 - **Changed:** `.replay` bots in practice move smoothly, aim like the recording and fire when you fired (`matchzy_replay_smooth`).
 - **New:** Chat translations in Brazilian Portuguese and Turkish (`!lang pt-BR`, `!lang tr`).
@@ -23,6 +23,15 @@ A short summary of each release. The [full changelog](changelog.md) has the deta
     After updating you can delete the old `runtimes/` folder, `MatchZy.pdb` and `Microsoft.Extensions.*.dll` in the plugin folder.
 - **Changed:** `.help` in practice shows a short list; `.help more` shows every command.
 - **Changed:** The lineup trainer's aim target model and hint box are replaced by the aim rings (`matchzy_practice_aim_rings`).
+- **Fixed:** A break between the maps of a series no longer forfeits it: the ready time limit (`get5_time_to_start`) only applies before the first map.
+- **Fixed:** E no longer opens the buy menu while a MatchZy menu is open; B still does.
+- **Fixed:** A `.matchsetup` BO3 keeps its teams between maps and after a side pick: the players on CT and T become the teams' player lists once everyone is ready.
+- **Fixed:** `.skipveto` on a BO2 / BO3 no longer stops the series after its first map.
+- **Security:** A match config can no longer send the server's own header or auth values to another host, uploaded round backups no longer hold them, and more cvars are refused from a match config (`sv_cheats`, log file and server identity cvars, owner-only MatchZy settings). Passwords and game settings still work.
+- **Changed:** Practice: saved recordings, strategies, bot positions and bot spawn pools have a limit per map.
+- **Security:** `get5_status` answers only the server console and admins (its reply holds the match config URL).
+- **Fixed:** Practice: `.nadespeed` no longer leaves the server in slow motion after practice ends.
+- **Fixed:** A `.matchsetup` (`.ma`) match counts its players: the ready panel no longer stays at CT 0 / T 0, `.ready` starts the match and the map veto finds its captains.
 - **Fixed:** A `.matchsetup` match played 4v4 (or 3v3) starts when everyone is ready, instead of waiting for 5 players per side until an admin used `.forcestart`.
 - **Fixed:** The bot quota no longer kicks CSTV when it removes bots (a lowered `bot_quota`, or `bot_quota_mode fill` and a player joining a team), so the demo is no longer split in two (`matchzy_cstv_kick_guard`).
 - **Fixed:** Practice `.bot` adds one bot instead of adding two and kicking one.

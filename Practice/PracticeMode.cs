@@ -3013,6 +3013,10 @@ namespace MatchZy
                     {
                         if (!isPractice || !IsPlayerValid(bot) || !bot.PawnIsAlive)
                             return;
+                        // A bot on a .replay / .strat path is moved by the recording: one that
+                        // starts by dropping off a ledge is below its start spot on purpose.
+                        if (bot.UserId.HasValue && IsBotReplayingPath(bot.UserId.Value))
+                            return;
                         var botPawn = bot.PlayerPawn.Value;
                         var botOrigin = botPawn?.AbsOrigin;
                         if (botPawn == null || botOrigin == null)
@@ -3977,15 +3981,16 @@ namespace MatchZy
                             }
                             catch (Exception ex)
                             {
-                                Console.WriteLine($"Error switching team: {ex.Message}");
-                                ReplyToUserCommand(player, Localizer.ForPlayer(player, "matchzy.pm.spectatorbroken"));
+                                // Not the "from spectator" text: this is any failure, also T <-> CT.
+                                Log($"[SideSwitchCommand] Switch to {team} failed: {ex}");
+                                ReplyToUserCommand(player, Localizer.ForPlayer(player, "matchzy.pm.teamswitchfailed"));
                             }
                         });
                     }
                     catch (Exception ex)
                     {
-                        Console.WriteLine($"Error switching team: {ex.Message}");
-                        ReplyToUserCommand(player, Localizer.ForPlayer(player, "matchzy.pm.spectatorbroken"));
+                        Log($"[SideSwitchCommand] Switch to {team} failed before the team change: {ex}");
+                        ReplyToUserCommand(player, Localizer.ForPlayer(player, "matchzy.pm.teamswitchfailed"));
                     }
                 });
                 return;
@@ -4153,7 +4158,15 @@ namespace MatchZy
                 else
                 {
                     Log($"[RespawnWhenTeamApplied] gave up: {player.PlayerName} team={player.TeamNum} target={(byte)team} pawnNull={player.PlayerPawn.Value == null} alive={player.PawnIsAlive}");
-                    ReplyToUserCommand(player, Localizer.ForPlayer(player, "matchzy.pm.spectatorbroken"));
+                    // Only when the player is on the side they asked for and still dead. Someone
+                    // who changed their mind (T -> CT -> T, or on to Spectator) while this was
+                    // polling has nothing wrong with them and gets no message.
+                    // Practice only (keepGoing == null). In a warmup or a match setup the engine
+                    // spawns the player itself with the next restart: a team change while the warmup
+                    // round is loading stays dead for longer than this helper waits, and the player
+                    // got an error message for a switch that worked.
+                    if (keepGoing == null && player.TeamNum == (byte)team && !player.PawnIsAlive)
+                        ReplyToUserCommand(player, Localizer.ForPlayer(player, "matchzy.pm.teamswitchfailed"));
                 }
             });
         }
@@ -4372,6 +4385,11 @@ namespace MatchZy
                 fastForwardTimer?.Kill();
                 ResetFastForward();
             }
+            // Same for .nadespeed with a grenade still in the air: host_timescale is a cheat convar,
+            // so the tick's own reset came one frame after sv_cheats went off and was refused,
+            // leaving warmup or the match in slow motion.
+            RestoreNadeSpeed();
+            nadeSpeedScale = 1f;
             // prac.cfg settings no mode cfg resets: undo them here, before sv_cheats goes off (buddha is
             // a cheat command). Otherwise all-talk and buddha stayed on into a dry run or warmup.
             Server.ExecuteCommand("buddha 0; buddha_ignore_bots 0; sv_full_alltalk 0; sv_showimpacts 0;");

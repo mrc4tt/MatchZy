@@ -333,6 +333,16 @@ namespace MatchZy
             matchzyTeam2.botDifficulty = BotDifficultyFrom(team2);
             matchzyTeam1.openRoster = !matchzyTeam1.botTeam && IsOpenRosterToken(team1["players"]);
             matchzyTeam2.openRoster = !matchzyTeam2.botTeam && IsOpenRosterToken(team2["players"]);
+            // One team without any listed player against a bot team or a team with a roster: nobody
+            // could be on that team (GetPlayerTeam had no team for them), so its players were left
+            // out of the match or kicked. Treat it like "players": "any". Two empty rosters stay
+            // as they are: that is the free-for-all match of .matchsetup.
+            bool team1Empty = !matchzyTeam1.botTeam && !matchzyTeam1.openRoster && RosterSize(matchzyTeam1.teamPlayers) == 0;
+            bool team2Empty = !matchzyTeam2.botTeam && !matchzyTeam2.openRoster && RosterSize(matchzyTeam2.teamPlayers) == 0;
+            if (team1Empty && !team2Empty && !matchzyTeam2.openRoster)
+                matchzyTeam1.openRoster = true;
+            else if (team2Empty && !team1Empty && !matchzyTeam1.openRoster)
+                matchzyTeam2.openRoster = true;
             // The "any" marker is not a roster; the bot team has none.
             if (matchzyTeam1.openRoster || matchzyTeam1.botTeam)
                 matchzyTeam1.teamPlayers = null;
@@ -704,6 +714,31 @@ namespace MatchZy
             if (matchId <= 0)
                 return;
             Task.Run(async () => await database.SetMatchCancelledAsync(matchId, mapNumber, 0, 0, 0, 0));
+        }
+
+        // A match without any roster (.matchsetup) only knew its teams as "whoever is on that side
+        // now". After map 1 of a series the players stand on swapped sides while team1 is CT again,
+        // and a side picked in a veto moved the team names but not the players, so the series
+        // score and the sides went to the wrong group. Once everyone is ready (before the veto or
+        // the knife), the players on each side become that team's roster, and the match behaves
+        // like one loaded with listed players. Not with an empty side (an admin starting alone):
+        // a one-sided roster would shut the other team out.
+        private void LockOpenMatchTeams()
+        {
+            if (!isMatchSetup || IsTeamWhitelistConfigured())
+                return;
+            int ct = 0, t = 0;
+            foreach (var p in playerData.Values)
+            {
+                if (p == null || !p.IsValid || p.IsBot)
+                    continue;
+                if (p.TeamNum == (int)CsTeam.CounterTerrorist) ct++;
+                else if (p.TeamNum == (int)CsTeam.Terrorist) t++;
+            }
+            if (ct == 0 || t == 0)
+                return;
+            if (LockTeamsManually())
+                Log($"[LockOpenMatchTeams] Rosters taken from the sides: {matchzyTeam1.teamName} {RosterSize(matchzyTeam1.teamPlayers)}, {matchzyTeam2.teamName} {RosterSize(matchzyTeam2.teamPlayers)}.");
         }
 
         public bool LockTeamsManually()

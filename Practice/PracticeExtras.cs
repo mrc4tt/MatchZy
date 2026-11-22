@@ -47,8 +47,10 @@ namespace MatchZy
                     // later; check again once they stand at their spawn.
                     AddTimer(2.0f, RestoreBuyZoneFlags, CounterStrikeSharp.API.Modules.Timers.TimerFlags.STOP_ON_MAPCHANGE);
                 }
+                SuppressBuyZoneForMenuHolders();
                 return;
             }
+            menuBuyZoneSlots.Clear();
             buyZoneSuppressed = true;
             foreach (var player in Utilities.GetPlayers())
             {
@@ -66,6 +68,55 @@ namespace MatchZy
 
         // True while OnPracticeBuyZonePostThink is forcing m_bInBuyZone false.
         private bool buyZoneSuppressed;
+
+        // Slots whose m_bInBuyZone is held false because a center menu is open for them.
+        private readonly HashSet<int> menuBuyZoneSlots = new();
+
+        // In every mode: E selects in a center menu (.matchsetup, .matchadmin, ...), and in a buy zone
+        // the same key press also opened the buy menu on top of it. While a player's menu is open
+        // their m_bInBuyZone is held false, the same way practice keeps E free; B still opens the
+        // buy menu. When the menu closes the flag is worked out again from the buy zone bounds.
+        // Costs nothing while no menu is open: the player list is only walked then.
+        private void SuppressBuyZoneForMenuHolders()
+        {
+            if (_centerMenuHolders.Count == 0 && menuBuyZoneSlots.Count == 0)
+                return;
+            try
+            {
+                bool restore = false;
+                var seen = new HashSet<int>();
+                foreach (var player in Utilities.GetPlayers())
+                {
+                    if (player == null || !player.IsValid || player.IsBot)
+                        continue;
+                    int slot = player.Slot;
+                    if (!IsCenterMenuOpen(player))
+                    {
+                        if (menuBuyZoneSlots.Remove(slot))
+                            restore = true;
+                        continue;
+                    }
+                    seen.Add(slot);
+                    menuBuyZoneSlots.Add(slot);
+                    var pawn = player.PlayerPawn?.Value;
+                    if (pawn == null || !pawn.IsValid)
+                        continue;
+                    if (!Schema.GetSchemaValue<bool>(pawn.Handle, "CCSPlayerPawn", "m_bInBuyZone"))
+                        continue;
+                    Schema.SetSchemaValue(pawn.Handle, "CCSPlayerPawn", "m_bInBuyZone", false);
+                    Utilities.SetStateChanged(pawn, "CCSPlayerPawn", "m_bInBuyZone");
+                }
+                // A holder who left the server.
+                if (menuBuyZoneSlots.RemoveWhere(slot => !seen.Contains(slot)) > 0)
+                    restore = true;
+                if (restore)
+                    RestoreBuyZoneFlags();
+            }
+            catch (Exception e)
+            {
+                Log($"[SuppressBuyZoneForMenuHolders] {e.GetType().Name}: {e.Message}");
+            }
+        }
 
         // Without mp_buy_anywhere the engine only writes m_bInBuyZone when a pawn enters or leaves a
         // func_buyzone trigger. A player who was already standing in the zone when practice ended
@@ -146,8 +197,21 @@ namespace MatchZy
         /// </summary>
         public void ShutdownPracticeExtrasForUnload(bool touchEntities = true)
         {
+            // A .nadespeed slow motion must not outlive the plugin.
+            try { RestoreNadeSpeed(); }
+            catch (Exception e) { Log($"[PracticeExtras] unload nadespeed: {e.Message}"); }
+            // On a hot reload nothing else leaves practice (LeaveModeOnUnload is skipped) and the
+            // new instance does not know practice was on: the quiet LagCompensation channel and a
+            // held bot quota (bot_join_delay) would stay for good. Both are no-ops when not active;
+            // a tier0 channel flag and a console command, no entity involved.
+            try { QuietLagCompensationLog(false); }
+            catch (Exception e) { Log($"[PracticeExtras] unload lagcomp log: {e.Message}"); }
+            try { ReleaseBotQuotaAdds(); }
+            catch (Exception e) { Log($"[PracticeExtras] unload bot quota: {e.Message}"); }
             if (!touchEntities)
             {
+                // The game rules go with the map: only forget the remembered team sizes.
+                ForgetPracticeTeamSize();
                 _nadeFollows.Clear();
                 try { ForgetNadeTutorialState(); }
                 catch (Exception e) { Log($"[PracticeExtras] unload trainer: {e.Message}"); }
@@ -157,6 +221,10 @@ namespace MatchZy
                 catch (Exception e) { Log($"[PracticeExtras] unload assert: {e.Message}"); }
                 return;
             }
+            // The raised team size is written into the game rules: put the map's own values back
+            // (does nothing when practice never raised it, or when there are no game rules).
+            try { RestorePracticeTeamSize(); }
+            catch (Exception e) { Log($"[PracticeExtras] unload team size: {e.Message}"); }
             try { ResetNadeFollow(mapStart: false, unloading: true); }
             catch (Exception e) { Log($"[PracticeExtras] unload follow: {e.Message}"); }
             try { ShutdownNadeTutorial(); }

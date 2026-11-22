@@ -96,6 +96,10 @@ namespace MatchZy
         [ConsoleCommand("get5_status", "Returns get5 status")]
         public void Get5StatusCommand(CCSPlayerController? player, CommandInfo command)
         {
+            // Panels ask over RCON (player == null). The reply holds the match config URL, which can
+            // carry a token, so a player typing it in their own console gets nothing unless admin.
+            if (player != null && !IsPlayerAdmin(player, "get5_status", "@css/config"))
+                return;
             // TODO: Add remaining Get5 status data as specified in https://splewis.github.io/get5/latest/commands/#get5_status
             //       The missing attributes are:
             //       - "matchid"    - It is currently implemented to return long and correspunds to the "liveMatchId".

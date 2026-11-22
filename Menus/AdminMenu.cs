@@ -29,7 +29,10 @@ namespace MatchZy
             {
                 open(player);
                 if (player.IsValid)
+                {
                     _centerMenuHolders.Add(player.Slot);
+                    _centerMenuSeenAt[player.Slot] = DateTime.UtcNow;
+                }
             }
             catch (Exception e) when (e is FileNotFoundException || e is TypeLoadException || e is FileLoadException)
             {
@@ -44,6 +47,13 @@ namespace MatchZy
         // Those writers skip a player whose menu is open. Slots are added in OpenMenuGuarded, so the
         // menu library is only asked (MenuStillOpen) after it has loaded.
         private readonly HashSet<int> _centerMenuHolders = new();
+        // When the library last reported the slot's menu as open (or when it was opened here). The
+        // library can report "no menu" for a moment right after Display and between two wizard
+        // steps; taking that at face value dropped the slot for good, so every gate (ready panel,
+        // use key, buy menu block) stopped seeing the menu. A slot is only dropped after the menu
+        // has been gone for half a second.
+        private readonly Dictionary<int, DateTime> _centerMenuSeenAt = new();
+        private static readonly TimeSpan CenterMenuGoneAfter = TimeSpan.FromMilliseconds(500);
 
         private bool IsCenterMenuOpen(CCSPlayerController player)
         {
@@ -58,9 +68,17 @@ namespace MatchZy
             {
                 open = false;
             }
-            if (!open)
-                _centerMenuHolders.Remove(player.Slot);
-            return open;
+            DateTime now = DateTime.UtcNow;
+            if (open)
+            {
+                _centerMenuSeenAt[player.Slot] = now;
+                return true;
+            }
+            if (_centerMenuSeenAt.TryGetValue(player.Slot, out DateTime seenAt) && now - seenAt < CenterMenuGoneAfter)
+                return true;
+            _centerMenuHolders.Remove(player.Slot);
+            _centerMenuSeenAt.Remove(player.Slot);
+            return false;
         }
 
         // Own method so the menu type is only JIT-resolved here, never in the always-run callers.

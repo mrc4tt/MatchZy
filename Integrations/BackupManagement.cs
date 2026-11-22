@@ -726,7 +726,9 @@ namespace MatchZy
                     // can point at it: the one built from the current match id, and the one carried by
                     // the JSON backup's own file name (they differ once the match id changed since).
                     string tempFileName = fileName.Replace(".json", ".txt");
-                    if (backupData.TryGetValue("round", out var roundNumber))
+                    // Only a plain number: the value ends up in a file name and a console command.
+                    if (backupData.TryGetValue("round", out var roundValue)
+                        && int.TryParse(Convert.ToString(roundValue, System.Globalization.CultureInfo.InvariantCulture), System.Globalization.NumberStyles.None, System.Globalization.CultureInfo.InvariantCulture, out int roundNumber))
                     {
                         tempFileName = $"matchzy_{liveMatchId}_{matchConfig.CurrentMapNumber}_round{roundNumber}.txt";
                     }
@@ -1473,6 +1475,18 @@ namespace MatchZy
                     backupWriteLock.Release();
                 }
 
+                // The file on disk keeps everything a restore on this server needs; the copy that
+                // leaves the server carries no header / auth values and no secret cvar values.
+                try
+                {
+                    body = SanitizeBackupForUpload(body);
+                }
+                catch (Exception e)
+                {
+                    Log($"[UploadRoundBackup] {Path.GetFileName(filePath)} not uploaded: could not strip secrets from it ({e.Message})");
+                    return;
+                }
+
                 using var request = new HttpRequestMessage(HttpMethod.Post, url);
                 using var content = new StringContent(body, System.Text.Encoding.UTF8, "application/json");
                 string fileName = Path.GetFileName(filePath);
@@ -1496,6 +1510,48 @@ namespace MatchZy
             {
                 Log($"[UploadRoundBackup] {e.Message}");
             }
+        }
+
+        // A cvar whose name contains one of these holds a credential (or names the header for one).
+        private static readonly string[] SecretCvarNameParts = { "password", "header_value", "auth", "token", "secret", "apikey", "api_key", "_key" };
+
+        /// <summary>
+        /// The round backup JSON as it is uploaded to matchzy_remote_backup_url: the same shape as the
+        /// file on disk, but in match_config the remote log header / auth values are empty and the
+        /// changed / original cvar maps have no entry whose name looks like a credential
+        /// (original_cvars holds the server's own previous value of every cvar the match touched).
+        /// Entries are dropped, not emptied, so a restore from such a copy never sets a password or
+        /// header to "". Throws when the backup cannot be read; the caller then does not upload.
+        /// </summary>
+        private static string SanitizeBackupForUpload(string body)
+        {
+            var data = JsonSerializer.Deserialize<Dictionary<string, string>>(body)
+                ?? throw new InvalidDataException("empty backup");
+            if (data.TryGetValue("match_config", out string? configJson) && !string.IsNullOrWhiteSpace(configJson))
+            {
+                if (System.Text.Json.Nodes.JsonNode.Parse(configJson) is not System.Text.Json.Nodes.JsonObject config)
+                    throw new InvalidDataException("match_config is not a JSON object");
+                // Newtonsoft writes the C# property names; the snake_case names are covered as well.
+                foreach (var property in config.ToList())
+                {
+                    string name = property.Key;
+                    if (name is "RemoteLogHeaderValue" or "RemoteLogAuthValue" or "remote_log_header_value" or "remote_log_auth_value")
+                    {
+                        config[name] = "";
+                    }
+                    else if (name is "ChangedCvars" or "OriginalCvars" or "changed_cvars" or "original_cvars"
+                        && property.Value is System.Text.Json.Nodes.JsonObject cvars)
+                    {
+                        foreach (var cvar in cvars.ToList())
+                        {
+                            if (Array.Exists(SecretCvarNameParts, part => cvar.Key.Contains(part, StringComparison.OrdinalIgnoreCase)))
+                                cvars.Remove(cvar.Key);
+                        }
+                    }
+                }
+                data["match_config"] = config.ToJsonString();
+            }
+            return JsonSerializer.Serialize(data, BackupJsonOptions);
         }
 
         private async Task WriteRoundDataBackupAsync(

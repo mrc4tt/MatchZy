@@ -47,7 +47,9 @@ namespace MatchZy
             // Logged so a forfeit can be checked against the limit that was actually in force (a
             // panel can set get5_time_to_start in the match config's cvars).
             if (readyPhaseStartedAt != null && CurrentReadyTimeout() > 0)
-                Log($"[Forfeit] Ready phase started: a team that is not ready in {CurrentReadyTimeout()} s forfeits.");
+                Log(ReadyTimeLimitApplies()
+                    ? $"[Forfeit] Ready phase started: a team that is not ready in {CurrentReadyTimeout()} s forfeits."
+                    : $"[Forfeit] Ready phase of map {matchConfig.CurrentMapNumber + 1}: no ready time limit between the maps of a series.");
             // Whoever is already here when the phase starts is not a late arrival.
             readyPhaseArrivals.Clear();
             joinGraceAnnounced.Clear();
@@ -83,6 +85,12 @@ namespace MatchZy
 
         private int SideOfTeam(Team team) => teamSides.TryGetValue(team, out var side) && side == "CT" ? (int)CsTeam.CounterTerrorist : (int)CsTeam.Terrorist;
 
+        // The ready time limit is for a team that does not show up to the match. Once a map of the
+        // series has been played both teams are there, and the break between two maps (which the
+        // clock counted from the first second of the next warmup) forfeited a running series: the
+        // panel got series_end and showed the match as finished while the teams played on.
+        private bool ReadyTimeLimitApplies() => matchConfig.CurrentMapNumber <= 0;
+
         private void CheckReadyForfeit()
         {
             // A started map ends the ready phase; the next one re-arms the clock in StartWarmup. Keeping
@@ -92,6 +100,8 @@ namespace MatchZy
 
             int timeout = CurrentReadyTimeout();
             if (timeout <= 0 || !readyAvailable || matchStarted || isVeto || readyPhaseStartedAt == null)
+                return;
+            if (!ReadyTimeLimitApplies())
                 return;
             // Before the restore check, so a player who joins during a restore gets the full grace.
             RecordReadyPhaseArrivals(DateTime.UtcNow);

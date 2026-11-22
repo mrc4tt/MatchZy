@@ -402,7 +402,12 @@ public partial class MatchZy
         int minReady = GetTeamMinReady(side);
         if (side != (int)CsTeam.CounterTerrorist && side != (int)CsTeam.Terrorist)
             return minReady;
-        return ReadyLogic.ForceReadyMinimum(matchConfig.PlayersPerTeam, minReady, forceReadyMaxMissing.Value, ReadyFloor());
+        // A side without a listed roster and without players_per_team (.matchsetup) is as big as
+        // the players made it: a 3v3 must not need the mode's 5 to .forceready.
+        int perTeam = matchConfig.PlayersPerTeam;
+        if (reverseTeamSides.TryGetValue(side == (int)CsTeam.CounterTerrorist ? "CT" : "TERRORIST", out Team? team) && team != null && IsOpenSizedTeam(team))
+            perTeam = RequiredPlayersOnSide(side);
+        return ReadyLogic.ForceReadyMinimum(perTeam, minReady, forceReadyMaxMissing.Value, ReadyFloor());
     }
 
     public int GetTeamMinReady(int team)

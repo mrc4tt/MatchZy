@@ -76,6 +76,14 @@ namespace MatchZy
             }
         }
 
+        // A new map has new game rules with the mode's own team sizes: the values remembered on
+        // the old map must not be written into them (wingman 2 into a competitive map).
+        private void ForgetPracticeTeamSize()
+        {
+            _teamSizeBeforePracticeT = -1;
+            _teamSizeBeforePracticeCt = -1;
+        }
+
         private void RestorePracticeTeamSize()
         {
             try

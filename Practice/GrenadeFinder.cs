@@ -102,8 +102,6 @@ namespace MatchZy
             // A lineup from the saved library (no drawn box: its own landing point is the target).
             public bool Library;
             public string Name = "";
-            // Sim test from a reference list: the landing point the list gives for this lineup.
-            public Vector3? Reference;
             public Vector3? SimRest;
             // Share of slightly-off throws (aim, run-up) that still land in the box, 0..1.
             public float Robust = -1f;
@@ -1874,7 +1872,7 @@ namespace MatchZy
 
 #if HAS_CSS_TRACE
         private static Vector? finderTraceFrom, finderTraceTo, finderHullMins, finderHullMaxs;
-        private static ulong finderLayersWith = 0x200003001UL, finderLayersAs = 0x8000020000UL, finderLayersExclude;
+        private static ulong finderLayersWith = 0x200003001UL, finderLayersAs = 0x8000020000UL, finderLayersExclude = 0UL;
 
         // The grenade's own move: a hull trace of its size. hit = the grenade's centre at contact.
         private static bool FinderGrenadeTrace(Vector3 from, Vector3 to, out Vector3 hit, out Vector3 normal, out float fraction, CBaseEntity? ignore)
@@ -2799,6 +2797,14 @@ namespace MatchZy
             finderDemoGeneration.Clear();
             finderUseDown.Clear();
             finderReloadDown.Clear();
+            // Per-session state keyed by slot: the next practice session starts without the last
+            // one's grenade type, kept lineups or .nextnade position.
+            finderCarry.Clear();
+            finderType.Clear();
+            finderArmedOff.Clear();
+            finderThrewSinceGo.Clear();
+            nadeStep.Clear();
+            nadeHoverTick.Clear();
             foreach (var slot in finderGoEntities.Keys.ToList())
                 if (finderGoEntities.Remove(slot, out var guide))
                     KillFinderEntities(guide);
@@ -2823,6 +2829,16 @@ namespace MatchZy
             finderReloadDown.Remove(slot);
             finderThrewSinceGo.Remove(slot);
             landingUseDown.Remove(slot);
+            // Slots are reused: the next player in this slot starts with none of this.
+            finderType.Remove(slot);
+            finderArmedOff.Remove(slot);
+            finderDemoShown.Remove(slot);
+            finderAimLockNoted.Remove(slot);
+            stuckWatches.Remove(slot);
+            nadeStep.Remove(slot);
+            nadeHoverTick.Remove(slot);
+            landingHeld.Remove(slot);
+            landingSelected.Remove(slot);
             finderTracks.RemoveAll(t => t.Slot == slot);
         }
 

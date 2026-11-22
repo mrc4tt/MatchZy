@@ -96,7 +96,9 @@ namespace MatchZy
                 var player = Utilities.GetPlayerFromUserid(userId);
                 if (!IsHumanPlayerValid(player))
                     continue;
-                if (matchModeOnly && GetPlayerTeam(player!) == CounterStrikeSharp.API.Modules.Utils.CsTeam.None
+                // A loaded match without rosters leaves nobody out (same rule as the connect gate).
+                if (matchModeOnly && !(isMatchSetup && !IsTeamWhitelistConfigured())
+                    && GetPlayerTeam(player!) == CounterStrikeSharp.API.Modules.Utils.CsTeam.None
                     && !IsPlayerAdmin(player, "", "@css/config"))
                     continue;
                 SendPlayerConnectEvent(player!);

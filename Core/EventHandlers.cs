@@ -42,6 +42,9 @@ public partial class MatchZy
             {
                 if (!matchModeOnly || pendingMatchLoadJson != null)
                     return;
+                // A loaded match without rosters leaves nobody out.
+                if (isMatchSetup && !IsTeamWhitelistConfigured())
+                    return;
                 foreach (int userId in letInWhilePending)
                 {
                     var player = Utilities.GetPlayerFromUserid(userId);
@@ -89,7 +92,12 @@ public partial class MatchZy
             // to manage the server. During plain match setup (convar off) a non-roster player
             // is left connected but untracked; team locking is enforced by the jointeam
             // listener and the EventPlayerTeam handler.
-            if (isMatchSetup || matchModeOnly)
+            // A loaded match without any roster (.matchsetup: both teams have an empty player list)
+            // has nobody to leave out. GetPlayerTeam returns None for everyone there, which used to
+            // keep every player out of playerData: the ready counters stayed at CT 0 / T 0, .ready
+            // never started the match, the veto found no captains, and with
+            // matchzy_kick_when_no_match_loaded every non-admin was kicked.
+            if (isMatchSetup ? IsTeamWhitelistConfigured() : matchModeOnly)
             {
                 CsTeam team = GetPlayerTeam(player);
                 if (team == CsTeam.None)

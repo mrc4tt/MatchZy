@@ -722,6 +722,11 @@ namespace MatchZy
                 ReplyToUserCommand(player, Localizer.ForPlayer(player, "matchzy.st.exists", name));
                 return;
             }
+            if (strats.Count >= MaxSavedStratsPerMap)
+            {
+                ReplyToUserCommand(player, Localizer.ForPlayer(player, "matchzy.pm.savelimitreached", MaxSavedStratsPerMap, ".delstrat"));
+                return;
+            }
             strats[name] = new SavedStrat { Team = (int)player.Team };
             if (!WriteSavedStrats(strats))
             {
@@ -877,6 +882,8 @@ namespace MatchZy
             public List<SavedStratRole> Roles { get; set; } = new();
         }
 
+        // Every player in practice can save and each save rewrites the whole file of the map.
+        private const int MaxSavedStratsPerMap = 32;
         private Dictionary<string, SavedStrat>? _savedStrats;
         private string _savedStratsMap = "";
         private bool _savedStratsLoadFailed;
@@ -985,6 +992,12 @@ namespace MatchZy
                 return;
             }
             var strats = LoadSavedStrats();
+            // Saving over an existing name is still allowed at the cap.
+            if (!strats.ContainsKey(name) && strats.Count >= MaxSavedStratsPerMap)
+            {
+                ReplyToUserCommand(player, Localizer.ForPlayer(player, "matchzy.pm.savelimitreached", MaxSavedStratsPerMap, ".delstrat"));
+                return;
+            }
             strats[name] = ToSavedStrat(strat);
             if (!WriteSavedStrats(strats))
             {
