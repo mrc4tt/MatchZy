@@ -116,6 +116,7 @@
     "matchzy.pm.dryrunnopractice": "Dryrun kan kun startes i øvelsestilstand!",
     "matchzy.pm.botlimit": "Kan ikke tilføje bots, holdet er fuldt! Brug .nobots for at fjerne de nuværende bots.",
     "matchzy.pm.spectatorbroken": "At skifte til et hold fra tilskuer er i øjeblikket defekt, brug holdmenuen.",
+    "matchzy.pm.teamswitchfailed": "Kunne ikke skifte hold. Prøv igen, eller brug holdmenuen.",
     "matchzy.pm.nothrownnades": "Du har ikke kastet nogen granat endnu!",
     "matchzy.pm.grenadehistory": "Din granathistorik går kun fra 1 til {0}!",
     "matchzy.pm.nothrownnadestype": "Du har ikke kastet nogen {green}{0}{default} endnu!",

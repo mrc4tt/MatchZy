@@ -116,6 +116,7 @@
     "matchzy.pm.dryrunnopractice": "Ekzekutimi i thatë mund të fillohet vetëm në modalitetin e praktikës!",
     "matchzy.pm.botlimit": "Nuk mund të shtohen robotë, skuadra është plot! Përdorni .nobots për të hequr robotët aktualë.",
     "matchzy.pm.spectatorbroken": "Kalimi në një skuadër nga shikuesi (spectator) është aktualisht i prishur, përdorni menunë e skuadrës.",
+    "matchzy.pm.teamswitchfailed": "Nuk u ndërrua skuadra. Provoni përsëri ose përdorni menunë e skuadrës.",
     "matchzy.pm.nothrownnades": "Nuk keni hedhur asnjë granatë akoma!",
     "matchzy.pm.grenadehistory": "Historia juaj e granatave shkon vetëm nga 1 në {0}!",
     "matchzy.pm.nothrownnadestype": "Nuk keni hedhur asnjë lloj granate {green}{0}{default} akoma!",

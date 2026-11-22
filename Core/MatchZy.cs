@@ -1012,7 +1012,10 @@ namespace MatchZy
                     // Polls until the team has applied, then respawns (recreating the pawn when the
                     // handle is empty); stops once alive or when the ready phase ends.
                     CsTeam team = (CsTeam)@event.Team;
-                    RespawnWhenTeamApplied(player, team, RespawnRetryAttempts,
+                    // Three times the usual wait (6 s): while the warmup round is loading (the
+                    // restarts StartWarmup queues) a respawn does not take, and the player should
+                    // be in as soon as it does instead of waiting for the next respawn wave.
+                    RespawnWhenTeamApplied(player, team, RespawnRetryAttempts * 3,
                         keepGoing: () => readyAvailable && !matchStarted && (_fakeWarmupActive || warmupInstantRespawn.Value)
                             && !matchzyTeam1.coach.Contains(player) && !matchzyTeam2.coach.Contains(player));
 
@@ -1080,6 +1083,25 @@ namespace MatchZy
                                 return HookResult.Stop;
                             }
                         }
+                    }
+                    // Ready phase: a T <-> CT change from the team menu. The engine's own change
+                    // leaves the player dead and observing, where the respawn call does nothing, so
+                    // they sat out until the next round reset (about 7 seconds in the ready phase's
+                    // round) instead of spawning right away as in a warmup. Do the change the way
+                    // practice .t / .ct does (suicide, next frame SwitchTeam, respawn), which keeps
+                    // the controller on its player pawn. Joins from Spectator or the team menu, a
+                    // full side and coaches stay with the engine.
+                    if (player != null && player.IsValid && !player.IsBot && !player.IsHLTV
+                        && readyAvailable && !matchStarted && !isPractice && !isVeto
+                        && (_fakeWarmupActive || warmupInstantRespawn.Value)
+                        && int.TryParse(info.ArgByIndex(1), out int wantedTeam)
+                        && (wantedTeam == (int)CsTeam.Terrorist || wantedTeam == (int)CsTeam.CounterTerrorist)
+                        && (player.TeamNum == (byte)CsTeam.Terrorist || player.TeamNum == (byte)CsTeam.CounterTerrorist)
+                        && player.TeamNum != wantedTeam
+                        && !IsMatchCoach(player) && !IsSideFull((CsTeam)wantedTeam, player))
+                    {
+                        SideSwitchCommand(player, (CsTeam)wantedTeam);
+                        return HookResult.Stop;
                     }
                     return HookResult.Continue;
                 }

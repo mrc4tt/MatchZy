@@ -116,6 +116,7 @@
     "matchzy.pm.dryrunnopractice": "Dryrun can only be started in practice mode!",
     "matchzy.pm.botlimit": "Cannot add bots, the team is full! Use .nobots to remove the current bots.",
     "matchzy.pm.spectatorbroken": "Switching to a team from spectator is currently broken, use the team menu.",
+    "matchzy.pm.teamswitchfailed": "Could not switch team. Try again, or use the team menu.",
     "matchzy.pm.nothrownnades": "You have not thrown any nade yet!",
     "matchzy.pm.grenadehistory": "Your grenade history only goes from 1 to {0}!",
     "matchzy.pm.nothrownnadestype": "You have not thrown any {green}{0}{default} yet!",

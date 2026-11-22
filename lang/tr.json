@@ -116,6 +116,7 @@
     "matchzy.pm.dryrunnopractice": "Dryrun sadece pratik modunda başlatılabilir!",
     "matchzy.pm.botlimit": "Bot eklenemiyor, takım dolu! Mevcut botları kaldırmak için .nobots kullan.",
     "matchzy.pm.spectatorbroken": "İzleyiciden bir takıma geçmek şu anda çalışmıyor, takım menüsünü kullan.",
+    "matchzy.pm.teamswitchfailed": "Takım değiştirilemedi. Tekrar dene veya takım menüsünü kullan.",
     "matchzy.pm.nothrownnades": "Henüz hiç nade atmadın!",
     "matchzy.pm.grenadehistory": "Bomba geçmişin sadece 1 ile {0} arasında!",
     "matchzy.pm.nothrownnadestype": "Henüz hiç {green}{0}{default} atmadın!",

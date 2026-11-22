@@ -3977,15 +3977,16 @@ namespace MatchZy
                             }
                             catch (Exception ex)
                             {
-                                Console.WriteLine($"Error switching team: {ex.Message}");
-                                ReplyToUserCommand(player, Localizer.ForPlayer(player, "matchzy.pm.spectatorbroken"));
+                                // Not the "from spectator" text: this is any failure, also T <-> CT.
+                                Log($"[SideSwitchCommand] Switch to {team} failed: {ex}");
+                                ReplyToUserCommand(player, Localizer.ForPlayer(player, "matchzy.pm.teamswitchfailed"));
                             }
                         });
                     }
                     catch (Exception ex)
                     {
-                        Console.WriteLine($"Error switching team: {ex.Message}");
-                        ReplyToUserCommand(player, Localizer.ForPlayer(player, "matchzy.pm.spectatorbroken"));
+                        Log($"[SideSwitchCommand] Switch to {team} failed before the team change: {ex}");
+                        ReplyToUserCommand(player, Localizer.ForPlayer(player, "matchzy.pm.teamswitchfailed"));
                     }
                 });
                 return;
@@ -4153,7 +4154,15 @@ namespace MatchZy
                 else
                 {
                     Log($"[RespawnWhenTeamApplied] gave up: {player.PlayerName} team={player.TeamNum} target={(byte)team} pawnNull={player.PlayerPawn.Value == null} alive={player.PawnIsAlive}");
-                    ReplyToUserCommand(player, Localizer.ForPlayer(player, "matchzy.pm.spectatorbroken"));
+                    // Only when the player is on the side they asked for and still dead. Someone
+                    // who changed their mind (T -> CT -> T, or on to Spectator) while this was
+                    // polling has nothing wrong with them and gets no message.
+                    // Practice only (keepGoing == null). In a warmup or a match setup the engine
+                    // spawns the player itself with the next restart: a team change while the warmup
+                    // round is loading stays dead for longer than this helper waits, and the player
+                    // got an error message for a switch that worked.
+                    if (keepGoing == null && player.TeamNum == (byte)team && !player.PawnIsAlive)
+                        ReplyToUserCommand(player, Localizer.ForPlayer(player, "matchzy.pm.teamswitchfailed"));
                 }
             });
         }

@@ -116,6 +116,7 @@
     "matchzy.pm.dryrunnopractice": "Dry Run можно запустить только в режиме тренировки!",
     "matchzy.pm.botlimit": "Нельзя добавить ботов, команда заполнена! Используй .nobots, чтобы убрать текущих ботов.",
     "matchzy.pm.spectatorbroken": "Переход из зрителей в команду сейчас не работает, используй меню выбора команды.",
+    "matchzy.pm.teamswitchfailed": "Не удалось сменить команду. Попробуй ещё раз или используй меню команд.",
     "matchzy.pm.nothrownnades": "Ты ещё не бросил ни одной гранаты!",
     "matchzy.pm.grenadehistory": "Твоя история гранат - только от 1 до {0}!",
     "matchzy.pm.nothrownnadestype": "Ты ещё не бросал {green}{0}{default}!",

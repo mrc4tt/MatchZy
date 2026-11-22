@@ -116,6 +116,7 @@
     "matchzy.pm.dryrunnopractice": "Dryrun można włączyć tylko w trybie treningu!",
     "matchzy.pm.botlimit": "Nie można dodać botów, drużyna jest pełna! Użyj .nobots, aby usunąć obecne boty.",
     "matchzy.pm.spectatorbroken": "Przejście ze spectatora do drużyny jest obecnie zepsute, użyj menu drużyn.",
+    "matchzy.pm.teamswitchfailed": "Nie udało się zmienić drużyny. Spróbuj ponownie lub użyj menu drużyn.",
     "matchzy.pm.nothrownnades": "Nie rzuciłeś jeszcze żadnego granatu!",
     "matchzy.pm.grenadehistory": "Twoja historia granatów obejmuje tylko pozycje od 1 do {0}!",
     "matchzy.pm.nothrownnadestype": "Nie rzuciłeś jeszcze żadnego {green}{0}{default}!",

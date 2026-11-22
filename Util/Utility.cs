@@ -711,7 +711,12 @@ namespace MatchZy
             catch (Exception e) { Log($"[TrackReadyEvents] {e.Message}"); }
             // Dryrun (.dryrun) is a practice-style mode with no ready gate - don't show the ready hint.
             if (!readyAvailable || matchStarted || isDryRun)
+            {
+                // A short start countdown cut off by .start, .prac or .dryrun must not carry its
+                // (by then past) deadline into the next ready phase.
+                shortStartAt = null;
                 return;
+            }
             try
             {
                 ComputeReadyData();
@@ -911,6 +916,18 @@ namespace MatchZy
             {
                 ComputeReadyData();
                 _readyTickCounter++;
+
+                // The fake warmup's rules must hold for the whole ready phase. "exec warmup.cfg"
+                // runs a frame later than the command that queues it, so the cfg's own
+                // mp_ignore_round_win_conditions 0 / mp_respawn_on_death 0 landed AFTER the rules
+                // were put back (ExecWarmupModeCfg) and stayed: a death ended the round (restart
+                // after mp_round_restart_delay) and the dead waited for it. An override cfg or an
+                // admin can do the same. Check twice a second and put them back.
+                if (_fakeWarmupActive && _readyTickCounter % 32 == 0
+                    && !(ConVar.Find("mp_ignore_round_win_conditions")?.GetPrimitiveValue<bool>() ?? true))
+                {
+                    Server.ExecuteCommand(FakeWarmupCommands);
+                }
 
                 // Ready-phase HUD sync (per tick):
                 //  - Hide the native "WARMUP" banner: m_bWarmupPeriod=false hides the client HUD
@@ -2202,7 +2219,9 @@ namespace MatchZy
                     // GetPlayerTeam returns None for everyone, and matchModeOnly used to drop every
                     // player still on the server after a series end out of playerData (a game
                     // started there then recorded no player stats at all).
-                    if (isMatchSetup)
+                    // A match without any roster (.matchsetup: both teams have an empty player
+                    // list) has nobody to leave out: every player is tracked, like in a pug.
+                    if (isMatchSetup && IsTeamWhitelistConfigured())
                     {
                         CsTeam team = GetPlayerTeam(player);
                         if (team == CsTeam.None)
@@ -2215,9 +2234,7 @@ namespace MatchZy
                     // Update or add player - dictionary update is idempotent
                     playerData[userId] = player;
 
-                    // A match without any roster (.matchsetup: both teams have an empty player
-                    // list) has nobody to leave out: every player is tracked, like in a pug.
-                    if (isMatchSetup && IsTeamWhitelistConfigured())
+                    if (isMatchSetup)
                         AssignRosteredCoach(player);
 
                     // Only add to ready status if not already present
@@ -2518,7 +2535,10 @@ namespace MatchZy
             }
             else if (countOfReadyPlayers >= EffectiveMinimumReadyRequired())
             {
-                liveRequired = true;
+                // At least one ready player on each side: with the default of 2, two players on
+                // the same team used to start a match for the whole server.
+                liveRequired = GetTeamPlayerCount((int)CsTeam.CounterTerrorist, false).Item2 > 0
+                    && GetTeamPlayerCount((int)CsTeam.Terrorist, false).Item2 > 0;
             }
 
             // The short start countdown (ReadyShortStart.cs) ran out with everyone still ready.
@@ -2560,6 +2580,8 @@ namespace MatchZy
             if (matchStartInProgress || matchStarted)
                 return;
             matchStartInProgress = true;
+            shortStartAt = null;
+            LockOpenMatchTeams();
 
             isPractice = false;
             isDryRun = false;
@@ -2580,8 +2602,6 @@ namespace MatchZy
                 // match normally instead of leaving the server in warmup with everyone ready.
                 Log($"[HandleMatchStart] Queued restore of {restoreFile} was refused; starting the match normally.");
             }
-            shortStartAt = null;
-            LockOpenMatchTeams();
 
             // Auto-naming disabled and both teams still on the scrim defaults (a Get5/JSON match has
             // explicit names by now and never enters the rename branches below): record the side
@@ -3147,6 +3167,18 @@ namespace MatchZy
                     isPractice = false;
                     isDryRun = false;
                     matchEndMapChangeTimer = null;
+                    // The changelevel is queued: the next map's match starts there. Players still
+                    // carry "ready" from the finished map, so a .forceready, .start or a team join
+                    // during a slow change (workshop download) could start the match on the map that
+                    // is about to unload, and the change then cancelled it as "map_changed". Same
+                    // guard the veto's map change uses; OnMapStart clears it. Only when the change
+                    // can actually run, or the ready phase would be stuck on this map.
+                    if (IsSafeMapName(nextMap) && BuildMapChangeCommand(nextMap) != null)
+                    {
+                        mapChangePending = true;
+                        foreach (var key in playerReadyStatus.Keys.ToList())
+                            playerReadyStatus[key] = false;
+                    }
                     //StartWarmup();
                     SetMapSides();
                 }
@@ -3167,18 +3199,6 @@ namespace MatchZy
             AddTimer(
                 delay,
                 () =>
-                    // The changelevel is queued: the next map's match starts there. Players still
-                    // carry "ready" from the finished map, so a .forceready, .start or a team join
-                    // during a slow change (workshop download) could start the match on the map that
-                    // is about to unload, and the change then cancelled it as "map_changed". Same
-                    // guard the veto's map change uses; OnMapStart clears it. Only when the change
-                    // can actually run, or the ready phase would be stuck on this map.
-                    if (IsSafeMapName(nextMap) && BuildMapChangeCommand(nextMap) != null)
-                    {
-                        mapChangePending = true;
-                        foreach (var key in playerReadyStatus.Keys.ToList())
-                            playerReadyStatus[key] = false;
-                    }
                 {
                     // Ensure demo is stopped before map change to prevent GOTV flush crash
                     StopDemoAndAnnounce();

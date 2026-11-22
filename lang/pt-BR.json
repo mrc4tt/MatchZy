@@ -116,6 +116,7 @@
     "matchzy.pm.dryrunnopractice": "O dryrun só pode ser iniciado no modo treino!",
     "matchzy.pm.botlimit": "Não é possível adicionar bots, o time está cheio! Use .nobots para remover os bots atuais.",
     "matchzy.pm.spectatorbroken": "Trocar de espectador para um time está quebrado no momento, use o menu de times.",
+    "matchzy.pm.teamswitchfailed": "Não foi possível trocar de time. Tente de novo ou use o menu de times.",
     "matchzy.pm.nothrownnades": "Você ainda não jogou nenhuma granada!",
     "matchzy.pm.grenadehistory": "Seu histórico de granadas vai só de 1 a {0}!",
     "matchzy.pm.nothrownnadestype": "Você ainda não jogou nenhuma {green}{0}{default}!",

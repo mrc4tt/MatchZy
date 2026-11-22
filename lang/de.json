@@ -116,6 +116,7 @@
     "matchzy.pm.dryrunnopractice": "Dryrun kann nur im Trainingsmodus gestartet werden!",
     "matchzy.pm.botlimit": "Es können keine Bots hinzugefügt werden, das Team ist voll! Verwende .nobots, um die aktuellen Bots zu entfernen.",
     "matchzy.pm.spectatorbroken": "Der Wechsel von Zuschauer in ein Team ist derzeit fehlerhaft, verwende das Teammenü.",
+    "matchzy.pm.teamswitchfailed": "Teamwechsel fehlgeschlagen. Versuche es erneut oder verwende das Teammenü.",
     "matchzy.pm.nothrownnades": "Du hast noch keine Granate geworfen!",
     "matchzy.pm.grenadehistory": "Dein Granatenverlauf reicht nur von 1 bis {0}!",
     "matchzy.pm.nothrownnadestype": "Du hast noch keine {green}{0}{default} geworfen!",

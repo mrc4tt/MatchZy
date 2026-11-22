@@ -116,6 +116,7 @@
     "matchzy.pm.dryrunnopractice": "Dryrun kan bara startas i träningsläge!",
     "matchzy.pm.botlimit": "Kan inte lägga till bottar, laget är fullt! Använd .nobots för att ta bort nuvarande bottar.",
     "matchzy.pm.spectatorbroken": "Att byta till ett lag från åskådarläge fungerar inte just nu, använd lagmenyn.",
+    "matchzy.pm.teamswitchfailed": "Kunde inte byta lag. Försök igen, eller använd lagmenyn.",
     "matchzy.pm.nothrownnades": "Du har inte kastat någon granat än!",
     "matchzy.pm.grenadehistory": "Din granathistorik går bara från 1 till {0}!",
     "matchzy.pm.nothrownnadestype": "Du har inte kastat någon {green}{0}{default} än!",

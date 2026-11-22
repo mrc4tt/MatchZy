@@ -47,8 +47,10 @@ namespace MatchZy
                     // later; check again once they stand at their spawn.
                     AddTimer(2.0f, RestoreBuyZoneFlags, CounterStrikeSharp.API.Modules.Timers.TimerFlags.STOP_ON_MAPCHANGE);
                 }
+                SuppressBuyZoneForMenuHolders();
                 return;
             }
+            menuBuyZoneSlots.Clear();
             buyZoneSuppressed = true;
             foreach (var player in Utilities.GetPlayers())
             {
@@ -66,6 +68,55 @@ namespace MatchZy
 
         // True while OnPracticeBuyZonePostThink is forcing m_bInBuyZone false.
         private bool buyZoneSuppressed;
+
+        // Slots whose m_bInBuyZone is held false because a center menu is open for them.
+        private readonly HashSet<int> menuBuyZoneSlots = new();
+
+        // In every mode: E selects in a center menu (.matchsetup, .matchadmin, ...), and in a buy zone
+        // the same key press also opened the buy menu on top of it. While a player's menu is open
+        // their m_bInBuyZone is held false, the same way practice keeps E free; B still opens the
+        // buy menu. When the menu closes the flag is worked out again from the buy zone bounds.
+        // Costs nothing while no menu is open: the player list is only walked then.
+        private void SuppressBuyZoneForMenuHolders()
+        {
+            if (_centerMenuHolders.Count == 0 && menuBuyZoneSlots.Count == 0)
+                return;
+            try
+            {
+                bool restore = false;
+                var seen = new HashSet<int>();
+                foreach (var player in Utilities.GetPlayers())
+                {
+                    if (player == null || !player.IsValid || player.IsBot)
+                        continue;
+                    int slot = player.Slot;
+                    if (!IsCenterMenuOpen(player))
+                    {
+                        if (menuBuyZoneSlots.Remove(slot))
+                            restore = true;
+                        continue;
+                    }
+                    seen.Add(slot);
+                    menuBuyZoneSlots.Add(slot);
+                    var pawn = player.PlayerPawn?.Value;
+                    if (pawn == null || !pawn.IsValid)
+                        continue;
+                    if (!Schema.GetSchemaValue<bool>(pawn.Handle, "CCSPlayerPawn", "m_bInBuyZone"))
+                        continue;
+                    Schema.SetSchemaValue(pawn.Handle, "CCSPlayerPawn", "m_bInBuyZone", false);
+                    Utilities.SetStateChanged(pawn, "CCSPlayerPawn", "m_bInBuyZone");
+                }
+                // A holder who left the server.
+                if (menuBuyZoneSlots.RemoveWhere(slot => !seen.Contains(slot)) > 0)
+                    restore = true;
+                if (restore)
+                    RestoreBuyZoneFlags();
+            }
+            catch (Exception e)
+            {
+                Log($"[SuppressBuyZoneForMenuHolders] {e.GetType().Name}: {e.Message}");
+            }
+        }
 
         // Without mp_buy_anywhere the engine only writes m_bInBuyZone when a pawn enters or leaves a
         // func_buyzone trigger. A player who was already standing in the zone when practice ended

@@ -116,6 +116,7 @@
     "matchzy.pm.dryrunnopractice": "Le dryrun ne peut être lancé qu'en mode entraînement !",
     "matchzy.pm.botlimit": "Impossible d'ajouter des bots, l'équipe est pleine ! Utilise .nobots pour retirer les bots actuels.",
     "matchzy.pm.spectatorbroken": "Passer de spectateur à une équipe ne fonctionne pas actuellement, utilise le menu des équipes.",
+    "matchzy.pm.teamswitchfailed": "Impossible de changer d'équipe. Réessaie ou utilise le menu des équipes.",
     "matchzy.pm.nothrownnades": "Tu n'as encore lancé aucune grenade !",
     "matchzy.pm.grenadehistory": "Ton historique de grenades va seulement de 1 à {0} !",
     "matchzy.pm.nothrownnadestype": "Tu n'as encore lancé aucune {green}{0}{default} !",
