@@ -571,6 +571,7 @@ namespace MatchZy
                 { ".nadecam", OnTrajCommand },
                 { ".follownade", OnFollowNadeCommand },
                 { ".cam", OnTrajCommand },
+                { ".preview", OnTrajCommand },
                 { ".warmup", OnWarmupCommand },
                 { ".crouchbot", OnCrouchBotCommand },
                 { ".tcrouchbot", OnTCrouchBotCommand },
