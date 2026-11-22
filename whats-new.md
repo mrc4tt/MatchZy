@@ -2,7 +2,7 @@
 
 A short summary of each release. The [full changelog](changelog.md) has the details and background for every change.
 
-## 1.0.26 <small>November 18, 2026</small>
+## 1.0.26 <small>November 20, 2026</small>
 
 - **New:** Ready up with the use key (E) during the ready phase (`matchzy_ready_use_key`, on by default). `.ready` still works.
 - **New:** A pug with fewer than 10 players (3v3, 4v4, 4v5) starts by itself 20 seconds after everyone is ready, and so does a `.matchsetup` match with uneven sides (`matchzy_ready_short_start_delay`). `.unready` stops the countdown.
@@ -10,8 +10,10 @@ A short summary of each release. The [full changelog](changelog.md) has the deta
 - **New:** Grenade follow camera in practice: a throw from a lineup spot is followed by the camera and shows where it lands; jump to come back. `.follownade` sets lineup spots / every throw / off.
 - **New:** Lineup trainer: `.shownades` spots get a glowing figure; near a spot you see the aim targets on the wall, and on the spot a hint box with the keys ("Left Click + Jump").
 - **New:** Players can vote all chat off with `.mute` (`matchzy_allchat_mute_votes`; `.nochat` with CS2-SimpleAdmin), so the teams can no longer write to each other; admins use `.allchat`.
+- **Changed:** `matchzy_minimum_ready_required` defaults to 2 (was 10). Existing config.cfg files keep their value.
 - **New:** `.spawns` toggles the practice spawn markers on and off.
-- **New:** Chat in Brazilian Portuguese and Turkish (`!lang pt-BR`, `!lang tr`).
+- **Changed:** `.replay` bots in practice move smoothly, aim like the recording and fire when you fired (`matchzy_replay_smooth`).
+- **New:** Chat translations in Brazilian Portuguese and Turkish (`!lang pt-BR`, `!lang tr`).
 - **Changed:** The round-end damage report uses the FACEIT layout (`To: [87 / 3 hits] From: [100 / 4 hits] - name (13 hp)`), sorted by damage dealt and in each player's language.
 - **Changed:** Coaches can no longer take control of bots on their team.
 - **Changed:** `matchzy_demo_upload_url ""` and `matchzy_remote_backup_url ""` turn uploads off.
@@ -46,6 +48,17 @@ A short summary of each release. The [full changelog](changelog.md) has the deta
 - **Fixed:** The ready panel switches language right away after `!lang`.
 - **Fixed:** After practice, terrorists no longer spawn with the full practice grenade set and an AK-47.
 - **Fixed:** Switching the server from practice to another mode (retakes, deathmatch, prefire) without a map change no longer leaves players flying in noclip or respawning on death.
+- **Fixed:** Practice: `.boost` bots no longer respawn tilted, and you stay upright when lifted onto the bot.
+- **Fixed:** Practice: a placed bot looks up or down the way you did when you placed it, and stays upright.
+- **Changed:** Practice: a killed bot respawns right away instead of after the death animation.
+- **Changed:** Practice: `.bot` can add more than five bots per side.
+- **Changed:** Practice: the grenade preview camera starts off; turn it on with `.cam`, `.preview` or `.pip`.
+- **Changed:** Practice: `.spawns` boxes face the spawn's direction; no chat line when toggled.
+- **Changed:** Practice: xray is on when practice starts (T red, CT blue); `.xray` turns it off.
+- **New:** Practice: `.jump` (bot at your aim jumps), `.bhop` (auto bunnyhop) and `.r` (respawn yourself).
+- **Changed:** `.help` prints a tidy command table to the console in every mode.
+- **Changed:** `.mhelp` prints the admin commands as the same console table, and the admin chat hints on joining are one short line.
+- **Fixed:** Practice: the console now says at practice start when a grenade rethrow signature did not resolve (`.rt` / `.throw` grenades that bounce and never detonate).
 - **Security:** A failed demo upload no longer logs the S3 signature details.
 
 ## 1.0.25 <small>November 13, 2026</small>

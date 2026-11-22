@@ -368,6 +368,7 @@ de_nuke
 de_overpass
 de_vertigo
 de_ancient
+de_cbble
 
 # Workshop Map Examples (uncomment to use):
 # workshop/3070212801

@@ -208,6 +208,8 @@ namespace MatchZy
 
         public Dictionary<byte, List<Position>> spawnsData = GetEmptySpawnsData();
         public Dictionary<byte, List<Position>> coachSpawns = GetEmptySpawnsData();
+        // Enabled spawns above the lowest priority: the engine only uses them once the match spawns
+        // are taken. Shown by .spawns in a dimmer colour, never numbered (.spawn N is match spawns only).
 
         // (Backup)
         private readonly object _botsDictLock = new();
@@ -298,6 +300,7 @@ namespace MatchZy
             // Practice manages its own bots; clear any warmup aim-bots first.
             KillWarmupBots();
             isPractice = true;
+            QuietLagCompensationLog(true);
             isDryRun = false;
             isWarmup = false;
             readyAvailable = false;
@@ -334,7 +337,7 @@ namespace MatchZy
             else
             {
                 practiceUsesWarmup = true;
-                Server.ExecuteCommand("""sv_cheats "true"; mp_force_pick_time "0"; bot_quota "0"; sv_showimpacts "1"; mp_limitteams "0"; sv_deadtalk "true"; sv_full_alltalk "true"; sv_ignoregrenaderadio "false"; mp_forcecamera "0"; sv_grenade_trajectory_prac_pipreview "true"; sv_grenade_trajectory_prac_trailtime "3"; sv_infinite_ammo "1"; weapon_auto_cleanup_time "15"; weapon_max_before_cleanup "30"; mp_buy_anywhere "1"; mp_maxmoney "9999999"; mp_startmoney "9999999";""");
+                Server.ExecuteCommand("""sv_cheats "true"; mp_force_pick_time "0"; bot_quota "0"; sv_showimpacts "1"; mp_limitteams "0"; sv_deadtalk "true"; sv_full_alltalk "true"; sv_ignoregrenaderadio "false"; mp_forcecamera "0"; sv_grenade_trajectory_prac_pipreview "false"; sv_grenade_trajectory_prac_trailtime "3"; sv_infinite_ammo "1"; weapon_auto_cleanup_time "15"; weapon_max_before_cleanup "30"; mp_buy_anywhere "1"; mp_maxmoney "9999999"; mp_startmoney "9999999";""");
                 Server.ExecuteCommand("""mp_weapons_allow_typecount "-1"; mp_death_drop_defuser "false"; mp_death_drop_taser "false"; mp_drop_knife_enable "true"; mp_death_drop_grenade "0"; ammo_grenade_limit_total "5"; mp_defuser_allocation "2"; mp_free_armor "2"; mp_ct_default_grenades "weapon_incgrenade weapon_hegrenade weapon_smokegrenade weapon_flashbang weapon_decoy"; mp_ct_default_primary "weapon_m4a1";""");
                 Server.ExecuteCommand("""mp_t_default_grenades "weapon_molotov weapon_hegrenade weapon_smokegrenade weapon_flashbang weapon_decoy"; mp_t_default_primary "weapon_ak47"; mp_warmuptime 9999; mp_warmuptime_all_players_connected 0; mp_warmup_online_enabled "true"; mp_warmup_pausetimer "1"; mp_warmup_start; bot_quota_mode normal; mp_solid_teammates 2; mp_autoteambalance false; mp_teammates_are_enemies false; buddha 1; buddha_ignore_bots 1; buddha_reset_hp 100;""");
             }
@@ -373,6 +376,7 @@ namespace MatchZy
             GetSpawns();
             ResetPracticeExtras();
             AddTimer(1.5f, () => { if (isPractice) WarmSpawnFloorCache(); }, TimerFlags.STOP_ON_MAPCHANGE);
+            AddTimer(2.0f, StartXrayDefault, TimerFlags.STOP_ON_MAPCHANGE);
             if (spawnMarkersEnabledDefault.Value)
                 AddTimer(2.0f, () => { if (isPractice) ShowAllSpawnMarkers(); }, TimerFlags.STOP_ON_MAPCHANGE);
             // Not in this frame: the practice cfg above runs on a later frame, and every notify cvar
@@ -456,16 +460,18 @@ namespace MatchZy
             int skipped = 0;
             foreach (var spawn in spawns)
             {
-                if (!spawn.IsValid || !spawn.Enabled || spawn.Priority != minPriority)
+                if (!spawn.IsValid || !spawn.Enabled)
                     continue;
                 var origin = spawn.CBodyComponent?.SceneNode?.AbsOrigin;
                 var rotation = spawn.CBodyComponent?.SceneNode?.AbsRotation;
                 if (origin == null || rotation == null)
                 {
-                    skipped++;
+                    if (spawn.Priority == minPriority)
+                        skipped++;
                     continue;
                 }
-                spawnsData[team].Add(new Position(origin, rotation));
+                if (spawn.Priority == minPriority)
+                    spawnsData[team].Add(new Position(origin, rotation));
             }
             return skipped;
         }
@@ -1119,9 +1125,15 @@ namespace MatchZy
             public uint Label;
             public bool Highlighted;
             public float FloorZ;
+            public float X, Y;
+            public bool Hidden;
         }
         readonly List<SpawnMarkerVisual> spawnMarkerVisuals = new();
         static readonly Color spawnMarkerHoverColor = Color.Lime;
+        // Beams always face the camera, so a wide edge stands up like the side of a box. One thin
+        // square in the floor plane reads as a flat outline. (Two squares a few units apart were
+        // tried as a band: the lines crossed at the corners and looked messy up close.)
+        const float spawnMarkerEdgeWidth = 2.0f;
 
         public void ShowSpawnMarker(Position spawn, Color color, int number, string side)
         {
@@ -1129,11 +1141,16 @@ namespace MatchZy
             spawnMarkerVisuals.Add(visual);
             Vector p = spawn.PlayerPosition;
             visual.FloorZ = SpawnMarkerFloorZ(p);
+            visual.X = p.X;
+            visual.Y = p.Y;
             float z = visual.FloorZ + spawnMarkerFloorLift;
-            foreach (uint raw in DrawFloorBox(p.X, p.Y, z, spawnMarkerHalfSize, color))
+            foreach (float half in new[] { spawnMarkerHalfSize })
             {
-                spawnMarkerEntities.Add(raw);
-                visual.Edges.Add(raw);
+                foreach (uint raw in DrawFloorBox(p.X, p.Y, z, half, color, spawn.PlayerAngle.Y, spawnMarkerEdgeWidth))
+                {
+                    spawnMarkerEntities.Add(raw);
+                    visual.Edges.Add(raw);
+                }
             }
 
             var text = Utilities.CreateEntityByName<CPointWorldText>("point_worldtext");
@@ -1160,15 +1177,18 @@ namespace MatchZy
 
         // A flat square outline (4 beams) centered on (cx, cy) at height z. Returns the raw entity
         // handles so the caller can track and remove them. Shared by .showspawns and .showbotspawn.
-        private List<uint> DrawFloorBox(float cx, float cy, float z, float halfSize, Color color)
+        // yaw turns the square around its centre, so it lines up with the way the spawn faces.
+        private List<uint> DrawFloorBox(float cx, float cy, float z, float halfSize, Color color, float yaw = 0.0f, float width = 4.0f)
         {
             var handles = new List<uint>(4);
             float h = halfSize;
+            float rad = yaw * MathF.PI / 180.0f;
+            float cos = MathF.Cos(rad), sin = MathF.Sin(rad);
             // Corners in order, each edge runs from corner i to corner i+1.
-            var corners = new (float X, float Y)[]
-            {
-                (cx - h, cy - h), (cx + h, cy - h), (cx + h, cy + h), (cx - h, cy + h),
-            };
+            var local = new (float X, float Y)[] { (-h, -h), (h, -h), (h, h), (-h, h) };
+            var corners = new (float X, float Y)[4];
+            for (int c = 0; c < 4; c++)
+                corners[c] = (cx + local[c].X * cos - local[c].Y * sin, cy + local[c].X * sin + local[c].Y * cos);
             for (int i = 0; i < 4; i++)
             {
                 var a = corners[i];
@@ -1180,7 +1200,7 @@ namespace MatchZy
                     break;
                 }
                 beam.LifeState = 1;
-                beam.Width = 4.0f;
+                beam.Width = width;
                 beam.Render = color;
                 beam.EndPos.X = b.X;
                 beam.EndPos.Y = b.Y;
@@ -1281,6 +1301,30 @@ namespace MatchZy
             return result;
         }
 
+        // A beam with one end behind the viewer is drawn as a huge band across the whole screen
+        // (seen live: standing on or next to a spawn box covered the view in its colour). The
+        // outline of a box is therefore not drawn while a player stands this close to it; the
+        // number stays. Shared entities: it is hidden for everyone, which only matters to someone
+        // watching the exact box another player stands on.
+        const float spawnMarkerHideDistance = 110.0f;
+        const float spawnMarkerHideHeight = 160.0f;
+
+        private void SetSpawnMarkerHidden(SpawnMarkerVisual visual, bool hidden)
+        {
+            if (visual.Hidden == hidden)
+                return;
+            visual.Hidden = hidden;
+            const uint EF_NODRAW = 0x20;
+            foreach (uint raw in visual.Edges)
+            {
+                var beam = new CHandle<CBeam>(raw).Value;
+                if (beam == null || !beam.IsValid)
+                    continue;
+                beam.Effects = hidden ? beam.Effects | EF_NODRAW : beam.Effects & ~EF_NODRAW;
+                Utilities.SetStateChanged(beam, "CBaseEntity", "m_fEffects");
+            }
+        }
+
         // Recolor one marker's box and number (hover highlight). Shared entities, so every player
         // sees it; in practice that only shows where someone is aiming.
         private void SetSpawnMarkerHighlight(SpawnMarkerVisual visual, bool on)
@@ -1295,11 +1339,12 @@ namespace MatchZy
                 if (beam == null || !beam.IsValid)
                     continue;
                 beam.Render = color;
-                beam.Width = on ? 6.0f : 4.0f;
+                beam.Width = on ? spawnMarkerEdgeWidth + 1.0f : spawnMarkerEdgeWidth;
                 Utilities.SetStateChanged(beam, "CBaseModelEntity", "m_clrRender");
                 Utilities.SetStateChanged(beam, "CBeam", "m_fWidth");
             }
-            var label = new CHandle<CPointWorldText>(visual.Label).Value;
+            // Label 0 = no number drawn (extra spawn); a zero handle would resolve to the world entity.
+            var label = visual.Label == 0 ? null : new CHandle<CPointWorldText>(visual.Label).Value;
             if (label != null && label.IsValid)
             {
                 label.Color = color;
@@ -1332,10 +1377,14 @@ namespace MatchZy
                 if (!spawnMarkersActive || !isPractice)
                     return;
                 var hovered = new HashSet<int>();
+                var eyes = new List<(float X, float Y, float Z)>();
                 foreach (var player in Utilities.GetPlayers())
                 {
                     if (!IsHumanPlayerValid(player) || !player.UserId.HasValue)
                         continue;
+                    var origin = player.PlayerPawn.Value?.AbsOrigin;
+                    if (origin != null)
+                        eyes.Add((origin.X, origin.Y, origin.Z));
                     int uid = player.UserId.Value;
                     int index = TargetSpawnMarkerIndex(player);
                     if (index >= 0)
@@ -1348,12 +1397,27 @@ namespace MatchZy
                     if (index >= 0 && index < spawnMarkerVisuals.Count)
                     {
                         var v = spawnMarkerVisuals[index];
-                        if (!IsCenterMenuOpen(player))
+                        if (v.Number > 0 && !IsCenterMenuOpen(player))
                             player.PrintToCenter(Localizer.ForPlayer(player, "matchzy.pm.spawnmarkeraim", v.Side, v.Number));
                     }
                 }
                 for (int i = 0; i < spawnMarkerVisuals.Count; i++)
-                    SetSpawnMarkerHighlight(spawnMarkerVisuals[i], hovered.Contains(i));
+                {
+                    var v = spawnMarkerVisuals[i];
+                    SetSpawnMarkerHighlight(v, hovered.Contains(i));
+                    bool near = false;
+                    foreach (var e in eyes)
+                    {
+                        float dx = e.X - v.X, dy = e.Y - v.Y;
+                        if (dx * dx + dy * dy < spawnMarkerHideDistance * spawnMarkerHideDistance
+                            && Math.Abs(e.Z - v.FloorZ) < spawnMarkerHideHeight)
+                        {
+                            near = true;
+                            break;
+                        }
+                    }
+                    SetSpawnMarkerHidden(v, near);
+                }
             }
             catch (Exception e)
             {
@@ -1570,6 +1634,9 @@ namespace MatchZy
 
             isPractice = false;
             isDryRun = true;
+            // Xray is on by default in practice: a dry run is a real round, nobody glows through walls.
+            // Next frame: killing the glow props re-enters the engine from the command.
+            Server.NextFrame(ResetXray);
             autoStartLatched = true; // explicit mode choice; no autostart mode maps to dryrun, so leave the cvar alone
 
             // Start dryrun from an empty round-history strip - whatever practice/warmup left behind is
@@ -1688,7 +1755,16 @@ namespace MatchZy
             }
         }
 
-        private const int MaxPracticeBots = 5;
+        // Practice bots have no fixed cap: the free player slots are the limit. Listen servers can
+        // report a bogus Server.MaxPlayers (1), so that value is not trusted there.
+        private static int FreePracticeBotSlots()
+        {
+            int max = Server.MaxPlayers;
+            if (max <= 1)
+                return 64;
+            int occupied = Utilities.GetPlayers().Count(p => p?.IsValid == true && p.Connected == PlayerConnectedState.Connected);
+            return Math.Max(0, max - occupied);
+        }
 
         // Cached so the "bots are disabled" line is logged once per load, not on every .bot.
         private static bool? noBotsFlag;
@@ -1746,14 +1822,6 @@ namespace MatchZy
 
         private bool CanSpawnAnotherBot(CCSPlayerController? player)
         {
-            // Count current bots
-            int currentBotCount = Utilities.GetPlayers().Count(p => p?.IsValid == true && p.IsBot && !p.IsHLTV);
-            if (currentBotCount >= MaxPracticeBots)
-            {
-                player?.PrintToChat($" {ChatColors.Green}[MatchZy] {ChatColors.White}{Localizer.ForPlayer(player, "matchzy.prac.maxbots", MaxPracticeBots)}");
-                return false;
-            }
-
             // Protect the CSTV bot: bot_add on a full server makes the engine free a slot, and the
             // slot it takes is the CSTV bot's - which kicks CSTV and kills GOTV/demo recording. Count
             // every occupied slot (humans, bots AND CSTV) and refuse the spawn when there is no free
@@ -1996,6 +2064,14 @@ namespace MatchZy
                 }
 
                 isSpawningBot = true;
+                RaisePracticeTeamSize();
+
+                // Where the bot goes, taken now (the owner may walk on before the claim) and
+                // handed to the spawn handler: see PlaceIncomingBot.
+                var ownerPawnNow = player.PlayerPawn.Value;
+                var ownerOriginNow = ownerPawnNow.CBodyComponent?.SceneNode?.AbsOrigin;
+                if (posOverride == null && ownerOriginNow != null)
+                    posOverride = new Position(ownerOriginNow, new QAngle(ownerPawnNow.EyeAngles.X, ownerPawnNow.EyeAngles.Y, 0));
 
                 // Determine target team
                 CsTeam targetTeam =
@@ -2018,24 +2094,29 @@ namespace MatchZy
                 int quotaBotCount;
                 lock (_botsDictLock)
                     quotaBotCount = pracUsedBots.Count;
-                Server.ExecuteCommand($"bot_quota {quotaBotCount}");
 
                 // Add bot to opposite team or forced team. Use ONLY bot_add_t / bot_add_ct - it already
                 // routes the bot to that team. A preceding bot_join_team ALSO spawned a bot, so the two
                 // together produced two bots per .bot (confirmed via diag: one .bot -> Crew + Shamat).
-                if (targetTeam == CsTeam.Terrorist)
-                    Server.ExecuteCommand("bot_add_t");
-                else
-                    Server.ExecuteCommand("bot_add_ct");
-                // bot_add raised the quota by one, but the quota counts bots by pawn and the new
-                // bot has none until it spawns: the next quota think saw one bot missing and added a
-                // second one (one .bot -> two bots, one kicked by the claim pass). Put the quota back
-                // to the tracked count until SpawnBot claims the bot and re-pins it. Only while the
-                // KickBotFromTeam hook is active: it keeps the quota from kicking anything in
-                // practice, so a quota one below the real bot count is harmless. Without it the
-                // quota would kick the new bot.
+                string botAdd = targetTeam == CsTeam.Terrorist ? "bot_add_t" : "bot_add_ct";
+                _incomingBotPlace = posOverride;
+                _incomingBotTeam = targetTeam;
                 if (_kickBotFromTeam != null)
+                {
+                    // One command string, so nothing can run between its parts: the quota think is
+                    // held (bot_join_delay, see HoldBotQuotaAdds) BEFORE the add, and the quota that
+                    // bot_add raised by one goes straight back to the tracked count. Sent as
+                    // separate commands, with the hold last, the think still added a second bot in
+                    // the tick after the add. Only while the KickBotFromTeam hook is active: it
+                    // keeps the quota from kicking anything in practice.
+                    HoldBotQuotaAdds();
+                    Server.ExecuteCommand($"bot_join_delay 999999; bot_quota {quotaBotCount}; {botAdd}; bot_quota {quotaBotCount}");
+                }
+                else
+                {
                     Server.ExecuteCommand($"bot_quota {quotaBotCount}");
+                    Server.ExecuteCommand(botAdd);
+                }
 
                 // Once bot is added, we teleport it to the requested position
                 var targetPlayer = player; // Capture for timer safety
@@ -2071,6 +2152,45 @@ namespace MatchZy
                 Log($"[AddBot - ERROR] {ex.GetType().Name}: {ex.Message}");
                 isSpawningBot = false;
             }
+        }
+
+        // The spot the bot being added right now is meant to stand on. The claim in SpawnBot runs
+        // 0.1 s or more after bot_add, and until then the bot stood on a map spawn in plain view:
+        // the client drew it there and then slid it across the map to the owner. The spawn handler
+        // moves it on the frame after it spawns instead, so the first position a client is sent
+        // for longer than a tick is the final one. SpawnBot still claims and places it afterwards.
+        private Position? _incomingBotPlace;
+        private CsTeam _incomingBotTeam = CsTeam.None;
+
+        private void PlaceIncomingBot(CCSPlayerController bot)
+        {
+            var place = _incomingBotPlace;
+            if (place == null)
+                return;
+            Server.NextFrame(() =>
+            {
+                try
+                {
+                    if (!isPractice || !isSpawningBot || !IsPlayerValid(bot) || !bot.IsBot || !bot.PawnIsAlive)
+                        return;
+                    var pawn = bot.PlayerPawn.Value;
+                    if (pawn == null || !pawn.IsValid)
+                        return;
+                    byte frame = pawn.InterpolationFrame;
+                    TeleportBotUpright(bot, place.PlayerPosition, place.PlayerAngle);
+                    // The client interpolates between two positions that share an interpolation
+                    // frame. If the teleport kept it, change it so the move is drawn as a snap.
+                    if (pawn.InterpolationFrame == frame)
+                    {
+                        pawn.InterpolationFrame = (byte)(frame + 1);
+                        Utilities.SetStateChanged(pawn, "CBaseEntity", "m_ubInterpolationFrame");
+                    }
+                }
+                catch (Exception e)
+                {
+                    Log($"[SpawnBot] early placement failed: {e.Message}");
+                }
+            });
         }
 
         private CCSPlayerController? GetClosestBotOfPlayer(CCSPlayerController player)
@@ -2212,7 +2332,10 @@ namespace MatchZy
                     {
                         if (botData["position"] is Position botPosition)
                         {
-                            player.PlayerPawn.Value?.Teleport(botPosition.PlayerPosition, botPosition.PlayerAngle, new Vector(0, 0, 0));
+                            // Upright, like the first placement: the saved angle carries the owner's
+                            // view pitch, and a plain teleport writes it into the model transform.
+                            TeleportBotUpright(player, botPosition.PlayerPosition, botPosition.PlayerAngle);
+                            GuardBotPlacement(player, botPosition, null, false);
                             bool isCrouched = (bool)botData["crouchstate"];
                             if (isCrouched)
                             {
@@ -2241,6 +2364,11 @@ namespace MatchZy
                                 );
                             }
                         }
+                    }
+                    else if (isSpawningBot && !player.IsHLTV && _incomingBotPlace != null
+                        && (player.TeamNum == (byte)_incomingBotTeam || player.TeamNum == (byte)CsTeam.None))
+                    {
+                        PlaceIncomingBot(player);
                     }
                     else if (!isSpawningBot && !player.IsHLTV)
                     {
@@ -2414,8 +2542,10 @@ namespace MatchZy
                     return;
                 }
 
-                // Teleport bot to stored position
-                player.PlayerPawn.Value.Teleport(botPosition.PlayerPosition, botPosition.PlayerAngle, new Vector(0, 0, 0));
+                // Teleport bot to stored position, upright (the saved angle carries the owner's view
+                // pitch, and a plain teleport writes it into the model transform).
+                TeleportBotUpright(player, botPosition.PlayerPosition, botPosition.PlayerAngle);
+                GuardBotPlacement(player, botPosition, null, false);
 
                 // Handle crouch state safely
                 if (botData.ContainsKey("crouchstate") && botData["crouchstate"] is bool isCrouched && isCrouched)
@@ -2539,6 +2669,65 @@ namespace MatchZy
             }
         }
 
+        // One .bot used to bring two bots (the second kicked 0.1 s later by the claim pass,
+        // "[SpawnBot] kicking extra pair bot"). From the server binary (build 14200): bot_add from
+        // the console does not raise bot_quota by one, it sets it to
+        // max(quota + 1, humans on a team - spectators + bots), so with one player on a team the
+        // quota lands one above the bots in the game, and with more players further above. The
+        // quota think of the next tick (bot_quota_mode normal: wanted = bot_quota) then adds the
+        // difference itself, on any team. Pinning bot_quota around the add did not stop it. bot_join_delay is meant to: while it is above the map time the quota think
+        // wants zero bots, so it adds none, and what it then tries to kick is refused by the
+        // KickBotFromTeam hook in practice. AddBot sets it in the same command string as the add;
+        // it is held until the bot is claimed and the quota is pinned again (through the claim
+        // retries too), and a timer lets go if the claim never happens. Only with the hook active:
+        // without it the think would kick every practice bot.
+        private int _botQuotaHoldSeq;
+        private bool _botQuotaHeld;
+
+        private void HoldBotQuotaAdds()
+        {
+            if (_kickBotFromTeam == null)
+                return;
+            _botQuotaHeld = true;
+            int seq = ++_botQuotaHoldSeq;
+            // Written to the convar directly, so it holds from this instant and does not depend
+            // on when the command buffer runs; the command string in AddBot repeats it.
+            try { ConVar.Find("bot_join_delay")?.SetValue(999999); }
+            catch (Exception e) { Log($"[SpawnBot] bot_join_delay could not be set directly: {e.Message}"); }
+            // Not STOP_ON_MAPCHANGE: left held, no bot would join on the next map either.
+            AddTimer(2.0f, () =>
+            {
+                if (seq == _botQuotaHoldSeq)
+                    ReleaseBotQuotaAdds();
+            });
+        }
+
+        // For the "extra pair bot" log line: what the quota think saw.
+        private string BotQuotaStateForLog()
+        {
+            try
+            {
+                int quota = ConVar.Find("bot_quota")?.GetPrimitiveValue<int>() ?? -1;
+                int delay = ConVar.Find("bot_join_delay")?.GetPrimitiveValue<int>() ?? -1;
+                int tracked;
+                lock (_botsDictLock)
+                    tracked = pracUsedBots.Count;
+                return $"bot_quota {quota}, bot_join_delay {delay}, held {_botQuotaHeld}, tracked {tracked}, hook {(_kickBotFromTeam != null)}";
+            }
+            catch (Exception e)
+            {
+                return e.Message;
+            }
+        }
+
+        private void ReleaseBotQuotaAdds()
+        {
+            if (!_botQuotaHeld)
+                return;
+            _botQuotaHeld = false;
+            Server.ExecuteCommand("bot_join_delay 0");
+        }
+
         private void SpawnBot(CCSPlayerController botOwner, bool crouch, bool boost = false, CsTeam targetTeam = CsTeam.None, Position? posOverride = null, int attempt = 0)
         {
             try
@@ -2564,7 +2753,10 @@ namespace MatchZy
                 // Capture the spawn spot on the first attempt so retries land the bot where
                 // the owner stood when the command was issued, not wherever they walked
                 // meanwhile. A posOverride (named bot position via .loadbotpos) still wins.
-                posOverride ??= new Position(botOwnerPawn.CBodyComponent!.SceneNode!.AbsOrigin, botOwnerPawn.CBodyComponent!.SceneNode!.AbsRotation);
+                // The angle is the owner's VIEW (pitch + yaw), not the body rotation: the bot is
+                // meant to look where the owner looked. TeleportBotUpright keeps the pitch off the body.
+                posOverride ??= new Position(botOwnerPawn.CBodyComponent!.SceneNode!.AbsOrigin,
+                    new QAngle(botOwnerPawn.EyeAngles.X, botOwnerPawn.EyeAngles.Y, 0));
 
                 // Gather ALL unused bots first and pick the claim afterwards. bot_add_t/_ct
                 // pair-spawns on current CS2 builds (one bot per team) and the enumeration
@@ -2632,7 +2824,7 @@ namespace MatchZy
                 {
                     if (extra == claimedBot)
                         continue;
-                    Log($"[SpawnBot] kicking extra pair bot {extra.PlayerName} (team {extra.TeamNum}, wanted {(byte)targetTeam})");
+                    Log($"[SpawnBot] kicking extra pair bot {extra.PlayerName} (team {extra.TeamNum}, wanted {(byte)targetTeam}; {BotQuotaStateForLog()})");
                     Server.ExecuteCommand($"kickid {extra.UserId!.Value}");
                 }
 
@@ -2669,7 +2861,8 @@ namespace MatchZy
                     // inherits facing) then flatten the body scene node over several frames so a
                     // look-down pitch never tilts the model flat / clips it under the map. Body
                     // stands upright at the owner's (or the saved spot's) position.
-                    TeleportUpright(claimedBot, botOwnerPosition.PlayerPosition, botOwnerPosition.PlayerAngle);
+                    TeleportBotUpright(claimedBot, botOwnerPosition.PlayerPosition, botOwnerPosition.PlayerAngle);
+                    GuardBotPlacement(claimedBot, botOwnerPosition, boost ? botOwner : null, crouch);
 
                     if (boost)
                     {
@@ -2685,6 +2878,9 @@ namespace MatchZy
                             new QAngle(0, ownerYaw, 0),
                             new Vector(0, 0, 0)
                         );
+                        // The teleport rotation re-syncs for a few ticks; hold the body flat like
+                        // every other teleport path does.
+                        FlattenBodyRotationFrames(botOwner, ownerYaw, 6);
                     }
                     else
                     {
@@ -2705,6 +2901,9 @@ namespace MatchZy
                 lock (_botsDictLock)
                     trackedBotCount = pracUsedBots.Count;
                 Server.ExecuteCommand($"bot_quota_mode normal; bot_quota {trackedBotCount}");
+                // The quota now equals the bots in the game, so the quota think may run again.
+                ReleaseBotQuotaAdds();
+                _incomingBotPlace = null;
 
                 if (!unusedBotFound)
                 {
@@ -2774,6 +2973,63 @@ namespace MatchZy
             catch (Exception e)
             {
                 Log($"[SpawnBot] late sweep: {e.Message}");
+            }
+        }
+
+        // Safety net against sinking after a bot placement. The bot is put on the spot its owner
+        // stood on, so it can never legitimately end up below that height; a boosted owner can
+        // never legitimately be inside the bot it was lifted onto. Both happen when a teleport and
+        // the collision solve of the same tick disagree (the pair overlaps for a tick and gravity
+        // pulls one through the other, or through thin floor). Checked a few times in the first
+        // second and put back; after that the players are on their own again.
+        private const float BotSinkTolerance = 6.0f;
+
+        private void GuardBotPlacement(CCSPlayerController bot, Position spot, CCSPlayerController? boostedOwner, bool crouch)
+        {
+            float x = spot.PlayerPosition.X, y = spot.PlayerPosition.Y, z = spot.PlayerPosition.Z;
+            float yaw = spot.PlayerAngle.Y;
+            // Standing hull is 72 high, ducked 54.
+            float top = z + (crouch ? 54.0f : 72.0f);
+            foreach (float delay in new[] { 0.1f, 0.3f, 0.6f, 1.0f })
+            {
+                AddTimer(delay, () =>
+                {
+                    try
+                    {
+                        if (!isPractice || !IsPlayerValid(bot) || !bot.PawnIsAlive)
+                            return;
+                        var botPawn = bot.PlayerPawn.Value;
+                        var botOrigin = botPawn?.AbsOrigin;
+                        if (botPawn == null || botOrigin == null)
+                            return;
+                        if (botOrigin.Z < z - BotSinkTolerance)
+                        {
+                            Log($"[GuardBotPlacement] {bot.PlayerName} sank {z - botOrigin.Z:F1} units, putting it back");
+                            botPawn.Teleport(new Vector(x, y, z + 2.0f), new QAngle(0, yaw, 0), new Vector(0, 0, 0));
+                        }
+
+                        if (boostedOwner == null || !IsPlayerValid(boostedOwner) || !boostedOwner.PawnIsAlive)
+                            return;
+                        var ownerPawn = boostedOwner.PlayerPawn.Value;
+                        var ownerOrigin = ownerPawn?.AbsOrigin;
+                        if (ownerPawn == null || ownerOrigin == null)
+                            return;
+                        float dx = ownerOrigin.X - x, dy = ownerOrigin.Y - y;
+                        // Only while still above the bot's footprint (hull is 32 wide): an owner who
+                        // stepped off on purpose is left alone.
+                        bool overBot = dx * dx + dy * dy < 24.0f * 24.0f;
+                        if (overBot && ownerOrigin.Z < top - BotSinkTolerance && ownerOrigin.Z > z - 128.0f)
+                        {
+                            Log($"[GuardBotPlacement] {boostedOwner.PlayerName} sank into boost bot, lifting back");
+                            // Null angle: keep the owner's own view and an upright body.
+                            ownerPawn.Teleport(new Vector(ownerOrigin.X, ownerOrigin.Y, top + 2.0f), null, new Vector(0, 0, 0));
+                        }
+                    }
+                    catch (Exception e)
+                    {
+                        Log($"[GuardBotPlacement] {e.Message}");
+                    }
+                }, TimerFlags.STOP_ON_MAPCHANGE);
             }
         }
 
@@ -3784,7 +4040,7 @@ namespace MatchZy
                         if (player.PlayerPawn.Value == null)
                         {
                             Log($"[RespawnWhenTeamApplied] {player.PlayerName}: pawn handle empty, calling Respawn vfunc directly ({attemptsLeft} attempts left)");
-                            VirtualFunction.CreateVoid<IntPtr>(player.Handle, MzGameData.GetOffset("CCSPlayerController_Respawn"))(player.Handle);
+                            VoidThisVFunc(player.Handle, MzGameData.GetOffset("CCSPlayerController_Respawn"))(player.Handle);
                         }
                         else
                         {
@@ -4001,7 +4257,7 @@ namespace MatchZy
             {
                 //Log($"[ExecDryRunCFG] Starting Dryrun! Dryrun CFG not found in {absolutePath}, using default CFG!");
                 Server.ExecuteCommand("ammo_grenade_limit_default 1;ammo_grenade_limit_flashbang 2;ammo_grenade_limit_total 4;bot_quota 0;cash_player_bomb_defused 300;cash_player_bomb_planted 300;cash_player_damage_hostage -30;cash_player_interact_with_hostage 300;cash_player_killed_enemy_default 300;cash_player_killed_enemy_factor 1;cash_player_killed_hostage -1000;cash_player_killed_teammate -300;cash_player_rescued_hostage 1000;cash_team_elimination_bomb_map 3250;cash_team_elimination_hostage_map_ct 3000;cash_team_elimination_hostage_map_t 3000;cash_team_hostage_alive 0;cash_team_hostage_interaction 600;cash_team_loser_bonus 1400;cash_team_loser_bonus_consecutive_rounds 500;cash_team_planted_bomb_but_defused 600;cash_team_rescued_hostage 600;cash_team_terrorist_win_bomb 3500;cash_team_win_by_defusing_bomb 3500;");
-                Server.ExecuteCommand("cash_team_win_by_hostage_rescue 2900;cash_team_win_by_time_running_out_bomb 3250;cash_team_win_by_time_running_out_hostage 3250;ff_damage_reduction_bullets 0.33;ff_damage_reduction_grenade 0.85;ff_damage_reduction_grenade_self 1;ff_damage_reduction_other 0.4;mp_afterroundmoney 0;mp_autokick 0;mp_autoteambalance 0;mp_backup_restore_load_autopause 1;mp_backup_round_auto 1;mp_buy_anywhere 0;mp_buy_during_immunity 0;mp_buytime 20;mp_c4timer 40;mp_ct_default_melee weapon_knife;mp_ct_default_primary \"\";mp_ct_default_secondary weapon_hkp2000;mp_death_drop_defuser 1;mp_death_drop_grenade 2;mp_death_drop_gun 1;mp_defuser_allocation 0;mp_drop_knife_enable 0;mp_display_kill_assists 1;mp_endmatch_votenextmap 0;mp_forcecamera 1;mp_free_armor 0;mp_freezetime 6;mp_friendlyfire 1;mp_give_player_c4 1;mp_halftime 1;mp_halftime_duration 15;mp_halftime_pausetimer 0;mp_ignore_round_win_conditions 0;mp_limitteams 0;mp_match_can_clinch 1;mp_match_end_restart 0;mp_maxmoney 16000;mp_maxrounds 24;mp_molotovusedelay 0;mp_overtime_enable 1;mp_overtime_halftime_pausetimer 0;mp_overtime_maxrounds 6;mp_overtime_startmoney 10000;mp_playercashawards 1;mp_randomspawn 0;mp_respawn_immunitytime 0;mp_respawn_on_death_ct 0;mp_respawn_on_death_t 0;mp_round_restart_delay 5;mp_roundtime 1.92;mp_roundtime_defuse 1.92;mp_roundtime_hostage 1.92;mp_solid_teammates 1;mp_starting_losses 1;mp_startmoney 16000;mp_t_default_melee weapon_knife;mp_t_default_primary \"\";mp_t_default_secondary weapon_glock;mp_teamcashawards 1;mp_timelimit 0;mp_weapons_allow_map_placed 1;mp_weapons_allow_zeus 1;mp_weapons_glow_on_ground 0;mp_win_panel_display_time 3;occlusion_test_async 0;spec_freeze_deathanim_time 0;spec_freeze_panel_extended_time 0;spec_freeze_time 2;spec_freeze_time_lock 2;spec_replay_enable 0;sv_allow_votes 1;sv_auto_full_alltalk_during_warmup_half_end 0;sv_coaching_enabled 1;sv_competitive_official_5v5 1;sv_deadtalk 1;sv_hibernate_postgame_delay 300;sv_holiday_mode 0;sv_ignoregrenaderadio 0;sv_infinite_ammo 0;sv_occlude_players 1;sv_talk_enemy_dead 0;sv_talk_enemy_living 0;sv_voiceenable 1;tv_relayvoice 1;mp_team_timeout_max 4;mp_team_timeout_time 30;sv_vote_command_delay 0;cash_team_bonus_shorthanded 0;cash_team_loser_bonus_shorthanded 0;mp_spectators_max 20;mp_team_intro_time 0;mp_restartgame 3;mp_warmup_end;");
+                Server.ExecuteCommand("cash_team_win_by_hostage_rescue 2900;cash_team_win_by_time_running_out_bomb 3250;cash_team_win_by_time_running_out_hostage 3250;ff_damage_reduction_bullets 0.33;ff_damage_reduction_grenade 0.85;ff_damage_reduction_grenade_self 1;ff_damage_reduction_other 0.4;mp_afterroundmoney 0;mp_autokick 0;mp_autoteambalance 0;mp_backup_restore_load_autopause 1;mp_backup_round_auto 1;mp_buy_anywhere 0;mp_buy_during_immunity 0;mp_buytime 20;mp_c4timer 40;mp_ct_default_melee weapon_knife;mp_ct_default_primary \"\";mp_ct_default_secondary weapon_hkp2000;mp_death_drop_defuser 1;mp_death_drop_grenade 2;mp_death_drop_gun 1;mp_defuser_allocation 0;mp_drop_knife_enable 0;mp_display_kill_assists 1;mp_endmatch_votenextmap 0;mp_forcecamera 1;mp_free_armor 0;mp_freezetime 6;mp_friendlyfire 1;mp_give_player_c4 1;mp_halftime 1;mp_halftime_duration 15;mp_halftime_pausetimer 0;mp_ignore_round_win_conditions 0;mp_limitteams 0;mp_match_can_clinch 1;mp_match_end_restart 0;mp_maxmoney 16000;mp_maxrounds 24;mp_molotovusedelay 0;mp_overtime_enable 1;mp_overtime_halftime_pausetimer 0;mp_overtime_maxrounds 6;mp_overtime_startmoney 10000;mp_playercashawards 1;mp_randomspawn 0;mp_respawn_immunitytime 0;mp_respawn_on_death_ct 0;mp_respawn_on_death_t 0;mp_round_restart_delay 5;mp_roundtime 1.92;mp_roundtime_defuse 1.92;mp_roundtime_hostage 1.92;mp_solid_teammates 1;mp_starting_losses 1;mp_startmoney 16000;mp_t_default_melee weapon_knife;mp_t_default_primary \"\";mp_t_default_secondary weapon_glock;mp_teamcashawards 1;mp_timelimit 0;mp_weapons_allow_map_placed 1;mp_weapons_allow_zeus 1;mp_weapons_glow_on_ground 0;mp_win_panel_display_time 3;occlusion_test_async 0;spec_freeze_deathanim_time 0;spec_freeze_panel_extended_time 0;spec_freeze_time 2;spec_freeze_time_lock 2;spec_replay_enable 0;sv_allow_votes 1;sv_auto_full_alltalk_during_warmup_half_end 0;sv_coaching_enabled 1;sv_competitive_official_5v5 1;sv_deadtalk 1;sv_hibernate_postgame_delay 300;sv_holiday_mode 0;sv_ignoregrenaderadio 0;sv_occlude_players 1;sv_talk_enemy_dead 0;sv_talk_enemy_living 0;sv_voiceenable 1;tv_relayvoice 1;mp_team_timeout_max 4;mp_team_timeout_time 30;sv_vote_command_delay 0;cash_team_bonus_shorthanded 0;cash_team_loser_bonus_shorthanded 0;mp_spectators_max 20;mp_team_intro_time 0;mp_restartgame 3;mp_warmup_end;");
             }
         }
 
@@ -4028,13 +4284,20 @@ namespace MatchZy
             // prac.cfg settings no mode cfg resets: undo them here, before sv_cheats goes off (buddha is
             // a cheat command). Otherwise all-talk and buddha stayed on into a dry run or warmup.
             Server.ExecuteCommand("buddha 0; buddha_ignore_bots 0; sv_full_alltalk 0; sv_showimpacts 0;");
+            // A .bot still waiting for its bot holds the quota think (HoldBotQuotaAdds).
+            ReleaseBotQuotaAdds();
+            RestorePracticeTeamSize();
+            QuietLagCompensationLog(false);
             // .bot / .botshoot set bot_stop/bot_freeze/bot_zombie 1 and bot_dont_shoot 1. They are cheat
             // cvars, so they can only be reset while sv_cheats is still on (same as LeaveModeOnUnload);
             // left at 1 the warmup and match bots stood still and never fired. bot_difficulty is left
             // alone: the warmup bot code sets its own.
             Server.ExecuteCommand("bot_stop 0; bot_freeze 0; bot_zombie 0; bot_dont_shoot 0");
+            // sv_infinite_ammo is cheat protected as well: after sv_cheats went off the server
+            // refused the reset ("is cheat protected, change ignored"), so it goes here too.
+            Server.ExecuteCommand("sv_infinite_ammo 0");
             Server.ExecuteCommand("sv_cheats false;sv_grenade_trajectory_prac_pipreview false;sv_grenade_trajectory_prac_trailtime 0; mp_ct_default_grenades \"\"; mp_ct_default_primary \"\"; mp_t_default_grenades \"\"; mp_t_default_primary \"\"; mp_teammates_are_enemies false;");
-            Server.ExecuteCommand("mp_death_drop_defuser true; mp_death_drop_taser true; mp_drop_knife_enable false; mp_death_drop_grenade 2; ammo_grenade_limit_total 4; ammo_grenade_limit_flashbang 2; ammo_grenade_limit_default 1; mp_defuser_allocation 0; sv_infinite_ammo 0; mp_force_pick_time 15");
+            Server.ExecuteCommand("mp_death_drop_defuser true; mp_death_drop_taser true; mp_drop_knife_enable false; mp_death_drop_grenade 2; ammo_grenade_limit_total 4; ammo_grenade_limit_flashbang 2; ammo_grenade_limit_default 1; mp_defuser_allocation 0; mp_force_pick_time 15");
         }
 
         // Leaves practice mode (and a dry run) without resetting the match: .exitprac / .match reset
@@ -4811,9 +5074,9 @@ namespace MatchZy
                 player.ReplicateConVar("sv_showimpacts", "1");
                 // Don't add to dictionary - let first .impacts command handle it
 
-                // Force grenade preview ON (default in practice)
-                _pipPreviewEnabled[player.Slot] = true;
-                player.ReplicateConVar("sv_grenade_trajectory_prac_pipreview", "1");
+                // Grenade preview camera is OFF by default; .cam / .preview / .pip turn it on per player.
+                _pipPreviewEnabled[player.Slot] = false;
+                player.ReplicateConVar("sv_grenade_trajectory_prac_pipreview", "0");
 
                 // Retry impacts after 2 seconds to ensure it sticks
                 AddTimer(
@@ -4824,6 +5087,7 @@ namespace MatchZy
                             return;
 
                         player.ReplicateConVar("sv_showimpacts", "1");
+                        ReapplyPipPreview(player);
                     }
                 );
             }
@@ -4867,6 +5131,7 @@ namespace MatchZy
         [ConsoleCommand("css_nadecam", "Toggles nade preview mode for practices")]
         [ConsoleCommand("css_traj", "Toggles sv_grenade_trajectory_prac_pipreview in practice mode")]
         [ConsoleCommand("css_pip", "Toggles sv_grenade_trajectory_prac_pipreview in practice mode")]
+        [ConsoleCommand("css_preview", "Toggles sv_grenade_trajectory_prac_pipreview in practice mode")]
         public void OnTrajCommand(CCSPlayerController? player, CommandInfo? command)
         {
             if (!RequirePractice(player))
@@ -4883,6 +5148,17 @@ namespace MatchZy
 
             // Notify only the player (not all chat)
             player.PrintToChat($" {Localizer.ForPlayer(player, "matchzy.prac.grenadepreviewcam", Localizer.ForPlayer(player, enabled ? "matchzy.cc.enabled" : "matchzy.cc.disabled"))}");
+        }
+
+        // Push the player's own preview state again (the server-wide convar can overwrite it).
+        private void ReapplyPipPreview(CCSPlayerController? player)
+        {
+            if (!isPractice || !IsPlayerValid(player) || player!.IsBot)
+                return;
+            int slot = player.Slot;
+            if (slot < 0 || slot >= _pipPreviewEnabled.Length)
+                return;
+            player.ReplicateConVar("sv_grenade_trajectory_prac_pipreview", _pipPreviewEnabled[slot] ? "1" : "0");
         }
 
         [ConsoleCommand("css_bestspawn", "Teleports you to your team's closest spawn from your current position")]
@@ -4983,7 +5259,6 @@ namespace MatchZy
                 if (!isPractice || !IsPlayerValid(player))
                     return;
                 ShowAllSpawnMarkers();
-                PrintToPlayerChat(player!, Localizer.ForPlayer(player, "matchzy.pm.spawnmarkerson"));
             });
         }
 
@@ -5096,7 +5371,6 @@ namespace MatchZy
             if (!IsPlayerValid(player))
                 return;
             RemoveSpawnBeams();   // also disarms the +use interaction
-            PrintToPlayerChat(player!, Localizer.ForPlayer(player, "matchzy.pm.spawnmarkersoff"));
         }
 
         private void ResetAllPlayerPracticeSettings(bool enteringPractice)
@@ -5120,8 +5394,14 @@ namespace MatchZy
                     if (playerImpacts.ContainsKey(player.Slot))
                         playerImpacts.Remove(player.Slot);
 
-                    _pipPreviewEnabled[player.Slot] = true;
-                    player.ReplicateConVar("sv_grenade_trajectory_prac_pipreview", "1");
+                    // Preview camera off by default; the player turns it on with .cam / .preview / .pip.
+                    _pipPreviewEnabled[player.Slot] = false;
+                    player.ReplicateConVar("sv_grenade_trajectory_prac_pipreview", "0");
+                    // prac.cfg runs a frame later, and a server that kept an older prac.cfg still
+                    // sets the convar to true there: the engine then replicates true to everyone
+                    // after the per-player value above. Send each player's own state once more.
+                    var late = player;
+                    AddTimer(1.0f, () => ReapplyPipPreview(late), TimerFlags.STOP_ON_MAPCHANGE);
                 }
                 else
                 {

@@ -468,6 +468,13 @@ namespace MatchZy
             if (player == null)
                 return;
 
+            // Practice has no ready phase and no pause: .r respawns the player.
+            if (isPractice)
+            {
+                RespawnSelfInPractice(player);
+                return;
+            }
+
             // If match is live and paused, treat as unpause command
             if ((isMatchLive || isKnifeRound) && isPaused)
             {

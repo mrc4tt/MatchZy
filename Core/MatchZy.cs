@@ -161,7 +161,7 @@ namespace MatchZy
 
         // Game Config
         public bool isKnifeRequired = true;
-        public int minimumReadyRequired = 10;
+        public int minimumReadyRequired = 2;
         public bool isWhitelistRequired = false;
         public bool isSaveNadesAsGlobalEnabled = false;
         public bool isPlayOutEnabled = false;
@@ -571,6 +571,7 @@ namespace MatchZy
                 { ".nadecam", OnTrajCommand },
                 { ".follownade", OnFollowNadeCommand },
                 { ".cam", OnTrajCommand },
+                { ".preview", OnTrajCommand },
                 { ".warmup", OnWarmupCommand },
                 { ".crouchbot", OnCrouchBotCommand },
                 { ".tcrouchbot", OnTCrouchBotCommand },

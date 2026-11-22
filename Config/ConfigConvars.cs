@@ -25,6 +25,7 @@ namespace MatchZy
         public FakeConVar<float> botJiggleRange = new("matchzy_botjiggle_range", "Practice .botjiggle: how far (units) bots strafe side-to-side. Default: 30", 30.0f);
 
         public FakeConVar<string> lineupTargetAngles = new("matchzy_lineup_target_angles", "Extra rotation (pitch yaw roll) added to the lineup trainer's aim target model, for tuning how it faces the wall. Default: \"0 0 0\"", "0 0 0");
+        public FakeConVar<bool> replaySmooth = new("matchzy_replay_smooth", "Practice .replay / .strat bots: keep the client interpolating between path steps (no weapon hitch) and write the recorded aim after the bots think. false = the older per-tick teleport and setang only. Default: true", true);
         public FakeConVar<bool> spawnMarkersEnabledDefault = new("matchzy_spawn_markers_enabled_default", "Show the .showspawns markers automatically when practice mode starts. Default: true", true);
 
 
@@ -258,7 +259,7 @@ namespace MatchZy
             resetCvarsOnSeriesEnd = ParseCvarBool(args, resetCvarsOnSeriesEnd);
         }
 
-        [ConsoleCommand("matchzy_minimum_ready_required", "Minimum ready players required to start the match. Default: 10")]
+        [ConsoleCommand("matchzy_minimum_ready_required", "Minimum ready players required to start the match. Default: 2")]
         public void MatchZyMinimumReadyRequired(CCSPlayerController? player, CommandInfo command)
         {
             if (player != null)
