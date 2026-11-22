@@ -208,6 +208,9 @@ namespace MatchZy
 
         public Dictionary<byte, List<Position>> spawnsData = GetEmptySpawnsData();
         public Dictionary<byte, List<Position>> coachSpawns = GetEmptySpawnsData();
+        // Enabled spawns above the lowest priority: the engine only uses them once the match spawns
+        // are taken. Shown by .spawns in a dimmer colour, never numbered (.spawn N is match spawns only).
+        public Dictionary<byte, List<Position>> extraSpawnsData = GetEmptySpawnsData();
 
         // (Backup)
         private readonly object _botsDictLock = new();
@@ -411,6 +414,7 @@ namespace MatchZy
         {
             // Resetting spawn data to avoid any glitches
             spawnsData = GetEmptySpawnsData();
+            extraSpawnsData = GetEmptySpawnsData();
 
             int ctSkipped = 0, tSkipped = 0;
             try
@@ -456,16 +460,17 @@ namespace MatchZy
             int skipped = 0;
             foreach (var spawn in spawns)
             {
-                if (!spawn.IsValid || !spawn.Enabled || spawn.Priority != minPriority)
+                if (!spawn.IsValid || !spawn.Enabled)
                     continue;
                 var origin = spawn.CBodyComponent?.SceneNode?.AbsOrigin;
                 var rotation = spawn.CBodyComponent?.SceneNode?.AbsRotation;
                 if (origin == null || rotation == null)
                 {
-                    skipped++;
+                    if (spawn.Priority == minPriority)
+                        skipped++;
                     continue;
                 }
-                spawnsData[team].Add(new Position(origin, rotation));
+                (spawn.Priority == minPriority ? spawnsData : extraSpawnsData)[team].Add(new Position(origin, rotation));
             }
             return skipped;
         }
@@ -1122,19 +1127,25 @@ namespace MatchZy
         }
         readonly List<SpawnMarkerVisual> spawnMarkerVisuals = new();
         static readonly Color spawnMarkerHoverColor = Color.Lime;
+        const float spawnMarkerEdgeWidth = 7.0f;
+        static readonly Color spawnMarkerExtraCt = Color.FromArgb(255, 40, 95, 170);
+        static readonly Color spawnMarkerExtraT = Color.FromArgb(255, 185, 80, 15);
 
-        public void ShowSpawnMarker(Position spawn, Color color, int number, string side)
+        // extra: a spawn outside the match set. Same box, no number (Number 0), no aim text.
+        public void ShowSpawnMarker(Position spawn, Color color, int number, string side, bool extra = false)
         {
             var visual = new SpawnMarkerVisual { Side = side, Number = number, BaseColor = color };
             spawnMarkerVisuals.Add(visual);
             Vector p = spawn.PlayerPosition;
             visual.FloorZ = SpawnMarkerFloorZ(p);
             float z = visual.FloorZ + spawnMarkerFloorLift;
-            foreach (uint raw in DrawFloorBox(p.X, p.Y, z, spawnMarkerHalfSize, color))
+            foreach (uint raw in DrawFloorBox(p.X, p.Y, z, spawnMarkerHalfSize, color, spawn.PlayerAngle.Y, spawnMarkerEdgeWidth))
             {
                 spawnMarkerEntities.Add(raw);
                 visual.Edges.Add(raw);
             }
+            if (extra)
+                return;
 
             var text = Utilities.CreateEntityByName<CPointWorldText>("point_worldtext");
             if (text == null)
@@ -1160,15 +1171,18 @@ namespace MatchZy
 
         // A flat square outline (4 beams) centered on (cx, cy) at height z. Returns the raw entity
         // handles so the caller can track and remove them. Shared by .showspawns and .showbotspawn.
-        private List<uint> DrawFloorBox(float cx, float cy, float z, float halfSize, Color color)
+        // yaw turns the square around its centre, so it lines up with the way the spawn faces.
+        private List<uint> DrawFloorBox(float cx, float cy, float z, float halfSize, Color color, float yaw = 0.0f, float width = 4.0f)
         {
             var handles = new List<uint>(4);
             float h = halfSize;
+            float rad = yaw * MathF.PI / 180.0f;
+            float cos = MathF.Cos(rad), sin = MathF.Sin(rad);
             // Corners in order, each edge runs from corner i to corner i+1.
-            var corners = new (float X, float Y)[]
-            {
-                (cx - h, cy - h), (cx + h, cy - h), (cx + h, cy + h), (cx - h, cy + h),
-            };
+            var local = new (float X, float Y)[] { (-h, -h), (h, -h), (h, h), (-h, h) };
+            var corners = new (float X, float Y)[4];
+            for (int c = 0; c < 4; c++)
+                corners[c] = (cx + local[c].X * cos - local[c].Y * sin, cy + local[c].X * sin + local[c].Y * cos);
             for (int i = 0; i < 4; i++)
             {
                 var a = corners[i];
@@ -1180,7 +1194,7 @@ namespace MatchZy
                     break;
                 }
                 beam.LifeState = 1;
-                beam.Width = 4.0f;
+                beam.Width = width;
                 beam.Render = color;
                 beam.EndPos.X = b.X;
                 beam.EndPos.Y = b.Y;
@@ -1295,11 +1309,12 @@ namespace MatchZy
                 if (beam == null || !beam.IsValid)
                     continue;
                 beam.Render = color;
-                beam.Width = on ? 6.0f : 4.0f;
+                beam.Width = on ? spawnMarkerEdgeWidth + 3.0f : spawnMarkerEdgeWidth;
                 Utilities.SetStateChanged(beam, "CBaseModelEntity", "m_clrRender");
                 Utilities.SetStateChanged(beam, "CBeam", "m_fWidth");
             }
-            var label = new CHandle<CPointWorldText>(visual.Label).Value;
+            // Label 0 = no number drawn (extra spawn); a zero handle would resolve to the world entity.
+            var label = visual.Label == 0 ? null : new CHandle<CPointWorldText>(visual.Label).Value;
             if (label != null && label.IsValid)
             {
                 label.Color = color;
@@ -1348,7 +1363,7 @@ namespace MatchZy
                     if (index >= 0 && index < spawnMarkerVisuals.Count)
                     {
                         var v = spawnMarkerVisuals[index];
-                        if (!IsCenterMenuOpen(player))
+                        if (v.Number > 0 && !IsCenterMenuOpen(player))
                             player.PrintToCenter(Localizer.ForPlayer(player, "matchzy.pm.spawnmarkeraim", v.Side, v.Number));
                     }
                 }
@@ -5091,6 +5106,18 @@ namespace MatchZy
             {
                 ShowSpawnMarker(tSpawns[i], Color.Orange, i + 1, "T");
                 activeSpawnMarkers.Add(tSpawns[i]);
+            }
+            // The spawns outside the match set, dimmer and without a number. Same list as the
+            // match spawns, so aiming at one and pressing USE works the same way.
+            foreach (var extra in extraSpawnsData[(byte)CsTeam.CounterTerrorist])
+            {
+                ShowSpawnMarker(extra, spawnMarkerExtraCt, 0, "CT", extra: true);
+                activeSpawnMarkers.Add(extra);
+            }
+            foreach (var extra in extraSpawnsData[(byte)CsTeam.Terrorist])
+            {
+                ShowSpawnMarker(extra, spawnMarkerExtraT, 0, "T", extra: true);
+                activeSpawnMarkers.Add(extra);
             }
             // Arm the +use teleport now that markers are drawn.
             spawnMarkersActive = activeSpawnMarkers.Count > 0;
