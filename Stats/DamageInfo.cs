@@ -73,6 +73,14 @@ namespace MatchZy
                 dealt, dealtHits, taken, takenHits, enemyName);
         }
 
+        private CCSPlayerController? DamageReportPlayer(int userId)
+        {
+            if (playerData.TryGetValue(userId, out var known))
+                return known;
+            var found = Utilities.GetPlayerFromUserid(userId);
+            return found != null && found.IsValid && found.IsBot && !found.IsHLTV ? found : null;
+        }
+
         private void ShowDamageInfo()
         {
             if (!enableDamageReport.Value)
@@ -111,8 +119,11 @@ namespace MatchZy
                             targetKilledAttacker = takenInfo.Killed;
                         }
 
-                        if (!playerData.TryGetValue(attackerId, out var attackerController) || !playerData.TryGetValue(targetId, out var targetController))
-                            continue;
+                        // playerData holds humans only. A bot standing in for a player is still an
+                        // opponent worth a line, so it is looked up by userid instead; a human with
+                        // only bots against them used to get no report at all.
+                        var attackerController = DamageReportPlayer(attackerId);
+                        var targetController = DamageReportPlayer(targetId);
 
                         if (attackerController != null && targetController != null)
                         {
@@ -130,12 +141,15 @@ namespace MatchZy
                             int attackerHP = attackerController.PlayerPawn.Value.Health < 0 ? 0 : attackerController.PlayerPawn.Value.Health;
                             int targetHP = targetController.PlayerPawn.Value.Health < 0 ? 0 : targetController.PlayerPawn.Value.Health;
 
-                            AddLine(attackerId, attackerController, damageGiven, damageTaken,
-                                DamageReportLine(attackerController, damageGiven, hitsGiven, damageTaken, hitsTaken,
-                                    targetController.PlayerName, targetHP, attackerKilledTarget));
-                            AddLine(targetId, targetController, damageTaken, damageGiven,
-                                DamageReportLine(targetController, damageTaken, hitsTaken, damageGiven, hitsGiven,
-                                    attackerController.PlayerName, attackerHP, targetKilledAttacker));
+                            // A bot reads no chat: lines go to the human side of the pair only.
+                            if (!attackerController.IsBot)
+                                AddLine(attackerId, attackerController, damageGiven, damageTaken,
+                                    DamageReportLine(attackerController, damageGiven, hitsGiven, damageTaken, hitsTaken,
+                                        targetController.PlayerName, targetHP, attackerKilledTarget));
+                            if (!targetController.IsBot)
+                                AddLine(targetId, targetController, damageTaken, damageGiven,
+                                    DamageReportLine(targetController, damageTaken, hitsTaken, damageGiven, hitsGiven,
+                                        attackerController.PlayerName, attackerHP, targetKilledAttacker));
                         }
 
                         // Mark this pair as processed to avoid duplicates.
