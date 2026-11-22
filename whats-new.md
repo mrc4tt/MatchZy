@@ -48,6 +48,7 @@ A short summary of each release. The [full changelog](changelog.md) has the deta
 - **Changed:** Practice: a killed bot respawns right away instead of after the death animation.
 - **Changed:** Practice: the grenade preview camera starts off; turn it on with `.cam`, `.preview` or `.pip`.
 - **Changed:** Practice: `.spawns` boxes are thicker, face the spawn's direction, and also show the extra spawns in a darker colour.
+- **Changed:** Practice: xray is on when practice starts (T red, CT blue); `.xray` turns it off.
 - **Fixed:** Practice: the console now says at practice start when a grenade rethrow signature did not resolve (`.rt` / `.throw` grenades that bounce and never detonate).
 - **Security:** A failed demo upload no longer logs the S3 signature details.
 
