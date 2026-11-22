@@ -210,7 +210,6 @@ namespace MatchZy
         public Dictionary<byte, List<Position>> coachSpawns = GetEmptySpawnsData();
         // Enabled spawns above the lowest priority: the engine only uses them once the match spawns
         // are taken. Shown by .spawns in a dimmer colour, never numbered (.spawn N is match spawns only).
-        public Dictionary<byte, List<Position>> extraSpawnsData = GetEmptySpawnsData();
 
         // (Backup)
         private readonly object _botsDictLock = new();
@@ -301,6 +300,7 @@ namespace MatchZy
             // Practice manages its own bots; clear any warmup aim-bots first.
             KillWarmupBots();
             isPractice = true;
+            QuietLagCompensationLog(true);
             isDryRun = false;
             isWarmup = false;
             readyAvailable = false;
@@ -415,7 +415,6 @@ namespace MatchZy
         {
             // Resetting spawn data to avoid any glitches
             spawnsData = GetEmptySpawnsData();
-            extraSpawnsData = GetEmptySpawnsData();
 
             int ctSkipped = 0, tSkipped = 0;
             try
@@ -471,7 +470,8 @@ namespace MatchZy
                         skipped++;
                     continue;
                 }
-                (spawn.Priority == minPriority ? spawnsData : extraSpawnsData)[team].Add(new Position(origin, rotation));
+                if (spawn.Priority == minPriority)
+                    spawnsData[team].Add(new Position(origin, rotation));
             }
             return skipped;
         }
@@ -1125,28 +1125,33 @@ namespace MatchZy
             public uint Label;
             public bool Highlighted;
             public float FloorZ;
+            public float X, Y;
+            public bool Hidden;
         }
         readonly List<SpawnMarkerVisual> spawnMarkerVisuals = new();
         static readonly Color spawnMarkerHoverColor = Color.Lime;
-        const float spawnMarkerEdgeWidth = 7.0f;
-        static readonly Color spawnMarkerExtraCt = Color.FromArgb(255, 40, 95, 170);
-        static readonly Color spawnMarkerExtraT = Color.FromArgb(255, 185, 80, 15);
+        // Beams always face the camera, so a wide edge stands up like the side of a box. One thin
+        // square in the floor plane reads as a flat outline. (Two squares a few units apart were
+        // tried as a band: the lines crossed at the corners and looked messy up close.)
+        const float spawnMarkerEdgeWidth = 2.0f;
 
-        // extra: a spawn outside the match set. Same box, no number (Number 0), no aim text.
-        public void ShowSpawnMarker(Position spawn, Color color, int number, string side, bool extra = false)
+        public void ShowSpawnMarker(Position spawn, Color color, int number, string side)
         {
             var visual = new SpawnMarkerVisual { Side = side, Number = number, BaseColor = color };
             spawnMarkerVisuals.Add(visual);
             Vector p = spawn.PlayerPosition;
             visual.FloorZ = SpawnMarkerFloorZ(p);
+            visual.X = p.X;
+            visual.Y = p.Y;
             float z = visual.FloorZ + spawnMarkerFloorLift;
-            foreach (uint raw in DrawFloorBox(p.X, p.Y, z, spawnMarkerHalfSize, color, spawn.PlayerAngle.Y, spawnMarkerEdgeWidth))
+            foreach (float half in new[] { spawnMarkerHalfSize })
             {
-                spawnMarkerEntities.Add(raw);
-                visual.Edges.Add(raw);
+                foreach (uint raw in DrawFloorBox(p.X, p.Y, z, half, color, spawn.PlayerAngle.Y, spawnMarkerEdgeWidth))
+                {
+                    spawnMarkerEntities.Add(raw);
+                    visual.Edges.Add(raw);
+                }
             }
-            if (extra)
-                return;
 
             var text = Utilities.CreateEntityByName<CPointWorldText>("point_worldtext");
             if (text == null)
@@ -1296,6 +1301,30 @@ namespace MatchZy
             return result;
         }
 
+        // A beam with one end behind the viewer is drawn as a huge band across the whole screen
+        // (seen live: standing on or next to a spawn box covered the view in its colour). The
+        // outline of a box is therefore not drawn while a player stands this close to it; the
+        // number stays. Shared entities: it is hidden for everyone, which only matters to someone
+        // watching the exact box another player stands on.
+        const float spawnMarkerHideDistance = 110.0f;
+        const float spawnMarkerHideHeight = 160.0f;
+
+        private void SetSpawnMarkerHidden(SpawnMarkerVisual visual, bool hidden)
+        {
+            if (visual.Hidden == hidden)
+                return;
+            visual.Hidden = hidden;
+            const uint EF_NODRAW = 0x20;
+            foreach (uint raw in visual.Edges)
+            {
+                var beam = new CHandle<CBeam>(raw).Value;
+                if (beam == null || !beam.IsValid)
+                    continue;
+                beam.Effects = hidden ? beam.Effects | EF_NODRAW : beam.Effects & ~EF_NODRAW;
+                Utilities.SetStateChanged(beam, "CBaseEntity", "m_fEffects");
+            }
+        }
+
         // Recolor one marker's box and number (hover highlight). Shared entities, so every player
         // sees it; in practice that only shows where someone is aiming.
         private void SetSpawnMarkerHighlight(SpawnMarkerVisual visual, bool on)
@@ -1310,7 +1339,7 @@ namespace MatchZy
                 if (beam == null || !beam.IsValid)
                     continue;
                 beam.Render = color;
-                beam.Width = on ? spawnMarkerEdgeWidth + 3.0f : spawnMarkerEdgeWidth;
+                beam.Width = on ? spawnMarkerEdgeWidth + 1.0f : spawnMarkerEdgeWidth;
                 Utilities.SetStateChanged(beam, "CBaseModelEntity", "m_clrRender");
                 Utilities.SetStateChanged(beam, "CBeam", "m_fWidth");
             }
@@ -1348,10 +1377,14 @@ namespace MatchZy
                 if (!spawnMarkersActive || !isPractice)
                     return;
                 var hovered = new HashSet<int>();
+                var eyes = new List<(float X, float Y, float Z)>();
                 foreach (var player in Utilities.GetPlayers())
                 {
                     if (!IsHumanPlayerValid(player) || !player.UserId.HasValue)
                         continue;
+                    var origin = player.PlayerPawn.Value?.AbsOrigin;
+                    if (origin != null)
+                        eyes.Add((origin.X, origin.Y, origin.Z));
                     int uid = player.UserId.Value;
                     int index = TargetSpawnMarkerIndex(player);
                     if (index >= 0)
@@ -1369,7 +1402,22 @@ namespace MatchZy
                     }
                 }
                 for (int i = 0; i < spawnMarkerVisuals.Count; i++)
-                    SetSpawnMarkerHighlight(spawnMarkerVisuals[i], hovered.Contains(i));
+                {
+                    var v = spawnMarkerVisuals[i];
+                    SetSpawnMarkerHighlight(v, hovered.Contains(i));
+                    bool near = false;
+                    foreach (var e in eyes)
+                    {
+                        float dx = e.X - v.X, dy = e.Y - v.Y;
+                        if (dx * dx + dy * dy < spawnMarkerHideDistance * spawnMarkerHideDistance
+                            && Math.Abs(e.Z - v.FloorZ) < spawnMarkerHideHeight)
+                        {
+                            near = true;
+                            break;
+                        }
+                    }
+                    SetSpawnMarkerHidden(v, near);
+                }
             }
             catch (Exception e)
             {
@@ -1707,7 +1755,16 @@ namespace MatchZy
             }
         }
 
-        private const int MaxPracticeBots = 5;
+        // Practice bots have no fixed cap: the free player slots are the limit. Listen servers can
+        // report a bogus Server.MaxPlayers (1), so that value is not trusted there.
+        private static int FreePracticeBotSlots()
+        {
+            int max = Server.MaxPlayers;
+            if (max <= 1)
+                return 64;
+            int occupied = Utilities.GetPlayers().Count(p => p?.IsValid == true && p.Connected == PlayerConnectedState.Connected);
+            return Math.Max(0, max - occupied);
+        }
 
         // Cached so the "bots are disabled" line is logged once per load, not on every .bot.
         private static bool? noBotsFlag;
@@ -1765,14 +1822,6 @@ namespace MatchZy
 
         private bool CanSpawnAnotherBot(CCSPlayerController? player)
         {
-            // Count current bots
-            int currentBotCount = Utilities.GetPlayers().Count(p => p?.IsValid == true && p.IsBot && !p.IsHLTV);
-            if (currentBotCount >= MaxPracticeBots)
-            {
-                player?.PrintToChat($" {ChatColors.Green}[MatchZy] {ChatColors.White}{Localizer.ForPlayer(player, "matchzy.prac.maxbots", MaxPracticeBots)}");
-                return false;
-            }
-
             // Protect the CSTV bot: bot_add on a full server makes the engine free a slot, and the
             // slot it takes is the CSTV bot's - which kicks CSTV and kills GOTV/demo recording. Count
             // every occupied slot (humans, bots AND CSTV) and refuse the spawn when there is no free
@@ -2015,6 +2064,14 @@ namespace MatchZy
                 }
 
                 isSpawningBot = true;
+                RaisePracticeTeamSize();
+
+                // Where the bot goes, taken now (the owner may walk on before the claim) and
+                // handed to the spawn handler: see PlaceIncomingBot.
+                var ownerPawnNow = player.PlayerPawn.Value;
+                var ownerOriginNow = ownerPawnNow.CBodyComponent?.SceneNode?.AbsOrigin;
+                if (posOverride == null && ownerOriginNow != null)
+                    posOverride = new Position(ownerOriginNow, new QAngle(ownerPawnNow.EyeAngles.X, ownerPawnNow.EyeAngles.Y, 0));
 
                 // Determine target team
                 CsTeam targetTeam =
@@ -2037,26 +2094,28 @@ namespace MatchZy
                 int quotaBotCount;
                 lock (_botsDictLock)
                     quotaBotCount = pracUsedBots.Count;
-                Server.ExecuteCommand($"bot_quota {quotaBotCount}");
 
                 // Add bot to opposite team or forced team. Use ONLY bot_add_t / bot_add_ct - it already
                 // routes the bot to that team. A preceding bot_join_team ALSO spawned a bot, so the two
                 // together produced two bots per .bot (confirmed via diag: one .bot -> Crew + Shamat).
-                if (targetTeam == CsTeam.Terrorist)
-                    Server.ExecuteCommand("bot_add_t");
-                else
-                    Server.ExecuteCommand("bot_add_ct");
-                // bot_add raised the quota by one, but the quota counts bots by pawn and the new
-                // bot has none until it spawns: the next quota think saw one bot missing and added a
-                // second one (one .bot -> two bots, one kicked by the claim pass). Put the quota back
-                // to the tracked count until SpawnBot claims the bot and re-pins it. Only while the
-                // KickBotFromTeam hook is active: it keeps the quota from kicking anything in
-                // practice, so a quota one below the real bot count is harmless. Without it the
-                // quota would kick the new bot.
+                string botAdd = targetTeam == CsTeam.Terrorist ? "bot_add_t" : "bot_add_ct";
+                _incomingBotPlace = posOverride;
+                _incomingBotTeam = targetTeam;
                 if (_kickBotFromTeam != null)
                 {
-                    Server.ExecuteCommand($"bot_quota {quotaBotCount}");
+                    // One command string, so nothing can run between its parts: the quota think is
+                    // held (bot_join_delay, see HoldBotQuotaAdds) BEFORE the add, and the quota that
+                    // bot_add raised by one goes straight back to the tracked count. Sent as
+                    // separate commands, with the hold last, the think still added a second bot in
+                    // the tick after the add. Only while the KickBotFromTeam hook is active: it
+                    // keeps the quota from kicking anything in practice.
                     HoldBotQuotaAdds();
+                    Server.ExecuteCommand($"bot_join_delay 999999; bot_quota {quotaBotCount}; {botAdd}; bot_quota {quotaBotCount}");
+                }
+                else
+                {
+                    Server.ExecuteCommand($"bot_quota {quotaBotCount}");
+                    Server.ExecuteCommand(botAdd);
                 }
 
                 // Once bot is added, we teleport it to the requested position
@@ -2093,6 +2152,45 @@ namespace MatchZy
                 Log($"[AddBot - ERROR] {ex.GetType().Name}: {ex.Message}");
                 isSpawningBot = false;
             }
+        }
+
+        // The spot the bot being added right now is meant to stand on. The claim in SpawnBot runs
+        // 0.1 s or more after bot_add, and until then the bot stood on a map spawn in plain view:
+        // the client drew it there and then slid it across the map to the owner. The spawn handler
+        // moves it on the frame after it spawns instead, so the first position a client is sent
+        // for longer than a tick is the final one. SpawnBot still claims and places it afterwards.
+        private Position? _incomingBotPlace;
+        private CsTeam _incomingBotTeam = CsTeam.None;
+
+        private void PlaceIncomingBot(CCSPlayerController bot)
+        {
+            var place = _incomingBotPlace;
+            if (place == null)
+                return;
+            Server.NextFrame(() =>
+            {
+                try
+                {
+                    if (!isPractice || !isSpawningBot || !IsPlayerValid(bot) || !bot.IsBot || !bot.PawnIsAlive)
+                        return;
+                    var pawn = bot.PlayerPawn.Value;
+                    if (pawn == null || !pawn.IsValid)
+                        return;
+                    byte frame = pawn.InterpolationFrame;
+                    TeleportBotUpright(bot, place.PlayerPosition, place.PlayerAngle);
+                    // The client interpolates between two positions that share an interpolation
+                    // frame. If the teleport kept it, change it so the move is drawn as a snap.
+                    if (pawn.InterpolationFrame == frame)
+                    {
+                        pawn.InterpolationFrame = (byte)(frame + 1);
+                        Utilities.SetStateChanged(pawn, "CBaseEntity", "m_ubInterpolationFrame");
+                    }
+                }
+                catch (Exception e)
+                {
+                    Log($"[SpawnBot] early placement failed: {e.Message}");
+                }
+            });
         }
 
         private CCSPlayerController? GetClosestBotOfPlayer(CCSPlayerController player)
@@ -2266,6 +2364,11 @@ namespace MatchZy
                                 );
                             }
                         }
+                    }
+                    else if (isSpawningBot && !player.IsHLTV && _incomingBotPlace != null
+                        && (player.TeamNum == (byte)_incomingBotTeam || player.TeamNum == (byte)CsTeam.None))
+                    {
+                        PlaceIncomingBot(player);
                     }
                     else if (!isSpawningBot && !player.IsHLTV)
                     {
@@ -2566,14 +2669,18 @@ namespace MatchZy
             }
         }
 
-        // One .bot used to bring two bots: bot_add_t/_ct creates the requested bot, and the quota
-        // think of the next tick added a second one on its own (kicked again 0.1 s later by the
-        // claim pass, "[SpawnBot] kicking extra pair bot"). Pinning bot_quota around the add did
-        // not stop it. bot_join_delay does: while it is above the map time the quota think wants
-        // zero bots, so it adds none, and what it then tries to kick is refused by the
-        // KickBotFromTeam hook in practice. Held only from the add until the bot is claimed and
-        // the quota is pinned again; a timer lets go if the claim never happens. Only with the
-        // hook active: without it the think would kick every practice bot.
+        // One .bot used to bring two bots (the second kicked 0.1 s later by the claim pass,
+        // "[SpawnBot] kicking extra pair bot"). From the server binary (build 14200): bot_add from
+        // the console does not raise bot_quota by one, it sets it to
+        // max(quota + 1, humans on a team - spectators + bots), so with one player on a team the
+        // quota lands one above the bots in the game, and with more players further above. The
+        // quota think of the next tick (bot_quota_mode normal: wanted = bot_quota) then adds the
+        // difference itself, on any team. Pinning bot_quota around the add did not stop it. bot_join_delay is meant to: while it is above the map time the quota think
+        // wants zero bots, so it adds none, and what it then tries to kick is refused by the
+        // KickBotFromTeam hook in practice. AddBot sets it in the same command string as the add;
+        // it is held until the bot is claimed and the quota is pinned again (through the claim
+        // retries too), and a timer lets go if the claim never happens. Only with the hook active:
+        // without it the think would kick every practice bot.
         private int _botQuotaHoldSeq;
         private bool _botQuotaHeld;
 
@@ -2583,13 +2690,34 @@ namespace MatchZy
                 return;
             _botQuotaHeld = true;
             int seq = ++_botQuotaHoldSeq;
-            Server.ExecuteCommand("bot_join_delay 999999");
+            // Written to the convar directly, so it holds from this instant and does not depend
+            // on when the command buffer runs; the command string in AddBot repeats it.
+            try { ConVar.Find("bot_join_delay")?.SetValue(999999); }
+            catch (Exception e) { Log($"[SpawnBot] bot_join_delay could not be set directly: {e.Message}"); }
             // Not STOP_ON_MAPCHANGE: left held, no bot would join on the next map either.
             AddTimer(2.0f, () =>
             {
                 if (seq == _botQuotaHoldSeq)
                     ReleaseBotQuotaAdds();
             });
+        }
+
+        // For the "extra pair bot" log line: what the quota think saw.
+        private string BotQuotaStateForLog()
+        {
+            try
+            {
+                int quota = ConVar.Find("bot_quota")?.GetPrimitiveValue<int>() ?? -1;
+                int delay = ConVar.Find("bot_join_delay")?.GetPrimitiveValue<int>() ?? -1;
+                int tracked;
+                lock (_botsDictLock)
+                    tracked = pracUsedBots.Count;
+                return $"bot_quota {quota}, bot_join_delay {delay}, held {_botQuotaHeld}, tracked {tracked}, hook {(_kickBotFromTeam != null)}";
+            }
+            catch (Exception e)
+            {
+                return e.Message;
+            }
         }
 
         private void ReleaseBotQuotaAdds()
@@ -2674,9 +2802,6 @@ namespace MatchZy
                 // erroneous-spawn kicker and the late sweep leave the incoming bot alone.
                 if (claimedBot == null && attempt < 4)
                 {
-                    // Nothing to claim yet: if this build creates the requested bot through the
-                    // quota think, the hold would keep it out. Let it through for the retries.
-                    ReleaseBotQuotaAdds();
                     var retryOwner = botOwner;
                     var retryPos = posOverride;
                     AddTimer(0.15f, () =>
@@ -2699,7 +2824,7 @@ namespace MatchZy
                 {
                     if (extra == claimedBot)
                         continue;
-                    Log($"[SpawnBot] kicking extra pair bot {extra.PlayerName} (team {extra.TeamNum}, wanted {(byte)targetTeam})");
+                    Log($"[SpawnBot] kicking extra pair bot {extra.PlayerName} (team {extra.TeamNum}, wanted {(byte)targetTeam}; {BotQuotaStateForLog()})");
                     Server.ExecuteCommand($"kickid {extra.UserId!.Value}");
                 }
 
@@ -2778,6 +2903,7 @@ namespace MatchZy
                 Server.ExecuteCommand($"bot_quota_mode normal; bot_quota {trackedBotCount}");
                 // The quota now equals the bots in the game, so the quota think may run again.
                 ReleaseBotQuotaAdds();
+                _incomingBotPlace = null;
 
                 if (!unusedBotFound)
                 {
@@ -4160,6 +4286,8 @@ namespace MatchZy
             Server.ExecuteCommand("buddha 0; buddha_ignore_bots 0; sv_full_alltalk 0; sv_showimpacts 0;");
             // A .bot still waiting for its bot holds the quota think (HoldBotQuotaAdds).
             ReleaseBotQuotaAdds();
+            RestorePracticeTeamSize();
+            QuietLagCompensationLog(false);
             // .bot / .botshoot set bot_stop/bot_freeze/bot_zombie 1 and bot_dont_shoot 1. They are cheat
             // cvars, so they can only be reset while sv_cheats is still on (same as LeaveModeOnUnload);
             // left at 1 the warmup and match bots stood still and never fired. bot_difficulty is left
@@ -5131,7 +5259,6 @@ namespace MatchZy
                 if (!isPractice || !IsPlayerValid(player))
                     return;
                 ShowAllSpawnMarkers();
-                PrintToPlayerChat(player!, Localizer.ForPlayer(player, "matchzy.pm.spawnmarkerson"));
             });
         }
 
@@ -5154,18 +5281,6 @@ namespace MatchZy
             {
                 ShowSpawnMarker(tSpawns[i], Color.Orange, i + 1, "T");
                 activeSpawnMarkers.Add(tSpawns[i]);
-            }
-            // The spawns outside the match set, dimmer and without a number. Same list as the
-            // match spawns, so aiming at one and pressing USE works the same way.
-            foreach (var extra in extraSpawnsData[(byte)CsTeam.CounterTerrorist])
-            {
-                ShowSpawnMarker(extra, spawnMarkerExtraCt, 0, "CT", extra: true);
-                activeSpawnMarkers.Add(extra);
-            }
-            foreach (var extra in extraSpawnsData[(byte)CsTeam.Terrorist])
-            {
-                ShowSpawnMarker(extra, spawnMarkerExtraT, 0, "T", extra: true);
-                activeSpawnMarkers.Add(extra);
             }
             // Arm the +use teleport now that markers are drawn.
             spawnMarkersActive = activeSpawnMarkers.Count > 0;
@@ -5256,7 +5371,6 @@ namespace MatchZy
             if (!IsPlayerValid(player))
                 return;
             RemoveSpawnBeams();   // also disarms the +use interaction
-            PrintToPlayerChat(player!, Localizer.ForPlayer(player, "matchzy.pm.spawnmarkersoff"));
         }
 
         private void ResetAllPlayerPracticeSettings(bool enteringPractice)
