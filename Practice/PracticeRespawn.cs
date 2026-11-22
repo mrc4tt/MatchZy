@@ -24,6 +24,13 @@ namespace MatchZy
         // next spawn.
         private readonly HashSet<int> respawnAtSavedLocation = new();
         private const float PracticeHumanRespawnDelay = 0.5f;
+        // The engine's own mp_respawn_on_death waits out the death animation and freeze cam
+        // (a couple of seconds). Tracked practice bots are brought back by the plugin instead.
+        // Not in the death event itself: the pawn is still being torn down on that tick (weapon
+        // drops, death notices, the other death handlers), and a respawn there re-enters the
+        // engine mid-teardown. A few ticks later the death is fully processed and the respawn is
+        // the same call .botrespawn already makes.
+        private const float PracticeBotRespawnDelay = 0.1f;
 
         [ConsoleCommand("css_botrespawn", "Toggle whether practice bots respawn after dying")]
         public void OnBotRespawnConsoleCommand(CCSPlayerController? player, CommandInfo command)
@@ -96,6 +103,29 @@ namespace MatchZy
 
                 if (!victim.IsBot && savedPlayerLocationData.ContainsKey(uid))
                     respawnAtSavedLocation.Add(uid);
+
+                if (victim.IsBot && botRespawnEnabled)
+                {
+                    bool tracked;
+                    lock (_botsDictLock)
+                        tracked = pracUsedBots.ContainsKey(uid);
+                    if (tracked)
+                    {
+                        var b = victim;
+                        AddTimer(PracticeBotRespawnDelay, () =>
+                        {
+                            // Still ours? .nobots / a kick in between removes it from the list.
+                            if (!botRespawnEnabled || !b.IsValid || !b.UserId.HasValue)
+                                return;
+                            lock (_botsDictLock)
+                            {
+                                if (!pracUsedBots.ContainsKey(b.UserId.Value))
+                                    return;
+                            }
+                            RespawnIfDead(b);
+                        }, TimerFlags.STOP_ON_MAPCHANGE);
+                    }
+                }
 
                 // Engine respawns are off while .botrespawn is off: bring the humans back ourselves.
                 if (!botRespawnEnabled && !victim.IsBot)

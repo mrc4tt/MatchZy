@@ -45,6 +45,7 @@ A short summary of each release. The [full changelog](changelog.md) has the deta
 - **Fixed:** Switching the server from practice to another mode (retakes, deathmatch, prefire) without a map change no longer leaves players flying in noclip or respawning on death.
 - **Fixed:** Practice: `.boost` bots no longer respawn tilted, and you stay upright when lifted onto the bot.
 - **Fixed:** Practice: a placed bot looks up or down the way you did when you placed it, and stays upright.
+- **Changed:** Practice: a killed bot respawns right away instead of after the death animation.
 - **Fixed:** Practice: the console now says at practice start when a grenade rethrow signature did not resolve (`.rt` / `.throw` grenades that bounce and never detonate).
 - **Security:** A failed demo upload no longer logs the S3 signature details.
 
