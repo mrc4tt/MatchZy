@@ -72,6 +72,7 @@ namespace MatchZy
         // ignored") on every warmup and match start. Leaving practice resets it now, and the line is
         // gone from the defaults; this takes that one line out of cfgs already on the server. Only
         // a line that is exactly that command is removed, nothing else in the file is touched.
+        // Done silently: nine lines at the first load told the admin nothing they had to act on.
         private void RemoveStaleInfiniteAmmoReset(IEnumerable<string> fileNames)
         {
             foreach (string fileName in fileNames)
@@ -92,7 +93,6 @@ namespace MatchZy
                     if (removed == 0)
                         continue;
                     File.WriteAllText(filePath, string.Join(newline, lines));
-                    Console.WriteLine($"[MatchZy] Removed the outdated \"sv_infinite_ammo 0\" line from {fileName} (the server refused it; leaving practice resets it now).");
                 }
                 catch (Exception ex)
                 {
