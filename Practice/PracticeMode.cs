@@ -2212,7 +2212,9 @@ namespace MatchZy
                     {
                         if (botData["position"] is Position botPosition)
                         {
-                            player.PlayerPawn.Value?.Teleport(botPosition.PlayerPosition, botPosition.PlayerAngle, new Vector(0, 0, 0));
+                            // Upright, like the first placement: the saved angle carries the owner's
+                            // view pitch, and a plain teleport writes it into the model transform.
+                            TeleportUpright(player, botPosition.PlayerPosition, botPosition.PlayerAngle);
                             bool isCrouched = (bool)botData["crouchstate"];
                             if (isCrouched)
                             {
@@ -2414,8 +2416,9 @@ namespace MatchZy
                     return;
                 }
 
-                // Teleport bot to stored position
-                player.PlayerPawn.Value.Teleport(botPosition.PlayerPosition, botPosition.PlayerAngle, new Vector(0, 0, 0));
+                // Teleport bot to stored position, upright (the saved angle carries the owner's view
+                // pitch, and a plain teleport writes it into the model transform).
+                TeleportUpright(player, botPosition.PlayerPosition, botPosition.PlayerAngle);
 
                 // Handle crouch state safely
                 if (botData.ContainsKey("crouchstate") && botData["crouchstate"] is bool isCrouched && isCrouched)
@@ -2685,6 +2688,9 @@ namespace MatchZy
                             new QAngle(0, ownerYaw, 0),
                             new Vector(0, 0, 0)
                         );
+                        // The teleport rotation re-syncs for a few ticks; hold the body flat like
+                        // every other teleport path does.
+                        FlattenBodyRotationFrames(botOwner, ownerYaw, 6);
                     }
                     else
                     {
@@ -3784,7 +3790,7 @@ namespace MatchZy
                         if (player.PlayerPawn.Value == null)
                         {
                             Log($"[RespawnWhenTeamApplied] {player.PlayerName}: pawn handle empty, calling Respawn vfunc directly ({attemptsLeft} attempts left)");
-                            VirtualFunction.CreateVoid<IntPtr>(player.Handle, MzGameData.GetOffset("CCSPlayerController_Respawn"))(player.Handle);
+                            VoidThisVFunc(player.Handle, MzGameData.GetOffset("CCSPlayerController_Respawn"))(player.Handle);
                         }
                         else
                         {

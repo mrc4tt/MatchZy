@@ -5536,8 +5536,29 @@ namespace MatchZy
             // to put a restored grenade in hand so a later manual throw animates from the
             // proper deploy state (subType 0 / a pointer switch releases mid-windup).
             var wsHandle = ws.Handle;
-            VirtualFunction.CreateVoid<IntPtr, IntPtr, int>(wsHandle, offset)(wsHandle, matched.Value.Handle, subType);
+            SelectItemVFunc(wsHandle, offset)(wsHandle, matched.Value.Handle, subType);
             return true;
+        }
+
+        // VirtualFunction.Create* builds a new native function object on every call. The slot resolves
+        // to the same function for every object of a class, so one is kept per (vtable, slot).
+        private static readonly Dictionary<(IntPtr VTable, int Offset), Action<IntPtr, IntPtr, int>> _selectItemVFuncs = new();
+        private static readonly Dictionary<(IntPtr VTable, int Offset), Action<IntPtr>> _voidThisVFuncs = new();
+
+        private static Action<IntPtr, IntPtr, int> SelectItemVFunc(IntPtr obj, int offset)
+        {
+            var key = (System.Runtime.InteropServices.Marshal.ReadIntPtr(obj), offset);
+            if (!_selectItemVFuncs.TryGetValue(key, out var fn))
+                _selectItemVFuncs[key] = fn = VirtualFunction.CreateVoid<IntPtr, IntPtr, int>(obj, offset);
+            return fn;
+        }
+
+        private static Action<IntPtr> VoidThisVFunc(IntPtr obj, int offset)
+        {
+            var key = (System.Runtime.InteropServices.Marshal.ReadIntPtr(obj), offset);
+            if (!_voidThisVFuncs.TryGetValue(key, out var fn))
+                _voidThisVFuncs[key] = fn = VirtualFunction.CreateVoid<IntPtr>(obj, offset);
+            return fn;
         }
 
         // Remove every weapon of the given classname from the player's inventory.

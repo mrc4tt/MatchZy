@@ -2,7 +2,7 @@
 
 A short summary of each release. The [full changelog](changelog.md) has the details and background for every change.
 
-## 1.0.26 <small>November 15, 2026</small>
+## 1.0.26 <small>November 20, 2026</small>
 
 - **New:** (Beta) Spectator coach with `matchzy_coaching_mode 3`: no body, first person on the own team, radar with only the own team and spotted enemies, teammates outlined through walls, no enemy ghosting. See [Coaching](guides/coaching.md#spectator-coach-beta-matchzy_coaching_mode-3).
 - **New:** Grenade follow camera in practice: a throw from a lineup spot is followed by the camera and shows where it lands; jump to come back. `.follownade` sets lineup spots / every throw / off.
@@ -10,7 +10,7 @@ A short summary of each release. The [full changelog](changelog.md) has the deta
 - **New:** Players can vote all chat off with `.mute` (`matchzy_allchat_mute_votes`; `.nochat` with CS2-SimpleAdmin), so the teams can no longer write to each other; admins use `.allchat`.
 - **Changed:** `matchzy_minimum_ready_required` defaults to 2 (was 10). Existing config.cfg files keep their value.
 - **New:** `.spawns` toggles the practice spawn markers on and off.
-- **New:** Chat in Brazilian Portuguese and Turkish (`!lang pt-BR`, `!lang tr`).
+- **New:** Chat translations in Brazilian Portuguese and Turkish (`!lang pt-BR`, `!lang tr`).
 - **Changed:** Coaches can no longer take control of bots on their team.
 - **Changed:** `matchzy_demo_upload_url ""` and `matchzy_remote_backup_url ""` turn uploads off.
 - **Changed:** The release zip is 2.4 MB with 35 files (was 36 MB unpacked, 59 files): only the Linux and Windows files a server uses, and a slimmer SQLite. Windows servers also get the patched SQLite 3.50.2.
@@ -43,6 +43,8 @@ A short summary of each release. The [full changelog](changelog.md) has the deta
 - **Fixed:** The ready panel switches language right away after `!lang`.
 - **Fixed:** After practice, terrorists no longer spawn with the full practice grenade set and an AK-47.
 - **Fixed:** Switching the server from practice to another mode (retakes, deathmatch, prefire) without a map change no longer leaves players flying in noclip or respawning on death.
+- **Fixed:** Practice: `.boost` bots no longer respawn tilted, and you stay upright when lifted onto the bot.
+- **Fixed:** Practice: the console now says at practice start when a grenade rethrow signature did not resolve (`.rt` / `.throw` grenades that bounce and never detonate).
 - **Security:** A failed demo upload no longer logs the S3 signature details.
 
 ## 1.0.25 <small>November 13, 2026</small>
