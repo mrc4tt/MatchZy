@@ -4,13 +4,19 @@ A short summary of each release. The [full changelog](changelog.md) has the deta
 
 ## 1.0.26 <small>November 22, 2026</small>
 
-- **New:** Ready up with the use key (E) during the ready phase (`matchzy_ready_use_key true`, off by default). `.ready` still works.
-- **New:** A pug with fewer than 10 players (3v3, 4v4, 4v5) starts by itself 20 seconds after everyone is ready, and so does a `.matchsetup` match with uneven sides (`matchzy_ready_short_start_delay`). `.unready` stops the countdown.
-- **New:** (Beta) Spectator coach with `matchzy_coaching_mode 3`: no body, first person on the own team, radar with only the own team and spotted enemies, teammates outlined through walls, no enemy ghosting. See [Coaching](guides/coaching.md#spectator-coach-beta-matchzy_coaching_mode-3).
-- **New:** Grenade follow camera in practice: a throw from a lineup spot is followed by the camera and shows where it lands; jump to come back. `.follownade` sets lineup spots / every throw / off.
+!!! warning "Action needed"
+    - Panels: if the server keeps its remote log, demo upload or backup header in config.cfg and your match config only sends a URL on another host, the header is no longer sent there. Send the header together with the URL in the match config's `cvars`.
+    - The ready time limit (`get5_time_to_start`, `matchzy_forfeit_ready_timeout`) now only applies before the first map of a series.
+    - A match config can no longer set `sv_cheats`, the log file cvars and a few owner-only MatchZy settings. Passwords and game settings still work.
+    - After updating, delete the old `runtimes/` folder in the plugin folder if it is still there.
+
 - **New:** Lineups in practice: throw a grenade and type `.save`. It is saved with its type and how you threw it, and `.shownades` marks it with the grenade's model. Aim at a mark and press E to stand on the spot; a ring shows where to aim and turns green when the crosshair is in it.
 - **New:** `.train` takes you through your saved lineups one by one and judges each throw; hold E on a mark to rename or delete it.
+- **New:** Grenade follow camera in practice: a throw from a lineup spot is followed by the camera and shows where it lands; jump to come back. `.follownade` sets lineup spots / every throw / off.
+- **New:** (Beta) Spectator coach with `matchzy_coaching_mode 3`: no body, first person on the own team, radar with only the own team and spotted enemies, teammates outlined through walls, no enemy ghosting. See [Coaching](guides/coaching.md#spectator-coach-beta-matchzy_coaching_mode-3).
 - **New:** (Beta) Grenade finder: `.draw` a box where a grenade should land, `.find` works out lineups that land in it from where you are.
+- **New:** Ready up with the use key (E) during the ready phase (`matchzy_ready_use_key true`, off by default). `.ready` still works.
+- **New:** A pug with fewer than 10 players (3v3, 4v4, 4v5) starts by itself 20 seconds after everyone is ready, and so does a `.matchsetup` match with uneven sides (`matchzy_ready_short_start_delay`). `.unready` stops the countdown.
 - **New:** Players can vote all chat off with `.mute` (`matchzy_allchat_mute_votes`; `.nochat` with CS2-SimpleAdmin), so the teams can no longer write to each other; admins use `.allchat`.
 - **Changed:** `matchzy_minimum_ready_required` defaults to 2 (was 10): a pug starts when two players are ready, at least one on each side. Existing config.cfg files keep their value.
 - **New:** `.spawns` toggles the practice spawn markers on and off.
