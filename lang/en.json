@@ -696,6 +696,9 @@
     "matchzy.ready.joinstartcountdown": "Everyone has joined. The match starts in {green}{0}{default} seconds.",
     "matchzy.ready.joinstartin": "The match starts in {green}{0}{default}...",
     "matchzy.ready.joinstartstopped": "A player left. The match starts once everyone has joined again.",
+    "matchzy.ready.shortstartcountdown": "Everyone is ready. The match starts {0}v{1} in {green}{2}{default} seconds. Type {green}.unready{default} to wait for more players.",
+    "matchzy.ready.shortstartin": "The match starts {0}v{1} in {green}{2}{default}...",
+    "matchzy.ready.shortstartstopped": "Countdown stopped. The match starts when everyone is ready.",
     "matchzy.pause.techpause.startedunlimited": "{GREEN}{0}{DEFAULT} called for a technical pause.",
     "matchzy.pause.anyonecanunpause": "The technical pause time is up. Either team can now type {green}.unpause{default}.",
     "matchzy.pause.techhinttime": "{0}: technical pause. Either team can unpause in {1}.",
@@ -762,5 +765,10 @@
     "matchzy.pracmisc.follownadeoff": "Grenade follow camera off. (.follownade again: lineup spots only)",
     "matchzy.pracmisc.follownadereturn": "Jump to come back",
     "matchzy.pracmisc.follownadelineup": "Grenade follow camera: automatic for throws from a lineup spot. Jump to come back. (.follownade again: every throw)",
-    "matchzy.pracmisc.follownadealways": "Grenade follow camera: every throw. Jump to come back. (.follownade again: off)"
+    "matchzy.pracmisc.follownadealways": "Grenade follow camera: every throw. Jump to come back. (.follownade again: off)",
+    "matchzy.ready.notreadyuse": "NOT READY - press E or type .ready",
+    "matchzy.hint.usereadykey": "Press E or type .ready to ready up!",
+    "matchzy.dmg.line": "{green}To: [{0} / {1} hits]{default} {red}From: [{2} / {3} hits]{default} - {4} ({green}{5} hp{default})",
+    "matchzy.dmg.killed": "{green}To: [{0} / {1} hits]{default} {red}From: [{2} / {3} hits]{default} - {4} ({red}killed{default})",
+    "matchzy.dmg.dead": "{green}To: [{0} / {1} hits]{default} {red}From: [{2} / {3} hits]{default} - {4} ({grey}dead{default})"
 }

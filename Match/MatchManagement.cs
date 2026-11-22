@@ -756,7 +756,10 @@ namespace MatchZy
 
                 matchData["matchid"] = liveMatchId;
                 matchData["num_maps"] = matchConfig.NumMaps;
-                matchData["players_per_team"] = matchConfig.PlayersPerTeam;
+                // Only when the match config set it: a reload then takes the team size from the
+                // rosters or the players on the server again, as the first load did.
+                if (matchConfig.PlayersPerTeamSet)
+                    matchData["players_per_team"] = matchConfig.PlayersPerTeam;
                 // Only when the match config set it, so a reload keeps the unset fallbacks.
                 if (matchConfig.MinPlayersToReadySet)
                     matchData["min_players_to_ready"] = matchConfig.MinPlayersToReady;
@@ -1011,6 +1014,7 @@ namespace MatchZy
                 matchConfig.MapSides = jsonDataObject["map_sides"]!.ToObject<List<string>>()!;
             }
 
+            matchConfig.PlayersPerTeamSet = jsonDataObject["players_per_team"] != null;
             if (jsonDataObject["players_per_team"] != null)
             {
                 matchConfig.PlayersPerTeam = jsonDataObject["players_per_team"]!.Value<int>();

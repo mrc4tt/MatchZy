@@ -696,6 +696,9 @@
     "matchzy.ready.joinstartcountdown": "Все зашли. Матч начнётся через {green}{0}{default} сек.",
     "matchzy.ready.joinstartin": "Матч начнётся через {green}{0}{default}...",
     "matchzy.ready.joinstartstopped": "Игрок вышел. Матч начнётся, когда все снова зайдут.",
+    "matchzy.ready.shortstartcountdown": "Все готовы. Матч начнётся {0}v{1} через {green}{2}{default} сек. Напишите {green}.unready{default}, чтобы подождать других игроков.",
+    "matchzy.ready.shortstartin": "Матч начнётся {0}v{1} через {green}{2}{default}...",
+    "matchzy.ready.shortstartstopped": "Отсчёт остановлен. Матч начнётся, когда все будут готовы.",
     "matchzy.pause.techpause.startedunlimited": "{GREEN}{0}{DEFAULT} взяли техническую паузу.",
     "matchzy.pause.anyonecanunpause": "Время технической паузы вышло. Теперь любая команда может написать {green}.unpause{default}.",
     "matchzy.pause.techhinttime": "{0}: техническая пауза. Любая команда сможет снять её через {1}.",
@@ -762,5 +765,10 @@
     "matchzy.pracmisc.follownadeoff": "Камера гранаты выключена. (.follownade ещё раз: только точки лайнапов)",
     "matchzy.pracmisc.follownadereturn": "Прыгните, чтобы вернуться",
     "matchzy.pracmisc.follownadelineup": "Камера гранаты: автоматически при броске с точки лайнапа. Прыгните, чтобы вернуться. (.follownade ещё раз: каждый бросок)",
-    "matchzy.pracmisc.follownadealways": "Камера гранаты: каждый бросок. Прыгните, чтобы вернуться. (.follownade ещё раз: выкл.)"
+    "matchzy.pracmisc.follownadealways": "Камера гранаты: каждый бросок. Прыгните, чтобы вернуться. (.follownade ещё раз: выкл.)",
+    "matchzy.ready.notreadyuse": "НЕ ГОТОВ - нажми E или .ready",
+    "matchzy.hint.usereadykey": "Нажми E или напиши .ready, чтобы отметиться готовым!",
+    "matchzy.dmg.line": "{green}По: [{0} / {1} попаданий]{default} {red}От: [{2} / {3} попаданий]{default} - {4} ({green}{5} hp{default})",
+    "matchzy.dmg.killed": "{green}По: [{0} / {1} попаданий]{default} {red}От: [{2} / {3} попаданий]{default} - {4} ({red}убит{default})",
+    "matchzy.dmg.dead": "{green}По: [{0} / {1} попаданий]{default} {red}От: [{2} / {3} попаданий]{default} - {4} ({grey}мёртв{default})"
 }

@@ -1,4 +1,5 @@
 using Newtonsoft.Json.Linq;
+using CounterStrikeSharp.API;
 using CounterStrikeSharp.API.Core;
 using CounterStrikeSharp.API.Core.Attributes.Registration;
 using CounterStrikeSharp.API.Core.Translations;
@@ -117,7 +118,30 @@ public partial class MatchZy
             return perTeam;
         if (!reverseTeamSides.TryGetValue(side == (int)CsTeam.CounterTerrorist ? "CT" : "TERRORIST", out Team? team))
             return perTeam;
-        return ReadyLogic.RequiredOnSide(perTeam, RosterPlayerCount(team), ReadyFloor());
+        int rosterSize = RosterPlayerCount(team);
+        // No listed roster and no players_per_team in the match config (.matchsetup, "any" teams):
+        // nothing says how big the teams are, so the side needs as many players as the larger of
+        // the two sides has. A 4v4 then starts once all 8 are ready; before, each side waited for
+        // the mode's 5 and only an admin's .forcestart got the match going. Join ready mode keeps
+        // players_per_team: there the side is ready the moment it is complete.
+        if (rosterSize <= 0 && IsOpenSizedTeam(team))
+        {
+            int otherSide = side == (int)CsTeam.CounterTerrorist ? (int)CsTeam.Terrorist : (int)CsTeam.CounterTerrorist;
+            (int own, _) = GetTeamPlayerCount(side, false);
+            // openSidesOwnSize: the uneven start countdown (ReadyShortStart.cs) takes each side
+            // at the size it has, so a 4v5 counts as complete.
+            int other = openSidesOwnSize || IsBotSide(otherSide) ? 0 : GetTeamPlayerCount(otherSide, false).Item1;
+            rosterSize = ReadyLogic.OpenSideSize(own, other, perTeam);
+        }
+        return ReadyLogic.RequiredOnSide(perTeam, rosterSize, ReadyFloor());
+    }
+
+    // A team whose size nothing in the match config sets: no listed roster and no
+    // players_per_team (.matchsetup, "players": "any"). Not in join ready mode.
+    private bool IsOpenSizedTeam(Team team)
+    {
+        return isMatchSetup && !matchConfig.PlayersPerTeamSet && !team.botTeam
+            && ListedRosterSize(team) == 0 && !IsJoinReadyMode();
     }
 
     // matchzy_ready_max_missing: the fewest players a side of a loaded match can ready up with
@@ -290,7 +314,28 @@ public partial class MatchZy
             if (playerReadyStatus.TryGetValue(userId, out bool r) && r)
                 ready++;
         }
-        return (players, ready);
+        int testBots = ReadyTestBotsOnSide((int)CsTeam.CounterTerrorist) + ReadyTestBotsOnSide((int)CsTeam.Terrorist);
+        return (players + testBots, ready + testBots);
+    }
+
+    // matchzy_ready_test_bots: bots on T and CT count as players who are ready, so one person can
+    // fill the sides with bot_add_ct / bot_add_t and try the ready rules (3v3, 4v5, the short
+    // start countdown) alone. Bots are never in playerData, so they are counted here; a bot that
+    // is in it anyway is skipped and not counted twice. Off by default: testing only.
+    private int ReadyTestBotsOnSide(int team)
+    {
+        if (!readyTestBots.Value || (team != (int)CsTeam.CounterTerrorist && team != (int)CsTeam.Terrorist))
+            return 0;
+        int bots = 0;
+        foreach (var p in Utilities.GetPlayers())
+        {
+            if (p == null || !p.IsValid || !p.IsBot || p.IsHLTV || p.TeamNum != team)
+                continue;
+            if (p.UserId.HasValue && playerData.ContainsKey(p.UserId.Value))
+                continue;
+            bots++;
+        }
+        return bots;
     }
 
     // .ready / .unready / ping from a spectator or a coach: tell them and ignore it.
@@ -383,12 +428,15 @@ public partial class MatchZy
             if (playerData[key].TeamNum == team)
             {
                 playerCount++;
-                if (playerReadyStatus[key] == true)
+                // TryGetValue: a player without a ready entry yet made this throw, and the caller
+                // (the start check after .ready) then never started the match.
+                if (playerReadyStatus.TryGetValue(key, out bool isReady) && isReady)
                     readyCount++;
             }
         }
 
-        return (playerCount, readyCount);
+        int testBots = ReadyTestBotsOnSide(team);
+        return (playerCount + testBots, readyCount + testBots);
     }
 
     // Ready players a side contributes toward matchzy_ready_per_team (capped at N; a ready side

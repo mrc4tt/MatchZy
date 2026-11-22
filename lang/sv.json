@@ -696,6 +696,9 @@
     "matchzy.ready.joinstartcountdown": "Alla har anslutit. Matchen startar om {green}{0}{default} sekunder.",
     "matchzy.ready.joinstartin": "Matchen startar om {green}{0}{default}...",
     "matchzy.ready.joinstartstopped": "En spelare lämnade. Matchen startar när alla har anslutit igen.",
+    "matchzy.ready.shortstartcountdown": "Alla är redo. Matchen startar {0}v{1} om {green}{2}{default} sekunder. Skriv {green}.unready{default} för att vänta på fler spelare.",
+    "matchzy.ready.shortstartin": "Matchen startar {0}v{1} om {green}{2}{default}...",
+    "matchzy.ready.shortstartstopped": "Nedräkningen stoppades. Matchen startar när alla är redo.",
     "matchzy.pause.techpause.startedunlimited": "{GREEN}{0}{DEFAULT} begärde en teknisk paus.",
     "matchzy.pause.anyonecanunpause": "Tiden för teknisk paus är slut. Vilket lag som helst kan nu skriva {green}.unpause{default}.",
     "matchzy.pause.techhinttime": "{0}: teknisk paus. Vilket lag som helst kan avbryta pausen om {1}.",
@@ -762,5 +765,10 @@
     "matchzy.pracmisc.follownadeoff": "Granatkamera av. (.follownade igen: bara lineup-platser)",
     "matchzy.pracmisc.follownadereturn": "Hoppa för att komma tillbaka",
     "matchzy.pracmisc.follownadelineup": "Granatkamera: automatisk vid kast från en lineup-plats. Hoppa för att komma tillbaka. (.follownade igen: alla kast)",
-    "matchzy.pracmisc.follownadealways": "Granatkamera: alla kast. Hoppa för att komma tillbaka. (.follownade igen: av)"
+    "matchzy.pracmisc.follownadealways": "Granatkamera: alla kast. Hoppa för att komma tillbaka. (.follownade igen: av)",
+    "matchzy.ready.notreadyuse": "INTE REDO - tryck E eller skriv .ready",
+    "matchzy.hint.usereadykey": "Tryck E eller skriv .ready för att bli redo!",
+    "matchzy.dmg.line": "{green}Till: [{0} / {1} träffar]{default} {red}Från: [{2} / {3} träffar]{default} - {4} ({green}{5} hp{default})",
+    "matchzy.dmg.killed": "{green}Till: [{0} / {1} träffar]{default} {red}Från: [{2} / {3} träffar]{default} - {4} ({red}dödad{default})",
+    "matchzy.dmg.dead": "{green}Till: [{0} / {1} träffar]{default} {red}Från: [{2} / {3} träffar]{default} - {4} ({grey}död{default})"
 }

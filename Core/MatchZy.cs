@@ -751,6 +751,7 @@ namespace MatchZy
             // string has no server xref), so no print hook can suppress it. The hook only spammed
             // the DynoHook "could not allocate trampoline" error for zero benefit.
             RegisterListener<Listeners.OnTick>(RenderReadyPanel);
+            RegisterReadyUseKey();
             RegisterListener<Listeners.OnTick>(TechPauseHudAntiFlashTick);
             RegisterSpectatorCoachListeners();
             RegisterCoachCommPatch();
