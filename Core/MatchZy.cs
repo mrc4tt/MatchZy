@@ -340,7 +340,12 @@ namespace MatchZy
             void ExecConfigOnce()
             {
                 if (pendingConfigExec != null && Interlocked.Exchange(ref configExecDone, 1) == 0)
+                {
+                    // config.cfg sets every convar at load: commands in it that answer on the
+                    // console (matchzy_minimum_ready_required) stay quiet for this window.
+                    configExecQuietUntil = DateTime.UtcNow.AddSeconds(3);
                     Server.ExecuteCommand(pendingConfigExec);
+                }
             }
             WarmRoundStartPaths(() => { if (hotReload) Server.NextFrame(ExecConfigOnce); });
             // Wrap startup config/ConVar/AutoStart init in try/catch. A throw anywhere

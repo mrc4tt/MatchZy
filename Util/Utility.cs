@@ -2442,6 +2442,8 @@ namespace MatchZy
             });
         }
 
+        private DateTime configExecQuietUntil = DateTime.MinValue;
+
         private void HandleReadyRequiredCommand(CCSPlayerController? player, string commandArg)
         {
             if (!IsPlayerAdmin(player, "css_readyrequired", "@css/config"))
@@ -2456,7 +2458,9 @@ namespace MatchZy
                 {
                     minimumReadyRequired = readyRequired;
                     string minimumReadyRequiredFormatted = (player == null) ? $"{EffectiveMinimumReadyRequired()}" : $"{ChatColors.Green}{EffectiveMinimumReadyRequired()}{ChatColors.Default}";
-                    ReplyToUserCommand(player, Localizer.ForPlayer(player, "matchzy.utility.minreadyplayers", minimumReadyRequiredFormatted));
+                    // Not when config.cfg sets it at load: that printed a line on every start.
+                    if (player != null || DateTime.UtcNow >= configExecQuietUntil)
+                        ReplyToUserCommand(player, Localizer.ForPlayer(player, "matchzy.utility.minreadyplayers", minimumReadyRequiredFormatted));
                     CheckLiveRequired();
                 }
                 else

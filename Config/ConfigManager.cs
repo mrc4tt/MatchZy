@@ -66,6 +66,50 @@ namespace MatchZy
             return Path.Combine(parent, name);
         }
 
+        // Up to 1.0.25 every mode cfg except prac.cfg ended practice's infinite ammo with
+        // "sv_infinite_ammo 0". The convar is cheat protected and cheats are already off when those
+        // cfgs run, so the server refused it ("Convar 'sv_infinite_ammo' is cheat protected, change
+        // ignored") on every warmup and match start. Leaving practice resets it now, and the line is
+        // gone from the defaults; this takes that one line out of cfgs already on the server. Only
+        // a line that is exactly that command is removed, nothing else in the file is touched.
+        private void RemoveStaleInfiniteAmmoReset(IEnumerable<string> fileNames)
+        {
+            foreach (string fileName in fileNames)
+            {
+                if (fileName == ConfigFiles.Paths.Config || fileName == ConfigFiles.Paths.Practice)
+                    continue;
+                try
+                {
+                    string filePath = Path.Combine(ServerPath, fileName);
+                    if (!File.Exists(filePath))
+                        continue;
+                    string text = File.ReadAllText(filePath);
+                    if (!text.Contains("sv_infinite_ammo", StringComparison.OrdinalIgnoreCase))
+                        continue;
+                    string newline = text.Contains("\r\n") ? "\r\n" : "\n";
+                    var lines = text.Split(new[] { "\r\n", "\n" }, StringSplitOptions.None).ToList();
+                    int removed = lines.RemoveAll(IsInfiniteAmmoResetLine);
+                    if (removed == 0)
+                        continue;
+                    File.WriteAllText(filePath, string.Join(newline, lines));
+                    Console.WriteLine($"[MatchZy] Removed the outdated \"sv_infinite_ammo 0\" line from {fileName} (the server refused it; leaving practice resets it now).");
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"[MatchZy] Could not clean {fileName}: {ex.Message}");
+                }
+            }
+        }
+
+        internal static bool IsInfiniteAmmoResetLine(string line)
+        {
+            string t = line.Trim().TrimEnd(';').Trim().Replace("\"", "");
+            string[] parts = t.Split(new[] { ' ', '\t' }, StringSplitOptions.RemoveEmptyEntries);
+            return parts.Length == 2
+                && parts[0].Equals("sv_infinite_ammo", StringComparison.OrdinalIgnoreCase)
+                && parts[1] == "0";
+        }
+
         private void CreateConfigFile(string fileName, string content)
         {
             try
@@ -142,6 +186,8 @@ namespace MatchZy
             {
                 CreateConfigFile(config.Key, config.Value);
             }
+
+            RemoveStaleInfiniteAmmoReset(configs.Keys);
 
             // Append any cvars missing from an existing config.cfg (preserves user edits)
             if (configs.TryGetValue(ConfigFiles.Paths.Config, out string? configTemplate))
