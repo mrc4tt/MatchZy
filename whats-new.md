@@ -10,6 +10,7 @@ A short summary of each release. The [full changelog](changelog.md) has the deta
 - **New:** Players can vote all chat off with `.mute` (`matchzy_allchat_mute_votes`; `.nochat` with CS2-SimpleAdmin), so the teams can no longer write to each other; admins use `.allchat`.
 - **Changed:** `matchzy_minimum_ready_required` defaults to 2 (was 10). Existing config.cfg files keep their value.
 - **New:** `.spawns` toggles the practice spawn markers on and off.
+- **Changed:** `.replay` bots in practice move smoothly, aim like the recording and fire when you fired (`matchzy_replay_smooth`).
 - **New:** Chat translations in Brazilian Portuguese and Turkish (`!lang pt-BR`, `!lang tr`).
 - **Changed:** Coaches can no longer take control of bots on their team.
 - **Changed:** `matchzy_demo_upload_url ""` and `matchzy_remote_backup_url ""` turn uploads off.
