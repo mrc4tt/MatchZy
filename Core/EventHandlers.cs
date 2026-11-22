@@ -154,6 +154,10 @@ public partial class MatchZy
             if (readyAvailable && !matchStarted && !IsJoinReadyMode())
                 AddTimer(Math.Max(1, afterReadyDelay), () => CheckLiveRequired(), CounterStrikeSharp.API.Modules.Timers.TimerFlags.STOP_ON_MAPCHANGE);
 
+            // The admin's mode line below already names .ma and .mhelp; the later admin hint is
+            // then skipped so an admin gets one line instead of two.
+            bool adminModeLineShown = false;
+
             // First player connection handling
             if (GetRealPlayersCount() == 1)
             {
@@ -194,6 +198,7 @@ public partial class MatchZy
                         {
                             PrintToPlayerChat(player, Localizer.ForPlayer(player, "matchzy.eh.adminscrim"));
                         }
+                        adminModeLineShown = true;
                     }
                 }
                 else if (isPractice && !readyAvailable && IsPlayerAdmin(player, "", "@css/map", "@custom/prac"))
@@ -225,7 +230,7 @@ public partial class MatchZy
             // Admins only. Delayed so it lands after the join/connect chat spam; re-validate.
             AddTimer(4.0f, () =>
             {
-                if (!IsHumanPlayerValid(player))
+                if (adminModeLineShown || !IsHumanPlayerValid(player))
                     return;
                 if (IsMatchLoadedOrPending() && loadedMatchHideModeHints.Value)
                     return;

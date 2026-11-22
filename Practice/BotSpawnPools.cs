@@ -224,17 +224,17 @@ namespace MatchZy
                 return;
             }
 
-            // Random distinct spots, capped by the pool size and the practice bot limit.
+            // Random distinct spots, capped by the pool size and the free player slots.
             var spots = pools[key].OrderBy(_ => Random.Shared.Next()).ToList();
             // Every bot gets its own spot, so a pool with fewer spots than asked for caps the count.
             if (count > spots.Count)
                 ReplyToUserCommand(player, Localizer.ForPlayer(player, "matchzy.px.botspawnfewspots", key, spots.Count, count));
             int existing = keepExisting ? TrackedPracticeBots().Count : 0;
-            int room = Math.Max(0, MaxPracticeBots - existing);
+            int room = FreePracticeBotSlots() + (keepExisting ? 0 : TrackedPracticeBots().Count);
             count = Math.Min(Math.Min(count, spots.Count), room);
             if (count == 0)
             {
-                ReplyToUserCommand(player, Localizer.ForPlayer(player, "matchzy.prac.maxbots", MaxPracticeBots));
+                ReplyToUserCommand(player, Localizer.ForPlayer(player, "matchzy.prac.maxbots", existing));
                 return;
             }
             spots = spots.Take(count).ToList();

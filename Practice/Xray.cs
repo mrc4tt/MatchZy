@@ -9,7 +9,7 @@ using CounterStrikeSharp.API.Modules.Utils;
 
 namespace MatchZy
 {
-    // .xray: every living player and bot glows through walls (T orange, CT blue), for checking
+    // .xray: every living player and bot glows through walls (T red, CT blue), for checking
     // lineups, angles and bot spots. Practice only, for everyone on the server.
     //
     // A pawn's own glow does not render, so each pawn gets a glowing copy of its model: an invisible
@@ -60,6 +60,25 @@ namespace MatchZy
             PrintLocalizedToAll(xrayEnabled ? "matchzy.px.xrayon" : "matchzy.px.xrayoff");
         }
 
+        // Xray is on when practice starts; .xray turns it off and on for the session. Called a
+        // moment after the practice cfg ran, so the players stand on their spawns with a model.
+        private void StartXrayDefault()
+        {
+            if (!isPractice || xrayEnabled)
+                return;
+            xrayEnabled = true;
+            // The assert is quieted through a console command that runs later in the frame: make
+            // the props after it, like the .xray command does.
+            RefreshGlowAssertQuiet();
+            AddTimer(0.1f, () =>
+            {
+                if (!xrayEnabled || !isPractice)
+                    return;
+                foreach (var p in Utilities.GetPlayers())
+                    AddXrayGlow(p);
+            }, TimerFlags.STOP_ON_MAPCHANGE);
+        }
+
         private void AddXrayGlow(CCSPlayerController player)
         {
             try
@@ -75,8 +94,8 @@ namespace MatchZy
                 RemoveXrayGlow(player.UserId.Value);
 
                 var color = player.TeamNum == (byte)CsTeam.Terrorist
-                    ? Color.FromArgb(255, 255, 165, 0)
-                    : Color.FromArgb(255, 80, 160, 255);
+                    ? Color.FromArgb(255, 255, 45, 35)
+                    : Color.FromArgb(255, 60, 110, 255);
                 var pair = CreateGlowPair(pawn, model, color);
                 if (pair != null)
                     xrayGlows[player.UserId.Value] = pair.Value;
