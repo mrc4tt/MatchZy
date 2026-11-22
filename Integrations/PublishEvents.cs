@@ -9,7 +9,7 @@ namespace MatchZy
         // Single HttpClient instance - avoids socket exhaustion from per-request allocation.
         // HttpClient is thread-safe and designed to be long-lived. 60 s: a slow receiver (e.g. a
         // panel writing a big map_result) timed out at 10 s and the event was lost.
-        private static readonly HttpClient _sharedHttpClient = new() { Timeout = TimeSpan.FromSeconds(60) };
+        private static readonly HttpClient _sharedHttpClient = new() { Timeout = TimeSpan.FromSeconds(60), MaxResponseContentBufferSize = 16 * 1024 * 1024 };
 
         // Where an event goes, taken when the event is created. Events sent after the match was
         // reset (series_end, match_cancelled) must still reach that match's URL, not the next one's.

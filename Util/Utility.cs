@@ -4460,6 +4460,15 @@ namespace MatchZy
         {
             "rcon_password",
             "matchzy_everyone_is_admin",
+            // Server integrity, identity and log files: the server owner's, never a match's.
+            "sv_cheats", "sv_rcon_whitelist_address", "sv_setsteamaccount", "hostport", "ip", "sv_lan",
+            "con_logfile", "sv_logfile", "sv_logsdir", "sv_log_onefile", "log",
+            // MatchZy settings about who may join, what is kept on disk and what runs outside a match.
+            "matchzy_kick_when_no_match_loaded", "matchzy_whitelist_enabled_default",
+            "matchzy_demo_keep_days", "matchzy_backup_keep_days",
+            "matchzy_auto_recover", "matchzy_auto_recover_max_age", "matchzy_raw_backup_restore",
+            "matchzy_practice_debug_log", "matchzy_ready_test_bots",
+            "matchzy_map_console_command_enabled", "matchzy_asay_console_enabled",
         };
 
         // MatchZy / Get5 settings implemented as console commands that only change a setting. Commands
@@ -4664,6 +4673,9 @@ namespace MatchZy
                 }
                 Server.ExecuteCommand($"{key} \"{value}\"");
             }
+            // After the whole block: a URL moved to another host must not get the server's own
+            // header / auth value (see RemoteLogConfig.cs).
+            DropInheritedCredentialsForRedirectedUrls();
         }
 
         private Dictionary<string, (Func<string> Get, Action<string> Set)>? _pluginSettingAccessors;

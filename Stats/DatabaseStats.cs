@@ -442,6 +442,20 @@ namespace MatchZy
             // MatchZy writes a few rows per round, so WAL's concurrency gains nothing here; writers
             // wait on the file lock (Default Timeout=30). The mode is stored in the file: switching
             // an existing WAL database back checkpoints it and removes the -wal/-shm files.
+            // Which SQLite library actually got loaded: a leftover runtimes/ folder from an older
+            // install, or another plugin's resolver, can win over the build MatchZy ships.
+            try
+            {
+                string? sqliteVersion = await conn.ExecuteScalarAsync<string>("SELECT sqlite_version();");
+                if (Version.TryParse(sqliteVersion, out Version? loaded) && loaded < new Version(3, 50, 2))
+                    Log($"[CreateRequiredTablesSQLite] WARNING: SQLite {sqliteVersion} is loaded, older than the 3.50.2 MatchZy ships. Delete the old runtimes/ folder in the plugin folder and restart the server.");
+                else
+                    Log($"[CreateRequiredTablesSQLite] SQLite {sqliteVersion}.");
+            }
+            catch (Exception ex)
+            {
+                Log($"[CreateRequiredTablesSQLite] Could not read the SQLite version: {ex.Message}");
+            }
             try
             {
                 string? mode = await conn.ExecuteScalarAsync<string>("PRAGMA journal_mode=DELETE;");
@@ -1309,7 +1323,7 @@ namespace MatchZy
                 }
 
                 using (var writer = new StreamWriter(csvFilePath))
-                using (var csv = new CsvWriter(writer, new CsvConfiguration(CultureInfo.InvariantCulture)))
+                using (var csv = new CsvWriter(writer, new CsvConfiguration(CultureInfo.InvariantCulture) { InjectionOptions = InjectionOptions.Escape }))
                 {
                     IEnumerable<dynamic> playerStatsData = await conn.QueryAsync("SELECT * FROM matchzy_stats_players WHERE matchid = @MatchId AND mapnumber = @MapNumber ORDER BY team, kills DESC", new { MatchId = matchId, MapNumber = mapNumber });
 

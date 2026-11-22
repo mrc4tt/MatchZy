@@ -27,6 +27,9 @@
     <!-- Debug symbols inside MatchZy.dll instead of a separate MatchZy.pdb: one file less in the zip,
          and exception stack traces in the logs keep their file and line numbers. -->
     <DebugType>embedded</DebugType>
+    <!-- The embedded symbols carry source paths: map the build machine's folder away, so the DLL
+         does not show a home directory. Stack traces then read /_/Core/MatchZy.cs. -->
+    <PathMap>$(MSBuildProjectDirectory)=/_/</PathMap>
     <CssApiVersion Condition="'$(CssApiVersion)' == ''">1.0.398</CssApiVersion>
     <DefineConstants>$(DefineConstants);HAS_CSS_TRACE</DefineConstants>
     <!-- Same deal for the fork's CommandLine helper (engine ICommandLine access). Compiled in
