@@ -252,6 +252,8 @@
     "matchzy.px.runboostbusy": "Ai bot është tashmë në përdorim (.runboost ose .replay).",
     "matchzy.px.xrayon": "Xray {green}NDEZUR{silver}: lojtarët shkëlqejnë përmes mureve.",
     "matchzy.px.xrayoff": "Xray {red}FIKUR{silver}.",
+    "matchzy.px.bhopon": "Auto bunnyhop {green}NDEZUR{silver}: mbaj kërcimin.",
+    "matchzy.px.bhopoff": "Auto bunnyhop {red}FIKUR{silver}.",
     "matchzy.rp.notalive": "Duhet të jesh gjallë në T ose CT për të regjistruar një rrugë.",
     "matchzy.rp.recstart": "Regjistrimi i rrugës tënde {green}filloi{silver} (maks {0} s). Shkruaj {green}.rec{silver} ose {green}.stoprecord{silver}, kliko dy herë djathtas ose shtyp {green}Shift + E{silver} për ta ndalur.",
     "matchzy.rp.reccountdown": "Regjistrimi fillon pas {green}{0}{silver} sekondash, je i ngrirë deri atëherë.",

@@ -252,6 +252,8 @@
     "matchzy.px.runboostbusy": "Den botten används redan (.runboost eller .replay).",
     "matchzy.px.xrayon": "Xray {green}PÅ{silver}: spelare lyser genom väggar.",
     "matchzy.px.xrayoff": "Xray {red}AV{silver}.",
+    "matchzy.px.bhopon": "Auto bunnyhop {green}PÅ{silver}: håll in hopp.",
+    "matchzy.px.bhopoff": "Auto bunnyhop {red}AV{silver}.",
     "matchzy.rp.notalive": "Du måste vara vid liv som T eller CT för att spela in en väg.",
     "matchzy.rp.recstart": "Inspelning av din väg {green}startad{silver} (max {0} s). Skriv {green}.rec{silver} eller {green}.stoprecord{silver}, dubbel-högerklicka eller tryck {green}Shift + E{silver} för att stoppa.",
     "matchzy.rp.reccountdown": "Inspelningen startar om {green}{0}{silver} sekunder, du är fryst tills dess.",

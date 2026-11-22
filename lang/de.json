@@ -252,6 +252,8 @@
     "matchzy.px.runboostbusy": "Dieser Bot wird bereits verwendet (.runboost oder .replay).",
     "matchzy.px.xrayon": "Xray {green}AN{silver}: Spieler leuchten durch Wände.",
     "matchzy.px.xrayoff": "Xray {red}AUS{silver}.",
+    "matchzy.px.bhopon": "Auto-Bunnyhop {green}AN{silver}: Springen gedrückt halten.",
+    "matchzy.px.bhopoff": "Auto-Bunnyhop {red}AUS{silver}.",
     "matchzy.rp.notalive": "Du musst als T oder CT am Leben sein, um einen Pfad aufzunehmen.",
     "matchzy.rp.recstart": "Aufnahme deines Pfads {green}gestartet{silver} (max. {0} s). Gib {green}.rec{silver} oder {green}.stoprecord{silver} ein, mach einen doppelten Rechtsklick oder drücke {green}Shift + E{silver}, um zu stoppen.",
     "matchzy.rp.reccountdown": "Aufnahme startet in {green}{0}{silver} Sekunden, bis dahin bist du eingefroren.",

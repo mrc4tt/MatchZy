@@ -252,6 +252,8 @@
     "matchzy.px.runboostbusy": "O bot zaten kullanımda (.runboost veya .replay).",
     "matchzy.px.xrayon": "Xray {green}AÇIK{silver}: oyuncular duvarların arkasından parlıyor.",
     "matchzy.px.xrayoff": "Xray {red}KAPALI{silver}.",
+    "matchzy.px.bhopon": "Auto bunnyhop {green}AÇIK{silver}: zıplamayı basılı tut.",
+    "matchzy.px.bhopoff": "Auto bunnyhop {red}KAPALI{silver}.",
     "matchzy.rp.notalive": "Yol kaydetmek için T veya CT'de hayatta olmalısın.",
     "matchzy.rp.recstart": "Yolunun kaydı {green}başladı{silver} (maks {0} sn). Durdurmak için {green}.rec{silver} veya {green}.stoprecord{silver} yaz, çift sağ tıkla ya da {green}Shift + E{silver} tuşuna bas.",
     "matchzy.rp.reccountdown": "Kayıt {green}{0}{silver} saniye içinde başlıyor, o zamana kadar donduruldun.",

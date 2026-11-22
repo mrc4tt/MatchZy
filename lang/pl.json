@@ -252,6 +252,8 @@
     "matchzy.px.runboostbusy": "Ten bot jest już używany (.runboost lub .replay).",
     "matchzy.px.xrayon": "Xray {green}WŁ.{silver}: gracze świecą przez ściany.",
     "matchzy.px.xrayoff": "Xray {red}WYŁ.{silver}",
+    "matchzy.px.bhopon": "Auto bunnyhop {green}WŁ.{silver}: przytrzymaj skok.",
+    "matchzy.px.bhopoff": "Auto bunnyhop {red}WYŁ.{silver}",
     "matchzy.rp.notalive": "Musisz żyć i być w T lub CT, aby nagrać ścieżkę.",
     "matchzy.rp.recstart": "Nagrywanie ścieżki {green}rozpoczęte{silver} (maks. {0} s). Wpisz {green}.rec{silver} lub {green}.stoprecord{silver}, zrób podwójny prawy klik albo wciśnij {green}Shift + E{silver}, aby zatrzymać.",
     "matchzy.rp.reccountdown": "Nagrywanie zacznie się za {green}{0}{silver} sek., do tego czasu jesteś zamrożony.",

@@ -252,6 +252,8 @@
     "matchzy.px.runboostbusy": "That bot is already in use (.runboost or .replay).",
     "matchzy.px.xrayon": "Xray {green}ON{silver}: players glow through walls.",
     "matchzy.px.xrayoff": "Xray {red}OFF{silver}.",
+    "matchzy.px.bhopon": "Auto bunnyhop {green}ON{silver}: hold jump.",
+    "matchzy.px.bhopoff": "Auto bunnyhop {red}OFF{silver}.",
     "matchzy.rp.notalive": "You must be alive on T or CT to record a path.",
     "matchzy.rp.recstart": "Recording your path {green}started{silver} (max {0} s). Type {green}.rec{silver} or {green}.stoprecord{silver}, double right click or press {green}Shift + E{silver} to stop.",
     "matchzy.rp.reccountdown": "Recording starts in {green}{0}{silver} seconds, you are frozen until then.",
