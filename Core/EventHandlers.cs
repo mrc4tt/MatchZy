@@ -291,6 +291,7 @@ public partial class MatchZy
                 return HookResult.Continue;
 
             int userId = player.UserId.Value;
+            ForgetFinderPlayer(player.Slot);
 
             if (player.IsHLTV)
             {
@@ -692,6 +693,7 @@ public partial class MatchZy
                 return;
             if (!Constants.ProjectileTypeMap.ContainsKey(entity.Entity.DesignerName))
                 return;
+            int spawnTick = Server.TickCount;
 
             Server.NextFrame(() =>
             {
@@ -735,6 +737,10 @@ public partial class MatchZy
                     }
                     Vector angularVelocity = new(projectile.AngVelocity.X, projectile.AngVelocity.Y, projectile.AngVelocity.Z);
                     string nadeType = Constants.ProjectileTypeMap[entity.Entity.DesignerName];
+                    // .savelast: what kind of throw this was and where it started.
+                    OnThrowWatchThrow(player, nadeType);
+                    if (finderArmed.Count > 0)
+                        OnFinderPlayerThrow(player, projectile, nadeType);
 
                     float duckAmount = 0.0f;
                     if (player.PlayerPawn.Value.MovementServices != null && player.PlayerPawn.Value.MovementServices.Handle != IntPtr.Zero)
@@ -748,6 +754,8 @@ public partial class MatchZy
                     uint projIndex = projectile.Index;
                     // .follownade: the camera follows this grenade (opt-in, practice only).
                     TryStartNadeFollow(player, projectile);
+                    // .nadespeed: slow motion while this grenade flies.
+                    OnNadeSpeedThrow(projectile);
 
                     lastGrenadeThrownTime[(int)projIndex] = DateTime.Now;
                     if (nadeType == "smoke")
