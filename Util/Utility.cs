@@ -4463,8 +4463,10 @@ namespace MatchZy
             // Server integrity, identity and log files: the server owner's, never a match's.
             "sv_cheats", "sv_rcon_whitelist_address", "sv_setsteamaccount", "hostport", "ip", "sv_lan",
             "con_logfile", "sv_logfile", "sv_logsdir", "sv_log_onefile", "log",
-            // MatchZy settings about who may join, what is kept on disk and what runs outside a match.
-            "matchzy_kick_when_no_match_loaded", "matchzy_whitelist_enabled_default",
+            // MatchZy settings about what is kept on disk and what runs outside a match. Not
+            // matchzy_kick_when_no_match_loaded and matchzy_whitelist_enabled_default: panels set
+            // them per match so that only the match's players can be on the server, and refusing
+            // them (1.0.26) let anyone stay and watch.
             "matchzy_demo_keep_days", "matchzy_backup_keep_days",
             "matchzy_auto_recover", "matchzy_auto_recover_max_age", "matchzy_raw_backup_restore",
             "matchzy_practice_debug_log", "matchzy_ready_test_bots",

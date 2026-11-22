@@ -2,6 +2,12 @@
 
 Based on [MatchZy](https://github.com/shobhit-pathak/MatchZy) by Shobhit Pathak, adapted for CS2 game-server hosting: remote log HTTP API, G5API compatibility, auto changelevel, advanced stats (HLTV 2.0 rating / KAST / clutch / opening duels), a coach system, a pause overhaul, and in-game admin and match-setup menus.
 
+# 1.0.27
+
+#### November 22, 2026
+
+- A match config can set `matchzy_kick_when_no_match_loaded` and `matchzy_whitelist_enabled_default` again. 1.0.26 refused both from a match config's `cvars` block, so a panel that turns the kick on per match no longer kept people who are not in the match off the server: they stayed as spectators. A server that has `matchzy_kick_when_no_match_loaded true` in its own config.cfg was not affected.
+
 # 1.0.26
 
 #### November 22, 2026
