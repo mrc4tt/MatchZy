@@ -151,6 +151,7 @@ jobs:
 
       # Creates the release, or refreshes the zip when the release already exists.
       - name: Create GitHub Release
+        id: release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
@@ -161,4 +162,21 @@ jobs:
             gh release upload "$VER" "$ASSET" --clobber
           else
             gh release create "$VER" "$ASSET" --title "MatchZy $VER" --notes-file notes.md
+            echo "created=true" >> "$GITHUB_OUTPUT"
           fi
+
+      # One embed with the highlights and the download link, only for a new release (not when the
+      # zip of an existing one is refreshed). Skipped when the DISCORD_RELEASE_WEBHOOK secret is not
+      # set; a Discord outage never fails the release.
+      - name: Announce on Discord
+        if: steps.release.outputs.created == 'true'
+        continue-on-error: true
+        env:
+          DISCORD_RELEASE_WEBHOOK: ${{ secrets.DISCORD_RELEASE_WEBHOOK }}
+        run: |
+          if [ -z "$DISCORD_RELEASE_WEBHOOK" ]; then
+            echo "DISCORD_RELEASE_WEBHOOK is not set, no announcement."
+            exit 0
+          fi
+          python3 tools/discord-release.py "${{ env.MATCHZY_VERSION }}" "${{ github.repository }}" whats-new-section.md > discord.json
+          curl -sS --fail-with-body -H "Content-Type: application/json" -d @discord.json "$DISCORD_RELEASE_WEBHOOK"
