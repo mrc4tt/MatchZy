@@ -2,6 +2,10 @@
 
 A short summary of each release. The [full changelog](changelog.md) has the details and background for every change.
 
+## 1.0.28 <small>November 23, 2026</small>
+
+- **Removed:** Inspect (F) no longer starts the grenade follow camera in practice; use `.follownade` to pick lineup spots, every throw or off.
+
 ## 1.0.27 <small>November 22, 2026</small>
 
 !!! warning "Action needed"
@@ -130,11 +134,11 @@ A short summary of each release. The [full changelog](changelog.md) has the deta
 - **Fixed:** Spectators and coaches cannot ready up and are no longer listed as not ready.
 - **Fixed:** A team's ready state in the get5 status (panels) follows the same rule that starts the match.
 
-## 1.0.23 <small>November 5, 2026</small>
-
-- **Fixed:** Reconnecting during a live round no longer refunds the money spent that round. Players keep the money they left with.
-
 ## Older releases
+
+??? note "1.0.23 - November 5, 2026"
+
+    - **Fixed:** Reconnecting during a live round no longer refunds the money spent that round. Players keep the money they left with.
 
 ??? note "1.0.22 - November 5, 2026"
 

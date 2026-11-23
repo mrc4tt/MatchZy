@@ -109,17 +109,11 @@ namespace MatchZy
         }
 
         // From OnEntitySpawnedHandler (next frame after the projectile spawned, thrower resolved).
-        // The last grenade each player threw: the inspect key (F) while it is still in the air
-        // puts the camera on it, whatever the mode. No bind to set up, no chat command.
-        private readonly Dictionary<ulong, uint> _nadeFollowLast = new();
-
-        private void TryStartNadeFollow(CCSPlayerController player, CBaseCSGrenadeProjectile projectile, bool byKey = false)
+        private void TryStartNadeFollow(CCSPlayerController player, CBaseCSGrenadeProjectile projectile)
         {
             ulong id = player.SteamID;
             if (!isPractice || _nadeFollows.ContainsKey(id))
                 return;
-            if (!byKey && projectile.IsValid)
-                _nadeFollowLast[id] = projectile.EntityHandle.Raw;
             // A throw during a recording (.rec, .stratrec, .stratslot or their countdown) would put
             // the camera flight into the recorded path.
             if (IsPracticeRecordingFor(id))
@@ -133,7 +127,7 @@ namespace MatchZy
                 float fdx = here.X - armedFinder.Plan.Feet.X, fdy = here.Y - armedFinder.Plan.Feet.Y;
                 onLineupSpot = fdx * fdx + fdy * fdy < 200f * 200f;
             }
-            if (!byKey && (mode == NadeFollowMode.Off || (mode == NadeFollowMode.Lineup && !onLineupSpot)))
+            if (mode == NadeFollowMode.Off || (mode == NadeFollowMode.Lineup && !onLineupSpot))
                 return;
             var pawn = player.PlayerPawn.Value;
             var o = pawn?.AbsOrigin;
@@ -215,33 +209,6 @@ namespace MatchZy
 
         public void OnNadeFollowTick()
         {
-            if (_nadeFollowLast.Count > 0)
-            {
-                try
-                {
-                    foreach (var (who, raw) in _nadeFollowLast.ToList())
-                    {
-                        var thrown = new CHandle<CBaseCSGrenadeProjectile>(raw).Value;
-                        if (!isPractice || thrown == null || !thrown.IsValid)
-                        {
-                            _nadeFollowLast.Remove(who); // landed and gone, or went off
-                            continue;
-                        }
-                        if (_nadeFollows.ContainsKey(who))
-                            continue;
-                        var presser = Utilities.GetPlayerFromSteamId(who);
-                        if (presser == null || !presser.IsValid || !presser.PawnIsAlive || (presser.Buttons & PlayerButtons.Inspect) == 0)
-                            continue;
-                        _nadeFollowLast.Remove(who);
-                        TryStartNadeFollow(presser, thrown, byKey: true);
-                    }
-                }
-                catch (Exception e)
-                {
-                    Log($"[NadeFollow] key: {e.Message}");
-                    _nadeFollowLast.Clear();
-                }
-            }
             if (_nadeFollows.Count == 0 && _nfTrailBeams.Count == 0)
                 return;
             try
@@ -512,7 +479,6 @@ namespace MatchZy
                     }
                 }
             _nadeFollows.Clear();
-            _nadeFollowLast.Clear();
             // Map start: the beams went with the old map. Unload: the tick that drains them stops, so
             // they are removed now. Practice end: the tick keeps removing them as they come due.
             if (unloading)

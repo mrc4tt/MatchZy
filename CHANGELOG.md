@@ -2,6 +2,12 @@
 
 Based on [MatchZy](https://github.com/shobhit-pathak/MatchZy) by Shobhit Pathak, adapted for CS2 game-server hosting: remote log HTTP API, G5API compatibility, auto changelevel, advanced stats (HLTV 2.0 rating / KAST / clutch / opening duels), a coach system, a pause overhaul, and in-game admin and match-setup menus.
 
+# 1.0.28
+
+#### November 23, 2026
+
+- Practice: Inspect (F) no longer starts the grenade follow camera while your grenade is in the air; F stays free for cycling lineup marks. `.follownade` (lineup spots / every throw / off) is unchanged.
+
 # 1.0.27
 
 #### November 22, 2026
