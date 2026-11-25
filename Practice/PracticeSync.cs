@@ -399,10 +399,9 @@ namespace MatchZy
                 bool given = name != "";
                 if (!given)
                 {
-                    int n = 1;
-                    while (mine.ContainsKey($"{type.ToLowerInvariant()}{n}"))
-                        n++;
-                    name = $"{type.ToLowerInvariant()}{n}";
+                    // Numbered across every player and the shared pack, not per player: two
+                    // players both got "smoke1", and .libadd of both overwrote one with the other.
+                    name = LineupNameLogic.NextFree(type.ToLowerInvariant(), LineupNamesInUse(all, mine, map));
                 }
                 bool replaces = mine.ContainsKey(name);
                 if (!replaces && mine.Count >= maxSavedNades)

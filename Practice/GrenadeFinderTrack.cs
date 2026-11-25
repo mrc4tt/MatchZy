@@ -316,10 +316,7 @@ namespace MatchZy
                         return; // already saved
                 if (mine.Count >= maxSavedNades)
                     return;
-                int n = 1;
-                while (mine.ContainsKey($"find{n}"))
-                    n++;
-                string name = $"find{n}";
+                string name = LineupNameLogic.NextFree("find", LineupNamesInUse(all, mine, map));
                 mine[name] = new Dictionary<string, string>
                 {
                     { "Position", position },
