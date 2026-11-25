@@ -242,7 +242,7 @@ public partial class MatchZy
 
     private void OnAdvancedStatsPlayerBlind(CCSPlayerController? victim, CCSPlayerController? attacker, float duration)
     {
-        if (!isMatchLive || duration <= 0f)
+        if (!isMatchLive || duration <= 0f || IsGoingLiveRestartPending())
             return;
         if (victim == null || !victim.IsValid || attacker == null || !attacker.IsValid || !TracksAdvancedStats(attacker))
             return;
@@ -261,6 +261,10 @@ public partial class MatchZy
         // the opening duel and can be a trade, and the human who killed it is owed the K in KAST.
         // Only the bot's own counters are gated on victimTracked below.
         if (!isMatchLive || victim == null || !victim.IsValid)
+            return;
+        // Warmup or side selection players are still alive in the second before the going-live
+        // restart, which wipes the scoreboard: a kill there is not a kill of the match.
+        if (IsGoingLiveRestartPending())
             return;
         // The coach's end-of-freezetime suicide would otherwise be the first death of every round
         // and take the opening duel away from the real players.
@@ -292,10 +296,6 @@ public partial class MatchZy
             AdvancedStatsFor(AdvancedStatsKey(attacker!)).KnifeKills++;
         }
 
-        if (assistedFlash && !isTeamKill && assister != null && assister.IsValid && TracksAdvancedStats(assister) && assister.TeamNum != victim.TeamNum)
-            AdvancedStatsFor(AdvancedStatsKey(assister)).FlashAssists++;
-
-        // Mark player as dead this round
         // Enemy kills only: a team kill or suicide is not a kill with the weapon.
         if (!isSuicide && !isTeamKill && attackerTracked && WeaponKillLogic.Key(weapon) is string weaponKey)
         {
@@ -303,6 +303,10 @@ public partial class MatchZy
             weaponKills[weaponKey] = weaponKills.GetValueOrDefault(weaponKey) + 1;
         }
 
+        if (assistedFlash && !isTeamKill && assister != null && assister.IsValid && TracksAdvancedStats(assister) && assister.TeamNum != victim.TeamNum)
+            AdvancedStatsFor(AdvancedStatsKey(assister)).FlashAssists++;
+
+        // Mark player as dead this round
         if (playerRoundStats.TryGetValue(victimSteamId, out var victimRoundStats))
         {
             victimRoundStats.Survived = false;
@@ -778,14 +782,14 @@ public partial class MatchZy
             Clutch1v2 = $"{advanced.Clutch1v2Wins}/{advanced.Clutch1v2Attempts}",
             FlashAssists = stats.FlashAssists,
             UtilityDamage = stats.UtilityDamage,
-        };
-    }
-}
-
             // Same three fields as the player stats of the round_end / map_result events.
             AwpKills = stats.AwpKills,
             WeaponKills = stats.WeaponKills,
             WeaponTypeKills = stats.WeaponTypeKills,
+        };
+    }
+}
+
 // ═══════════════════════════════════════════════════════════════════
 // JSON export data structures
 // ═══════════════════════════════════════════════════════════════════
@@ -899,7 +903,6 @@ public class MatchStatsPlayer
 
     [JsonPropertyName("utility_damage")]
     public int UtilityDamage { get; set; }
-}
 
     [JsonPropertyName("awp_kills")]
     public int AwpKills { get; set; }
@@ -909,3 +912,4 @@ public class MatchStatsPlayer
 
     [JsonPropertyName("weapon_type_kills")]
     public Dictionary<string, int> WeaponTypeKills { get; set; } = new();
+}

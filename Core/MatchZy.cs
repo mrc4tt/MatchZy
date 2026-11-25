@@ -51,6 +51,10 @@ namespace MatchZy
         // mp_warmup_start). False when prac.cfg drives it (mp_warmup_end -> live 60 min round).
         private bool practiceUsesWarmup = false;
         private int explicitAutoStartModeGraceTick = -1;
+        // As in Get5: set when a map is played to its end, cleared on map start. While set, the next
+        // match changes the level even when it starts on the current map (on load, or after the
+        // veto), so it never starts on a map the engine restarted in place after a match (CSTV
+        // client kicked, players coming back into their old controllers and sides).
         public bool mapReloadRequired = false;
 
         // Carries a just-loaded match across the changelevel it triggers. When a match config's
@@ -960,7 +964,11 @@ namespace MatchZy
                     // Where the player is going, not where they were (player_team fires before the
                     // controller's team number is updated).
                     CsTeam joinedTeam = (CsTeam)@event.Team;
-                    CsTeam playerTeam = GetPlayerTeam(player);
+                    bool isJoin = @event.Oldteam <= (int)CsTeam.Spectator;
+                    // A join during halftime goes to the side the team is still on (the engine swaps
+                    // at the next round start); the swap's own T<->CT moves are checked against the
+                    // new sides.
+                    CsTeam playerTeam = isJoin ? GetPlayerTeamInEngine(player) : GetPlayerTeam(player);
                     if (playerTeam == CsTeam.None && !IsMatchCoach(player))
                         playerTeam = CsTeam.Spectator;
                     // A full side (players_per_team) takes no more players; extra roster players
@@ -968,7 +976,6 @@ namespace MatchZy
                     // Only for a real join (from the menu or Spectator). A T<->CT move is a side swap
                     // (halftime, knife .switch) where the engine moves players one by one, so the
                     // target side still looks full and half the teams would be sent to Spectator.
-                    bool isJoin = @event.Oldteam <= (int)CsTeam.Spectator;
                     if (isJoin && playerTeam is CsTeam.Terrorist or CsTeam.CounterTerrorist && !IsMatchCoach(player) && IsSideFull(playerTeam, player))
                     {
                         PrintToPlayerChat(player, Localizer.ForPlayer(player, "matchzy.cmd.teamfullspectator", matchConfig.PlayersPerTeam));
@@ -1059,7 +1066,9 @@ namespace MatchZy
                     {
                         if (int.TryParse(info.ArgByIndex(1), out int joiningTeam))
                         {
-                            int playerTeam = (int)GetPlayerTeam(player);
+                            // Halftime: the side the team is on now, where its players and its free
+                            // slot are. The next half's side is still full of the other team.
+                            int playerTeam = (int)GetPlayerTeamInEngine(player);
 
                             // Allow spectators to join freely (team 1 = spectator in CS2)
                             if (joiningTeam == 1)
@@ -1187,6 +1196,9 @@ namespace MatchZy
                 // Set by FinishVeto when it queued a changelevel; the new map is here.
                 mapChangePending = false;
                 mapEnding = false;
+                // A fresh map: new CSTV client, no controllers left over from a finished match.
+                mapReloadRequired = false;
+                teamSidesAheadOfEngine = false;
                 // .mute (all chat off) lasts one map.
                 ResetAllChatVote();
                 // Server.CurrentTime restarts near 0 on a new map: a settle window from the old map
@@ -1362,7 +1374,8 @@ namespace MatchZy
             RegisterEventHandler<EventPlayerDeath>(
                 (@event, info) =>
                 {
-                    if (!isMatchLive)
+                    // Not the second before the going-live restart: it wipes what happens there.
+                    if (!isMatchLive || IsGoingLiveRestartPending())
                         return HookResult.Continue;
                     if (string.IsNullOrEmpty(matchConfig.RemoteLogURL))
                         return HookResult.Continue;
@@ -1701,7 +1714,8 @@ namespace MatchZy
             RegisterEventHandler<EventPlayerHurt>(
                 (@event, info) =>
                 {
-                    if (!isMatchLive)
+                    // Not the second before the going-live restart: it wipes what happens there.
+                    if (!isMatchLive || IsGoingLiveRestartPending())
                         return HookResult.Continue;
                     if (string.IsNullOrEmpty(matchConfig.RemoteLogURL))
                         return HookResult.Continue;
