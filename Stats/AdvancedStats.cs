@@ -81,6 +81,10 @@ public partial class MatchZy
         public int TeamKills { get; set; } = 0;
         public int Suicides { get; set; } = 0;
         public int KnifeKills { get; set; } = 0;
+        // Enemy kills per weapon, keyed by WeaponKillLogic.Key ("ak47", "awp", "knife", ...).
+        // Needs the setter: the round backup snapshot is read back with System.Text.Json, which
+        // leaves a get-only property empty.
+        public Dictionary<string, int> WeaponKills { get; set; } = new();
         public int FlashAssists { get; set; } = 0;
         public int FriendliesFlashed { get; set; } = 0;
         public int BombPlants { get; set; } = 0;
@@ -292,6 +296,13 @@ public partial class MatchZy
             AdvancedStatsFor(AdvancedStatsKey(assister)).FlashAssists++;
 
         // Mark player as dead this round
+        // Enemy kills only: a team kill or suicide is not a kill with the weapon.
+        if (!isSuicide && !isTeamKill && attackerTracked && WeaponKillLogic.Key(weapon) is string weaponKey)
+        {
+            var weaponKills = AdvancedStatsFor(AdvancedStatsKey(attacker!)).WeaponKills;
+            weaponKills[weaponKey] = weaponKills.GetValueOrDefault(weaponKey) + 1;
+        }
+
         if (playerRoundStats.TryGetValue(victimSteamId, out var victimRoundStats))
         {
             victimRoundStats.Survived = false;
@@ -771,6 +782,10 @@ public partial class MatchZy
     }
 }
 
+            // Same three fields as the player stats of the round_end / map_result events.
+            AwpKills = stats.AwpKills,
+            WeaponKills = stats.WeaponKills,
+            WeaponTypeKills = stats.WeaponTypeKills,
 // ═══════════════════════════════════════════════════════════════════
 // JSON export data structures
 // ═══════════════════════════════════════════════════════════════════
@@ -885,3 +900,12 @@ public class MatchStatsPlayer
     [JsonPropertyName("utility_damage")]
     public int UtilityDamage { get; set; }
 }
+
+    [JsonPropertyName("awp_kills")]
+    public int AwpKills { get; set; }
+
+    [JsonPropertyName("weapon_kills")]
+    public Dictionary<string, int> WeaponKills { get; set; } = new();
+
+    [JsonPropertyName("weapon_type_kills")]
+    public Dictionary<string, int> WeaponTypeKills { get; set; } = new();

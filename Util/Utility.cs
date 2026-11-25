@@ -5118,6 +5118,10 @@ namespace MatchZy
             { 'þ', "th" }, { 'Þ', "TH" }, { 'ð', "d" }, { 'Ð', "D" },
         };
 
+                        AwpKills = adv?.WeaponKills.GetValueOrDefault(WeaponKillLogic.Awp) ?? 0,
+                        // A copy: the event is serialized after this method returns.
+                        WeaponKills = adv != null ? new Dictionary<string, int>(adv.WeaponKills) : new Dictionary<string, int>(),
+                        WeaponTypeKills = WeaponKillLogic.TypeTotals(adv?.WeaponKills),
         // Keeps ASCII as is, transliterates common accented letters (é -> e, æ -> ae) and drops
         // anything else that is not ASCII (Cyrillic, CJK, emoji).
         public static string ToAsciiFileName(string input)
