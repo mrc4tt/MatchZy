@@ -600,16 +600,19 @@ namespace MatchZy
             var result = new List<NadeLineup>(256);
             string map = Server.MapName;
 
-            // Private (this player's savednades.json).
+            // savednades.json: the "default" group (what everyone saves into while
+            // matchzy_save_nades_as_global_enabled is on) and this player's own. Same two groups
+            // and order as .listnades / .loadnade (OrderedLineupsForMap). Only the player's own
+            // group was read here, so a lineup saved with the convar on was listed but never drawn.
             try
             {
                 string path = Path.Join(Server.GameDirectory + "/csgo/cfg", MatchZyCfgRel("savednades.json"));
                 if (File.Exists(path))
                 {
                     var dict = JsonSerializer.Deserialize<Dictionary<string, Dictionary<string, Dictionary<string, string>>>>(ReadSavedNadesJson(path));
-                    string steam = player.SteamID.ToString();
-                    if (dict != null && dict.TryGetValue(steam, out var slots))
-                        AddLineupsFromSlots(slots, map, global: false, result);
+                    foreach (string owner in new[] { "default", player.SteamID.ToString() })
+                        if (dict != null && dict.TryGetValue(owner, out var slots))
+                            AddLineupsFromSlots(slots, map, global: false, result);
                 }
             }
             catch (Exception e) { Log($"[GrenadeLibrary] private load: {e.Message}"); }
@@ -913,6 +916,24 @@ namespace MatchZy
             return true;
         }
 
+        // Every lineup name a new automatic name ("smoke3", "find2") must not repeat: the saving
+        // group's own names (its keys are shared by all maps), every owner's lineups on this map
+        // and the shared pack for this map.
+        private IEnumerable<string> LineupNamesInUse(
+            Dictionary<string, Dictionary<string, Dictionary<string, string>>> all,
+            Dictionary<string, Dictionary<string, string>> mine,
+            string map)
+        {
+            var names = new List<string>(mine.Keys);
+            foreach (var slots in all.Values)
+                foreach (var kv in slots)
+                    if (kv.Value.TryGetValue("Map", out var m) && m == map)
+                        names.Add(kv.Key);
+            if (LoadGlobalPack().TryGetValue(map, out var packSlots))
+                names.AddRange(packSlots.Keys);
+            return names;
+        }
+
         // .libadd <name> - promote the caller's saved lineup (current map) into the shared pack.
         public void HandleLibAddCommand(CCSPlayerController? player, string name)
         {
@@ -927,9 +948,19 @@ namespace MatchZy
                 string path = Path.Join(Server.GameDirectory + "/csgo/cfg", MatchZyCfgRel("savednades.json"));
                 if (!File.Exists(path)) { ReplyToUserCommand(player, Localizer.ForPlayer(player, "matchzy.gl.privnotfound", name)); return; }
                 var dict = JsonSerializer.Deserialize<Dictionary<string, Dictionary<string, Dictionary<string, string>>>>(ReadSavedNadesJson(path));
-                string steam = player!.SteamID.ToString();
-                if (dict == null || !dict.TryGetValue(steam, out var slots) || !slots.TryGetValue(name, out var info)
-                    || !info.TryGetValue("Map", out var m) || m != map)
+                // The caller's own lineup first, then the "default" group: with
+                // matchzy_save_nades_as_global_enabled on every save lands there.
+                Dictionary<string, string>? info = null;
+                foreach (string owner in new[] { player!.SteamID.ToString(), "default" })
+                {
+                    if (dict != null && dict.TryGetValue(owner, out var slots) && slots.TryGetValue(name, out var found)
+                        && found.TryGetValue("Map", out var m) && m == map)
+                    {
+                        info = found;
+                        break;
+                    }
+                }
+                if (info == null)
                 {
                     ReplyToUserCommand(player, Localizer.ForPlayer(player, "matchzy.gl.privnotfound", name));
                     return;
@@ -937,6 +968,13 @@ namespace MatchZy
 
                 var pack = LoadGlobalPack();
                 if (!pack.TryGetValue(map, out var mapSlots)) { mapSlots = new(); pack[map] = mapSlots; }
+                // A pack lineup of the same name at another spot or aim is someone else's lineup
+                // (two players both had a "smoke1"): keep it and add this one under a free name.
+                // The same spot and aim is the same lineup added again, which updates it.
+                if (mapSlots.TryGetValue(name, out var existing)
+                    && (existing.GetValueOrDefault("Position") != info.GetValueOrDefault("Position")
+                        || existing.GetValueOrDefault("Angles") != info.GetValueOrDefault("Angles")))
+                    name = LineupNameLogic.Unique(name, mapSlots.Keys);
                 mapSlots[name] = new Dictionary<string, string>(info);
                 if (!SaveGlobalPack(pack))
                 {

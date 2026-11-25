@@ -2,6 +2,14 @@
 
 Based on [MatchZy](https://github.com/shobhit-pathak/MatchZy) by Shobhit Pathak, adapted for CS2 game-server hosting: remote log HTTP API, G5API compatibility, auto changelevel, advanced stats (HLTV 2.0 rating / KAST / clutch / opening duels), a coach system, a pause overhaul, and in-game admin and match-setup menus.
 
+# 1.0.30
+
+#### November 25, 2026
+
+- Practice: with `matchzy_save_nades_as_global_enabled true`, a lineup saved with `.save` / `.savenade` shows up in `.shownades` (marks, landing spots, `.nextnade`, `.train`). The marks only read the player's own lineups, while a save with the convar on goes to the group everyone shares, so the lineup was in `.listnades` but never drawn.
+- Practice: `.save` without a name numbers the lineup across all players and the shared library (`smoke1`, `smoke2`, ...), not per player. Two players both got `smoke1`. The Grenade Finder's `find1`, `find2`, ... names are numbered the same way.
+- Practice: `.libadd <name>` no longer replaces a library lineup of the same name that stands at another spot or aim: the new one is added as `<name>_2` (the reply says the name it got). Adding the same spot and aim again still updates the lineup. `.libadd` also finds a lineup saved with `matchzy_save_nades_as_global_enabled true`.
+
 # 1.0.29
 
 #### November 25, 2026
