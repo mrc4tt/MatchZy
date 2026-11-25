@@ -133,7 +133,10 @@ namespace MatchZy
                 // Get5 reports per team: side as "ct"/"t", the team's own ready state and its
                 // connected players. (It used to send "terrorist", the server-wide ready state for
                 // both teams and -1 for connected clients.)
-                CsTeam SideOf(Team t) => teamSides[t] == "CT" ? CsTeam.CounterTerrorist : CsTeam.Terrorist;
+                // During halftime teamSides already holds the next half's sides while the players
+                // are still on the old ones: report the side the team is on right now.
+                bool swapPending = IsHalfSwapPendingInEngine();
+                CsTeam SideOf(Team t) => (teamSides[t] == "CT") != swapPending ? CsTeam.CounterTerrorist : CsTeam.Terrorist;
                 // The same rule as the ready gate (roster size, min_players_to_ready,
                 // matchzy_ready_per_team, .forceready), so a panel shows what actually starts the match.
                 bool TeamReady(CsTeam side) => IsTeamReady((int)side);
@@ -211,7 +214,10 @@ namespace MatchZy
             {
                 state = Get5GameState.WaitingForKnifeDecision;
             }
-            else if (IsPostGamePhase())
+            // seriesEnded: the series is over until ResetMatch runs. When the game leaves the post
+            // game before that (in-place restart on a workshop server), isMatchLive is already false
+            // and matchStarted still true, which reported "live" for a finished series.
+            else if (IsPostGamePhase() || seriesEnded)
             {
                 state = Get5GameState.PostGame;
             }

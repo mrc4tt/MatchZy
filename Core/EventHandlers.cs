@@ -435,6 +435,9 @@ public partial class MatchZy
     {
         try
         {
+            // A map was played to its end here (also without a loaded match): the next match on
+            // this map reloads it. Cleared on map start.
+            mapReloadRequired = true;
             HandleMatchEnd();
             // isKnifeRequired is set explicitly by SetMapSides() / ResetMatch() - never toggle blindly
             return HookResult.Continue;
@@ -584,6 +587,8 @@ public partial class MatchZy
         {
             // A new round has no planted bomb: the cached site must not leak into this round.
             plantedBombSite = null;
+            // The engine swapped the teams in the restart that started this round.
+            teamSidesAheadOfEngine = false;
             // "Game commencing": a match that went live with an empty team (players joined later,
             // e.g. bots added after .start, or everyone coaching from Spectator) is put back into
             // warmup by the engine when the first player joins that team. A live match is never in

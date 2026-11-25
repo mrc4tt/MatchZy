@@ -217,13 +217,16 @@ public partial class MatchZy
 
         Team matchZyCoachTeam;
 
+        // The coach is on wantedTeam as the engine has it. During halftime reverseTeamSides
+        // already names the next half's sides, where that side belongs to the other team.
+        bool coachSideSwapPending = IsHalfSwapPendingInEngine();
         if (side == "t")
         {
-            matchZyCoachTeam = reverseTeamSides["TERRORIST"];
+            matchZyCoachTeam = reverseTeamSides[coachSideSwapPending ? "CT" : "TERRORIST"];
         }
         else if (side == "ct")
         {
-            matchZyCoachTeam = reverseTeamSides["CT"];
+            matchZyCoachTeam = reverseTeamSides[coachSideSwapPending ? "TERRORIST" : "CT"];
         }
         else
         {

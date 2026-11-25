@@ -65,6 +65,17 @@ public class PlayerStats
     [JsonPropertyName("knife_kills")]
     public int KnifeKills { get; set; }
 
+    [JsonPropertyName("awp_kills")]
+    public int AwpKills { get; set; }
+
+    // Enemy kills per weapon; only weapons with at least one kill are listed.
+    [JsonPropertyName("weapon_kills")]
+    public Dictionary<string, int> WeaponKills { get; set; } = new();
+
+    // weapon_kills summed per weapon type; every type is always present (see WeaponKillLogic.Types).
+    [JsonPropertyName("weapon_type_kills")]
+    public Dictionary<string, int> WeaponTypeKills { get; set; } = new();
+
     [JsonPropertyName("headshot_kills")]
     public int HeadshotKills { get; set; }
 

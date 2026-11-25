@@ -1533,8 +1533,8 @@ namespace MatchZy
                 return;
             }
 
-            // For last map (series end), change after exactly 15 seconds
-            float mapChangeDelay = 15.0f;
+            // Last map of the series: the change follows the end-of-match countdown.
+            float mapChangeDelay = MatchEndMapChangeDelay(restartDelay);
 
             // Guard against empty map rotation
             if (mapRotationList.Count == 0)

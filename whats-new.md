@@ -2,6 +2,16 @@
 
 A short summary of each release. The [full changelog](changelog.md) has the details and background for every change.
 
+## 1.0.29 <small>November 25, 2026</small>
+
+- **New:** Player stats in the `round_end` and `map_result` events and the `_stats.json` file have `weapon_kills` (enemies killed per weapon), `weapon_type_kills` (per type: rifle, sniper, pistol and so on) and `awp_kills`.
+- **Changed:** A match that starts on the map the previous match ended on reloads that map first, so it always has a CSTV client for the demo.
+- **Fixed:** `get5_status` no longer swaps the two teams' map score, side and player count during halftime.
+- **Fixed:** `kills` in the database no longer ends up 1 lower than the `player_death` events: a kill in the second before round 1 starts is no longer sent or counted.
+- **Fixed:** Joining during halftime no longer fails with "team full", and `.coach t` / `.coach ct` during halftime picks the right team.
+- **Fixed:** A player who reconnects during the knife round or side selection is moved to their team's side.
+- **Fixed:** `get5_status` reports `post_game`, not `live`, from the end of a series until the match is reset.
+
 ## 1.0.28 <small>November 23, 2026</small>
 
 - **Removed:** Inspect (F) no longer starts the grenade follow camera in practice; use `.follownade` to pick lineup spots, every throw or off.
@@ -104,37 +114,38 @@ A short summary of each release. The [full changelog](changelog.md) has the deta
 - **Changed:** `.restore`, `.restorelast` and `.restorecurrent` without a live match list the backups on disk and how to load one, instead of doing nothing.
 - **Fixed:** A round restored from warmup (crash recovery or `.restore` twice) or during a technical pause no longer gets stuck with everyone dead and the timer at 0:00.
 
-## 1.0.24 <small>November 10, 2026</small>
-
-- **New:** Admin tickets (turn on with `matchzy_admin_call_enabled`): `.admin` writes to the match's ticket (seen by every player in the match), `.report` to a private one. A panel or ticket system gets every message as an event and answers with `matchzy_admin_reply` over RCON.
-- **New:** Loading a match warns in the console (and admins in chat) about roster mistakes that keep it from starting by itself, such as a team player also listed as a spectator.
-- **New:** `matchzy_validate_match` checks a match config (file or URL) without loading it.
-- **New:** `.pause` and `.tac` show an on-screen box like `.tech`: who paused and which teams typed `.unpause`, or the timeout's time left and timeouts left.
-- **New:** `matchzy_demo_live_only` records only live maps: no more demos of practice mode or an idle server from `tv_autorecord`.
-- **New:** Phase events `knife_round_started`, `knife_round_ended`, `halftime_started`, `side_swap` and `overtime_started`, plus `matchzy_test_event` to test the connection to a panel.
-- **New:** `matchzy_backup_keep_days` deletes old round backups.
-- **New:** Ready-up events `player_ready`, `player_unready`, `team_ready` and `all_players_ready`, plus `unpause_requested` and `demo_recording_start`.
-- **New:** A tactical timeout (`.tac`) is sent as `game_paused` with `pause_type` `tactical` when called, and `game_unpaused` when it ends.
-- **New:** A technical pause (`.tech`) shows an on-screen box with who called it, the time left, the technical pauses left and which teams have typed `.unpause`. `matchzy_pause_hud` sets it to a small text (`1`) or off (`0`).
-- **New:** `matchzy_demo_keep_days` deletes old demos (off by default).
-- **Changed:** `matchzy_ready_hint_style` defaults to `1` (the HTML ready-up panel) on new installs. Existing servers keep the value in their `config.cfg`.
-- **Changed:** The ready panel shows `Ready (min. 4): CT 2  T 1` and `3 joined (min. 4): 1 missing` instead of a bare `2/4`, and the missing-players line waits 30 seconds after a player joins before it shows.
-- **Changed:** The ready panel and chat name the registered players a team is still waiting for.
-- **Changed:** `.readycheck` in a loaded match shows per team who is missing by name and who has not typed `.ready`.
-- **Changed:** A match config without `players_per_team` takes the team size from the rosters (two rosters of 4 = 4v4), at most 5 in competitive.
-- **Fixed:** An engine pause MatchZy did not start no longer leaves a match paused after going live.
-- **Fixed:** In-game menus no longer flicker when the ready panel, the tech pause box or the practice timer is shown at the same time.
-- **Fixed:** Loading a match while practice mode or a dry run is running ends it like `.exitprac`. Practice settings such as free grenades no longer carry into the match.
-- **Fixed:** Players who join while practice mode is already running get the practice command list in chat.
-- **Fixed:** Players are placed on their correct team already in warmup, also after a map change, instead of being moved when the match starts.
-- **Fixed:** Players moved to their roster side when the match starts no longer die and miss the knife round or the first live round.
-- **Fixed:** Team names are on the correct sides after a round restore, also when team1 started as T or the restore goes back across halftime.
-- **Fixed:** A registered player who coaches with `.coach` no longer blocks the ready-up as a missing player (a 4v4 with one coach now starts).
-- **Fixed:** A team that typed `.ready` while waiting for a player now starts by itself once that player has joined, without anyone typing `.ready` again.
-- **Fixed:** Spectators and coaches cannot ready up and are no longer listed as not ready.
-- **Fixed:** A team's ready state in the get5 status (panels) follows the same rule that starts the match.
-
 ## Older releases
+
+??? note "1.0.24 - November 10, 2026"
+
+    - **New:** Admin tickets (turn on with `matchzy_admin_call_enabled`): `.admin` writes to the match's ticket (seen by every player in the match), `.report` to a private one. A panel or ticket system gets every message as an event and answers with `matchzy_admin_reply` over RCON.
+    - **New:** Loading a match warns in the console (and admins in chat) about roster mistakes that keep it from starting by itself, such as a team player also listed as a spectator.
+    - **New:** `matchzy_validate_match` checks a match config (file or URL) without loading it.
+    - **New:** `.pause` and `.tac` show an on-screen box like `.tech`: who paused and which teams typed `.unpause`, or the timeout's time left and timeouts left.
+    - **New:** `matchzy_demo_live_only` records only live maps: no more demos of practice mode or an idle server from `tv_autorecord`.
+    - **New:** Phase events `knife_round_started`, `knife_round_ended`, `halftime_started`, `side_swap` and `overtime_started`, plus `matchzy_test_event` to test the connection to a panel.
+    - **New:** `matchzy_backup_keep_days` deletes old round backups.
+    - **New:** Ready-up events `player_ready`, `player_unready`, `team_ready` and `all_players_ready`, plus `unpause_requested` and `demo_recording_start`.
+    - **New:** A tactical timeout (`.tac`) is sent as `game_paused` with `pause_type` `tactical` when called, and `game_unpaused` when it ends.
+    - **New:** A technical pause (`.tech`) shows an on-screen box with who called it, the time left, the technical pauses left and which teams have typed `.unpause`. `matchzy_pause_hud` sets it to a small text (`1`) or off (`0`).
+    - **New:** `matchzy_demo_keep_days` deletes old demos (off by default).
+    - **Changed:** `matchzy_ready_hint_style` defaults to `1` (the HTML ready-up panel) on new installs. Existing servers keep the value in their `config.cfg`.
+    - **Changed:** The ready panel shows `Ready (min. 4): CT 2  T 1` and `3 joined (min. 4): 1 missing` instead of a bare `2/4`, and the missing-players line waits 30 seconds after a player joins before it shows.
+    - **Changed:** The ready panel and chat name the registered players a team is still waiting for.
+    - **Changed:** `.readycheck` in a loaded match shows per team who is missing by name and who has not typed `.ready`.
+    - **Changed:** A match config without `players_per_team` takes the team size from the rosters (two rosters of 4 = 4v4), at most 5 in competitive.
+    - **Fixed:** An engine pause MatchZy did not start no longer leaves a match paused after going live.
+    - **Fixed:** In-game menus no longer flicker when the ready panel, the tech pause box or the practice timer is shown at the same time.
+    - **Fixed:** Loading a match while practice mode or a dry run is running ends it like `.exitprac`. Practice settings such as free grenades no longer carry into the match.
+    - **Fixed:** Players who join while practice mode is already running get the practice command list in chat.
+    - **Fixed:** Players are placed on their correct team already in warmup, also after a map change, instead of being moved when the match starts.
+    - **Fixed:** Players moved to their roster side when the match starts no longer die and miss the knife round or the first live round.
+    - **Fixed:** Team names are on the correct sides after a round restore, also when team1 started as T or the restore goes back across halftime.
+    - **Fixed:** A registered player who coaches with `.coach` no longer blocks the ready-up as a missing player (a 4v4 with one coach now starts).
+    - **Fixed:** A team that typed `.ready` while waiting for a player now starts by itself once that player has joined, without anyone typing `.ready` again.
+    - **Fixed:** Spectators and coaches cannot ready up and are no longer listed as not ready.
+    - **Fixed:** A team's ready state in the get5 status (panels) follows the same rule that starts the match.
+
 
 ??? note "1.0.23 - November 5, 2026"
 

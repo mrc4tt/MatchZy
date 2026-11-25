@@ -1579,6 +1579,7 @@ namespace MatchZy
 
             // Reset advanced stats for new match
             ResetAdvancedStats();
+            liveFlagsSetTime = Server.CurrentTime;
             ResetSideScores();
 
             // Start auto-pause monitoring for competitive matches
@@ -1601,6 +1602,7 @@ namespace MatchZy
 
             // Reset advanced stats for new match
             ResetAdvancedStats();
+            liveFlagsSetTime = Server.CurrentTime;
             ResetSideScores();
 
             // Start auto-pause monitoring for scrims
@@ -1624,6 +1626,7 @@ namespace MatchZy
 
             // Reset advanced stats for new match
             ResetAdvancedStats();
+            liveFlagsSetTime = Server.CurrentTime;
             ResetSideScores();
 
             // Start auto-pause monitoring for hill mode
@@ -1963,6 +1966,7 @@ namespace MatchZy
             try
             {
                 seriesEnded = false;
+                teamSidesAheadOfEngine = false;
                 owedSeriesStart = null;
                 owedSeriesStartTarget = null;
                 // Set when the veto's first map needs a changelevel and cleared on map start. If that
@@ -3035,6 +3039,8 @@ namespace MatchZy
             // Get player stats for the map_result event
             (Dictionary<ulong, Dictionary<string, object>> playerStatsDictionary, List<StatsPlayer> playerStatsListTeam1, List<StatsPlayer> playerStatsListTeam2) = GetPlayerStatsDict();
 
+            LogKillCountDifferences();
+
             // Get demo filename (StopDemoRecording above picked the file that was actually recorded)
             string? demoFilename = !string.IsNullOrEmpty(lastStoppedDemoFile) ? Path.GetFileName(lastStoppedDemoFile) : null;
 
@@ -3141,10 +3147,8 @@ namespace MatchZy
                 Server.ExecuteCommand("mp_match_end_restart 0");
             }
 
-            // For multi-map series, change map after 15 seconds, or earlier when a match config or
-            // override cfg lowered mp_match_restart_delay: the engine's own map change at the end of
-            // the intermission must never beat ours (it picks the next mapgroup map, not the series map).
-            float mapChangeDelay = Math.Clamp(restartDelay - 3, 3, 15);
+            // For multi-map series the change follows the end-of-match countdown (see MatchEndMapChangeDelay).
+            float mapChangeDelay = MatchEndMapChangeDelay(restartDelay);
             matchEndMapChangeTimer = AddTimer(
                 mapChangeDelay,
                 () =>
@@ -3187,6 +3191,17 @@ namespace MatchZy
 
         // See MatchConfigLogic.IsSafeMapName (Logic/, unit tested).
         public static bool IsSafeMapName(string? mapName) => MatchConfigLogic.IsSafeMapName(mapName);
+
+        /// <summary>
+        /// Seconds from the end of a map until the plugin changes the level. It follows the game's
+        /// own end-of-match countdown (mp_match_restart_delay) and fires just before it runs out, so
+        /// the scoreboard is shown for its full length. The scoreboard countdown starts about three
+        /// seconds after the last round ends, so restartDelay - 4 is about 0:01 on the clock. It must
+        /// stay ahead of the engine's own map change at the end of the countdown: that one picks the
+        /// next mapgroup map by name, not the series or rotation map. The demo is already stopped at
+        /// the end of the map (StopDemoRecording), so a later change gives GOTV more time, not less.
+        /// </summary>
+        private static float MatchEndMapChangeDelay(int restartDelay) => Math.Max(3, restartDelay - 4);
 
         private void ChangeMap(string mapName, float delay)
         {
@@ -3267,6 +3282,62 @@ namespace MatchZy
             }
         }
 
+        // Set when HandlePostRoundEndEvent swaps teamSides at the end of a half, cleared when the
+        // next round starts. The engine swaps the teams, and their scores with them, only at that
+        // round start: in between teamSides names the side each team is about to play.
+        private bool teamSidesAheadOfEngine = false;
+
+        /// <summary>
+        /// True during halftime (regulation or overtime) while teamSides already holds the next
+        /// half's sides and the engine still has the teams, and their scores, on the old ones
+        /// (gamerules m_bSwitchingTeamsAtRoundReset). Readers of the engine's team entities by
+        /// teamSides have to look at the other side while this is true.
+        /// </summary>
+        private bool IsHalfSwapPendingInEngine()
+        {
+            if (!teamSidesAheadOfEngine)
+                return false;
+            try { return GetGameRules()?.SwitchingTeamsAtRoundReset == true; }
+            catch { return false; }
+        }
+
+        /// <summary>
+        /// GetPlayerTeam as the engine has the teams right now: during halftime the side the
+        /// player's team is still on, not the one it plays next. For a player joining a side in
+        /// that window (team menu, reconnect): the engine's swap at the next round start then takes
+        /// them along with their team. Not for the T/CT moves of that swap itself.
+        /// </summary>
+        private CsTeam GetPlayerTeamInEngine(CCSPlayerController player)
+        {
+            CsTeam team = GetPlayerTeam(player);
+            if (!IsHalfSwapPendingInEngine())
+                return team;
+            return team == CsTeam.Terrorist ? CsTeam.CounterTerrorist
+                : team == CsTeam.CounterTerrorist ? CsTeam.Terrorist
+                : team;
+        }
+
+        // Server time at which the live flags were last set (see IsGoingLiveRestartPending).
+        private float liveFlagsSetTime = -1f;
+
+        /// <summary>
+        /// True from the moment a match is flagged live until the restart of its mode cfg
+        /// (mp_restartgame) has landed. Players are still alive from the warmup or the side selection
+        /// in that second and can kill each other, and the restart then wipes the engine's
+        /// scoreboard: a kill counted here was in the events and the advanced stats but missing
+        /// from the kills the database takes from the scoreboard.
+        /// </summary>
+        private bool IsGoingLiveRestartPending()
+        {
+            if (!isMatchLive)
+                return false;
+            if (IsRestartQueued())
+                return true;
+            // The cfg and its restart are executed from the command buffer a moment after the flags.
+            float now = Server.CurrentTime;
+            return liveFlagsSetTime >= 0f && now >= liveFlagsSetTime && now - liveFlagsSetTime < 0.5f;
+        }
+
         private (int t1score, int t2score) GetTeamsScore()
         {
             int t1score = 0;
@@ -3279,6 +3350,10 @@ namespace MatchZy
 
             string team1Side = teamSides[matchzyTeam1]; // "CT" or "TERRORIST"
             string team2Side = teamSides[matchzyTeam2];
+            // Halftime: the scores are still on the sides of the half that just ended. Reading by
+            // the new sides gave each team the other's score (get5_status, a force end, a forfeit).
+            if (IsHalfSwapPendingInEngine())
+                (team1Side, team2Side) = (team2Side, team1Side);
 
             // Map sides to cached entities
             if (_cachedCtTeam != null && _cachedCtTeam.IsValid && _cachedTTeam != null && _cachedTTeam.IsValid)
@@ -3501,6 +3576,7 @@ namespace MatchZy
                     if (swapRequired && !isRoundRestoring)
                     {
                         SwapSidesInTeamData(false);
+                        teamSidesAheadOfEngine = true;
                     }
                     if (!isRoundRestoring)
                     {
@@ -4923,6 +4999,36 @@ namespace MatchZy
         // Last "no player stats" reason logged, so it is logged once per match, map and reason.
         private string lastNoStatsLogKey = "";
 
+        /// <summary>
+        /// Diagnostic, at the end of a map: the kills column of the database comes from the engine's
+        /// scoreboard counter, the events and the demo from player_death. Logs every player whose two
+        /// counts differ, with the team kills and suicides counted from player_death, to tell an
+        /// engine deduction (a team kill or suicide taking a kill off the scoreboard) from a lost kill.
+        /// </summary>
+        private void LogKillCountDifferences()
+        {
+            try
+            {
+                foreach (CCSPlayerController player in StatsPlayers())
+                {
+                    if (player == null || !player.IsValid || player.ActionTrackingServices == null)
+                        continue;
+                    ulong key = player.IsBot ? BotStatsId(player.PlayerName) : player.SteamID;
+                    if (!advancedStats.TryGetValue(key, out var adv) || adv == null)
+                        continue;
+                    int engineKills = player.ActionTrackingServices.MatchStats.Kills;
+                    int eventKills = adv.WeaponKills.Values.Sum();
+                    if (engineKills == eventKills)
+                        continue;
+                    Log($"[KillCount] {player.PlayerName} ({key}) match {liveMatchId} map {matchConfig.CurrentMapNumber}: scoreboard kills {engineKills}, player_death enemy kills {eventKills}, team kills {adv.TeamKills}, suicides {adv.Suicides}");
+                }
+            }
+            catch (Exception e)
+            {
+                Log($"[KillCount] {e.Message}");
+            }
+        }
+
         public (Dictionary<ulong, Dictionary<string, object>>, List<StatsPlayer>, List<StatsPlayer>) GetPlayerStatsDict()
         {
             Dictionary<ulong, Dictionary<string, object>> playerStatsDictionary = new Dictionary<ulong, Dictionary<string, object>>();
@@ -5012,6 +5118,10 @@ namespace MatchZy
                         EnemiesFlashed = playerStats.EnemiesFlashed,
                         FriendliesFlashed = adv?.FriendliesFlashed ?? 0,
                         KnifeKills = adv?.KnifeKills ?? 0,
+                        AwpKills = adv?.WeaponKills.GetValueOrDefault(WeaponKillLogic.Awp) ?? 0,
+                        // A copy: the event is serialized after this method returns.
+                        WeaponKills = adv != null ? new Dictionary<string, int>(adv.WeaponKills) : new Dictionary<string, int>(),
+                        WeaponTypeKills = WeaponKillLogic.TypeTotals(adv?.WeaponKills),
                         HeadshotKills = playerStats.HeadShotKills,
                         RoundsPlayed = roundsPlayed,
                         BombDefuses = adv?.BombDefuses ?? 0,
@@ -6064,7 +6174,8 @@ namespace MatchZy
         /// </summary>
         private void PlaceMatchPlayerAfterConnect(CCSPlayerController player)
         {
-            if (!isMatchSetup || matchStarted || !IsTeamWhitelistConfigured())
+            // Until the match is live: the ready phase, the knife round and its side selection.
+            if (!isMatchSetup || isMatchLive || !IsTeamWhitelistConfigured())
                 return;
             int? userId = player.UserId;
             foreach (float delay in new[] { 0.5f, 3.0f })
@@ -6073,7 +6184,7 @@ namespace MatchZy
                 {
                     try
                     {
-                        if (!isMatchSetup || matchStarted || isVeto || !IsTeamWhitelistConfigured())
+                        if (!isMatchSetup || isMatchLive || isVeto || !IsTeamWhitelistConfigured())
                             return;
                         if (player == null || !player.IsValid || player.UserId != userId || player.Connected != PlayerConnectedState.Connected)
                             return;
