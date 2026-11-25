@@ -2,6 +2,19 @@
 
 Based on [MatchZy](https://github.com/shobhit-pathak/MatchZy) by Shobhit Pathak, adapted for CS2 game-server hosting: remote log HTTP API, G5API compatibility, auto changelevel, advanced stats (HLTV 2.0 rating / KAST / clutch / opening duels), a coach system, a pause overhaul, and in-game admin and match-setup menus.
 
+# 1.0.29
+
+#### November 25, 2026
+
+- Stats events (`round_end`, `map_result`) and the `_stats.json` file have three new player stats: `weapon_kills`, the enemies killed per weapon (`{"ak47": 9, "awp": 7, "knife": 1}`, only weapons with a kill, every knife model as `knife`, fire as `inferno`), `weapon_type_kills`, the same kills summed per type (`pistol`, `smg`, `rifle`, `sniper`, `shotgun`, `machinegun`, `grenade`, `knife`, `other`, all always present), and `awp_kills`, the AWP count on its own. Team kills do not count, and bots report none like the other extra stats.
+- `get5_status` no longer swaps the two teams' `current_map_score`, `side`, `connected_clients` and `ready` during halftime. MatchZy switches its side data at the end of the half's last round, the game moves the teams and their scores only when the next half starts, so for the length of the halftime each team was read from the other side. The same read gave swapped map scores to `get5_endmatch` / `.forceend` used during halftime.
+- A kill in the second between "LIVE" and the restart that starts round 1 no longer counts. Players are still alive from the warmup or the knife round's side selection there, and the restart wipes the scoreboard: such a kill was sent as a `player_death` event and counted in the advanced stats (rating, opening kills, `weapon_kills`), but was missing from `kills` in `matchzy_stats_players`, which then was 1 lower than the events.
+- A player who joins during halftime (reconnect, team menu) is put on the side their team is still on and changes sides with it. The team menu only allowed the next half's side, which was still full of the other team, so with `players_per_team` set the join was refused as "team full".
+- `.coach t` / `.coach ct` during halftime registers the coach for the team that is on that side now, not for the team that plays it in the next half.
+- A player who reconnects during the knife round or its side selection is moved to their team's side, as in the ready phase. The game puts a returning player back on the side they left from, which can be the other team's.
+- `get5_status` and `get5_web_available` report `post_game` from the end of a series until the match is reset. On a server where the game restarts the map in place after a match (workshop maps), they said `live` for the seconds between that restart and the reset.
+- A match that starts on the map the previous match was played to its end on reloads that map first (when it is loaded, or after its veto), as Get5 does. Where the game restarted the map in place after a match, the next match could start without a CSTV client (no demo) and with returning players on the side they left from.
+
 # 1.0.28
 
 #### November 23, 2026
