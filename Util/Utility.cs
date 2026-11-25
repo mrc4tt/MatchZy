@@ -3141,10 +3141,8 @@ namespace MatchZy
                 Server.ExecuteCommand("mp_match_end_restart 0");
             }
 
-            // For multi-map series, change map after 15 seconds, or earlier when a match config or
-            // override cfg lowered mp_match_restart_delay: the engine's own map change at the end of
-            // the intermission must never beat ours (it picks the next mapgroup map, not the series map).
-            float mapChangeDelay = Math.Clamp(restartDelay - 3, 3, 15);
+            // For multi-map series the change follows the end-of-match countdown (see MatchEndMapChangeDelay).
+            float mapChangeDelay = MatchEndMapChangeDelay(restartDelay);
             matchEndMapChangeTimer = AddTimer(
                 mapChangeDelay,
                 () =>
@@ -3194,6 +3192,17 @@ namespace MatchZy
             {
                 Log($"[ChangeMap] Refusing map name with invalid characters: {mapName}");
                 return;
+        /// <summary>
+        /// Seconds from the end of a map until the plugin changes the level. It follows the game's
+        /// own end-of-match countdown (mp_match_restart_delay) and fires just before it runs out, so
+        /// the scoreboard is shown for its full length. The scoreboard countdown starts about three
+        /// seconds after the last round ends, so restartDelay - 4 is about 0:01 on the clock. It must
+        /// stay ahead of the engine's own map change at the end of the countdown: that one picks the
+        /// next mapgroup map by name, not the series or rotation map. The demo is already stopped at
+        /// the end of the map (StopDemoRecording), so a later change gives GOTV more time, not less.
+        /// </summary>
+        private static float MatchEndMapChangeDelay(int restartDelay) => Math.Max(3, restartDelay - 4);
+
             }
             Log($"[ChangeMap] Changing map to {mapName} with delay {delay}");
             AddTimer(
@@ -5109,6 +5118,10 @@ namespace MatchZy
             Regex regex = new("[^\\p{L}0-9 _-]");
             return regex.Replace(input, "");
         }
+                        AwpKills = adv?.WeaponKills.GetValueOrDefault(WeaponKillLogic.Awp) ?? 0,
+                        // A copy: the event is serialized after this method returns.
+                        WeaponKills = adv != null ? new Dictionary<string, int>(adv.WeaponKills) : new Dictionary<string, int>(),
+                        WeaponTypeKills = WeaponKillLogic.TypeTotals(adv?.WeaponKills),
 
         // Letters that do not decompose into an ASCII letter plus an accent.
         private static readonly Dictionary<char, string> AsciiLetterMap = new()
@@ -5118,10 +5131,6 @@ namespace MatchZy
             { 'þ', "th" }, { 'Þ', "TH" }, { 'ð', "d" }, { 'Ð', "D" },
         };
 
-                        AwpKills = adv?.WeaponKills.GetValueOrDefault(WeaponKillLogic.Awp) ?? 0,
-                        // A copy: the event is serialized after this method returns.
-                        WeaponKills = adv != null ? new Dictionary<string, int>(adv.WeaponKills) : new Dictionary<string, int>(),
-                        WeaponTypeKills = WeaponKillLogic.TypeTotals(adv?.WeaponKills),
         // Keeps ASCII as is, transliterates common accented letters (é -> e, æ -> ae) and drops
         // anything else that is not ASCII (Cyrillic, CJK, emoji).
         public static string ToAsciiFileName(string input)
