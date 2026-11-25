@@ -2,6 +2,12 @@
 
 A short summary of each release. The [full changelog](changelog.md) has the details and background for every change.
 
+## 1.0.30 <small>November 25, 2026</small>
+
+- **Changed:** Practice: `.save` without a name numbers the lineup across all players and the shared library, so two players no longer both get `smoke1`.
+- **Fixed:** Practice: lineups saved with `matchzy_save_nades_as_global_enabled true` show up in `.shownades`, and `.libadd` finds them.
+- **Fixed:** Practice: `.libadd` no longer replaces another lineup of the same name in the shared library; the new one is added as `<name>_2`.
+
 ## 1.0.29 <small>November 25, 2026</small>
 
 - **New:** Player stats in the `round_end` and `map_result` events and the `_stats.json` file have `weapon_kills` (enemies killed per weapon), `weapon_type_kills` (per type: rifle, sniper, pistol and so on) and `awp_kills`.
@@ -102,19 +108,19 @@ A short summary of each release. The [full changelog](changelog.md) has the deta
 - **Fixed:** Practice: the console now says at practice start when a grenade rethrow signature did not resolve (`.rt` / `.throw` grenades that bounce and never detonate).
 - **Security:** A failed demo upload no longer logs the S3 signature details.
 
-## 1.0.25 <small>November 13, 2026</small>
-
-- **New:** A match interrupted by a crash, restart or plugin reload comes back on its own (`matchzy_auto_recover`): MatchZy restores the newest round backup of that match with its rosters, team names, match id and score. Players on its roster are let in meanwhile instead of being kicked.
-- **New:** `.recover` / `matchzy_recover` brings back the interrupted match without a file name: its newest backup, or a round number.
-- **New:** Valve's `mp_backup_restore_load_file` goes through MatchZy's restore (`matchzy_raw_backup_restore`), so rosters, team names and the pause come back as well. A `.txt` round file without MatchZy's `.json` is rebuilt from the match's other backups.
-- **New:** A live round that never ends (one side all dead, or the timer at 0:00) is ended after a few seconds (`matchzy_round_watchdog`).
-- **New:** Players kicked at connect see why in the disconnect dialog, the server log has a `[ConnectGate]` line with the cause, and panels get a `player_kicked` event. Every disconnect is logged with the engine's reason.
-- **New:** `match_recovered` event when a match was brought back on its own.
-- **Changed:** `matchzy_loadbackup` also takes the `.txt` name, a name without extension, `latest` or a round number.
-- **Changed:** `.restore`, `.restorelast` and `.restorecurrent` without a live match list the backups on disk and how to load one, instead of doing nothing.
-- **Fixed:** A round restored from warmup (crash recovery or `.restore` twice) or during a technical pause no longer gets stuck with everyone dead and the timer at 0:00.
-
 ## Older releases
+
+??? note "1.0.25 - November 13, 2026"
+
+    - **New:** A match interrupted by a crash, restart or plugin reload comes back on its own (`matchzy_auto_recover`): MatchZy restores the newest round backup of that match with its rosters, team names, match id and score. Players on its roster are let in meanwhile instead of being kicked.
+    - **New:** `.recover` / `matchzy_recover` brings back the interrupted match without a file name: its newest backup, or a round number.
+    - **New:** Valve's `mp_backup_restore_load_file` goes through MatchZy's restore (`matchzy_raw_backup_restore`), so rosters, team names and the pause come back as well. A `.txt` round file without MatchZy's `.json` is rebuilt from the match's other backups.
+    - **New:** A live round that never ends (one side all dead, or the timer at 0:00) is ended after a few seconds (`matchzy_round_watchdog`).
+    - **New:** Players kicked at connect see why in the disconnect dialog, the server log has a `[ConnectGate]` line with the cause, and panels get a `player_kicked` event. Every disconnect is logged with the engine's reason.
+    - **New:** `match_recovered` event when a match was brought back on its own.
+    - **Changed:** `matchzy_loadbackup` also takes the `.txt` name, a name without extension, `latest` or a round number.
+    - **Changed:** `.restore`, `.restorelast` and `.restorecurrent` without a live match list the backups on disk and how to load one, instead of doing nothing.
+    - **Fixed:** A round restored from warmup (crash recovery or `.restore` twice) or during a technical pause no longer gets stuck with everyone dead and the timer at 0:00.
 
 ??? note "1.0.24 - November 10, 2026"
 
