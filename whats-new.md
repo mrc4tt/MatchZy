@@ -2,6 +2,12 @@
 
 A short summary of each release. The [full changelog](changelog.md) has the details and background for every change.
 
+## 1.0.31 <small>November 26, 2026</small>
+
+- **New:** Practice: `.nades` has a **Delete a lineup** entry that lists your own lineups and deletes the one you pick.
+- **New:** Practice: `.delsmoke`, `.deletesmoke`, `.dellineup`, `.deletelineup` and `.delnades` do the same as `.delnade`.
+- **Changed:** Practice: saving a lineup also says how to delete it (`.delnade <name>`).
+
 ## 1.0.30 <small>November 25, 2026</small>
 
 - **Changed:** Practice: `.save` without a name numbers the lineup across all players and the shared library, so two players no longer both get `smoke1`.
@@ -29,86 +35,86 @@ A short summary of each release. The [full changelog](changelog.md) has the deta
 
 - **Fixed:** A match config can set `matchzy_kick_when_no_match_loaded` and `matchzy_whitelist_enabled_default` again; 1.0.26 refused both.
 
-## 1.0.26 <small>November 22, 2026</small>
-
-!!! warning "Action needed"
-    - Panels: if the server keeps its remote log, demo upload or backup header in config.cfg and your match config only sends a URL on another host, the header is no longer sent there. Send the header together with the URL in the match config's `cvars`.
-    - The ready time limit (`get5_time_to_start`, `matchzy_forfeit_ready_timeout`) now only applies before the first map of a series.
-    - A match config can no longer set `sv_cheats`, the log file cvars and a few owner-only MatchZy settings (not the kick and whitelist settings, see 1.0.27). Passwords and game settings still work.
-    - After updating, delete the old `runtimes/` folder in the plugin folder if it is still there.
-
-- **New:** Lineups in practice: throw a grenade and type `.save`. It is saved with its type and how you threw it, and `.shownades` marks it with the grenade's model. Aim at a mark and press E to stand on the spot; a ring shows where to aim and turns green when the crosshair is in it.
-- **New:** `.train` takes you through your saved lineups one by one and judges each throw; hold E on a mark to rename or delete it.
-- **New:** Grenade follow camera in practice: a throw from a lineup spot is followed by the camera and shows where it lands; jump to come back. `.follownade` sets lineup spots / every throw / off.
-- **New:** (Beta) Spectator coach with `matchzy_coaching_mode 3`: no body, first person on the own team, radar with only the own team and spotted enemies, teammates outlined through walls, no enemy ghosting. See [Coaching](guides/coaching.md#spectator-coach-beta-matchzy_coaching_mode-3).
-- **New:** (Beta) Grenade finder: `.draw` a box where a grenade should land, `.find` works out lineups that land in it from where you are.
-- **New:** Ready up with the use key (E) during the ready phase (`matchzy_ready_use_key true`, off by default). `.ready` still works.
-- **New:** A pug with fewer than 10 players (3v3, 4v4, 4v5) starts by itself 20 seconds after everyone is ready, and so does a `.matchsetup` match with uneven sides (`matchzy_ready_short_start_delay`). `.unready` stops the countdown.
-- **New:** Players can vote all chat off with `.mute` (`matchzy_allchat_mute_votes`; `.nochat` with CS2-SimpleAdmin), so the teams can no longer write to each other; admins use `.allchat`.
-- **Changed:** `matchzy_minimum_ready_required` defaults to 2 (was 10): a pug starts when two players are ready, at least one on each side. Existing config.cfg files keep their value.
-- **New:** `.spawns` toggles the practice spawn markers on and off.
-- **Changed:** `.replay` bots in practice move smoothly, aim like the recording and fire when you fired (`matchzy_replay_smooth`).
-- **New:** Chat translations in Brazilian Portuguese and Turkish (`!lang pt-BR`, `!lang tr`).
-- **Changed:** The round-end damage report uses the FACEIT layout (`To: [87 / 3 hits] From: [100 / 4 hits] - name (13 hp)`), sorted by damage dealt and in each player's language.
-- **Changed:** Coaches can no longer take control of bots on their team.
-- **Changed:** `matchzy_demo_upload_url ""` and `matchzy_remote_backup_url ""` turn uploads off.
-- **Changed:** The release zip is 2.4 MB with 35 files (was 36 MB unpacked, 59 files): only the Linux and Windows files a server uses, and a slimmer SQLite. Windows servers also get the patched SQLite 3.50.2.
-    After updating you can delete the old `runtimes/` folder, `MatchZy.pdb` and `Microsoft.Extensions.*.dll` in the plugin folder.
-- **Changed:** `.help` in practice shows a short list; `.help more` shows every command.
-- **Changed:** The lineup trainer's aim target model and hint box are replaced by the aim rings (`matchzy_practice_aim_rings`).
-- **Fixed:** A break between the maps of a series no longer forfeits it: the ready time limit (`get5_time_to_start`) only applies before the first map.
-- **Fixed:** E no longer opens the buy menu while a MatchZy menu is open; B still does.
-- **Fixed:** A `.matchsetup` BO3 keeps its teams between maps and after a side pick: the players on CT and T become the teams' player lists once everyone is ready.
-- **Fixed:** `.skipveto` on a BO2 / BO3 no longer stops the series after its first map.
-- **Security:** A match config can no longer send the server's own header or auth values to another host, uploaded round backups no longer hold them, and more cvars are refused from a match config (`sv_cheats`, log file and server identity cvars, owner-only MatchZy settings). Passwords and game settings still work.
-- **Changed:** Practice: saved recordings, strategies, bot positions and bot spawn pools have a limit per map.
-- **Security:** `get5_status` answers only the server console and admins (its reply holds the match config URL).
-- **Fixed:** Practice: `.nadespeed` no longer leaves the server in slow motion after practice ends.
-- **Fixed:** A `.matchsetup` (`.ma`) match counts its players: the ready panel no longer stays at CT 0 / T 0, `.ready` starts the match and the map veto finds its captains.
-- **Fixed:** A `.matchsetup` match played 4v4 (or 3v3) starts when everyone is ready, instead of waiting for 5 players per side until an admin used `.forcestart`.
-- **Fixed:** The bot quota no longer kicks CSTV when it removes bots (a lowered `bot_quota`, or `bot_quota_mode fill` and a player joining a team), so the demo is no longer split in two (`matchzy_cstv_kick_guard`).
-- **Fixed:** Practice `.bot` adds one bot instead of adding two and kicking one.
-- **Fixed:** A server crash when a coach got the bomb (two hand-offs removed the same C4 at once).
-- **Fixed:** `.uncoach` during freeze time no longer leaves an unkillable coach body in the round.
-- **Fixed:** `.matchsetup` with a veto and "Skip knife" gives team1 CT on every map, also the decider.
-- **Fixed:** A technical pause counts its time only while it is in effect, so a `.tech` early in a round is no longer used up without pausing.
-- **Fixed:** A BO2 veto from 3 maps plays both maps instead of stopping after map 1.
-- **Fixed:** A match loaded right after a series end is no longer reset by the old series' restart, and a second load no longer replaces a match that is still loading.
-- **Fixed:** A match whose first map cannot be loaded fails the load instead of reporting success.
-- **Fixed:** `min_spectators_to_ready` works again (spectators can `.ready`).
-- **Fixed:** `.match`, `.scrim` and `.hill` from practice start the chosen mode with its settings.
-- **Fixed:** `.skipveto`, `.start` and `.warmup` behave during a veto; `.rr` works in practice with "." as chat trigger; readying up by ping sends `player_ready`.
-- **Fixed:** The server no longer crashes at start when `matchzymaps.cfg` cannot be created.
-- **Fixed:** Coach bomb carrier: the C4 is no longer deleted.
-- **Fixed:** Forfeits, `.gg` and `get5_endmatch` write the final stats, CSV and stats JSON; match events are retried; `series_start` is no longer lost when the database was down at load.
-- **Fixed:** S3 demo uploads no longer overwrite one part with the next.
-- **Fixed:** MySQL stats with long team names or emoji player names; advanced stats with bots.
-- **Fixed:** Practice: leftover bots, bot settings and player settings after leaving practice or the server, stuck strat playback, broken save files.
-- **Fixed:** A match load whose map never loads no longer blocks the server (dropped after 2 minutes, 15 for workshop maps; panels get `match_cancelled` with reason `load_failed`), and recovery or a re-sent load no longer clash with it.
-- **Fixed:** Warmup-time round restores are no longer undone, and match result events are no longer sent twice after a slow receiver.
-- **Fixed:** `.help` in practice shows every command again: long lists continue on a new line instead of being cut off, and the list shown when practice starts is no longer pushed out of chat by server messages.
-- **Fixed:** In practice, E no longer opens the buy menu, so it always works on spawn markers and lineups. B still opens the buy menu.
-- **Fixed:** E on the spawn markers picks exactly the box or number under your crosshair.
-- **Fixed:** No more `matchzy.db-wal` and `matchzy.db-shm` files next to `matchzy.db`. They are removed on the next start, and `matchzy.db` alone is a complete backup.
-- **Fixed:** Stats no longer turn off after a plugin reload with "Unable to load shared library 'e_sqlite3'".
-- **Fixed:** The ready panel switches language right away after `!lang`.
-- **Fixed:** After practice, terrorists no longer spawn with the full practice grenade set and an AK-47.
-- **Fixed:** Switching the server from practice to another mode (retakes, deathmatch, prefire) without a map change no longer leaves players flying in noclip or respawning on death.
-- **Fixed:** A lineup spot inside a kerb or a wall no longer leaves you stuck after the teleport.
-- **Fixed:** Practice: `.boost` bots no longer respawn tilted, and you stay upright when lifted onto the bot.
-- **Fixed:** Practice: a placed bot looks up or down the way you did when you placed it, and stays upright.
-- **Changed:** Practice: a killed bot respawns right away instead of after the death animation.
-- **Changed:** Practice: `.bot` can add more than five bots per side.
-- **Changed:** Practice: the grenade preview camera starts off; turn it on with `.cam`, `.preview` or `.pip`.
-- **Changed:** Practice: `.spawns` boxes face the spawn's direction; no chat line when toggled.
-- **Changed:** Practice: xray is on when practice starts (T red, CT blue); `.xray` turns it off.
-- **New:** Practice: `.jump` (bot at your aim jumps), `.bhop` (auto bunnyhop) and `.r` (respawn yourself).
-- **Changed:** `.help` prints a tidy command table to the console in every mode.
-- **Changed:** `.mhelp` prints the admin commands as the same console table, and the admin chat hints on joining are one short line.
-- **Fixed:** Practice: the console now says at practice start when a grenade rethrow signature did not resolve (`.rt` / `.throw` grenades that bounce and never detonate).
-- **Security:** A failed demo upload no longer logs the S3 signature details.
-
 ## Older releases
+
+??? note "1.0.26 - November 22, 2026"
+
+    !!! warning "Action needed"
+        - Panels: if the server keeps its remote log, demo upload or backup header in config.cfg and your match config only sends a URL on another host, the header is no longer sent there. Send the header together with the URL in the match config's `cvars`.
+        - The ready time limit (`get5_time_to_start`, `matchzy_forfeit_ready_timeout`) now only applies before the first map of a series.
+        - A match config can no longer set `sv_cheats`, the log file cvars and a few owner-only MatchZy settings (not the kick and whitelist settings, see 1.0.27). Passwords and game settings still work.
+        - After updating, delete the old `runtimes/` folder in the plugin folder if it is still there.
+
+    - **New:** Lineups in practice: throw a grenade and type `.save`. It is saved with its type and how you threw it, and `.shownades` marks it with the grenade's model. Aim at a mark and press E to stand on the spot; a ring shows where to aim and turns green when the crosshair is in it.
+    - **New:** `.train` takes you through your saved lineups one by one and judges each throw; hold E on a mark to rename or delete it.
+    - **New:** Grenade follow camera in practice: a throw from a lineup spot is followed by the camera and shows where it lands; jump to come back. `.follownade` sets lineup spots / every throw / off.
+    - **New:** (Beta) Spectator coach with `matchzy_coaching_mode 3`: no body, first person on the own team, radar with only the own team and spotted enemies, teammates outlined through walls, no enemy ghosting. See [Coaching](guides/coaching.md#spectator-coach-beta-matchzy_coaching_mode-3).
+    - **New:** (Beta) Grenade finder: `.draw` a box where a grenade should land, `.find` works out lineups that land in it from where you are.
+    - **New:** Ready up with the use key (E) during the ready phase (`matchzy_ready_use_key true`, off by default). `.ready` still works.
+    - **New:** A pug with fewer than 10 players (3v3, 4v4, 4v5) starts by itself 20 seconds after everyone is ready, and so does a `.matchsetup` match with uneven sides (`matchzy_ready_short_start_delay`). `.unready` stops the countdown.
+    - **New:** Players can vote all chat off with `.mute` (`matchzy_allchat_mute_votes`; `.nochat` with CS2-SimpleAdmin), so the teams can no longer write to each other; admins use `.allchat`.
+    - **Changed:** `matchzy_minimum_ready_required` defaults to 2 (was 10): a pug starts when two players are ready, at least one on each side. Existing config.cfg files keep their value.
+    - **New:** `.spawns` toggles the practice spawn markers on and off.
+    - **Changed:** `.replay` bots in practice move smoothly, aim like the recording and fire when you fired (`matchzy_replay_smooth`).
+    - **New:** Chat translations in Brazilian Portuguese and Turkish (`!lang pt-BR`, `!lang tr`).
+    - **Changed:** The round-end damage report uses the FACEIT layout (`To: [87 / 3 hits] From: [100 / 4 hits] - name (13 hp)`), sorted by damage dealt and in each player's language.
+    - **Changed:** Coaches can no longer take control of bots on their team.
+    - **Changed:** `matchzy_demo_upload_url ""` and `matchzy_remote_backup_url ""` turn uploads off.
+    - **Changed:** The release zip is 2.4 MB with 35 files (was 36 MB unpacked, 59 files): only the Linux and Windows files a server uses, and a slimmer SQLite. Windows servers also get the patched SQLite 3.50.2.
+        After updating you can delete the old `runtimes/` folder, `MatchZy.pdb` and `Microsoft.Extensions.*.dll` in the plugin folder.
+    - **Changed:** `.help` in practice shows a short list; `.help more` shows every command.
+    - **Changed:** The lineup trainer's aim target model and hint box are replaced by the aim rings (`matchzy_practice_aim_rings`).
+    - **Fixed:** A break between the maps of a series no longer forfeits it: the ready time limit (`get5_time_to_start`) only applies before the first map.
+    - **Fixed:** E no longer opens the buy menu while a MatchZy menu is open; B still does.
+    - **Fixed:** A `.matchsetup` BO3 keeps its teams between maps and after a side pick: the players on CT and T become the teams' player lists once everyone is ready.
+    - **Fixed:** `.skipveto` on a BO2 / BO3 no longer stops the series after its first map.
+    - **Security:** A match config can no longer send the server's own header or auth values to another host, uploaded round backups no longer hold them, and more cvars are refused from a match config (`sv_cheats`, log file and server identity cvars, owner-only MatchZy settings). Passwords and game settings still work.
+    - **Changed:** Practice: saved recordings, strategies, bot positions and bot spawn pools have a limit per map.
+    - **Security:** `get5_status` answers only the server console and admins (its reply holds the match config URL).
+    - **Fixed:** Practice: `.nadespeed` no longer leaves the server in slow motion after practice ends.
+    - **Fixed:** A `.matchsetup` (`.ma`) match counts its players: the ready panel no longer stays at CT 0 / T 0, `.ready` starts the match and the map veto finds its captains.
+    - **Fixed:** A `.matchsetup` match played 4v4 (or 3v3) starts when everyone is ready, instead of waiting for 5 players per side until an admin used `.forcestart`.
+    - **Fixed:** The bot quota no longer kicks CSTV when it removes bots (a lowered `bot_quota`, or `bot_quota_mode fill` and a player joining a team), so the demo is no longer split in two (`matchzy_cstv_kick_guard`).
+    - **Fixed:** Practice `.bot` adds one bot instead of adding two and kicking one.
+    - **Fixed:** A server crash when a coach got the bomb (two hand-offs removed the same C4 at once).
+    - **Fixed:** `.uncoach` during freeze time no longer leaves an unkillable coach body in the round.
+    - **Fixed:** `.matchsetup` with a veto and "Skip knife" gives team1 CT on every map, also the decider.
+    - **Fixed:** A technical pause counts its time only while it is in effect, so a `.tech` early in a round is no longer used up without pausing.
+    - **Fixed:** A BO2 veto from 3 maps plays both maps instead of stopping after map 1.
+    - **Fixed:** A match loaded right after a series end is no longer reset by the old series' restart, and a second load no longer replaces a match that is still loading.
+    - **Fixed:** A match whose first map cannot be loaded fails the load instead of reporting success.
+    - **Fixed:** `min_spectators_to_ready` works again (spectators can `.ready`).
+    - **Fixed:** `.match`, `.scrim` and `.hill` from practice start the chosen mode with its settings.
+    - **Fixed:** `.skipveto`, `.start` and `.warmup` behave during a veto; `.rr` works in practice with "." as chat trigger; readying up by ping sends `player_ready`.
+    - **Fixed:** The server no longer crashes at start when `matchzymaps.cfg` cannot be created.
+    - **Fixed:** Coach bomb carrier: the C4 is no longer deleted.
+    - **Fixed:** Forfeits, `.gg` and `get5_endmatch` write the final stats, CSV and stats JSON; match events are retried; `series_start` is no longer lost when the database was down at load.
+    - **Fixed:** S3 demo uploads no longer overwrite one part with the next.
+    - **Fixed:** MySQL stats with long team names or emoji player names; advanced stats with bots.
+    - **Fixed:** Practice: leftover bots, bot settings and player settings after leaving practice or the server, stuck strat playback, broken save files.
+    - **Fixed:** A match load whose map never loads no longer blocks the server (dropped after 2 minutes, 15 for workshop maps; panels get `match_cancelled` with reason `load_failed`), and recovery or a re-sent load no longer clash with it.
+    - **Fixed:** Warmup-time round restores are no longer undone, and match result events are no longer sent twice after a slow receiver.
+    - **Fixed:** `.help` in practice shows every command again: long lists continue on a new line instead of being cut off, and the list shown when practice starts is no longer pushed out of chat by server messages.
+    - **Fixed:** In practice, E no longer opens the buy menu, so it always works on spawn markers and lineups. B still opens the buy menu.
+    - **Fixed:** E on the spawn markers picks exactly the box or number under your crosshair.
+    - **Fixed:** No more `matchzy.db-wal` and `matchzy.db-shm` files next to `matchzy.db`. They are removed on the next start, and `matchzy.db` alone is a complete backup.
+    - **Fixed:** Stats no longer turn off after a plugin reload with "Unable to load shared library 'e_sqlite3'".
+    - **Fixed:** The ready panel switches language right away after `!lang`.
+    - **Fixed:** After practice, terrorists no longer spawn with the full practice grenade set and an AK-47.
+    - **Fixed:** Switching the server from practice to another mode (retakes, deathmatch, prefire) without a map change no longer leaves players flying in noclip or respawning on death.
+    - **Fixed:** A lineup spot inside a kerb or a wall no longer leaves you stuck after the teleport.
+    - **Fixed:** Practice: `.boost` bots no longer respawn tilted, and you stay upright when lifted onto the bot.
+    - **Fixed:** Practice: a placed bot looks up or down the way you did when you placed it, and stays upright.
+    - **Changed:** Practice: a killed bot respawns right away instead of after the death animation.
+    - **Changed:** Practice: `.bot` can add more than five bots per side.
+    - **Changed:** Practice: the grenade preview camera starts off; turn it on with `.cam`, `.preview` or `.pip`.
+    - **Changed:** Practice: `.spawns` boxes face the spawn's direction; no chat line when toggled.
+    - **Changed:** Practice: xray is on when practice starts (T red, CT blue); `.xray` turns it off.
+    - **New:** Practice: `.jump` (bot at your aim jumps), `.bhop` (auto bunnyhop) and `.r` (respawn yourself).
+    - **Changed:** `.help` prints a tidy command table to the console in every mode.
+    - **Changed:** `.mhelp` prints the admin commands as the same console table, and the admin chat hints on joining are one short line.
+    - **Fixed:** Practice: the console now says at practice start when a grenade rethrow signature did not resolve (`.rt` / `.throw` grenades that bounce and never detonate).
+    - **Security:** A failed demo upload no longer logs the S3 signature details.
 
 ??? note "1.0.25 - November 13, 2026"
 

@@ -16,7 +16,7 @@ namespace MatchZy
     public partial class MatchZy : BasePlugin
     {
         public override string ModuleName => "MatchZy";
-        public override string ModuleVersion => "1.0.30";
+        public override string ModuleVersion => "1.0.31";
 
         // Shown next to the version in the load line and the version command, so a log or a
         // support question tells this fork (1.0.x) apart from the original MatchZy (0.x).
@@ -1961,7 +1961,8 @@ namespace MatchZy
                         HandleDeleteNadeCommand(player, messageCommandArg);
                     }
 
-                    if (cmdWord == ".deletenade")
+                    // Players look for "smoke" or "lineup", not "nade": same delete under those words.
+                    if (cmdWord is ".deletenade" or ".delnades" or ".delsmoke" or ".deletesmoke" or ".dellineup" or ".deletelineup")
                     {
                         HandleDeleteNadeCommand(player, messageCommandArg);
                     }

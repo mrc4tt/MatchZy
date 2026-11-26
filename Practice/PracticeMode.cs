@@ -670,6 +670,7 @@ namespace MatchZy
                     ShowNadeMarksAfterSave(player);
 
                     PrintToPlayerChat(player, Localizer.ForPlayer(player, "matchzy.pm.lineupsavedsucces", lineupName));
+                    PrintToPlayerChat(player, Localizer.ForPlayer(player, "matchzy.pm.lineupdeletehint", lineupName));
                     PrintLocalizedToAll("matchzy.pm.playersavedlineup", player.PlayerName, $"{lineupName} {playerPos} {playerAngle}");
                 }
                 catch (JsonException ex)
@@ -5089,6 +5090,10 @@ namespace MatchZy
         [ConsoleCommand("css_deletenade", "Deletes the nade by name")]
         [ConsoleCommand("css_delnade", "Deletes the nade by name")]
         [ConsoleCommand("css_dn", "Deletes the nade by name")]
+        [ConsoleCommand("css_delsmoke", "Deletes the nade by name")]
+        [ConsoleCommand("css_deletesmoke", "Deletes the nade by name")]
+        [ConsoleCommand("css_dellineup", "Deletes the nade by name")]
+        [ConsoleCommand("css_deletelineup", "Deletes the nade by name")]
         public void OnDeleteNadeCommand(CCSPlayerController? player, CommandInfo command)
         {
             if (!RequirePractice(player))

@@ -98,6 +98,7 @@
     "matchzy.pm.negativenumber": "Vlerë e pavlefshme për komandën {0}. Ju lutem specifikoni një numër të vlefshëm jo-negativ. Përdorimi: !{0} <numër>",
     "matchzy.pm.lineupissaved": "Rreshtimi (Lineup) ekziston tashmë! Ju lutem përdorni një emër tjetër ose përdorni .delnade <nade>",
     "matchzy.pm.lineupsavedsucces": "Rreshtimi {green}{0}{default} u ruajt me sukses!",
+    "matchzy.pm.lineupdeletehint": "Fshije me {green}.delnade {0}{default}, ose zgjidhe te Delete a lineup në {green}.nades{default}.",
     "matchzy.pm.playersavedlineup": "{lightblue}{0}{default} Sapo ruajti një Rreshtim! Kodi i Rreshtimit: {green}{1}{default}",
     "matchzy.pm.lineupdeletesuccess": "Rreshtimi {green}{0}{default} u fshi me sukses.",
     "matchzy.pm.nadesdeleted": "Rreshtimet e fshira: {green}{0}{default}",

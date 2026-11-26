@@ -98,6 +98,7 @@
     "matchzy.pm.negativenumber": "Неверное значение для команды {0}. Укажи неотрицательное число. Использование: !{0} <number>",
     "matchzy.pm.lineupissaved": "Такой лайнап уже есть! Используй другое имя или .delnade <nade>",
     "matchzy.pm.lineupsavedsucces": "Лайнап {green}{0}{default} успешно сохранён!",
+    "matchzy.pm.lineupdeletehint": "Удалить: {green}.delnade {0}{default} или пункт Delete a lineup в {green}.nades{default}.",
     "matchzy.pm.playersavedlineup": "{lightblue}{0}{default} только что сохранил лайнап! Код лайнапа: {green}{1}{default}",
     "matchzy.pm.lineupdeletesuccess": "Лайнап {green}{0}{default} успешно удалён.",
     "matchzy.pm.nadesdeleted": "Удалены лайнапы: {green}{0}{default}",

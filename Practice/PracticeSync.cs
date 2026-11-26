@@ -430,6 +430,7 @@ namespace MatchZy
                 PrintToPlayerChat(player, given
                     ? Localizer.ForPlayer(player, "matchzy.pp.menu.savelast.hint_named", name)
                     : Localizer.ForPlayer(player, "matchzy.pp.menu.savelast.hint_auto", name));
+                PrintToPlayerChat(player, Localizer.ForPlayer(player, "matchzy.pm.lineupdeletehint", name));
             }
             catch (Exception e)
             {
