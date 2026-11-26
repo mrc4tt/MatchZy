@@ -98,6 +98,7 @@
     "matchzy.pm.negativenumber": "{0} komutu için geçersiz değer. Lütfen geçerli, negatif olmayan bir sayı girin. Kullanım: !{0} <sayı>",
     "matchzy.pm.lineupissaved": "Bu lineup zaten var! Lütfen farklı bir isim kullanın ya da .delnade <nade> kullanın",
     "matchzy.pm.lineupsavedsucces": "{green}{0}{default} lineup'ı başarıyla kaydedildi!",
+    "matchzy.pm.lineupdeletehint": "{green}.delnade {0}{default} ile sil ya da {green}.nades{default} içindeki Delete a lineup altından seç.",
     "matchzy.pm.playersavedlineup": "{lightblue}{0}{default} az önce bir lineup kaydetti! Lineup kodu: {green}{1}{default}",
     "matchzy.pm.lineupdeletesuccess": "{green}{0}{default} lineup'ı başarıyla silindi.",
     "matchzy.pm.nadesdeleted": "Silinen lineup(lar): {green}{0}{default}",

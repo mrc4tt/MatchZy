@@ -98,6 +98,7 @@
     "matchzy.pm.negativenumber": "Ogiltigt värde för kommandot {0}. Ange ett giltigt icke-negativt tal. Användning: !{0} <number>",
     "matchzy.pm.lineupissaved": "Lineupen finns redan! Använd ett annat namn eller använd .delnade <nade>",
     "matchzy.pm.lineupsavedsucces": "Lineup {green}{0}{default} sparad!",
+    "matchzy.pm.lineupdeletehint": "Ta bort den med {green}.delnade {0}{default}, eller välj den under Delete a lineup i {green}.nades{default}.",
     "matchzy.pm.playersavedlineup": "{lightblue}{0}{default} sparade precis en lineup! Lineup-kod: {green}{1}{default}",
     "matchzy.pm.lineupdeletesuccess": "Lineup {green}{0}{default} raderad.",
     "matchzy.pm.nadesdeleted": "Raderade lineup(s): {green}{0}{default}",

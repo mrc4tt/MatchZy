@@ -13,7 +13,8 @@ namespace MatchZy
 {
     // .nades - WasdMenu browser over the grenade library (private lineups + shared pack) for the
     // current map: filter by grenade type, click a lineup to load it (same path as .loadnade -
-    // teleport + grenade equipped). Menu types stay inside the OpenX methods and every entry point
+    // teleport + grenade equipped). "Delete a lineup" lists the player's own lineups and removes
+    // the picked one after a yes/no (same path as .delnade). Menu types stay inside the OpenX methods and every entry point
     // goes through OpenMenuGuarded, so the CS2MenuManager dependency stays optional (see AdminMenu).
     public partial class MatchZy
     {
@@ -40,7 +41,62 @@ namespace MatchZy
                 string t = type;
                 menu.AddItem(t, (p, _) => OpenNadesListMenu(p, t, menu));
             }
+            menu.AddItem("Delete a lineup", (p, _) => OpenNadesDeleteMenu(p, menu));
             menu.Display(player, 0);
+        }
+
+        // Only the lineups .delnade can remove: the player's own on this map (the shared "default"
+        // group when lineups are saved globally). The shared pack is left to .libremove.
+        private void OpenNadesDeleteMenu(CCSPlayerController player, WasdMenu root)
+        {
+            if (!isPractice || !IsPlayerValid(player))
+                return;
+            string ownGroup = isSaveNadesAsGlobalEnabled ? "default" : player.SteamID.ToString();
+            List<(string Name, string Type)> own = new();
+            try
+            {
+                string path = Path.Join(Server.GameDirectory + "/csgo/cfg", MatchZyCfgRel("savednades.json"));
+                var dict = File.Exists(path)
+                    ? JsonSerializer.Deserialize<Dictionary<string, Dictionary<string, Dictionary<string, string>>>>(ReadSavedNadesJson(path)) ?? new()
+                    : new Dictionary<string, Dictionary<string, Dictionary<string, string>>>();
+                foreach (var (steam, name, info) in OrderedLineupsForMap(player, dict, ""))
+                {
+                    if (steam != ownGroup)
+                        continue;
+                    own.Add((name, info.TryGetValue("Type", out var ty) ? ty : ""));
+                }
+            }
+            catch (Exception e)
+            {
+                Log($"[NadesMenu] {e.Message}");
+            }
+
+            var sub = new WasdMenu($"Delete a lineup ({own.Count})", this) { PrevMenu = root };
+            if (own.Count == 0)
+            {
+                sub.AddItem("(no lineups of yours on this map)", (_, _) => { });
+            }
+            else
+            {
+                foreach (var (name, type) in own)
+                {
+                    string label = string.IsNullOrEmpty(type) ? name : $"[{type}] {name}";
+                    string target = name;
+                    sub.AddItem(label, (p, _) =>
+                    {
+                        var confirm = new WasdMenu($"Delete {target}?", this) { PrevMenu = sub };
+                        confirm.AddItem("Yes, delete it", (p2, _) =>
+                        {
+                            HandleDeleteNadeCommand(p2, target);
+                            // Fresh list, so the deleted lineup is gone and the next one can be picked.
+                            OpenNadesDeleteMenu(p2, root);
+                        });
+                        confirm.AddItem("No, keep it", (p2, _) => OpenNadesDeleteMenu(p2, root));
+                        confirm.Display(p, 0);
+                    });
+                }
+            }
+            sub.Display(player, 0);
         }
 
         private void OpenNadesListMenu(CCSPlayerController player, string typeFilter, WasdMenu prev)

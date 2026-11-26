@@ -98,6 +98,7 @@
     "matchzy.pm.negativenumber": "Valeur invalide pour la commande {0}. Indique un nombre positif ou nul valide. Utilisation : !{0} <number>",
     "matchzy.pm.lineupissaved": "Ce lineup existe déjà ! Utilise un autre nom ou .delnade <nade>",
     "matchzy.pm.lineupsavedsucces": "Lineup {green}{0}{default} sauvegardé avec succès !",
+    "matchzy.pm.lineupdeletehint": "Supprime-le avec {green}.delnade {0}{default}, ou choisis-le sous Delete a lineup dans {green}.nades{default}.",
     "matchzy.pm.playersavedlineup": "{lightblue}{0}{default} vient de sauvegarder un lineup ! Code du lineup : {green}{1}{default}",
     "matchzy.pm.lineupdeletesuccess": "Lineup {green}{0}{default} supprimé avec succès.",
     "matchzy.pm.nadesdeleted": "Lineup(s) supprimé(s) : {green}{0}{default}",

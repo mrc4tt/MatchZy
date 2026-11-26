@@ -2,6 +2,14 @@
 
 Based on [MatchZy](https://github.com/shobhit-pathak/MatchZy) by Shobhit Pathak, adapted for CS2 game-server hosting: remote log HTTP API, G5API compatibility, auto changelevel, advanced stats (HLTV 2.0 rating / KAST / clutch / opening duels), a coach system, a pause overhaul, and in-game admin and match-setup menus.
 
+# 1.0.31
+
+#### November 26, 2026
+
+- Practice: saving a lineup (`.savenade`, `.save`) now also says how to delete it: `.delnade <name>`, or **Delete a lineup** in `.nades`. Nothing on screen told a player the delete command.
+- Practice: `.nades` has a **Delete a lineup** entry: it lists your own lineups on the map and deletes the one you pick after a yes/no. Lineups in the shared library are not listed (`.libremove`).
+- Practice: `.delsmoke`, `.deletesmoke`, `.dellineup`, `.deletelineup` and `.delnades` do the same as `.delnade`.
+
 # 1.0.30
 
 #### November 25, 2026
