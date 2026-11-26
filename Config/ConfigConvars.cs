@@ -180,6 +180,8 @@ namespace MatchZy
 
         public FakeConVar<bool> mapConsoleCommandEnabled = new("matchzy_map_console_command_enabled", "Whether MatchZy registers the css_map console command (!map). MatchZy also auto-yields it: if a dedicated map plugin (CS2-SimpleAdmin / CS2MapChange) is installed alongside, css_map is NOT registered even when this is true, avoiding a ConCommand conflict that can block players from connecting. Set false to never register it. The .map chat command stays available regardless. Default: true", true);
 
+        public FakeConVar<bool> commandSuggestions = new("matchzy_command_suggestions", "Whether a mistyped chat command gets a 'did you mean' reply naming the closest MatchZy command (.redy -> .ready). Only near misses are answered. Default: true", true);
+
         public FakeConVar<bool> dotTriggerDedupe = new("matchzy_dot_trigger_dedupe", "Only has an effect when \".\" is listed in PublicChatTrigger/SilentChatTrigger in CounterStrikeSharp's configs/core.json. CSS then already runs css_<command> for a dot message before the chat event fires, so MatchZy skips its own chat dispatch for commands it registers as console commands - otherwise every such command runs twice and prints twice. Set to false to restore the old double-dispatch behaviour. Default: true", true);
 
         /// <summary>

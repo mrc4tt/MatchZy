@@ -196,6 +196,77 @@ namespace MatchZy
         // User command - action map
         public Dictionary<string, Action<CCSPlayerController?, CommandInfo?>>? commandActions;
 
+        // Chat-dispatch words that reach a practice handler which stays silent outside practice
+        // mode. The bare forms that sit in commandActions never get this far.
+        private static readonly HashSet<string> PracticeOnlyArgCommands = new(StringComparer.Ordinal)
+        {
+            ".savenade", ".sn", ".delnade", ".dn", ".deletenade", ".delnades", ".delsmoke", ".deletesmoke",
+            ".dellineup", ".deletelineup", ".importnade", ".listnades", ".lin", ".loadnade", ".ln",
+            ".libadd", ".libremove", ".liblist", ".savebotpos", ".sbp", ".loadbotpos", ".lbp",
+            ".delbotpos", ".dbp", ".savepos", ".loadpos", ".delpos", ".spawn", ".sp", ".ctspawn", ".cts",
+            ".tspawn", ".ts", ".back", ".delay", ".throwindex", ".throwidx",
+        };
+
+        // Chat-dispatch words that are neither a commandActions key nor a css_ console command.
+        // A word handled in EventPlayerChat but missing here would get a "did you mean" reply for
+        // a neighbouring command, so new dot-only argument commands go in this list
+        // (ChatCommandCoverageTests reads this file and fails the build's tests when one is missing).
+        private static readonly string[] DotOnlyArgCommands = { ".cts", ".ts", ".libadd", ".libremove", ".liblist", ".delnades", ".report", ".map" };
+
+        private HashSet<string>? _knownDotCommands;
+
+        // Every dot command MatchZy answers to: commandActions keys, the css_ console commands
+        // (each has a dot twin) and the dot-only argument words. Built on first use, after Load
+        // has filled the first two.
+        private HashSet<string> KnownDotCommands()
+        {
+            if (_knownDotCommands != null)
+                return _knownDotCommands;
+            var known = new HashSet<string>(StringComparer.Ordinal);
+            if (commandActions != null)
+            {
+                foreach (string key in commandActions.Keys)
+                {
+                    int space = key.IndexOf(' ');
+                    known.Add((space > 0 ? key.Substring(0, space) : key).ToLowerInvariant());
+                }
+            }
+            foreach (string css in _ownConsoleCommands)
+            {
+                if (css.StartsWith("css_", StringComparison.OrdinalIgnoreCase) && css.Length > 4)
+                    known.Add("." + css.Substring(4).ToLowerInvariant());
+            }
+            foreach (string word in DotOnlyArgCommands)
+                known.Add(word);
+            foreach (string word in PracticeOnlyArgCommands)
+                known.Add(word);
+            _knownDotCommands = known;
+            return known;
+        }
+
+        // ".redy" -> "Did you mean .ready?". Only for a dot word MatchZy does not know that is a
+        // near miss of exactly one it does (CommandSuggestLogic), so another plugin's commands and
+        // ordinary chat starting with a dot stay unanswered.
+        private void SuggestChatCommand(CCSPlayerController player, string cmdWord)
+        {
+            try
+            {
+                if (!commandSuggestions.Value || cmdWord.Length < 5 || cmdWord[0] != '.')
+                    return;
+                var known = KnownDotCommands();
+                if (known.Contains(cmdWord))
+                    return;
+                string? suggestion = CommandSuggestLogic.Closest(cmdWord, known);
+                if (suggestion == null || !IsPlayerValid(player))
+                    return;
+                PrintToPlayerChat(player, Localizer.ForPlayer(player, "matchzy.cmd.didyoumean", cmdWord, suggestion));
+            }
+            catch (Exception e)
+            {
+                Log($"[SuggestChatCommand] {e.Message}");
+            }
+        }
+
         // SQLite/MySQL Database
         private Database database = new();
 
@@ -1864,6 +1935,14 @@ namespace MatchZy
                     // required"; that is kept as an explicit non-empty argument check.
                     string cmdWord = messageCommand.ToLowerInvariant();
 
+                    // The handlers of these return without a word outside practice mode, so a
+                    // player typing .delnade in warmup saw nothing happen. Say why instead.
+                    if (!isPractice && PracticeOnlyArgCommands.Contains(cmdWord))
+                    {
+                        RequirePractice(player);
+                        return HookResult.Continue;
+                    }
+
                     // Practice extras (.botshoot, .startround, .placebot, .slp, ...): bare and argument forms.
                     if (HandlePracticeExtraChatCommand(player, cmdWord, messageCommandArg))
                         return HookResult.Continue;
@@ -2125,6 +2204,8 @@ namespace MatchZy
                     {
                         HandleThrowIndexCommand(player, messageCommandArg);
                     }
+
+                    SuggestChatCommand(player, cmdWord);
 
                     return HookResult.Continue;
                 }

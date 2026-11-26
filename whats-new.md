@@ -5,8 +5,11 @@ A short summary of each release. The [full changelog](changelog.md) has the deta
 ## 1.0.31 <small>November 26, 2026</small>
 
 - **New:** Practice: `.nades` has a **Delete a lineup** entry that lists your own lineups and deletes the one you pick.
+- **New:** A mistyped chat command gets a "Did you mean .ready?" reply naming the closest command. New setting `matchzy_command_suggestions` (default `true`) turns it off.
 - **New:** Practice: `.delsmoke`, `.deletesmoke`, `.dellineup`, `.deletelineup` and `.delnades` do the same as `.delnade`.
 - **Changed:** Practice: saving a lineup also says how to delete it (`.delnade <name>`).
+- **Changed:** Practice: lineup, bot position and spawn chat commands typed outside practice mode now say that practice mode is not active.
+- **Changed:** Practice: "not found" replies name the command that lists the names (`.listnades`, `.listbp`, `.liststrat`, `.liblist`).
 
 ## 1.0.30 <small>November 25, 2026</small>
 

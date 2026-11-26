@@ -9,6 +9,9 @@ Based on [MatchZy](https://github.com/shobhit-pathak/MatchZy) by Shobhit Pathak,
 - Practice: saving a lineup (`.savenade`, `.save`) now also says how to delete it: `.delnade <name>`, or **Delete a lineup** in `.nades`. Nothing on screen told a player the delete command.
 - Practice: `.nades` has a **Delete a lineup** entry: it lists your own lineups on the map and deletes the one you pick after a yes/no. Lineups in the shared library are not listed (`.libremove`).
 - Practice: `.delsmoke`, `.deletesmoke`, `.dellineup`, `.deletelineup` and `.delnades` do the same as `.delnade`.
+- A mistyped chat command gets a reply naming the closest command: `.redy` answers "Did you mean .ready?". Only near misses of one command are answered (4 letters or more, one or two letters off), so other plugins' dot commands and normal chat get no reply. `matchzy_command_suggestions false` turns it off (default `true`).
+- Practice: the argument forms of the lineup, bot position, saved position, spawn, `.back`, `.delay` and `.throwindex` chat commands (`.delnade x`, `.ln x`, `.spawn 3`, ...) now answer "Practice mode is not active!" outside practice mode. They did nothing and said nothing. That reply also names `.prac` now.
+- Practice: "not found" replies for lineups, bot positions, strategies and the shared library now name the command that lists the names (`.listnades`, `.listbp`, `.liststrat`, `.liblist`).
 
 # 1.0.30
 
